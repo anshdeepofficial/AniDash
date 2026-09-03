@@ -66,21 +66,7 @@ class _TrackingSettingsScreenState
                       .updateSettings((s) => s.copyWith(syncAnilist: val));
                 },
               ),
-              ToggleableSettingsItem(
-                icon: Icon(Iconsax.book, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'MyAnimeList',
-                description: isMalLoggedIn
-                    ? 'Sync progress with MyAnimeList'
-                    : 'Log in to enable MAL sync',
-                value: syncSettings.syncMal && isMalLoggedIn,
-                onChanged: (val) {
-                  if (!isMalLoggedIn) return;
-                  ref
-                      .read(syncSettingsProvider.notifier)
-                      .updateSettings((s) => s.copyWith(syncMal: val));
-                },
-              ),
+
               ToggleableSettingsItem(
                 icon: Icon(Iconsax.mobile, color: colorScheme.primary),
                 accent: colorScheme.primary,

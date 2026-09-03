@@ -10,6 +10,7 @@ import 'package:ani_dash/features/home/view/home_screen.dart' as h_screen;
 import 'package:ani_dash/features/loading/view/loading_screen.dart';
 import 'package:ani_dash/features/loading/view_model/initialization_notifier.dart';
 import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
+import 'package:ani_dash/features/manga/view/manga_screen.dart';
 
 class NavItem {
   final String path;
@@ -25,6 +26,11 @@ final List<NavItem> navItems = [
     path: '/browse',
     icon: Iconsax.discover_1,
     screen: BrowseScreen(),
+  ),
+  const NavItem(
+    path: '/manga',
+    icon: Iconsax.book,
+    screen: MangaScreen(),
   ),
   const NavItem(
     path: '/downloads',
@@ -216,7 +222,7 @@ class _BottomNav extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: width * 0.15),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.08),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(100),
         child: BackdropFilter(

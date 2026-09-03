@@ -22,16 +22,6 @@ class AccountAuthenticationSection extends ConsumerWidget {
           brandColor: const Color(0xFF02A9FF),
           state: state,
         ),
-        const SizedBox(height: 8),
-        _ServiceCard(
-          platform: AuthPlatform.mal,
-          name: 'MyAnimeList',
-          description: 'Work in progress',
-          logoUrl:
-              'https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png',
-          brandColor: const Color(0xFF2E51A2),
-          state: state,
-        ),
       ],
     );
   }

@@ -69,8 +69,9 @@ class SourceNotifier extends _$SourceNotifier {
 
     // Fetch initial data
     fetchSources(ItemType.anime);
+    fetchSources(ItemType.manga);
 
-    for (final type in [ItemType.anime]) {
+    for (final type in [ItemType.anime, ItemType.manga]) {
       List<Source> extensions = [];
       switch (type) {
         case ItemType.anime:

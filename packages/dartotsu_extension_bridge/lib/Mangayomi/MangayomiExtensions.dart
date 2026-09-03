@@ -46,7 +46,28 @@ class MangayomiExtensions extends Extension {
 
           if (match != null) {
             match.itemType = ItemType.anime;
-            print('[EXT_AUTO_INSTALL] Installing default extension: ${match.name} (${match.version})');
+            print('[EXT_AUTO_INSTALL] Installing default anime extension: ${match.name} (${match.version})');
+            await installSource(match);
+          }
+        }
+      }
+
+      // Auto-install default verified Manga extensions
+      final installedManga = getInstalledRx(ItemType.manga).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
+      final availableManga = getAvailableRx(ItemType.manga).value;
+      const targetManga = ['mangadex', 'mangakakalot'];
+
+      for (final target in targetManga) {
+        if (!installedManga.contains(target)) {
+          final match = availableManga.firstWhereOrNull(
+            (s) => s.name?.toLowerCase() == target && (s.lang == 'en' || s.lang == 'all'),
+          ) ?? availableManga.firstWhereOrNull(
+            (s) => s.name?.toLowerCase() == target,
+          );
+
+          if (match != null) {
+            match.itemType = ItemType.manga;
+            print('[EXT_AUTO_INSTALL] Installing default manga extension: ${match.name} (${match.version})');
             await installSource(match);
           }
         }

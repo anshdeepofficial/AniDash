@@ -61,21 +61,7 @@ class _TrackBottomSheetState extends ConsumerState<TrackBottomSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _TrackerListItem(
-              title:
-                  widget.anime.title.english ??
-                  widget.anime.title.romaji ??
-                  'Unknown Title',
-              type: TrackerType.mal,
-              iconUrl:
-                  'https://upload.wikimedia.org/wikipedia/commons/7/7a/MyAnimeList_Logo.png',
-              iconBgColor: const Color(0xFF2E51A2),
-              isBound: hasMal,
-              entry: state.entries[TrackerType.mal],
-              statuses: state.supportedStatuses[TrackerType.mal] ?? [],
-              anime: widget.anime,
-            ),
-            const SizedBox(height: 16),
+
             _TrackerListItem(
               title:
                   widget.anime.title.english ??

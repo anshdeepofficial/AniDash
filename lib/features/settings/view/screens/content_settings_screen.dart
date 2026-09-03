@@ -53,19 +53,7 @@ class ContentSettingsScreen extends ConsumerWidget {
                     .initialize(forceRefresh: true);
               },
             ),
-            ToggleableSettingsItem(
-              title: 'Show Adult Content (MAL)',
-              description: 'Include 18+ content in MyAnimeList results',
-              icon: Icon(Iconsax.danger, color: colorScheme.secondary),
-              accent: colorScheme.secondary,
-              value: settings.showMalAdult,
-              onChanged: (val) {
-                notifier.updateSettings((s) => s.copyWith(showMalAdult: val));
-                ref
-                    .read(homepageProvider.notifier)
-                    .initialize(forceRefresh: true);
-              },
-            ),
+
             ToggleableSettingsItem(
               title: 'Smart Source Persistence',
               description:
