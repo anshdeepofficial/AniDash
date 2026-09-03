@@ -1,0 +1,34 @@
+import 'package:hive_ce/hive.dart';
+import 'package:ani_dash/core/models/universal/universal_news.dart';
+import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
+import 'package:ani_dash/shared/ui/cards/anime/anime_card_mode.dart';
+import 'package:ani_dash/shared/ui/cards/spotlight/spotlight_card_mode.dart';
+import 'package:ani_dash/features/downloads/model/download_item.dart';
+import 'package:ani_dash/features/downloads/model/download_status.dart';
+import 'package:ani_dash/features/home/model/home_page.dart';
+import 'package:ani_dash/core/models/settings/content_settings_model.dart';
+import 'package:ani_dash/core/models/settings/download_settings_model.dart';
+import 'package:ani_dash/core/models/settings/experimental_model.dart';
+import 'package:ani_dash/core/models/settings/player_model.dart';
+import 'package:ani_dash/core/models/settings/subtitle_appearance_model.dart';
+import 'package:ani_dash/core/models/settings/theme_model.dart';
+import 'package:ani_dash/core/models/settings/ui_model.dart';
+
+@GenerateAdapters([
+  AdapterSpec<ThemeModel>(),
+  AdapterSpec<UiSettings>(),
+  AdapterSpec<PlayerModel>(),
+  AdapterSpec<HomePageModel>(),
+  AdapterSpec<AnimeWatchProgressEntry>(),
+  AdapterSpec<EpisodeProgress>(),
+  AdapterSpec<SubtitleAppearanceModel>(),
+  AdapterSpec<ExperimentalFeaturesModel>(),
+  AdapterSpec<DownloadItem>(),
+  AdapterSpec<DownloadStatus>(),
+  AdapterSpec<DownloadSettingsModel>(),
+  AdapterSpec<ContentSettingsModel>(),
+  AdapterSpec<UniversalNews>(),
+  AdapterSpec<AnimeCardMode>(),
+  AdapterSpec<SpotlightCardMode>(),
+])
+part 'hive_adapters.g.dart';

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:label="AniDash Debug"
+        android:icon="@mipmap/ic_launcher"
+        tools:replace="android:label">
+    </application>
+</manifest>

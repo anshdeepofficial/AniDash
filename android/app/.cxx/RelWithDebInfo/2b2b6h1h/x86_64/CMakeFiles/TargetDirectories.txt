@@ -1,0 +1,2 @@
+D:/Downloads/ShonenX/android/app/.cxx/RelWithDebInfo/2b2b6h1h/x86_64/CMakeFiles/edit_cache.dir
+D:/Downloads/ShonenX/android/app/.cxx/RelWithDebInfo/2b2b6h1h/x86_64/CMakeFiles/rebuild_cache.dir

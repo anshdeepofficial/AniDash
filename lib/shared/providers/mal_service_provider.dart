@@ -1,0 +1,31 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ani_dash/core/services/myanimelist/mal_service.dart';
+export 'package:ani_dash/core/services/myanimelist/mal_service.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/content_settings_notifier.dart';
+
+final malServiceProvider = Provider<MyAnimeListService>((ref) {
+  return MyAnimeListService(
+    getAccessToken: () {
+      final authState = ref.read(authProvider);
+      if (!authState.isMalAuthenticated) {
+        AppLogger.w('MAL operation requires a logged-in MAL user.');
+        return null;
+      }
+      final token = authState.malAccessToken;
+      if (token == null || token.isEmpty) {
+        AppLogger.w('Access token is missing for MAL operation.');
+        return null;
+      }
+      return token;
+    },
+    getShowAdult: () {
+      final settings = ref.read(contentSettingsProvider);
+      return settings.showMalAdult;
+    },
+    onTokenRefresh: () async {
+      return await ref.read(authProvider.notifier).refreshMalToken();
+    },
+  );
+});

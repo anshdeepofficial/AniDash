@@ -1,0 +1,34 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ani_dash/core/services/anilist/anilist_service.dart';
+export 'package:ani_dash/core/services/anilist/anilist_service.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/content_settings_notifier.dart';
+
+final anilistServiceProvider = Provider<AnilistService>((ref) {
+  return AnilistService(
+    getAuthContext: () {
+      final authState = ref.read(authProvider);
+
+      if (!authState.isAniListAuthenticated) {
+        AppLogger.w('Anilist operation requires a logged-in Anilist user.');
+        return null;
+      }
+
+      final userId = authState.anilistUser?.id;
+      final accessToken = authState.anilistAccessToken;
+
+      if (userId == null || accessToken == null || accessToken.isEmpty) {
+        AppLogger.w(
+          'Invalid user ID or access token for authenticated operation.',
+        );
+        return null;
+      }
+      return (userId: userId.toString(), accessToken: accessToken);
+    },
+    getAdultParam: () {
+      final settings = ref.read(contentSettingsProvider);
+      return (settings.showAnilistAdult == true) ? null : false;
+    },
+  );
+});
