@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dartotsu_extension_bridge/Models/DEpisode.dart';
-import 'package:dartotsu_extension_bridge/Models/DMedia.dart';
-import 'package:dartotsu_extension_bridge/Models/Source.dart';
+
+
+import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'manga_reader_screen.dart';

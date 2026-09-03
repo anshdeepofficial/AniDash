@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:dartotsu_extension_bridge/Models/DMedia.dart';
-import 'package:dartotsu_extension_bridge/Models/Source.dart';
+
+import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -133,7 +133,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                     return ListTile(
                       leading: const Icon(Iconsax.book),
                       title: Text(src.name ?? 'Unknown'),
-                      subtitle: Text('v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}'),
+                      subtitle: Text('v${src.version ?? '0.0.1'} â€¢ ${src.lang?.toUpperCase() ?? 'EN'}'),
                       trailing: isSelected
                           ? Icon(Icons.check_circle, color: theme.colorScheme.primary)
                           : null,
