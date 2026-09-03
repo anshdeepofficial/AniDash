@@ -2,39 +2,21 @@
 
    <img src="assets/icons/app_icon-modified-2.png" alt="ShonenX Logo" width="120"/>
 
-# ShonenX
+# AniDash
 
-### A Modern AniList & MyAnimeList Client
+### A Modern Anime Streaming & Discovery Client
 
 [![Flutter](https://img.shields.io/badge/Flutter-≥3.8.1-02569B?logo=flutter)](https://flutter.dev/)
 [![Dart](https://img.shields.io/badge/Dart-≥3.8.1-0175C2?logo=dart)](https://dart.dev)
-[![Version](https://img.shields.io/badge/Version-1.7.5-blue)](https://github.com/Darkx-dev/ShonenX/releases)
+[![Version](https://img.shields.io/badge/Version-1.7.5-blue)](https://github.com/anshdeepofficial/AniDash/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-orange.svg)](https://opensource.org/licenses/apache-2-0)
-[![GitHub stars](https://img.shields.io/github/stars/Darkx-dev/ShonenX?style=social)](https://github.com/Darkx-dev/ShonenX/stargazers)
-[![Discord](https://img.shields.io/discord/1348756894034165800?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/uJyXZYSmH4)
+[![GitHub stars](https://img.shields.io/github/stars/anshdeepofficial/AniDash?style=social)](https://github.com/anshdeepofficial/AniDash/stargazers)
 
-Track and manage your anime library with AniList and MyAnimeList integration. Built with Flutter for Android and Windows.
+Track, discover and stream your anime library with AniList, MyAnimeList and Community Extensions. Built with Flutter for Android and Windows.
 
 [Features](#-features) • [Screenshots](#-screenshots) • [Installation](#-installation) • [Contributing](#-contributing)
 
 </div>
-
-## ☕ Supporters
-
-<table>
-  <tr>
-    <td align="center">
-        <img src="https://cdn.buymeacoffee.com/uploads/profile_pictures/default/v2/DEBBB9/IZ.png" width="80px;" />
-        <br />
-        <sub><b>Izan</b></sub>
-    </td>
-    <td align="center">
-        <img src="https://cdn.buymeacoffee.com/uploads/profile_pictures/default/v2/E3CBF4/EK.png" width="80px;" />
-        <br />
-        <sub><b>EVEE KNOA</b></sub>
-    </td>
-  </tr>
-</table>
 
 ---
 
@@ -238,12 +220,11 @@ Apache 2.0 License - see [LICENSE](LICENSE.md) file.
 
 ---
 
-## 📞 Support
+## 📞 Support & Author
 
-**Developer**: Roshan Kumar  
-**GitHub**: [@roshancodespace](https://github.com/roshancodespace)  
-**Email**: roshan.codespace@gmail.com  
-**Discord**: [Join Community](https://discord.gg/uJyXZYSmH4)
+**Developer**: Anshdeep Singh  
+**GitHub**: [@anshdeepofficial](https://github.com/anshdeepofficial)  
+**Repository**: [AniDash](https://github.com/anshdeepofficial/AniDash)
 
 ---
 
@@ -251,6 +232,6 @@ Apache 2.0 License - see [LICENSE](LICENSE.md) file.
 
 ### ⭐ Star this repo if you find it useful!
 
-**Made with ❤️ by [Roshan Kumar](https://github.com/roshancodespace)**
+**Made with ❤️ by [Anshdeep Singh](https://github.com/anshdeepofficial)**
 
 </div>
