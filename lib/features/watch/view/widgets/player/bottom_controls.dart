@@ -425,8 +425,8 @@ class _ToolbarIcon extends StatelessWidget {
         onLongPress: onHold,
         customBorder: const CircleBorder(),
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Icon(icon, color: Colors.white, size: 24),
+          padding: const EdgeInsets.all(6.0),
+          child: Icon(icon, color: Colors.white, size: 22),
         ),
       ),
     );
@@ -459,7 +459,7 @@ class _FlatTextBtn extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(4),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             child: Text(
               text,
               style: TextStyle(
