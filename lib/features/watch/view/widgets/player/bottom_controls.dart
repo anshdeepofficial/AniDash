@@ -174,6 +174,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

@@ -46,13 +46,13 @@ class MangayomiExtensions extends Extension {
 
           if (match != null) {
             match.itemType = ItemType.anime;
-            debugPrint('[EXT_AUTO_INSTALL] Installing default extension: ${match.name} (${match.version})');
+            print('[EXT_AUTO_INSTALL] Installing default extension: ${match.name} (${match.version})');
             await installSource(match);
           }
         }
       }
     } catch (e) {
-      debugPrint('[EXT_AUTO_INSTALL] Error installing defaults: $e');
+      print('[EXT_AUTO_INSTALL] Error installing defaults: $e');
     }
   }
 
