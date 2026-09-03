@@ -254,6 +254,90 @@ class AboutScreen extends StatelessWidget {
                   ],
                 ),
 
+                const SizedBox(height: 24),
+
+                // Sponsor & Donate Section
+                Text(
+                  'Support AniDash',
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'If you enjoy using AniDash and want to support its ongoing development, consider sponsoring or buying me a coffee!',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.8),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        color: const Color(0xFFFFDD00).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          onTap: () => _launchUrl(
+                            'https://buymeacoffee.com/anshdeepofficial',
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Iconsax.coffee, color: Color(0xFFFFDD00), size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Buy Me a Coffee',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        color: const Color(0xFFEA4AAA).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          onTap: () => _launchUrl(
+                            'https://github.com/sponsors/anshdeepofficial',
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Iconsax.heart, color: Color(0xFFEA4AAA), size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'GitHub Sponsor',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 32),
 
                 // Legal Section

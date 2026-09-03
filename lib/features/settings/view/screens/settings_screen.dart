@@ -151,6 +151,26 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () {},
               children: [
                 NormalSettingsItem(
+                  icon: const Icon(Iconsax.coffee, color: Color(0xFFFFDD00)),
+                  accent: const Color(0xFFFFDD00),
+                  title: 'Buy Me a Coffee',
+                  description: 'Support the developer directly',
+                  onTap: () => launchUrl(
+                    Uri.parse('https://buymeacoffee.com/anshdeepofficial'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+                NormalSettingsItem(
+                  icon: const Icon(Iconsax.heart, color: Color(0xFFEA4AAA)),
+                  accent: const Color(0xFFEA4AAA),
+                  title: 'GitHub Sponsors',
+                  description: 'Sponsor the development on GitHub',
+                  onTap: () => launchUrl(
+                    Uri.parse('https://github.com/sponsors/anshdeepofficial'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+                NormalSettingsItem(
                   icon: Icon(Iconsax.info_circle, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'About',

@@ -12,7 +12,14 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-orange.svg)](https://opensource.org/licenses/apache-2-0)
 [![GitHub stars](https://img.shields.io/github/stars/anshdeepofficial/AniDash?style=social)](https://github.com/anshdeepofficial/AniDash/stargazers)
 
-Track, discover and stream your anime library with AniList, MyAnimeList and Community Extensions. Built with Flutter for Android and Windows.
+<br/>
+
+<a href="https://github.com/sponsors/anshdeepofficial"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" height="32" /></a>
+<a href="https://buymeacoffee.com/anshdeepofficial"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="32" /></a>
+
+<br/>
+
+Track, discover, and stream your anime library & read manga with AniList and Community Extensions. Built with Flutter for Android and Windows.
 
 [Features](#-features) • [Screenshots](#-screenshots) • [Installation](#-installation) • [Contributing](#-contributing)
 
