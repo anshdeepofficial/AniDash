@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:install_plugin/install_plugin.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -77,21 +78,48 @@ class UpdateService {
     return false;
   }
 
-  Future<void> downloadAndInstallUpdate(String url) async {
+  Future<void> downloadAndInstallUpdate(
+    String url, {
+    void Function(int receivedBytes, int totalBytes)? onProgress,
+  }) async {
+    final client = http.Client();
     try {
       final tempDir = await getTemporaryDirectory();
       final savePath = '${tempDir.path}/update.apk';
-      
-      final response = await _httpClient.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final file = File(savePath);
-        await file.writeAsBytes(response.bodyBytes);
-        
-        final packageInfo = await PackageInfo.fromPlatform();
+      final file = File(savePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers['User-Agent'] =
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode >= 200 &&
+          streamedResponse.statusCode < 300) {
+        final totalBytes = streamedResponse.contentLength ?? 0;
+        int receivedBytes = 0;
+
+        final sink = file.openWrite();
+        await for (final chunk in streamedResponse.stream) {
+          sink.add(chunk);
+          receivedBytes += chunk.length;
+          onProgress?.call(receivedBytes, totalBytes);
+        }
+
+        await sink.flush();
+        await sink.close();
+
         await InstallPlugin.install(savePath);
+      } else {
+        throw 'HTTP status ${streamedResponse.statusCode}';
       }
     } catch (e) {
       AppLogger.e('Error downloading/installing update: $e');
+      rethrow;
+    } finally {
+      client.close();
     }
   }
 }

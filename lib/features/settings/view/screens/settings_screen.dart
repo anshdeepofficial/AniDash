@@ -100,6 +100,13 @@ class SettingsScreen extends ConsumerWidget {
                   description: 'Manage video player settings',
                   onTap: () => context.push('/settings/player'),
                 ),
+                NormalSettingsItem(
+                  icon: Icon(Iconsax.notification, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Notifications',
+                  description: 'News, episode releases, reminders',
+                  onTap: () => context.push('/settings/notifications'),
+                ),
               ],
             ),
             const SizedBox(height: 10),

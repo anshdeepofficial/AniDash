@@ -19,7 +19,7 @@ class DownloadSettingsModel {
     this.speedLimitKBps = 0,
     this.wifiOnly = false,
     this.rememberDownloadPreferences = false,
-    this.preferredLanguage = 'sub',
+    this.preferredLanguage = 'dub',
     this.preferredQuality = '1080p',
   });
 
@@ -72,7 +72,7 @@ class DownloadSettingsModel {
       wifiOnly: map['wifiOnly'] ?? false,
       rememberDownloadPreferences:
           map['rememberDownloadPreferences'] ?? false,
-      preferredLanguage: map['preferredLanguage'] ?? 'sub',
+      preferredLanguage: map['preferredLanguage'] ?? 'dub',
       preferredQuality: map['preferredQuality'] ?? '1080p',
     );
   }

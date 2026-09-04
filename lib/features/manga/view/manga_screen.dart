@@ -43,7 +43,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
         sourceState.installedMangaExtensions.firstOrNull;
   }
 
-  Future<void> _loadPopularManga([String query = 'One Piece']) async {
+  Future<void> _loadPopularManga([String? query]) async {
     final source = _getActiveMangaSource();
     if (source == null) {
       setState(() {
@@ -59,16 +59,29 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     });
 
     try {
-      final pages = await source.methods.search(query, 1, []).timeout(
-        const Duration(seconds: 15),
-      );
+      dynamic pages;
+      if (query != null && query.trim().isNotEmpty) {
+        pages = await source.methods.search(query.trim(), 1, []).timeout(
+          const Duration(seconds: 15),
+        );
+      } else {
+        try {
+          pages = await source.methods.getPopular(1).timeout(
+            const Duration(seconds: 15),
+          );
+        } catch (_) {
+          pages = await source.methods.getLatestUpdates(1).timeout(
+            const Duration(seconds: 15),
+          );
+        }
+      }
 
       if (mounted) {
         setState(() {
           _mangaList = pages.list;
           _isLoading = false;
           if (_mangaList.isEmpty) {
-            _error = 'No manga found for "$query"';
+            _error = query != null ? 'No manga found for "$query"' : 'No popular manga found';
           }
         });
       }
@@ -88,7 +101,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
       if (query.trim().isNotEmpty) {
         _loadPopularManga(query.trim());
       } else {
-        _loadPopularManga('One Piece');
+        _loadPopularManga();
       }
     });
   }

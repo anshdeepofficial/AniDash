@@ -37,6 +37,7 @@ import 'package:ani_dash/features/settings/view/screens/content_settings_screen.
 import 'package:ani_dash/features/debug/view/debug_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/permissions_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/notification_settings_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
 class AnimatedGoRoute extends GoRoute {
@@ -123,6 +124,26 @@ final routerConfig = GoRouter(
       ),
     ),
     AnimatedGoRoute(
+      path: '/details/:id',
+      contentBuilder: (context, state) {
+        final anime = state.extra is UniversalMedia
+            ? state.extra as UniversalMedia
+            : UniversalMedia(
+                id: state.pathParameters['id']!,
+                title: const UniversalTitle(
+                  english: 'Anime',
+                  romaji: 'Anime',
+                ),
+                coverImage: const UniversalCoverImage(),
+              );
+        return AnimeDetailsScreen(
+          anime: anime,
+          tag: state.uri.queryParameters['tag'] ?? '',
+          forceFetch: true,
+        );
+      },
+    ),
+    AnimatedGoRoute(
       path: '/watch/:id',
       contentBuilder: (context, state) => WatchScreen(
         mediaId: state.pathParameters['id']!,
@@ -179,6 +200,10 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'update',
           contentBuilder: (_, _) => const UpdateScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'notifications',
+          contentBuilder: (_, _) => const NotificationSettingsScreen(),
         ),
         AnimatedGoRoute(
           path: 'watch-history',

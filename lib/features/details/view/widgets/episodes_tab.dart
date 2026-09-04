@@ -28,6 +28,14 @@ import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 
 enum EpisodeViewMode { list, compact, grid, block }
 
+final Map<String, ValueNotifier<Set<int>>> _episodesSelectionStore = {};
+ValueNotifier<Set<int>> _getEpisodesSelectionNotifier(String mediaId) {
+  return _episodesSelectionStore.putIfAbsent(
+    mediaId,
+    () => ValueNotifier<Set<int>>({}),
+  );
+}
+
 class EpisodesTab extends ConsumerStatefulWidget {
   final String mediaId;
   final UniversalTitle mediaTitle;
@@ -51,49 +59,103 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   @override
   bool get wantKeepAlive => true;
 
-  bool _isSelectionMode = false;
-  final Set<int> _selectedEpisodes = {};
+  late final ValueNotifier<Set<int>> _selectionNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectionNotifier = _getEpisodesSelectionNotifier(widget.mediaId);
+    _selectionNotifier.addListener(_onSelectionChanged);
+  }
+
+  @override
+  void dispose() {
+    _selectionNotifier.removeListener(_onSelectionChanged);
+    super.dispose();
+  }
+
+  void _onSelectionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Set<int> get _selectedEpisodes => _selectionNotifier.value;
+  bool get _isSelectionMode => _selectedEpisodes.isNotEmpty;
 
   void _enterSelectionMode(int epNum) {
-    setState(() {
-      _isSelectionMode = true;
-      _selectedEpisodes.add(epNum);
-    });
+    _selectionNotifier.value = {..._selectionNotifier.value, epNum};
   }
 
   void _toggleSelection(int epNum) {
-    setState(() {
-      if (_selectedEpisodes.contains(epNum)) {
-        _selectedEpisodes.remove(epNum);
-        if (_selectedEpisodes.isEmpty) {
-          _isSelectionMode = false;
-        }
-      } else {
-        _selectedEpisodes.add(epNum);
-      }
-    });
+    final s = _selectionNotifier.value;
+    _selectionNotifier.value = s.contains(epNum)
+        ? (Set<int>.from(s)..remove(epNum))
+        : (Set<int>.from(s)..add(epNum));
   }
 
   void _exitSelectionMode() {
-    setState(() {
-      _isSelectionMode = false;
-      _selectedEpisodes.clear();
-    });
+    _selectionNotifier.value = {};
   }
 
   void _toggleSelectAll(List<EpisodeDataModel> visibleEpisodes) {
-    setState(() {
-      final visibleNums = visibleEpisodes
-          .map((e) => e.number)
-          .whereType<int>()
-          .toSet();
-      if (_selectedEpisodes.length >= visibleNums.length) {
-        _selectedEpisodes.clear();
-        _isSelectionMode = false;
-      } else {
-        _selectedEpisodes.addAll(visibleNums);
-      }
-    });
+    final visibleNums =
+        visibleEpisodes.map((e) => e.number).whereType<int>().toSet();
+    final s = _selectionNotifier.value;
+    _selectionNotifier.value =
+        s.length >= visibleNums.length ? {} : visibleNums;
+  }
+
+  Future<void> _markSelectedAsWatched({required bool watched}) async {
+    if (_selectedEpisodes.isEmpty) return;
+
+    final repo = ref.read(watchProgressRepositoryProvider);
+    final animeId = widget.mediaId;
+    final animeTitle = ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
+        widget.mediaTitle.english ??
+        widget.mediaTitle.romaji ??
+        'Anime';
+
+    final currentEntry = repo.getProgress(animeId);
+    final episodesMap = Map<int, EpisodeProgress>.from(currentEntry?.episodesProgress ?? {});
+
+    for (final epNum in _selectedEpisodes) {
+      final existing = episodesMap[epNum];
+      episodesMap[epNum] = EpisodeProgress(
+        episodeNumber: epNum,
+        episodeTitle: existing?.episodeTitle ?? 'Episode $epNum',
+        episodeThumbnail: existing?.episodeThumbnail,
+        progressInSeconds: watched ? (existing?.durationInSeconds ?? 1440) : 0,
+        durationInSeconds: existing?.durationInSeconds ?? 1440,
+        isCompleted: watched,
+        watchedAt: DateTime.now(),
+      );
+    }
+
+    final updatedEntry = (currentEntry ?? AnimeWatchProgressEntry(
+      animeId: animeId,
+      animeTitle: animeTitle,
+      animeCover: widget.mediaCover,
+      animeFormat: widget.mediaFormat,
+      totalEpisodes: _selectedEpisodes.length,
+    )).copyWith(
+      episodesProgress: episodesMap,
+      lastUpdated: DateTime.now(),
+      currentEpisode: _selectedEpisodes.reduce((a, b) => a > b ? a : b),
+    );
+
+    await repo.saveProgress(updatedEntry);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            watched
+                ? 'Marked ${_selectedEpisodes.length} episodes as watched'
+                : 'Marked ${_selectedEpisodes.length} episodes as unwatched',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _handleBatchDownload(
@@ -383,7 +445,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                     tooltip: 'Cancel',
                                   ),
                                   Text(
-                                    '${_selectedEpisodes.length} Selected',
+                                    '${_selectedEpisodes.length}',
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(
                                       fontWeight: FontWeight.bold,
@@ -391,24 +453,40 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                     ),
                                   ),
                                   const Spacer(),
-                                  TextButton.icon(
-                                    onPressed: () =>
-                                        _toggleSelectAll(visibleEpisodes),
-                                    icon: Icon(
-                                      _selectedEpisodes.length >=
-                                                  visibleEpisodes.length &&
-                                              visibleEpisodes.isNotEmpty
-                                          ? Icons.deselect
-                                          : Icons.select_all,
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      _selectedEpisodes.length >=
-                                                  visibleEpisodes.length &&
-                                              visibleEpisodes.isNotEmpty
-                                          ? 'Deselect'
-                                          : 'Select All',
-                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.check_circle_outline),
+                                    tooltip: 'Mark as Watched',
+                                    color: theme.colorScheme.primary,
+                                    onPressed: _selectedEpisodes.isEmpty
+                                        ? null
+                                        : () => _markSelectedAsWatched(watched: true),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert),
+                                    tooltip: 'More actions',
+                                    onSelected: (val) {
+                                      if (val == 'unwatch') {
+                                        _markSelectedAsWatched(watched: false);
+                                      } else if (val == 'select_all') {
+                                        _toggleSelectAll(visibleEpisodes);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'select_all',
+                                        child: Text(
+                                          _selectedEpisodes.length >=
+                                                      visibleEpisodes.length &&
+                                                  visibleEpisodes.isNotEmpty
+                                              ? 'Deselect All'
+                                              : 'Select All',
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'unwatch',
+                                        child: Text('Mark as Unwatched'),
+                                      ),
+                                    ],
                                   ),
                                   FilledButton.icon(
                                     onPressed: _selectedEpisodes.isEmpty
@@ -428,7 +506,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                     style: FilledButton.styleFrom(
                                       visualDensity: VisualDensity.compact,
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
+                                        horizontal: 10,
                                       ),
                                     ),
                                   ),

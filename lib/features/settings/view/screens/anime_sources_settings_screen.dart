@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';

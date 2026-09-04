@@ -15,6 +15,7 @@ import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/core/models/settings/download_settings_model.dart';
 import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/storage_provider.dart';
 
 class DownloadService {
@@ -64,6 +65,7 @@ class DownloadService {
     } else {
       _queue.removeWhere((i) => i.id == item.id);
     }
+    NotificationService().cancelNotification(item.id.hashCode);
     _notifier.updateDownloadState(item.copyWith(state: DownloadStatus.paused));
   }
 
@@ -108,7 +110,22 @@ class DownloadService {
           _ports[item.id] = msg;
         } else if (msg is DownloadItem) {
           _notifier.updateDownloadState(msg);
-          if (msg.state == DownloadStatus.downloaded) _cleanup(item.id);
+          final notifId = item.id.hashCode;
+          if (msg.state == DownloadStatus.downloaded) {
+            NotificationService().showDownloadCompletedNotification(
+              id: notifId,
+              animeTitle: msg.animeTitle,
+              episodeNumber: msg.episodeNumber,
+            );
+            _cleanup(item.id);
+          } else if (msg.state == DownloadStatus.downloading) {
+            NotificationService().showDownloadProgressNotification(
+              id: notifId,
+              animeTitle: msg.animeTitle,
+              episodeNumber: msg.episodeNumber,
+              progress: msg.progress / 100.0,
+            );
+          }
         } else if (msg is String) {
           if (msg.startsWith('err:')) _fail(item, msg.substring(4));
           if (msg.startsWith('log:')) {
@@ -129,6 +146,7 @@ class DownloadService {
 
   void _fail(DownloadItem item, String reason) {
     AppLogger.e(reason);
+    NotificationService().cancelNotification(item.id.hashCode);
     _notifier.updateDownloadState(item.copyWith(state: DownloadStatus.failed));
     _cleanup(item.id);
   }

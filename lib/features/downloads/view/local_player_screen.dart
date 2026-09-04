@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:ani_dash/helpers/ui.dart';
 
 class LocalPlayerScreen extends StatefulWidget {
   final String filePath;
@@ -23,11 +24,16 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    UIHelper.enableImmersiveMode();
+    UIHelper.enableAutoRotate();
     _initializePlayer();
   }
 
   @override
   void dispose() {
+    UIHelper.forcePortrait();
+    UIHelper.exitImmersiveMode();
+    UIHelper.enableAutoRotate();
     player.dispose();
     super.dispose();
   }
@@ -40,17 +46,46 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topBar = [
+      IconButton(
+        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          widget.title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Center(
-        child: Video(
-          controller: controller,
-          controls: MaterialVideoControls,
+      body: MaterialVideoControlsTheme(
+        normal: MaterialVideoControlsThemeData(
+          volumeGesture: true,
+          brightnessGesture: true,
+          seekGesture: true,
+          topButtonBar: topBar,
+        ),
+        fullscreen: MaterialVideoControlsThemeData(
+          volumeGesture: true,
+          brightnessGesture: true,
+          seekGesture: true,
+          topButtonBar: topBar,
+        ),
+        child: Center(
+          child: Video(
+            controller: controller,
+            controls: MaterialVideoControls,
+          ),
         ),
       ),
     );

@@ -342,7 +342,7 @@ class ContinueSection extends ConsumerWidget {
                   title: const Text('View Anime Details'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    context.push('/details/${entry.animeId}');
+                    context.push('/details', extra: entry.toUniversalMedia());
                   },
                 ),
               ],

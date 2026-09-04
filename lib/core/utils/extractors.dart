@@ -55,15 +55,17 @@ List<Map<String, dynamic>> _parseM3U8(String body, String masterUrl) {
     ];
   }
 
-  final lines = body.split('\n');
+  final cleanBody = body.replaceAll('\r', '');
+  final lines = cleanBody.split('\n');
   final extractedQualities = <Map<String, dynamic>>[];
 
   for (int i = 0; i < lines.length; i++) {
     final line = lines[i];
     
     if (line.startsWith('#EXT-X-STREAM-INF')) {
-      final resolutionMatch = RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(line);
-      final nameMatch = RegExp(r'NAME="([^"]+)"').firstMatch(line);
+      final resolutionMatch = RegExp(r'RESOLUTION=\d+x(\d+)', caseSensitive: false).firstMatch(line);
+      final nameMatch = RegExp(r'NAME="?([^",\r\n]+)"?', caseSensitive: false).firstMatch(line);
+      final bandwidthMatch = RegExp(r'BANDWIDTH=(\d+)', caseSensitive: false).firstMatch(line);
       
       String quality = 'Unknown';
 
@@ -71,6 +73,17 @@ List<Map<String, dynamic>> _parseM3U8(String body, String masterUrl) {
         quality = '${resolutionMatch.group(1)}p';
       } else if (nameMatch != null) {
         quality = nameMatch.group(1)!;
+      } else if (bandwidthMatch != null) {
+        final bw = int.tryParse(bandwidthMatch.group(1)!) ?? 0;
+        if (bw >= 4000000) {
+          quality = '1080p';
+        } else if (bw >= 2000000) {
+          quality = '720p';
+        } else if (bw >= 1000000) {
+          quality = '480p';
+        } else {
+          quality = '360p';
+        }
       }
 
       for (int j = i + 1; j < lines.length; j++) {

@@ -361,12 +361,6 @@ class _DownloadSourceSelectorState
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _LanguageChip(
-                    label: 'Japanese (Sub)',
-                    icon: Iconsax.translate,
-                    isSelected: _selectedLanguage == 'sub',
-                    onTap: () => setState(() => _selectedLanguage = 'sub'),
-                  ),
                   if (_hasDub)
                     _LanguageChip(
                       label: 'English (Dub)',
@@ -374,6 +368,12 @@ class _DownloadSourceSelectorState
                       isSelected: _selectedLanguage == 'dub',
                       onTap: () => setState(() => _selectedLanguage = 'dub'),
                     ),
+                  _LanguageChip(
+                    label: 'Japanese (Sub)',
+                    icon: Iconsax.translate,
+                    isSelected: _selectedLanguage == 'sub',
+                    onTap: () => setState(() => _selectedLanguage = 'sub'),
+                  ),
                   if (_hasHindi)
                     _LanguageChip(
                       label: 'Hindi',
