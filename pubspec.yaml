@@ -110,6 +110,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/app_icon-modified-2.png
+    - assets/icons/anidash_logo_dark.png
+    - assets/icons/anidash_logo_light.png
 
 flutter_launcher_icons:
   android: true

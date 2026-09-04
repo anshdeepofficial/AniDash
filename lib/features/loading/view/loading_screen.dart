@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:ani_dash/shared/ui/brand_logo.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
@@ -173,16 +174,7 @@ class _PulsingLogoState extends State<_PulsingLogo>
       child: Center(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: Image.asset(
-            'assets/icons/app_icon-modified-2.png',
-            width: 90,
-            height: 90,
-            errorBuilder: (_, _, _) => Icon(
-              Icons.play_circle_filled,
-              size: 90,
-              color: colorScheme.primaryContainer,
-            ),
-          ),
+          child: BrandLogo(size: 90, borderRadius: BorderRadius.circular(20)),
         ),
       ),
     );
@@ -298,9 +290,10 @@ class _AnimatedProgressBar extends StatelessWidget {
           Text(
             _getStatusText(status),
             style: TextStyle(
-              color: hasError
-                  ? colorScheme.error
-                  : colorScheme.onSurface.withValues(alpha: 0.8),
+              color:
+                  hasError
+                      ? colorScheme.error
+                      : colorScheme.onSurface.withValues(alpha: 0.8),
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),

@@ -100,9 +100,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     videoController = VideoController(
       _player,
       configuration: VideoControllerConfiguration(
-        androidAttachSurfaceAfterVideoParameters: Platform.isAndroid
-            ? true
-            : null,
+        androidAttachSurfaceAfterVideoParameters:
+            Platform.isAndroid ? true : null,
       ),
     );
 
@@ -163,7 +162,26 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     Duration? startAt, {
     Map<String, String>? headers,
   }) async {
-    await _player.open(Media(url, httpHeaders: headers, start: startAt));
+    final effectiveHeaders = <String, String>{
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      ...?headers,
+    };
+    if (effectiveHeaders['Referer']?.isNotEmpty != true) {
+      final uri = Uri.tryParse(url);
+      if (uri != null && uri.scheme.startsWith('http')) {
+        effectiveHeaders['Referer'] = '${uri.scheme}://${uri.host}/';
+      }
+    }
+    try {
+      final platform = _player.platform as dynamic;
+      await platform.setProperty('user-agent', effectiveHeaders['User-Agent']!);
+      await platform.setProperty('referrer', effectiveHeaders['Referer'] ?? '');
+    } catch (_) {}
+    await _player.open(
+      Media(url, httpHeaders: effectiveHeaders, start: startAt),
+      play: true,
+    );
 
     if (startAt == null || startAt == Duration.zero) return;
 

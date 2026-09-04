@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 class UIHelper {
+  static const _orientationChannel = MethodChannel('shonenx/orientation');
   static bool _isFullscreen = false;
   static bool get _isDesktop => !Platform.isAndroid && !Platform.isIOS;
 
@@ -30,7 +31,9 @@ class UIHelper {
 
   /// Force landscape orientation (mobile only)
   static Future<void> forceLandscape() async {
-    if (!_isDesktop) {
+    if (Platform.isAndroid) {
+      await _orientationChannel.invokeMethod('sensorLandscape');
+    } else if (Platform.isIOS) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,

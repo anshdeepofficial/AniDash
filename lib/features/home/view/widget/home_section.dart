@@ -10,11 +10,13 @@ import 'package:ani_dash/helpers/navigation.dart';
 class HomeSectionWidget extends ConsumerWidget {
   final String title;
   final List<UniversalMedia> mediaList;
+  final VoidCallback? onTitleTap;
 
   const HomeSectionWidget({
     super.key,
     required this.title,
     required this.mediaList,
+    this.onTitleTap,
   });
 
   @override
@@ -31,7 +33,16 @@ class HomeSectionWidget extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(title, style: theme.textTheme.titleLarge),
+          child: InkWell(
+            onTap: onTitleTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              children: [
+                Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+                if (onTitleTap != null) const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(

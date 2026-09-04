@@ -82,6 +82,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .fetchEpisodes(
           animeTitle: animeName,
           animeId: animeId,
+          animeCover: animeCover,
           episodes: episodes,
           force: false,
         );
@@ -114,10 +115,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .stream
         .completed
         .listen((completed) {
-      if (completed && !_isDisposed && _dur > 30 && _pos >= _dur - 5) {
-        ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
-      }
-    });
+          if (completed && !_isDisposed && _dur > 30 && _pos >= _dur - 5) {
+            ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+          }
+        });
 
     ref.listen(playerStateProvider, (prev, next) {
       if (_isDisposed) return;

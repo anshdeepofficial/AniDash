@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
@@ -7,7 +8,6 @@ import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
-import 'package:ani_dash/features/downloads/view/downloads_screen.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/core/utils/extractors.dart' as extractor;
@@ -20,8 +20,12 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
   final ServerData? server;
   final Future<BaseSourcesModel?> Function()? fetchSources;
   final ScrollController scrollController;
-  final Future<void> Function(String language, String quality, bool doNotAskAgain)?
-      onConfirmBatchDownload;
+  final Future<void> Function(
+    String language,
+    String quality,
+    bool doNotAskAgain,
+  )?
+  onConfirmBatchDownload;
 
   const DownloadSourceSelector({
     super.key,
@@ -77,7 +81,8 @@ class _DownloadSourceSelectorState
       if (!mounted) return;
 
       if (data != null && data.sources.isNotEmpty) {
-        final hasHindi = data.sources.any(
+        final hasHindi =
+            data.sources.any(
               (s) =>
                   s.quality?.toLowerCase().contains('hindi') == true ||
                   s.url?.toLowerCase().contains('hindi') == true,
@@ -132,7 +137,9 @@ class _DownloadSourceSelectorState
   Future<void> _startDownload() async {
     // 1. Save preferences if remember was checked
     if (_rememberChoice) {
-      ref.read(downloadSettingsProvider.notifier).saveDownloadPreferences(
+      ref
+          .read(downloadSettingsProvider.notifier)
+          .saveDownloadPreferences(
             remember: true,
             language: _selectedLanguage,
             quality: _selectedQuality,
@@ -202,16 +209,21 @@ class _DownloadSourceSelectorState
     }
 
     final ext = isM3U8 ? 'ts' : 'mp4';
-    final sanitizedTitle =
-        widget.animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    final qualityName =
-        _selectedQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final sanitizedTitle = widget.animeTitle.replaceAll(
+      RegExp(r'[\\/:*?"<>|]'),
+      '_',
+    );
+    final qualityName = _selectedQuality.replaceAll(
+      RegExp(r'[\\/:*?"<>|]'),
+      '_',
+    );
     final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
-    final thumb = (widget.episode?.thumbnail != null &&
-            widget.episode!.thumbnail!.isNotEmpty)
-        ? widget.episode!.thumbnail!
-        : (widget.animeCover ?? '');
+    final thumb =
+        (widget.episode?.thumbnail != null &&
+                widget.episode!.thumbnail!.isNotEmpty)
+            ? widget.episode!.thumbnail!
+            : (widget.animeCover ?? '');
 
     final item = DownloadItem(
       animeTitle: widget.animeTitle,
@@ -232,23 +244,32 @@ class _DownloadSourceSelectorState
       },
     );
 
-    ref.read(downloadsProvider.notifier).addDownload(item);
+    await ref.read(downloadsProvider.notifier).addDownload(item);
 
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Download queued for Episode $epNum ($_selectedQuality)',
+          content: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Download queued for Episode $epNum ($_selectedQuality)',
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go('/downloads'),
+                child: const Text('View Downloads'),
+              ),
+            ],
           ),
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
-            label: 'View Downloads',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DownloadsScreen()),
-              );
-            },
+            label: 'Cancel',
+            onPressed:
+                () => ref
+                    .read(downloadsProvider.notifier)
+                    .cancelDownload(item.id),
           ),
         ),
       );
@@ -352,12 +373,19 @@ class _DownloadSourceSelectorState
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: colorScheme.error, size: 20),
+                      Icon(
+                        Icons.error_outline,
+                        color: colorScheme.error,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
-                          style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 13),
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -411,9 +439,10 @@ class _DownloadSourceSelectorState
               _QualityCard(
                 quality: '1080p',
                 title: '1080p (Full HD)',
-                sizeDescription: isBatch
-                    ? '${_formatSize(350)} / ep • ${_formatSize(350 * widget.episodeCount)} Total'
-                    : _formatSize(350),
+                sizeDescription:
+                    isBatch
+                        ? '${_formatSize(350)} / ep • ${_formatSize(350 * widget.episodeCount)} Total'
+                        : _formatSize(350),
                 isSelected: _selectedQuality == '1080p',
                 onTap: () => setState(() => _selectedQuality = '1080p'),
               ),
@@ -421,9 +450,10 @@ class _DownloadSourceSelectorState
               _QualityCard(
                 quality: '720p',
                 title: '720p (High Definition)',
-                sizeDescription: isBatch
-                    ? '${_formatSize(200)} / ep • ${_formatSize(200 * widget.episodeCount)} Total'
-                    : _formatSize(200),
+                sizeDescription:
+                    isBatch
+                        ? '${_formatSize(200)} / ep • ${_formatSize(200 * widget.episodeCount)} Total'
+                        : _formatSize(200),
                 isSelected: _selectedQuality == '720p',
                 onTap: () => setState(() => _selectedQuality = '720p'),
               ),
@@ -431,9 +461,10 @@ class _DownloadSourceSelectorState
               _QualityCard(
                 quality: '480p',
                 title: '480p (Standard)',
-                sizeDescription: isBatch
-                    ? '${_formatSize(100)} / ep • ${_formatSize(100 * widget.episodeCount)} Total'
-                    : _formatSize(100),
+                sizeDescription:
+                    isBatch
+                        ? '${_formatSize(100)} / ep • ${_formatSize(100 * widget.episodeCount)} Total'
+                        : _formatSize(100),
                 isSelected: _selectedQuality == '480p',
                 onTap: () => setState(() => _selectedQuality = '480p'),
               ),
@@ -441,18 +472,23 @@ class _DownloadSourceSelectorState
               _QualityCard(
                 quality: '360p',
                 title: '360p (Data Saver)',
-                sizeDescription: isBatch
-                    ? '${_formatSize(60)} / ep • ${_formatSize(60 * widget.episodeCount)} Total'
-                    : _formatSize(60),
+                sizeDescription:
+                    isBatch
+                        ? '${_formatSize(60)} / ep • ${_formatSize(60 * widget.episodeCount)} Total'
+                        : _formatSize(60),
                 isSelected: _selectedQuality == '360p',
                 onTap: () => setState(() => _selectedQuality = '360p'),
               ),
               const SizedBox(height: 16),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.6,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -487,8 +523,9 @@ class _DownloadSourceSelectorState
                     children: [
                       Checkbox(
                         value: _rememberChoice,
-                        onChanged: (val) =>
-                            setState(() => _rememberChoice = val ?? false),
+                        onChanged:
+                            (val) =>
+                                setState(() => _rememberChoice = val ?? false),
                       ),
                       Expanded(
                         child: Column(
@@ -520,16 +557,17 @@ class _DownloadSourceSelectorState
                 height: 50,
                 child: FilledButton.icon(
                   onPressed: _loading ? null : _startDownload,
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.download_rounded),
+                  icon:
+                      _loading
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Icon(Icons.download_rounded),
                   label: Text(
                     isBatch
                         ? 'Download ${widget.episodeCount} Episodes (${_formatSize(totalSizeMB)})'
@@ -575,13 +613,17 @@ class _LanguageChip extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected
-                ? colorScheme.primaryContainer
-                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            color:
+                isSelected
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
             border: Border.all(
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              color:
+                  isSelected
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
               width: isSelected ? 1.5 : 1,
             ),
             borderRadius: BorderRadius.circular(10),
@@ -592,17 +634,19 @@ class _LanguageChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 18,
-                color: isSelected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
+                color:
+                    isSelected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface,
+                  color:
+                      isSelected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   fontSize: 13,
                 ),
@@ -641,13 +685,15 @@ class _QualityCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer.withValues(alpha: 0.7)
-              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          color:
+              isSelected
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.7)
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
           border: Border.all(
-            color: isSelected
-                ? colorScheme.primary
-                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+            color:
+                isSelected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant.withValues(alpha: 0.3),
             width: isSelected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -658,9 +704,10 @@ class _QualityCard extends StatelessWidget {
               isSelected
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant,
+              color:
+                  isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
               size: 22,
             ),
             const SizedBox(width: 14),
@@ -674,9 +721,10 @@ class _QualityCard extends StatelessWidget {
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.w600,
                       fontSize: 14,
-                      color: isSelected
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurface,
+                      color:
+                          isSelected
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -684,29 +732,33 @@ class _QualityCard extends StatelessWidget {
                     sizeDescription,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isSelected
-                          ? colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
-                          : colorScheme.onSurfaceVariant,
+                      color:
+                          isSelected
+                              ? colorScheme.onPrimaryContainer.withValues(
+                                alpha: 0.8,
+                              )
+                              : colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                color:
+                    isSelected
+                        ? colorScheme.primary
+                        : colorScheme.outlineVariant.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 quality,
                 style: TextStyle(
-                  color: isSelected
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurfaceVariant,
+                  color:
+                      isSelected
+                          ? colorScheme.onPrimary
+                          : colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                 ),

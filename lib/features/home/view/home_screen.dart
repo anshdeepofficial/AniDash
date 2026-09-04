@@ -16,6 +16,8 @@ import 'package:ani_dash/features/home/view_model/homepage_notifier.dart';
 import 'package:ani_dash/features/home/view/widget/header_section.dart';
 import 'package:ani_dash/features/home/view/widget/home_section.dart';
 import 'package:ani_dash/features/home/view/widget/spotlight_section.dart';
+import 'package:ani_dash/features/browse/view/section_screen.dart';
+import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:go_router/go_router.dart';
@@ -53,15 +55,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final oldList = previous?.value ?? [];
         final newList = next.value ?? [];
         final oldUrls = oldList.map((e) => e.url).toSet();
-        final newItems = newList
-            .where((e) => !oldUrls.contains(e.url))
-            .toList();
+        final newItems =
+            newList.where((e) => !oldUrls.contains(e.url)).toList();
 
         if (newItems.isNotEmpty) {
           final count = newItems.length;
-          final message = count == 1
-              ? 'New Article: ${newItems.first.title ?? "Check it out!"}'
-              : '$count New Articles Available!';
+          final message =
+              count == 1
+                  ? 'New Article: ${newItems.first.title ?? "Check it out!"}'
+                  : '$count New Articles Available!';
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -146,14 +148,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 }
 
 //  handles the switching logic so the main build isn't a mess
-class _HomeSectionRenderer extends StatelessWidget {
+class _HomeSectionRenderer extends ConsumerWidget {
   final HomeSection section;
   final HomePage home;
 
   const _HomeSectionRenderer({required this.section, required this.home});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     switch (section.type) {
       case HomeSectionType.spotlight:
         if (home.trendingAnime.data.isEmpty) return const SizedBox.shrink();
@@ -174,6 +176,30 @@ class _HomeSectionRenderer extends StatelessWidget {
           child: HomeSectionWidget(
             title: section.title,
             mediaList: mediaResponse.data,
+            onTitleTap: () {
+              final repo = ref.read(animeRepositoryProvider);
+              final fetcher = switch (section.dataId) {
+                'trending' => repo.getTrendingAnime,
+                'popular' => repo.getPopularAnime,
+                'top_rated' => repo.getTopRatedAnime,
+                'recently_updated' => repo.getRecentlyUpdatedAnime,
+                'upcoming' => repo.getUpcomingAnime,
+                'most_favorite' => repo.getMostFavoriteAnime,
+                _ => null,
+              };
+              if (fetcher != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (_) => SectionScreen(
+                          title: section.title,
+                          fetchItems: fetcher,
+                        ),
+                  ),
+                );
+              }
+            },
           ),
         );
 

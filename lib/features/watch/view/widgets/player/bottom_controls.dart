@@ -9,7 +9,6 @@ import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/helpers/show_subtitle_sidebar.dart';
-import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class BottomControls extends ConsumerStatefulWidget {
@@ -167,20 +166,6 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                             icon: Icons.view_list_rounded,
                             onTap: widget.onEpisodePressed,
                           ),
-                          if (Platform.isAndroid || Platform.isIOS)
-                            _ToolbarIcon(
-                              icon: Icons.screen_rotation_rounded,
-                              onTap: () async {
-                                final orientation = MediaQuery.of(context).orientation;
-                                if (orientation == Orientation.portrait) {
-                                  await UIHelper.forceLandscape();
-                                } else {
-                                  await UIHelper.forcePortrait();
-                                }
-                                await Future.delayed(const Duration(milliseconds: 600));
-                                await UIHelper.enableAutoRotate();
-                              },
-                            ),
                           if (!(Platform.isAndroid || Platform.isIOS))
                             _ToolbarIcon(
                               icon: Icons.fullscreen_rounded,

@@ -12,7 +12,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  static const String _iconName = '@drawable/ic_launcher_foreground';
+  static const String _iconName = '@drawable/ic_notification';
   static const String _largeIconName = '@mipmap/ic_launcher';
   static const Color _brandColor = Color(0xFF4CAF50);
 
@@ -48,10 +48,11 @@ class NotificationService {
   }
 
   Future<void> _createNotificationChannels() async {
-    final androidImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final androidImplementation =
+        flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
 
     const AndroidNotificationChannel newsChannel = AndroidNotificationChannel(
       'AniDash_news_channel',
@@ -62,33 +63,37 @@ class NotificationService {
       enableVibration: true,
     );
 
-    const AndroidNotificationChannel episodeChannel = AndroidNotificationChannel(
-      'AniDash_episodes_channel',
-      'Episode Releases',
-      description: 'Notifications when new Sub or Dub episodes are released',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationChannel episodeChannel =
+        AndroidNotificationChannel(
+          'AniDash_episodes_channel',
+          'Episode Releases',
+          description:
+              'Notifications when new Sub or Dub episodes are released',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        );
 
-    const AndroidNotificationChannel downloadChannel = AndroidNotificationChannel(
-      'AniDash_downloads_channel',
-      'Downloads',
-      description: 'Download progress and completed status',
-      importance: Importance.low,
-      playSound: false,
-      enableVibration: false,
-      showBadge: false,
-    );
+    const AndroidNotificationChannel downloadChannel =
+        AndroidNotificationChannel(
+          'AniDash_downloads_channel',
+          'Downloads',
+          description: 'Download progress and completed status',
+          importance: Importance.low,
+          playSound: false,
+          enableVibration: false,
+          showBadge: false,
+        );
 
-    const AndroidNotificationChannel reminderChannel = AndroidNotificationChannel(
-      'AniDash_reminders_channel',
-      'Continue Watching Reminders',
-      description: 'Reminders to continue watching your paused anime',
-      importance: Importance.defaultImportance,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationChannel reminderChannel =
+        AndroidNotificationChannel(
+          'AniDash_reminders_channel',
+          'Continue Watching Reminders',
+          description: 'Reminders to continue watching your paused anime',
+          importance: Importance.defaultImportance,
+          playSound: true,
+          enableVibration: true,
+        );
 
     await androidImplementation?.createNotificationChannel(newsChannel);
     await androidImplementation?.createNotificationChannel(episodeChannel);
@@ -201,7 +206,8 @@ class NotificationService {
         AndroidNotificationDetails(
           'AniDash_episodes_channel',
           'Episode Releases',
-          channelDescription: 'Notifications when new Sub or Dub episodes are released',
+          channelDescription:
+              'Notifications when new Sub or Dub episodes are released',
           importance: Importance.high,
           priority: Priority.high,
           icon: _iconName,
@@ -230,7 +236,8 @@ class NotificationService {
         AndroidNotificationDetails(
           'AniDash_reminders_channel',
           'Continue Watching Reminders',
-          channelDescription: 'Reminders to continue watching your paused anime',
+          channelDescription:
+              'Reminders to continue watching your paused anime',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           icon: _iconName,

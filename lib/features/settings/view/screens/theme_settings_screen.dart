@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
+import 'package:ani_dash/shared/ui/brand_logo.dart';
 
 class ThemeSettingsScreen extends ConsumerWidget {
   const ThemeSettingsScreen({super.key});
@@ -38,23 +39,35 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 title: 'Appearance',
                 titleColor: colorScheme.primary,
                 children: [
+                  NormalSettingsItem(
+                    leading: BrandLogo(
+                      size: 36,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    title: 'Adaptive App Logo',
+                    description:
+                        'Black on light themes and white on dark themes',
+                    trailingWidgets: const [Icon(Icons.check_circle_rounded)],
+                  ),
                   SegmentedToggleSettingsItem<dynamic>(
                     accent: colorScheme.primary,
                     iconColor: colorScheme.primary,
                     title: 'Theme Mode',
                     description: 'Choose your preferred theme',
-                    selectedValue: theme.themeMode == 'light'
-                        ? 1
-                        : theme.themeMode == 'dark'
-                        ? 2
-                        : 0,
+                    selectedValue:
+                        theme.themeMode == 'light'
+                            ? 1
+                            : theme.themeMode == 'dark'
+                            ? 2
+                            : 0,
                     onValueChanged: (value) {
                       final index = value as int;
-                      final newMode = index == 0
-                          ? 'system'
-                          : index == 1
-                          ? 'light'
-                          : 'dark';
+                      final newMode =
+                          index == 0
+                              ? 'system'
+                              : index == 1
+                              ? 'light'
+                              : 'dark';
                       themeNotifier.updateSettings(
                         (prev) => prev.copyWith(themeMode: newMode),
                       );
@@ -82,8 +95,9 @@ class ThemeSettingsScreen extends ConsumerWidget {
                     accent: colorScheme.primary,
                     title: 'Color Scheme',
                     description: _formatSchemeName(theme.flexScheme ?? ''),
-                    onTap: () =>
-                        _showColorSchemeSheet(context, ref, themeNotifier),
+                    onTap:
+                        () =>
+                            _showColorSchemeSheet(context, ref, themeNotifier),
                   ),
                   if (theme.themeMode == 'dark' ||
                       (theme.themeMode == 'system' && isCurrentlyDark))
@@ -192,9 +206,10 @@ class ThemeSettingsScreen extends ConsumerWidget {
             );
 
             final isDark = Theme.of(context).brightness == Brightness.dark;
-            final previewScheme = isDark
-                ? FlexThemeData.dark(scheme: currentScheme).colorScheme
-                : FlexThemeData.light(scheme: currentScheme).colorScheme;
+            final previewScheme =
+                isDark
+                    ? FlexThemeData.dark(scheme: currentScheme).colorScheme
+                    : FlexThemeData.light(scheme: currentScheme).colorScheme;
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (scrollController.hasClients && scrollController.offset == 0) {
@@ -263,12 +278,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
                           },
                           leading: _buildListIcon(scheme),
                           title: Text(_formatSchemeName(scheme.name)),
-                          trailing: isSelected
-                              ? Icon(
-                                  Iconsax.tick_circle,
-                                  color: Theme.of(context).colorScheme.primary,
-                                )
-                              : null,
+                          trailing:
+                              isSelected
+                                  ? Icon(
+                                    Iconsax.tick_circle,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  )
+                                  : null,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -400,9 +417,10 @@ class ThemeSettingsScreen extends ConsumerWidget {
         )
         .split(' ')
         .map(
-          (word) => word.isNotEmpty
-              ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
-              : word,
+          (word) =>
+              word.isNotEmpty
+                  ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
+                  : word,
         )
         .join(' ');
   }

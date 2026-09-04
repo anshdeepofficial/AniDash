@@ -10,6 +10,7 @@ import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Source;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -20,7 +21,6 @@ import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
-import 'package:ani_dash/features/downloads/view/downloads_screen.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
@@ -158,17 +158,22 @@ class EpisodeData extends _$EpisodeData {
 
     // 1. Try to find the matching server with the target dub status
     ServerData? alt = state.servers.firstWhereOrNull(
-      (s) => s.isDub == targetIsDub && (s.id == current?.id || s.name == current?.name),
+      (s) =>
+          s.isDub == targetIsDub &&
+          (s.id == current?.id || s.name == current?.name),
     );
     // 2. Otherwise find any server with the target dub status
     alt ??= state.servers.firstWhereOrNull((s) => s.isDub == targetIsDub);
 
     // 3. If no server in list has target dub status, synthesize or toggle the current one
-    alt ??= (current != null)
-        ? current.copyWith(isDub: targetIsDub)
-        : ServerData(id: 'default', name: 'Default', isDub: targetIsDub);
+    alt ??=
+        (current != null)
+            ? current.copyWith(isDub: targetIsDub)
+            : ServerData(id: 'default', name: 'Default', isDub: targetIsDub);
 
-    AppLogger.i('Toggling Dub/Sub to: ${targetIsDub ? "DUB" : "SUB"} on server: ${alt.name ?? alt.id}');
+    AppLogger.i(
+      'Toggling Dub/Sub to: ${targetIsDub ? "DUB" : "SUB"} on server: ${alt.name ?? alt.id}',
+    );
     await changeServer(alt);
   }
 
@@ -271,9 +276,10 @@ class EpisodeData extends _$EpisodeData {
           AppLogger.warning('No servers available for download');
           return _showSnack(context, "No servers found");
         }
-        selected = servers.length == 1
-            ? servers.first
-            : await _showServerSheet(context, servers);
+        selected =
+            servers.length == 1
+                ? servers.first
+                : await _showServerSheet(context, servers);
       }
 
       if (selected == null || !context.mounted) return;
@@ -282,21 +288,23 @@ class EpisodeData extends _$EpisodeData {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (c) => DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (c, controller) => DownloadSourceSelector(
-            animeTitle: _epList.animeTitle ?? 'Unknown',
-            animeCover: _epList.animeCover,
-            episode: ep,
-            episodeCount: 1,
-            server: selected,
-            fetchSources: () => _fetchSourceData(ep, server: selected),
-            scrollController: controller,
-          ),
-        ),
+        builder:
+            (c) => DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder:
+                  (c, controller) => DownloadSourceSelector(
+                    animeTitle: _epList.animeTitle ?? 'Unknown',
+                    animeCover: _epList.animeCover,
+                    episode: ep,
+                    episodeCount: 1,
+                    server: selected,
+                    fetchSources: () => _fetchSourceData(ep, server: selected),
+                    scrollController: controller,
+                  ),
+            ),
       );
     } finally {
       link.close();
@@ -319,7 +327,10 @@ class EpisodeData extends _$EpisodeData {
       Navigator.pop(context);
 
       if (data == null || data.sources.isEmpty) {
-        return _showSnack(context, "No download sources available for Ep $epNum");
+        return _showSnack(
+          context,
+          "No download sources available for Ep $epNum",
+        );
       }
 
       Source? matchedSource;
@@ -367,15 +378,18 @@ class EpisodeData extends _$EpisodeData {
       }
 
       final ext = isM3U8 ? 'ts' : 'mp4';
-      final sanitizedTitle =
-          animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final sanitizedTitle = animeTitle.replaceAll(
+        RegExp(r'[\\/:*?"<>|]'),
+        '_',
+      );
       final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
       final animeCover = _epList.animeCover ?? '';
-      final thumb = (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
-          ? ep.thumbnail!
-          : animeCover;
+      final thumb =
+          (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
+              ? ep.thumbnail!
+              : animeCover;
 
       final item = DownloadItem(
         animeTitle: animeTitle,
@@ -396,12 +410,13 @@ class EpisodeData extends _$EpisodeData {
         },
       );
 
-      ref.read(downloadsProvider.notifier).addDownload(item);
+      await ref.read(downloadsProvider.notifier).addDownload(item);
       if (context.mounted) {
         _showSnack(
           context,
           "Download queued for Ep $epNum ($quality)",
           showDownloadsAction: true,
+          downloadId: item.id,
         );
       }
     } catch (e) {
@@ -417,10 +432,11 @@ class EpisodeData extends _$EpisodeData {
     String? preferredLanguage,
     String? preferredQuality,
   }) async {
-    final epModels = _epList.episodes
-        .where((e) => e.number != null && epNums.contains(e.number))
-        .toList()
-      ..sort((a, b) => (a.number ?? 0).compareTo(b.number ?? 0));
+    final epModels =
+        _epList.episodes
+            .where((e) => e.number != null && epNums.contains(e.number))
+            .toList()
+          ..sort((a, b) => (a.number ?? 0).compareTo(b.number ?? 0));
 
     if (epModels.isEmpty) return;
 
@@ -463,11 +479,7 @@ class EpisodeData extends _$EpisodeData {
         if (isM3U8) {
           try {
             final extracted = await extractor
-                .extractQualities(
-                  source.url!,
-                  source.headers ?? {},
-                  true,
-                )
+                .extractQualities(source.url!, source.headers ?? {}, true)
                 .timeout(const Duration(seconds: 5));
 
             final target = extracted.firstWhereOrNull(
@@ -486,14 +498,17 @@ class EpisodeData extends _$EpisodeData {
           RegExp(r'[\\/:*?"<>|]'),
           '_',
         );
-        final qualityName =
-            targetQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        final qualityName = targetQuality.replaceAll(
+          RegExp(r'[\\/:*?"<>|]'),
+          '_',
+        );
         final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
         final animeCover = _epList.animeCover ?? '';
-        final thumb = (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
-            ? ep.thumbnail!
-            : animeCover;
+        final thumb =
+            (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
+                ? ep.thumbnail!
+                : animeCover;
 
         final item = DownloadItem(
           animeTitle: animeTitle,
@@ -514,7 +529,7 @@ class EpisodeData extends _$EpisodeData {
           },
         );
 
-        ref.read(downloadsProvider.notifier).addDownload(item);
+        await ref.read(downloadsProvider.notifier).addDownload(item);
         queuedCount++;
       } catch (e) {
         AppLogger.e('Error batch downloading Ep ${ep.number}', e);
@@ -527,18 +542,13 @@ class EpisodeData extends _$EpisodeData {
           content: Text(
             'Queued $queuedCount of ${epModels.length} episodes ($targetLang, $targetQuality)',
           ),
-          backgroundColor: queuedCount > 0
-              ? Colors.green.shade700
-              : Colors.red.shade700,
+          backgroundColor:
+              queuedCount > 0 ? Colors.green.shade700 : Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'View Downloads',
             textColor: Colors.white,
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DownloadsScreen()),
-              );
-            },
+            onPressed: () => context.go('/downloads'),
           ),
         ),
       );
@@ -578,7 +588,7 @@ class EpisodeData extends _$EpisodeData {
       final ep = _epList.episodes.firstWhereOrNull((e) => e.number == epNum);
       if (ep == null) return;
 
-      var list = await _getRawServers(ep);
+      var list = await _getRawServers(ep).timeout(const Duration(seconds: 15));
       if (list.isEmpty) {
         list = [
           ServerData(name: "Default", id: "default", isDub: false),
@@ -588,10 +598,7 @@ class EpisodeData extends _$EpisodeData {
         final hasDub = list.any((s) => s.isDub);
         final hasSub = list.any((s) => !s.isDub);
         if (!hasDub && hasSub) {
-          list = [
-            ...list,
-            ...list.map((s) => s.copyWith(isDub: true)),
-          ];
+          list = [...list, ...list.map((s) => s.copyWith(isDub: true))];
         }
       }
 
@@ -620,35 +627,30 @@ class EpisodeData extends _$EpisodeData {
       clearError: true,
     );
 
-    final epModel = _epList.getEpisode(epNum);
-    if (epModel == null) return;
-
-    final data = await _fetchSourceData(epModel, server: state.selectedServer);
-
-    if (data == null || data.sources.isEmpty) {
-      AppLogger.fail('No extractable sources found');
+    try {
+      final epModel = _epList.getEpisode(epNum);
+      if (epModel == null) throw StateError('Episode $epNum was not found');
+      final data = await _fetchSourceData(
+        epModel,
+        server: state.selectedServer,
+      ).timeout(const Duration(seconds: 20));
+      if (data == null || data.sources.isEmpty) {
+        throw StateError('No playable sources found');
+      }
       state = state.copyWith(
-        removeState: EpisodeStreamState.SOURCE_LOADING,
-        error: 'No sources found',
+        sources: data.sources,
+        subtitles: [Subtitle(lang: 'None'), ...data.tracks],
+        headers: data.headers?.cast<String, String>(),
       );
-      return;
+      await _loadSourceStream(0, startAt: startAt);
+    } catch (e, stack) {
+      AppLogger.e('Episode playback failed', e, stack);
+      state = state.copyWith(
+        error: 'Unable to play episode. Try another server.',
+      );
+    } finally {
+      state = state.copyWith(removeState: EpisodeStreamState.SOURCE_LOADING);
     }
-
-    state = state.copyWith(
-      sources: data.sources,
-      subtitles: [
-        Subtitle(lang: 'None'),
-        ...data.tracks,
-      ],
-      headers: data.headers?.cast<String, String>(),
-    );
-
-    AppLogger.success(
-      'Extracted ${data.sources.length} sources and ${data.tracks.length} subtitles',
-    );
-    await _loadSourceStream(0, startAt: startAt);
-
-    state = state.copyWith(removeState: EpisodeStreamState.SOURCE_LOADING);
   }
 
   Future<void> _loadSourceStream(
@@ -659,124 +661,142 @@ class EpisodeData extends _$EpisodeData {
 
     state = state.copyWith(addState: EpisodeStreamState.QUALITY_LOADING);
 
-    // Build quality options from ALL available sources
-    final allQualities = <Map<String, dynamic>>[];
+    try {
+      // Build quality options from ALL available sources
+      final allQualities = <Map<String, dynamic>>[];
 
-    // Check if the primary source is M3U8 (master playlist with multiple qualities)
-    final primarySrc = state.sources[sourceIdx];
-    if (primarySrc.isM3U8) {
-      // M3U8 master playlist — extract qualities from the playlist itself
-      final extracted = await _getQualities(primarySrc, state.headers);
-      allQualities.addAll(extracted);
-    } else {
-      // Non-M3U8 sources: each Source object IS a quality variant
-      // Aggregate all sources that share the same dub/sub type
-      for (final src in state.sources) {
-        if (src.url != null && src.url!.isNotEmpty) {
-          allQualities.add({
-            'quality': src.quality ?? 'Default',
-            'url': src.url,
-          });
+      // Check if the primary source is M3U8 (master playlist with multiple qualities)
+      final primarySrc = state.sources[sourceIdx];
+      if (primarySrc.isM3U8) {
+        // M3U8 master playlist — extract qualities from the playlist itself
+        final extracted = await _getQualities(
+          primarySrc,
+          state.headers,
+        ).timeout(const Duration(seconds: 12));
+        allQualities.addAll(extracted);
+      } else {
+        // Non-M3U8 sources: each Source object IS a quality variant
+        // Aggregate all sources that share the same dub/sub type
+        for (final src in state.sources) {
+          if (src.url != null && src.url!.isNotEmpty) {
+            allQualities.add({
+              'quality': src.quality ?? 'Default',
+              'url': src.url,
+            });
+          }
         }
+
+        // Deduplicate by URL
+        final seen = <String>{};
+        allQualities.retainWhere((q) {
+          final url = q['url'] as String?;
+          if (url == null || seen.contains(url)) return false;
+          seen.add(url);
+          return true;
+        });
+
+        // Sort: highest resolution first (e.g. 1080p > 720p > 480p)
+        allQualities.sort((a, b) {
+          final aVal =
+              int.tryParse(
+                (a['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+              ) ??
+              0;
+          final bVal =
+              int.tryParse(
+                (b['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+              ) ??
+              0;
+          return bVal.compareTo(aVal);
+        });
       }
 
-      // Deduplicate by URL
-      final seen = <String>{};
-      allQualities.retainWhere((q) {
-        final url = q['url'] as String?;
-        if (url == null || seen.contains(url)) return false;
-        seen.add(url);
-        return true;
-      });
+      if (allQualities.isEmpty) {
+        // Fallback: just use the primary source
+        allQualities.add({
+          'quality': primarySrc.quality ?? 'Default',
+          'url': primarySrc.url,
+        });
+      }
 
-      // Sort: highest resolution first (e.g. 1080p > 720p > 480p)
-      allQualities.sort((a, b) {
-        final aVal = int.tryParse(
-              (a['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
-            ) ??
-            0;
-        final bVal = int.tryParse(
-              (b['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
-            ) ??
-            0;
-        return bVal.compareTo(aVal);
-      });
-    }
-
-    if (allQualities.isEmpty) {
-      // Fallback: just use the primary source
-      allQualities.add({
-        'quality': primarySrc.quality ?? 'Default',
-        'url': primarySrc.url,
-      });
-    }
-
-    // Pick best match for preferred quality
-    final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
-    int qIdx = allQualities.indexWhere(
-      (q) => (q['quality'] as String).contains(prefQuality),
-    );
-    if (qIdx == -1) qIdx = 0;
-
-    AppLogger.d(
-      'Opening stream: ${allQualities[qIdx]['quality']} '
-      '(${allQualities.length} quality options available)',
-    );
-    final streamHeaders = {
-      ...?state.headers,
-      ...?primarySrc.headers,
-    };
-
-    _player.open(
-      allQualities[qIdx]['url'] as String,
-      startAt,
-      headers: streamHeaders,
-    );
-
-    final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
-    if (!isDub) {
-      final engIdx = state.subtitles.indexWhere(
-        (s) => s.lang?.toLowerCase().contains('eng') ?? false,
+      // Pick best match for preferred quality
+      final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
+      int qIdx = allQualities.indexWhere(
+        (q) => (q['quality'] as String).contains(prefQuality),
       );
-      if (engIdx != -1) changeSubtitle(engIdx);
-    }
+      if (qIdx == -1) qIdx = 0;
 
-    state = state.copyWith(
-      qualityOptions: allQualities,
-      selectedSourceIdx: sourceIdx,
-      selectedQualityIdx: qIdx,
-      removeState: EpisodeStreamState.QUALITY_LOADING,
-    );
+      AppLogger.d(
+        'Opening stream: ${allQualities[qIdx]['quality']} '
+        '(${allQualities.length} quality options available)',
+      );
+      final streamHeaders = {...?state.headers, ...?primarySrc.headers};
+
+      await _player
+          .open(
+            allQualities[qIdx]['url'] as String,
+            startAt,
+            headers: streamHeaders,
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
+      if (!isDub) {
+        final engIdx = state.subtitles.indexWhere(
+          (s) => s.lang?.toLowerCase().contains('eng') ?? false,
+        );
+        if (engIdx != -1) changeSubtitle(engIdx);
+      }
+
+      state = state.copyWith(
+        qualityOptions: allQualities,
+        selectedSourceIdx: sourceIdx,
+        selectedQualityIdx: qIdx,
+      );
+    } finally {
+      state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
+    }
   }
 
   Future<BaseSourcesModel?> _fetchSourceData(
     EpisodeDataModel ep, {
     ServerData? server,
   }) async {
-    AppLogger.d('Fetching source data via ${server?.name ?? "Extension"} (${server?.isDub == true ? "DUB" : "SUB"})');
-    final epTargetUrl = (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
+    AppLogger.d(
+      'Fetching source data via ${server?.name ?? "Extension"} (${server?.isDub == true ? "DUB" : "SUB"})',
+    );
+    final epTargetUrl =
+        (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
     if (_exp.useExtensions && epTargetUrl != null && epTargetUrl.isNotEmpty) {
       try {
         final res = await _srcNotifier.getSources(
           DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
         );
         final isDubRequested = server?.isDub == true;
-        final extractedHeaders = res.firstWhereOrNull((v) => v?.headers != null && v!.headers!.isNotEmpty)?.headers ??
+        final extractedHeaders =
+            res
+                .firstWhereOrNull(
+                  (v) => v?.headers != null && v!.headers!.isNotEmpty,
+                )
+                ?.headers ??
             res.firstOrNull?.headers;
 
-        var sources = res
-            .where((s) => s != null && s.url.isNotEmpty)
-            .map((s) {
+        var sources =
+            res.where((s) => s != null && s.url.isNotEmpty).map((s) {
               final item = s!;
               final title = item.title?.trim() ?? '';
               final quality = item.quality.trim();
-              final cleanQ = title.isEmpty
-                  ? (quality.isEmpty ? 'Default' : quality)
-                  : (quality.isEmpty || title == quality || title.contains(quality))
+              final cleanQ =
+                  title.isEmpty
+                      ? (quality.isEmpty ? 'Default' : quality)
+                      : (quality.isEmpty ||
+                          title == quality ||
+                          title.contains(quality))
                       ? title
                       : (quality.contains(title) ? quality : '$title $quality');
 
-              final isDubSource = item.url.toLowerCase().contains('dub') ||
+              final isDubSource =
+                  item.url.toLowerCase().contains('dub') ||
                   item.title?.toLowerCase().contains('dub') == true ||
                   item.quality.toLowerCase().contains('dub');
 
@@ -787,8 +807,7 @@ class EpisodeData extends _$EpisodeData {
                 headers: item.headers ?? extractedHeaders,
                 isDub: isDubSource,
               );
-            })
-            .toList();
+            }).toList();
 
         if (isDubRequested) {
           final dubSources = sources.where((s) => s.isDub).toList();
@@ -808,7 +827,7 @@ class EpisodeData extends _$EpisodeData {
                   String label = t.label?.trim() ?? 'Unknown';
                   final baseKey = label.toLowerCase();
                   langCount[baseKey] = (langCount[baseKey] ?? 0) + 1;
-                  
+
                   // If there are duplicate languages, disambiguate
                   if (langCount[baseKey]! > 1) {
                     if (t.file!.toLowerCase().contains('sign') ||
@@ -819,7 +838,9 @@ class EpisodeData extends _$EpisodeData {
                     }
                   }
 
-                  allTracks.add(Subtitle(url: t.file, lang: label, isSub: true));
+                  allTracks.add(
+                    Subtitle(url: t.file, lang: label, isSub: true),
+                  );
                 }
               }
             }
@@ -832,7 +853,9 @@ class EpisodeData extends _$EpisodeData {
           );
         }
       } catch (err) {
-        AppLogger.e('Extension source fetch failed, trying legacy provider: $err');
+        AppLogger.e(
+          'Extension source fetch failed, trying legacy provider: $err',
+        );
       }
     }
 
@@ -881,20 +904,35 @@ class EpisodeData extends _$EpisodeData {
     BuildContext context,
     String msg, {
     bool showDownloadsAction = false,
+    String? downloadId,
   }) => ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(msg),
+      content:
+          showDownloadsAction
+              ? Row(
+                children: [
+                  Expanded(child: Text(msg)),
+                  TextButton(
+                    onPressed: () => context.go('/downloads'),
+                    child: const Text('View Downloads'),
+                  ),
+                ],
+              )
+              : Text(msg),
       behavior: SnackBarBehavior.floating,
-      action: showDownloadsAction
-          ? SnackBarAction(
-              label: 'View Downloads',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DownloadsScreen()),
-                );
-              },
-            )
-          : null,
+      action:
+          showDownloadsAction
+              ? SnackBarAction(
+                label: downloadId == null ? 'View Downloads' : 'Cancel',
+                onPressed:
+                    () =>
+                        downloadId == null
+                            ? context.go('/downloads')
+                            : ref
+                                .read(downloadsProvider.notifier)
+                                .cancelDownload(downloadId),
+              )
+              : null,
     ),
   );
 
@@ -937,14 +975,14 @@ class EpisodeData extends _$EpisodeData {
                         s.id ?? 'unknown',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: s.name?.isNotEmpty == true
-                          ? Text(s.name!)
-                          : null,
+                      subtitle:
+                          s.name?.isNotEmpty == true ? Text(s.name!) : null,
                       trailing: Badge(
                         label: Text(s.isDub ? 'DUB' : 'SUB'),
-                        backgroundColor: s.isDub
-                            ? theme.colorScheme.secondary
-                            : theme.colorScheme.primary,
+                        backgroundColor:
+                            s.isDub
+                                ? theme.colorScheme.secondary
+                                : theme.colorScheme.primary,
                       ),
                       onTap: () => Navigator.pop(context, s),
                     );

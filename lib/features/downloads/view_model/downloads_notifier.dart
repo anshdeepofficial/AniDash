@@ -126,11 +126,15 @@ class DownloadsNotifier extends _$DownloadsNotifier {
         });
   }
 
+  void cancelDownload(String id) {
+    final item = state.downloads.where((d) => d.id == id).firstOrNull;
+    if (item != null) deleteDownload(item);
+  }
+
   void removeDownload(DownloadItem item) {
     state = state.copyWith(
-      downloads: state.downloads
-          .where((d) => d.filePath != item.filePath)
-          .toList(),
+      downloads:
+          state.downloads.where((d) => d.filePath != item.filePath).toList(),
     );
   }
 
@@ -141,9 +145,10 @@ class DownloadsNotifier extends _$DownloadsNotifier {
     );
 
     state = state.copyWith(
-      downloads: state.downloads
-          .map((d) => d.filePath == item.filePath ? item : d)
-          .toList(),
+      downloads:
+          state.downloads
+              .map((d) => d.filePath == item.filePath ? item : d)
+              .toList(),
     );
     _repository.saveDownload(item);
   }
