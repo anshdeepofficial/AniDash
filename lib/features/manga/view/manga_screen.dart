@@ -100,6 +100,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -107,7 +108,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
         final theme = Theme.of(ctx);
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.fromLTRB(0, 16, 0, 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

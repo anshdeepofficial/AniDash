@@ -80,5 +80,8 @@ List<Map<String, dynamic>> _parseM3U8(String body, String masterUrl) {
     return bVal.compareTo(aVal);
   });
 
-  return extractedQualities;
+  return [
+    {'quality': 'Auto', 'url': masterUrl},
+    ...extractedQualities,
+  ];
 }

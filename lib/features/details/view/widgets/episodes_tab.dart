@@ -544,6 +544,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: theme.scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
@@ -814,6 +815,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final repo = ref.read(watchProgressRepositoryProvider);
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       builder: (sheetContext) {
         return SafeArea(

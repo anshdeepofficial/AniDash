@@ -36,6 +36,7 @@ import 'package:ani_dash/features/settings/view/screens/tracking_settings_screen
 import 'package:ani_dash/features/settings/view/screens/content_settings_screen.dart';
 import 'package:ani_dash/features/debug/view/debug_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/permissions_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
 class AnimatedGoRoute extends GoRoute {
@@ -174,6 +175,10 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'about',
           contentBuilder: (_, _) => const AboutScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'update',
+          contentBuilder: (_, _) => const UpdateScreen(),
         ),
         AnimatedGoRoute(
           path: 'watch-history',

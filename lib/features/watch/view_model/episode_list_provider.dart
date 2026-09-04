@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:collection/collection.dart';
@@ -221,19 +221,53 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       final malId = matches.first.result.malId;
       
       AppLogger.d('Fetching MAL episode data for ID: $malId');
-      final jikanEpisodes = await _jikan.getEpisodes(malId, 1);
+      final allJikanEpisodes = <JikanEpisode>[];
+      int page = 1;
+      final totalNeeded = state.episodes.length;
 
-      if (jikanEpisodes.isEmpty) return;
+      while (allJikanEpisodes.length < totalNeeded) {
+        final jikanEpisodes = await _jikan.getEpisodes(malId, page);
+        if (jikanEpisodes.isEmpty) break;
+        allJikanEpisodes.addAll(jikanEpisodes);
+        if (jikanEpisodes.length < 100) break; // Last page
+        page++;
+        if (page > 15) break; // Safety cap ~1500 episodes
+      }
+
+      if (allJikanEpisodes.isEmpty) return;
+
+      // Create a lookup by malId (episode number in Jikan)
+      final titleByEpNum = <int, String>{};
+      for (final jEp in allJikanEpisodes) {
+        if (jEp.title.isNotEmpty && !jEp.title.toLowerCase().startsWith('episode ')) {
+          titleByEpNum[jEp.malId] = jEp.title;
+        } else if (jEp.title.isNotEmpty) {
+          titleByEpNum[jEp.malId] = jEp.title;
+        }
+      }
 
       // Create a mutable copy of the list to update titles
       final updated = List<EpisodeDataModel>.of(state.episodes);
-      final count = updated.length.clamp(0, jikanEpisodes.length);
+      int syncedCount = 0;
 
-      for (var i = 0; i < count; i++) {
-        updated[i] = updated[i].copyWith(title: jikanEpisodes[i].title);
+      for (var i = 0; i < updated.length; i++) {
+        final epNum = updated[i].number ?? (i + 1);
+        final syncedTitle = titleByEpNum[epNum];
+        if (syncedTitle != null && syncedTitle.isNotEmpty) {
+          // If extension already gave a real title (not just "Episode X"), keep it or enrich it
+          final currentTitle = updated[i].title ?? '';
+          final isGeneric = currentTitle.isEmpty ||
+              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
+                  .hasMatch(currentTitle.trim());
+
+          if (isGeneric) {
+            updated[i] = updated[i].copyWith(title: 'EP $epNum - $syncedTitle');
+            syncedCount++;
+          }
+        }
       }
 
-      AppLogger.success('Successfully synced $count episode titles from Jikan');
+      AppLogger.success('Successfully synced $syncedCount episode titles from Jikan');
       state = state.copyWith(episodes: updated);
       
     } catch (e, st) {

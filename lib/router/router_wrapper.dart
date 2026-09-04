@@ -24,7 +24,7 @@ final List<NavItem> navItems = [
   const NavItem(path: '/', icon: Iconsax.home, screen: h_screen.HomeScreen()),
   const NavItem(
     path: '/browse',
-    icon: Iconsax.discover_1,
+    icon: Iconsax.search_normal_1,
     screen: BrowseScreen(),
   ),
   const NavItem(

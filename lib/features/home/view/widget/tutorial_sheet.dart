@@ -1,13 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 void showTutorialSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => const TutorialSheet(),
+    builder: (context) => const SafeArea(child: TutorialSheet()),
   );
 }
 
@@ -77,7 +78,7 @@ class _TutorialSheetState extends State<TutorialSheet> {
         color: theme.colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
       child: Column(
         children: [
           Row(

@@ -179,7 +179,7 @@ class MangayomiExtensionManager extends GetxController {
         ..sourceCode = req.body
         ..headers = jsonEncode(headers);
 
-      await isar.writeTxnSync(() async => isar.mSources.putSync(s));
+      isar.writeTxnSync(() => isar.mSources.putSync(s));
     } catch (e) {
       debugPrint("Error installing source: $e");
       return Future.error(e);
@@ -189,8 +189,8 @@ class MangayomiExtensionManager extends GetxController {
   Future<void> uninstallSource(Source source) async {
     try {
       var mSource = await getInstalled(source.itemType!, source.id);
-      await isar.writeTxnSync(
-        () async => isar.mSources.deleteSync(mSource.id!),
+      isar.writeTxnSync(
+        () => isar.mSources.deleteSync(mSource.id!),
       );
     } catch (e) {
       debugPrint("Error uninstalling source: $e");
@@ -211,7 +211,7 @@ class MangayomiExtensionManager extends GetxController {
         ..version = source.version
         ..headers = jsonEncode(headers);
 
-      await isar.writeTxnSync(() async => isar.mSources.putSync(s));
+      isar.writeTxnSync(() => isar.mSources.putSync(s));
     } catch (e) {
       debugPrint("Error updating source: $e");
       return Future.error(e);

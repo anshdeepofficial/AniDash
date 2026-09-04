@@ -27,11 +27,13 @@ import 'package:window_manager/window_manager.dart';
 
 class AniDashVideoPlayer extends ConsumerStatefulWidget {
   final VoidCallback? onEpisodesPressed;
+  final VoidCallback? onPanelCloseRequest;
   final ScreenshotController? screenshotController;
 
   const AniDashVideoPlayer({
     super.key,
     this.onEpisodesPressed,
+    this.onPanelCloseRequest,
     this.screenshotController,
   });
 
@@ -383,7 +385,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               // Gesture Layer (Background)
               Positioned.fill(
                 child: PlayerGestureHandler(
-                  onTap: () => uiController.toggleVisibility(),
+                  onTap: () {
+                    widget.onPanelCloseRequest?.call();
+                    uiController.toggleVisibility();
+                  },
                   onDoubleTap: _onDoubleTap,
                   onLongPressStart: _onLongPressStart,
                   onLongPressUpdate: _onLongPressUpdate,

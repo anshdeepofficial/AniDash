@@ -20,6 +20,7 @@ part 'watch_controller.g.dart';
 
 @riverpod
 class WatchController extends _$WatchController with WidgetsBindingObserver {
+  StreamSubscription<bool>? _completedSubscription;
   int? _lastAniSkipEpisode;
   bool _isDisposed = false;
   bool _isPlayerReady = false;
@@ -39,6 +40,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
     ref.onDispose(() {
       _isDisposed = true;
+      _completedSubscription?.cancel();
       WidgetsBinding.instance.removeObserver(this);
       _triggerSave();
     });
@@ -104,6 +106,19 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     String animeName,
     List<EpisodeDataModel> episodes,
   ) {
+    _completedSubscription?.cancel();
+    _completedSubscription = ref
+        .read(playerStateProvider.notifier)
+        .videoController
+        .player
+        .stream
+        .completed
+        .listen((completed) {
+      if (completed && !_isDisposed) {
+        ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+      }
+    });
+
     ref.listen(playerStateProvider, (prev, next) {
       if (_isDisposed) return;
 

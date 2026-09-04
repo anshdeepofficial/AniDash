@@ -95,6 +95,18 @@ class AboutScreen extends StatelessWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.push('/settings/update'),
+                  icon: const Icon(Iconsax.refresh, size: 18),
+                  label: const Text('Check for Updates'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

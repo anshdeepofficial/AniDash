@@ -8,6 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
@@ -58,15 +59,30 @@ class ContinueSection extends ConsumerWidget {
             itemBuilder: (context, index) {
               final entry = validEntries[index];
               final currentEp = entry.episodesProgress[entry.currentEpisode];
+              
+              // If current episode is completed (or watched > 85%), show next episode
+              final isCurrentCompleted = currentEp?.isCompleted == true ||
+                  ((currentEp?.durationInSeconds ?? 0) > 0 &&
+                      ((currentEp?.progressInSeconds ?? 0) /
+                              currentEp!.durationInSeconds!) >=
+                          0.85);
+
+              final nextEpisodeNum = isCurrentCompleted &&
+                      (entry.totalEpisodes == 0 ||
+                          entry.currentEpisode < entry.totalEpisodes)
+                  ? entry.currentEpisode + 1
+                  : entry.currentEpisode;
+
+              final displayEp = entry.episodesProgress[nextEpisodeNum] ?? currentEp;
 
               double progressValue = 0.0;
-              if (currentEp != null) {
+              if (!isCurrentCompleted && currentEp != null) {
                 final p = currentEp.progressInSeconds?.toDouble() ?? 0.0;
                 final d = currentEp.durationInSeconds?.toDouble() ?? 0.0;
                 if (d > 0) progressValue = (p / d).clamp(0.0, 1.0);
               }
 
-              final thumb = currentEp?.episodeThumbnail;
+              final thumb = displayEp?.episodeThumbnail ?? currentEp?.episodeThumbnail;
               Widget imageWidget;
 
               if (thumb != null && thumb.startsWith('http')) {
@@ -103,6 +119,15 @@ class ContinueSection extends ConsumerWidget {
                       width: itemWidth,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
+                        onLongPress: () {
+                          _showContinueWatchingMenu(
+                            context,
+                            ref,
+                            entry,
+                            currentEp,
+                            colorScheme,
+                          );
+                        },
                         onTap: () async {
                           if (isLoading) return;
                           setState(() => isLoading = true);
@@ -121,7 +146,7 @@ class ContinueSection extends ConsumerWidget {
                                 medium: entry.animeCover,
                               ),
                             ),
-                            startAt: entry.currentEpisode,
+                            startAt: nextEpisodeNum,
                             withAnimeMatch: true,
                           );
                           if (context.mounted) {
@@ -176,7 +201,7 @@ class ContinueSection extends ConsumerWidget {
                                           ),
                                         ),
                                         child: Text(
-                                          'EP ${currentEp?.episodeNumber ?? entry.currentEpisode}',
+                                          'EP $nextEpisodeNum',
                                           style: TextStyle(
                                             color:
                                                 colorScheme.onPrimaryContainer,
@@ -215,7 +240,13 @@ class ContinueSection extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              currentEp?.episodeTitle ?? 'Continue Watching',
+                              isCurrentCompleted
+                                  ? (displayEp?.episodeTitle.isNotEmpty == true
+                                      ? displayEp!.episodeTitle
+                                      : 'Episode $nextEpisodeNum')
+                                  : (currentEp?.episodeTitle.isNotEmpty == true
+                                      ? currentEp!.episodeTitle
+                                      : 'Continue Watching'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodySmall?.copyWith(
@@ -235,6 +266,90 @@ class ContinueSection extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  void _showContinueWatchingMenu(
+    BuildContext context,
+    WidgetRef ref,
+    AnimeWatchProgressEntry entry,
+    EpisodeProgress? currentEp,
+    ColorScheme colorScheme,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.dividerColor.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  entry.animeTitle,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (currentEp != null)
+                  Text(
+                    currentEp.episodeTitle.isNotEmpty
+                        ? currentEp.episodeTitle
+                        : 'EP ${currentEp.episodeNumber}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const Divider(height: 24),
+                ListTile(
+                  leading: Icon(
+                    Iconsax.close_circle,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: const Text('Remove from Continue Watching'),
+                  subtitle: const Text('Clears your watch progress'),
+                  onTap: () {
+                    ref
+                        .read(watchProgressRepositoryProvider)
+                        .deleteProgress(entry.animeId);
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Iconsax.info_circle,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('View Anime Details'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.push('/details/${entry.animeId}');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

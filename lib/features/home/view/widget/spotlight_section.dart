@@ -74,11 +74,7 @@ class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
             );
           },
         ),
-        _DotIndicator(
-          length: trendingAnimes.length,
-          currentIndex: _currentIndex,
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
       ],
     );
   }

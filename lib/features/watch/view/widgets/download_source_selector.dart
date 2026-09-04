@@ -39,6 +39,7 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
   final Map<int, List<Map<String, dynamic>>> _extractedCache = {};
   final Set<int> _extractingIndices = {};
   int? _expandedIndex;
+  String _filter = 'All';
 
   @override
   void initState() {
@@ -138,8 +139,10 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
       final notifier = providerContext.read(downloadsProvider.notifier);
       final epNum = widget.episode.number ?? 0;
 
-      final ext = isM3U8 ? '.ts' : '.mp4';
-      final fileName = 'video$ext';
+      final ext = isM3U8 ? 'ts' : 'mp4';
+      final sanitizedTitle = widget.animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
       final item = DownloadItem(
         animeTitle: widget.animeTitle,
@@ -192,7 +195,15 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
               TextButton(onPressed: _init, child: Text("Retry")),
             ],
           ),
@@ -205,32 +216,59 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(
-            'Select Source',
-            style: Theme.of(context).textTheme.titleMedium,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select Source',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Row(
+                children: ['All', 'Sub', 'Dub'].map((type) => Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: FilterChip(
+                    label: Text(type),
+                    selected: _filter == type,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _filter = type);
+                    },
+                    padding: EdgeInsets.zero,
+                  ),
+                )).toList(),
+              ),
+            ],
           ),
         ),
         const Divider(height: 1),
         Expanded(
-          child: ListView.separated(
-            controller: widget.scrollController,
-            itemCount: _sources.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final source = _sources[index];
-              final isExpanded = _expandedIndex == index;
-              final cachedQualities = _extractedCache[index] ?? [];
-              final isExtracting = _extractingIndices.contains(index);
+          child: () {
+            final filteredSources = _sources.where((s) {
+              if (_filter == 'All') return true;
+              if (_filter == 'Sub') return !s.isDub;
+              if (_filter == 'Dub') return s.isDub;
+              return true;
+            }).toList();
 
-              return Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  maintainState: true,
-                  initiallyExpanded: isExpanded,
-                  onExpansionChanged: (val) => _expandSource(index, source),
-                  title: Row(
+            return ListView.separated(
+              controller: widget.scrollController,
+              itemCount: filteredSources.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final source = filteredSources[index];
+                  final originalIndex = _sources.indexOf(source);
+                  final isExpanded = _expandedIndex == originalIndex;
+                  final cachedQualities = _extractedCache[originalIndex] ?? [];
+                  final isExtracting = _extractingIndices.contains(originalIndex);
+
+                  return Theme(
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      maintainState: true,
+                      initiallyExpanded: isExpanded,
+                      onExpansionChanged: (val) => _expandSource(originalIndex, source),
+                      title: Row(
                     children: [
                       Text(
                         source.quality ?? 'Source ${index + 1}',
@@ -318,9 +356,10 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
                 ),
               );
             },
-          ),
-        ),
-      ],
-    );
+          );
+        }(),
+      ),
+    ],
+  );
   }
 }

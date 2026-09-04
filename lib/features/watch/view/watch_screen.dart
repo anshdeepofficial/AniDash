@@ -161,6 +161,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         builder: (_, orientation) {
           final player = AniDashVideoPlayer(
             onEpisodesPressed: _togglePanel,
+            onPanelCloseRequest: () => _panelController.reverse(),
             screenshotController: _screenshotController,
           );
 

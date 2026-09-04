@@ -46,11 +46,15 @@ class ControlsOverlay extends ConsumerWidget {
   }
 
   Widget _lockBtn() {
-    return Center(
-      child: IconButton(
-        onPressed: onLockPressed,
-        icon: const Icon(Icons.lock_open, size: 32, color: Colors.white),
-        style: IconButton.styleFrom(backgroundColor: Colors.black54),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 24),
+        child: IconButton(
+          onPressed: onLockPressed,
+          icon: const Icon(Icons.lock_open, size: 32, color: Colors.white),
+          style: IconButton.styleFrom(backgroundColor: Colors.black54),
+        ),
       ),
     );
   }

@@ -18,9 +18,6 @@ import 'package:ani_dash/features/home/view/widget/home_section.dart';
 import 'package:ani_dash/features/home/view/widget/spotlight_section.dart';
 import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
-import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
-import 'package:ani_dash/features/home/view/widget/search_model.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -105,8 +102,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final layout = ref.watch(homeLayoutProvider);
     final sections = layout.where((s) => s.enabled).toList();
 
-    final useNewUI = ref.watch(experimentalProvider.select((s) => s.newUI));
-
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () => ref.read(homepageProvider.notifier).fetchHomePage(),
@@ -143,16 +138,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 );
               },
             ),
-            if (useNewUI)
-              Positioned(
-                bottom: 100,
-                right: 30,
-                child: FloatingActionButton(
-                  heroTag: 'search_fab',
-                  onPressed: () => showSearchModal(context, 'search_fab'),
-                  child: const Icon(Iconsax.search_normal),
-                ),
-              ),
           ],
         ),
       ),

@@ -206,7 +206,7 @@ abstract class BaseSettingsItem extends StatelessWidget {
                 fontSize: dimensions.descriptionFontSize,
               ),
               overflow: TextOverflow.ellipsis,
-              maxLines: (effectiveCompact || isVertical) ? 2 : 3,
+              maxLines: (effectiveCompact || isVertical) ? 3 : 3,
             ),
           ],
         ],

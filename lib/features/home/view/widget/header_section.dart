@@ -8,7 +8,6 @@ import 'package:ani_dash/core/services/auth_provider_enum.dart';
 import 'package:ani_dash/core/models/auth/user.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/features/home/view/widget/search_model.dart';
-import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/core/utils/greeting_methods.dart';
 
@@ -120,8 +119,6 @@ class _DiscoverCard extends StatelessWidget {
           _buildLeadingIcon(theme),
           const SizedBox(width: 16),
           const Expanded(child: _DiscoverTextContent()),
-          const _NewsActionBadge(),
-          const SizedBox(width: 8),
           Icon(
             Iconsax.arrow_right_3,
             color: theme.colorScheme.primary,
@@ -180,25 +177,9 @@ class _NewsActionBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final newsCount = ref.watch(
-      newsProvider.select(
-        (state) => state.value?.where((n) => !n.isRead).length ?? 0,
-      ),
-    );
-
-    return IconButton(
-      onPressed: () => context.push('/news'),
-      icon: Badge(
-        isLabelVisible: newsCount > 0,
-        label: Text(
-          '$newsCount',
-          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-        ),
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: const Icon(Iconsax.document_text),
-      ),
-      tooltip: 'Latest News',
+    return _ActionButton(
+      icon: Iconsax.document_text,
+      onTap: () => context.push('/news'),
     );
   }
 }
@@ -315,15 +296,11 @@ class ActionPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!isDesktop) ...[
+            const _NewsActionBadge(),
+            const SizedBox(width: 8),
             _ActionButton(
               icon: Icons.help_outline,
               onTap: () => showTutorialSheet(context),
-            ),
-            const SizedBox(width: 8),
-            _ActionButton(
-              icon: Iconsax.search_normal,
-              onTap: () => showSearchModal(context, 'search_fab'),
-              heroTag: 'search_fab',
             ),
             const SizedBox(width: 8),
           ],
@@ -338,19 +315,17 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String? route;
   final VoidCallback? onTap;
-  final String? heroTag;
 
   const _ActionButton({
     required this.icon,
     this.route,
     this.onTap,
-    this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final button = Material(
+    return Material(
       color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -366,14 +341,6 @@ class _ActionButton extends StatelessWidget {
         ),
       ),
     );
-
-    if (heroTag != null) {
-      return Hero(
-        tag: heroTag!,
-        child: Material(type: MaterialType.transparency, child: button),
-      );
-    }
-    return button;
   }
 }
 

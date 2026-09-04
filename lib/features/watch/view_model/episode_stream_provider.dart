@@ -404,29 +404,78 @@ class EpisodeData extends _$EpisodeData {
   }) async {
     if (sourceIdx < 0 || sourceIdx >= state.sources.length) return;
 
-    final src = state.sources[sourceIdx];
     state = state.copyWith(addState: EpisodeStreamState.QUALITY_LOADING);
 
-    final qualities = await _getQualities(src, state.headers);
-    if (qualities.isEmpty) {
-      state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
-      return;
+    // Build quality options from ALL available sources
+    final allQualities = <Map<String, dynamic>>[];
+
+    // Check if the primary source is M3U8 (master playlist with multiple qualities)
+    final primarySrc = state.sources[sourceIdx];
+    if (primarySrc.isM3U8) {
+      // M3U8 master playlist — extract qualities from the playlist itself
+      final extracted = await _getQualities(primarySrc, state.headers);
+      allQualities.addAll(extracted);
+    } else {
+      // Non-M3U8 sources: each Source object IS a quality variant
+      // Aggregate all sources that share the same dub/sub type
+      for (final src in state.sources) {
+        if (src.url != null && src.url!.isNotEmpty) {
+          allQualities.add({
+            'quality': src.quality ?? 'Default',
+            'url': src.url,
+          });
+        }
+      }
+
+      // Deduplicate by URL
+      final seen = <String>{};
+      allQualities.retainWhere((q) {
+        final url = q['url'] as String?;
+        if (url == null || seen.contains(url)) return false;
+        seen.add(url);
+        return true;
+      });
+
+      // Sort: highest resolution first (e.g. 1080p > 720p > 480p)
+      allQualities.sort((a, b) {
+        final aVal = int.tryParse(
+              (a['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+            ) ??
+            0;
+        final bVal = int.tryParse(
+              (b['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+            ) ??
+            0;
+        return bVal.compareTo(aVal);
+      });
     }
 
+    if (allQualities.isEmpty) {
+      // Fallback: just use the primary source
+      allQualities.add({
+        'quality': primarySrc.quality ?? 'Default',
+        'url': primarySrc.url,
+      });
+    }
+
+    // Pick best match for preferred quality
     final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
-    int qIdx = qualities.indexWhere(
+    int qIdx = allQualities.indexWhere(
       (q) => (q['quality'] as String).contains(prefQuality),
     );
     if (qIdx == -1) qIdx = 0;
 
-    AppLogger.d('Opening stream: ${qualities[qIdx]['quality']}');
+    AppLogger.d(
+      'Opening stream: ${allQualities[qIdx]['quality']} '
+      '(${allQualities.length} quality options available)',
+    );
     _player.open(
-      qualities[qIdx]['url'] as String,
+      allQualities[qIdx]['url'] as String,
       startAt,
       headers: state.headers,
     );
 
-    final isDub = state.selectedServer?.isDub == true || src.isDub;
+    final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
     if (!isDub) {
       final engIdx = state.subtitles.indexWhere(
         (s) => s.lang?.toLowerCase().contains('eng') ?? false,
@@ -435,7 +484,7 @@ class EpisodeData extends _$EpisodeData {
     }
 
     state = state.copyWith(
-      qualityOptions: qualities,
+      qualityOptions: allQualities,
       selectedSourceIdx: sourceIdx,
       selectedQualityIdx: qIdx,
       removeState: EpisodeStreamState.QUALITY_LOADING,
@@ -475,11 +524,29 @@ class EpisodeData extends _$EpisodeData {
           res.firstOrNull?.headers;
 
       final allTracks = <Subtitle>[];
+      final seenUrls = <String>{};
+      final langCount = <String, int>{};
+
       for (final v in res) {
         if (v?.subtitles != null) {
           for (final t in v!.subtitles!) {
-            if (!allTracks.any((existing) => existing.url == t.file)) {
-              allTracks.add(Subtitle(url: t.file, lang: t.label, isSub: true));
+            if (t.file != null && !seenUrls.contains(t.file)) {
+              seenUrls.add(t.file!);
+              String label = t.label?.trim() ?? 'Unknown';
+              final baseKey = label.toLowerCase();
+              langCount[baseKey] = (langCount[baseKey] ?? 0) + 1;
+              
+              // If there are duplicate languages, disambiguate
+              if (langCount[baseKey]! > 1) {
+                if (t.file!.toLowerCase().contains('sign') ||
+                    label.toLowerCase().contains('sign')) {
+                  label = '$label (Signs & Songs)';
+                } else {
+                  label = '$label (Track ${langCount[baseKey]})';
+                }
+              }
+
+              allTracks.add(Subtitle(url: t.file, lang: label, isSub: true));
             }
           }
         }

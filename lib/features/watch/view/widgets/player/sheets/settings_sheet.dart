@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
-import 'package:ani_dash/helpers/show_subtitle_sidebar.dart';
 
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
@@ -34,12 +33,6 @@ class SettingsSheetContent extends ConsumerWidget {
         ? streamData.qualityOptions[streamData.selectedQualityIdx!]['quality']
             ?.toString()
         : 'Auto';
-
-    final hasSubtitles = streamData.selectedSubtitleIdx != 0;
-    final currentSubLang = hasSubtitles &&
-            streamData.selectedSubtitleIdx < streamData.subtitles.length
-        ? streamData.subtitles[streamData.selectedSubtitleIdx].lang ?? 'On'
-        : 'Off';
 
     final isDub = streamData.selectedServer?.isDub == true;
 
@@ -92,23 +85,6 @@ class SettingsSheetContent extends ConsumerWidget {
                 },
               ),
               ListTile(
-                leading: Icon(
-                  hasSubtitles ? Icons.closed_caption_rounded : Icons.closed_caption_off_rounded,
-                ),
-                title: const Text("Subtitles"),
-                trailing: Text(currentSubLang),
-                onTap: () {
-                  if (hasSubtitles) {
-                    streamNotifier.changeSubtitle(0);
-                  } else if (streamData.subtitles.length > 1) {
-                    final engIdx = streamData.subtitles.indexWhere(
-                      (s) => s.lang?.toLowerCase().contains('eng') ?? false,
-                    );
-                    streamNotifier.changeSubtitle(engIdx != -1 ? engIdx : 1);
-                  }
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.record_voice_over_rounded),
                 title: const Text("Audio Track"),
                 trailing: Text(isDub ? 'DUB' : 'SUB'),
@@ -143,14 +119,6 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 onTap: () =>
                     _showDialog(context, builder: (ctx) => const FitDialog()),
-              ),
-              ListTile(
-                leading: const Icon(Icons.subtitles_rounded),
-                title: const Text("Subtitle Customization"),
-                onTap: () {
-                  Navigator.pop(context);
-                  showSubtitleSettings(context);
-                },
               ),
             ],
           ),
