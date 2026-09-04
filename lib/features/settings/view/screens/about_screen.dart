@@ -391,7 +391,7 @@ class AboutScreen extends StatelessWidget {
                 // Footer
                 Center(
                   child: Text(
-                    'Made with ❤️ by Anshdeep\n© 2025 AniDash',
+                    'Made with ❤️ by Anshdeep\n© 2026 AniDash',
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.6),

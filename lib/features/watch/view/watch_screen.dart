@@ -83,7 +83,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   Future<void> _setupSystemUI() async {
     await Future.wait([
-      UIHelper.hideNavigationBarOnly(),
+      UIHelper.enableImmersiveMode(),
       UIHelper.forceLandscape(),
     ]);
   }

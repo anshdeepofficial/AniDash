@@ -57,6 +57,11 @@ class UIHelper {
   /// Force portrait orientation (mobile only)
   static Future<void> forcePortrait() async {
     if (Platform.isAndroid) {
+      try {
+        await _orientationChannel.invokeMethod('portrait');
+      } on PlatformException {
+        // Fall through to Flutter's orientation API.
+      }
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);

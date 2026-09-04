@@ -7,7 +7,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/features/browse/view/browse_screen.dart';
 import 'package:ani_dash/features/downloads/view/downloads_screen.dart';
 import 'package:ani_dash/features/home/view/home_screen.dart' as h_screen;
-import 'package:ani_dash/features/loading/view/loading_screen.dart';
 import 'package:ani_dash/features/loading/view_model/initialization_notifier.dart';
 import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
 import 'package:ani_dash/features/manga/view/manga_screen.dart';
@@ -27,11 +26,7 @@ final List<NavItem> navItems = [
     icon: Iconsax.search_normal_1,
     screen: BrowseScreen(),
   ),
-  const NavItem(
-    path: '/manga',
-    icon: Iconsax.book,
-    screen: MangaScreen(),
-  ),
+  const NavItem(path: '/manga', icon: Iconsax.book, screen: MangaScreen()),
   const NavItem(
     path: '/downloads',
     icon: Iconsax.receive_square,
@@ -64,6 +59,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
   @override
   void initState() {
     super.initState();
+    Future.microtask(
+      () => ref.read(initializationProvider.notifier).initialize(),
+    );
     _pageController = PageController(
       initialPage: widget.navigationShell.currentIndex,
     );
@@ -95,9 +93,6 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(initializationProvider).status;
-    if (status != InitializationStatus.success) return const LoadingScreen();
-
     final isWide = MediaQuery.sizeOf(context).width > 800;
 
     return PopScope(
@@ -120,20 +115,21 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
               controller: _pageController,
               onPageChanged: _onPageChanged,
               physics: const BouncingScrollPhysics(),
-              children: widget.children.map((child) {
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    isWide ? 90 : 0,
-                    isWide ? 15 : 0,
-                    0,
-                    isWide ? 15 : 0,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: _KeepAliveWrapper(child: child),
-                  ),
-                );
-              }).toList(),
+              children:
+                  widget.children.map((child) {
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        isWide ? 90 : 0,
+                        isWide ? 15 : 0,
+                        0,
+                        isWide ? 15 : 0,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: _KeepAliveWrapper(child: child),
+                      ),
+                    );
+                  }).toList(),
             ),
             Positioned(
               left: isWide ? 10 : 0,
@@ -141,9 +137,10 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
               top: isWide ? 10 : null,
               bottom: 10,
               child: SafeArea(
-                child: isWide
-                    ? _SideNav(shell: widget.navigationShell)
-                    : _BottomNav(shell: widget.navigationShell),
+                child:
+                    isWide
+                        ? _SideNav(shell: widget.navigationShell)
+                        : _BottomNav(shell: widget.navigationShell),
               ),
             ),
           ],
@@ -189,16 +186,18 @@ class _SideNav extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
-                    color: isSelected
-                        ? colorScheme.primary.withValues(alpha: 0.2)
-                        : null,
+                    color:
+                        isSelected
+                            ? colorScheme.primary.withValues(alpha: 0.2)
+                            : null,
                   ),
                   alignment: Alignment.center,
                   child: Icon(
                     navItems[index].icon,
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.onSurface,
+                    color:
+                        isSelected
+                            ? colorScheme.primary
+                            : colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -247,17 +246,19 @@ class _BottomNav extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? colorScheme.primary.withValues(alpha: 0.2)
-                            : null,
+                        color:
+                            isSelected
+                                ? colorScheme.primary.withValues(alpha: 0.2)
+                                : null,
                         borderRadius: BorderRadius.circular(100),
                       ),
                       alignment: Alignment.center,
                       child: Icon(
                         navItems[index].icon,
-                        color: isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
+                        color:
+                            isSelected
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -277,27 +278,28 @@ void showExitConfirmationDialog(
 }) {
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Confirm Exit'),
-      content: const Text('Are you sure you want to exit the app?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+    builder:
+        (context) => AlertDialog(
+          title: const Text('Confirm Exit'),
+          content: const Text('Are you sure you want to exit the app?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                if (isSystemExit) {
+                  SystemNavigator.pop();
+                } else {
+                  context.pop();
+                }
+              },
+              child: const Text('Exit'),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-            if (isSystemExit) {
-              SystemNavigator.pop();
-            } else {
-              context.pop();
-            }
-          },
-          child: const Text('Exit'),
-        ),
-      ],
-    ),
   );
 }
 
