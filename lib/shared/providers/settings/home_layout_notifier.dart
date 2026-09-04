@@ -20,26 +20,49 @@ class HomeLayoutNotifier extends Notifier<List<HomeSection>> {
   }
 
   List<HomeSection>? _load() {
+    List<HomeSection>? result;
     final jsonString = sharedPrefs.getString(_prefsKey);
     if (jsonString != null) {
       try {
         final List<dynamic> list = json.decode(jsonString);
-        return list.map((e) => HomeSection.fromJson(e)).toList();
+        result = list.map((e) => HomeSection.fromJson(e)).toList();
       } catch (_) {}
     }
 
-    if (Hive.isBoxOpen(_boxName)) {
+    if (result == null && Hive.isBoxOpen(_boxName)) {
       try {
         final box = Hive.box(_boxName);
         final List<dynamic>? data = box.get(_hiveKey);
         if (data != null) {
-          final migrated = data
+          result = data
               .map((e) => HomeSection.fromJson(Map<String, dynamic>.from(e)))
               .toList();
-          _saveList(migrated);
-          return migrated;
         }
       } catch (_) {}
+    }
+
+    if (result != null) {
+      final index = result.indexWhere(
+        (s) =>
+            s.type == HomeSectionType.continueWatching ||
+            s.id == 'continue_watching',
+      );
+      if (index == -1) {
+        result.insert(
+          1.clamp(0, result.length),
+          const HomeSection(
+            id: 'continue_watching',
+            title: 'Continue Watching',
+            type: HomeSectionType.continueWatching,
+            enabled: true,
+          ),
+        );
+        _saveList(result);
+      } else if (!result[index].enabled) {
+        result[index] = result[index].copyWith(enabled: true);
+        _saveList(result);
+      }
+      return result;
     }
     return null;
   }

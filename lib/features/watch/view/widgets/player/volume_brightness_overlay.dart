@@ -54,7 +54,8 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
     if (_opacity == 0.0) return const SizedBox();
 
     final isBoosted = widget.isVolume && widget.value > 1.0;
-    final displayValue = widget.value.clamp(0.0, 1.25);
+    final maxLimit = widget.isVolume ? 2.0 : 1.0;
+    final displayValue = widget.value.clamp(0.0, maxLimit);
     final percent = (displayValue * 100).toInt();
 
     return AnimatedOpacity(
@@ -82,32 +83,66 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
                 size: 32,
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: 100,
-                width: 8,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  height: 100,
+                  width: 8,
+                  child: Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      Container(
                         color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
                       ),
-                    ),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Container(
-                          height: constraints.maxHeight * (displayValue / 1.25),
-                          decoration: BoxDecoration(
-                            color: isBoosted
-                                ? Colors.redAccent
-                                : Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (!widget.isVolume) {
+                            return Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                height: constraints.maxHeight *
+                                    displayValue.clamp(0.0, 1.0),
+                                width: double.infinity,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            );
+                          }
+
+                          final double normalHeight = constraints.maxHeight *
+                              displayValue.clamp(0.0, 1.0);
+                          final double boostHeight = isBoosted
+                              ? constraints.maxHeight *
+                                  (displayValue - 1.0).clamp(0.0, 1.0)
+                              : 0.0;
+
+                          return Stack(
+                            alignment: Alignment.bottomCenter,
+                            children: [
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  height: normalHeight,
+                                  width: double.infinity,
+                                  color: isBoosted
+                                      ? Colors.redAccent.withValues(alpha: 0.35)
+                                      : Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              if (isBoosted)
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Container(
+                                    height: boostHeight,
+                                    width: double.infinity,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

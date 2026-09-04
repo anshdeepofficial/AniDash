@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -53,13 +55,21 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isChangingVolume = false;
   bool _isChangingBrightness = false;
   bool _isDragLeft = false;
-  bool _allowBoost = false;
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
+  Timer? _volumeOverlayTimer;
 
   @override
   void initState() {
     super.initState();
+    if (Platform.isAndroid || Platform.isIOS) {
+      FlutterVolumeController.updateShowSystemUI(false);
+      UIHelper.enableVolumeInterception();
+      UIHelper.setVolumeKeyHandler(
+        onVolumeUp: () => _handleHardwareVolumeKey(true),
+        onVolumeDown: () => _handleHardwareVolumeKey(false),
+      );
+    }
     // Restart auto-hide timer on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -76,10 +86,57 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _volumeOverlayTimer?.cancel();
+    if (Platform.isAndroid || Platform.isIOS) {
+      UIHelper.disableVolumeInterception();
+      UIHelper.removeVolumeKeyHandler();
+      FlutterVolumeController.updateShowSystemUI(true);
+    }
     if (!(Platform.isAndroid || Platform.isIOS)) {
       windowManager.setFullScreen(false);
     }
     super.dispose();
+  }
+
+  void _handleHardwareVolumeKey(bool isUp) {
+    if (!mounted) return;
+    if (ref.read(playerUIControllerProvider).isLocked) return;
+
+    final controller = ref.read(playerUIControllerProvider.notifier);
+    final state = ref.read(playerUIControllerProvider);
+
+    const step = 0.05; // 5% per press
+    double newV = (state.volume + (isUp ? step : -step)).clamp(0.0, 2.0);
+
+    setState(() {
+      _isChangingVolume = true;
+    });
+
+    controller.setVolume(newV);
+
+    if (newV > 1.0) {
+      final gain = (newV * 100);
+      ref
+          .read(playerStateProvider.notifier)
+          .videoController
+          .player
+          .setVolume(gain);
+    } else {
+      ref
+          .read(playerStateProvider.notifier)
+          .videoController
+          .player
+          .setVolume(100.0);
+    }
+
+    _volumeOverlayTimer?.cancel();
+    _volumeOverlayTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _isChangingVolume = false;
+        });
+      }
+    });
   }
 
   void _onVerticalDragStart(DragStartDetails details) {
@@ -112,20 +169,12 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       double newB = (state.brightness + delta).clamp(0.0, 1.0);
       controller.setBrightness(newB);
     } else {
-      double maxVol = _allowBoost ? 1.25 : 1.0;
-      double newV = state.volume + delta;
-
-      if (newV > 1.0 && !_allowBoost) {
-        newV = 1.0;
-        if (delta > 0) _showBoostWarning();
-      }
-
-      newV = newV.clamp(0.0, maxVol);
+      double newV = (state.volume + delta).clamp(0.0, 2.0);
 
       // Update system/player volume
       controller.setVolume(newV);
 
-      // Update actual player gain if needed (boost)
+      // Update actual player gain if needed (boost up to 200%)
       if (newV > 1.0) {
         final gain = (newV * 100);
         ref
@@ -148,34 +197,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       _isChangingBrightness = false;
       _isChangingVolume = false;
     });
-  }
-
-  void _showBoostWarning() {
-    if (ModalRoute.of(context)?.isCurrent != true) return;
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('High Volume Warning'),
-            content: const Text(
-              'Boost volume above 100%? This may damage hearing or speakers.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  Navigator.pop(context);
-                  setState(() => _allowBoost = true);
-                },
-                child: const Text('Boost'),
-              ),
-            ],
-          ),
-    );
   }
 
   void _onDoubleTap(bool forward) {

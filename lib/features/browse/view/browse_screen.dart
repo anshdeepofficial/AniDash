@@ -180,11 +180,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   void _selectSuggestion(String value) {
     _searchController.text = value;
     _searchController.selection = TextSelection.collapsed(offset: value.length);
+    FocusScope.of(context).unfocus();
+    setState(() => _isSearchFocused = false);
     _submitSearch();
   }
 
   List<String> get _suggestions {
     final query = _searchController.text.trim().toLowerCase();
+    if (query.length < 3) return const [];
     final titles = [..._trending, ..._popular, ..._upcoming]
         .map((anime) => anime.title.userPreferred)
         .where((title) => title.isNotEmpty);
@@ -193,7 +196,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     return candidates
         .where((title) {
           final key = title.toLowerCase();
-          return seen.add(key) && (query.isEmpty || key.contains(query));
+          return seen.add(key) && key.contains(query);
         })
         .take(8)
         .toList();
@@ -271,33 +274,55 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
             hasFilter: !_currentFilter.isEmpty,
           ),
           Expanded(
-            child:
-                _isSearchFocused && _suggestions.isNotEmpty
-                    ? _SearchSuggestions(
-                      items: _suggestions,
-                      history: _searchHistory.toSet(),
-                      onSelected: _selectSuggestion,
-                      onClear: () async {
-                        await sharedPrefs.setStringList(_historyKey, []);
-                        setState(() => _searchHistory = []);
-                      },
-                    )
-                    : _searchController.text.isEmpty && _currentFilter.isEmpty
-                    ? _ExploreView(
-                      trending: _trending,
-                      popular: _popular,
-                      upcoming: _upcoming,
-                      isLoading: _isExploreLoading,
-                    )
-                    : _results.isEmpty && !_isLoading
-                    ? _EmptyState()
-                    : _ResultsGrid(
-                      results: _results,
-                      scrollController: _scrollController,
-                      columnCount: _getColumnCount(),
-                      isLoading: _isLoading,
-                      animation: _animationController,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _searchController.text.isEmpty && _currentFilter.isEmpty
+                      ? _ExploreView(
+                          trending: _trending,
+                          popular: _popular,
+                          upcoming: _upcoming,
+                          isLoading: _isExploreLoading,
+                        )
+                      : _results.isEmpty && !_isLoading
+                          ? _EmptyState()
+                          : _ResultsGrid(
+                              results: _results,
+                              scrollController: _scrollController,
+                              columnCount: _getColumnCount(),
+                              isLoading: _isLoading,
+                              animation: _animationController,
+                            ),
+                ),
+                if (_isSearchFocused && _suggestions.isNotEmpty)
+                  Positioned(
+                    top: 0,
+                    left: 10,
+                    right: 10,
+                    child: Material(
+                      elevation: 8,
+                      shadowColor: Colors.black54,
+                      borderRadius: BorderRadius.circular(16),
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 320),
+                          child: _SearchSuggestions(
+                            items: _suggestions,
+                            history: _searchHistory.toSet(),
+                            onSelected: _selectSuggestion,
+                            onClear: () async {
+                              await sharedPrefs.setStringList(_historyKey, []);
+                              setState(() => _searchHistory = []);
+                            },
+                          ),
+                        ),
+                      ),
                     ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -321,7 +346,8 @@ class _SearchSuggestions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       children: [
         if (history.isNotEmpty)
           Align(
@@ -333,11 +359,14 @@ class _SearchSuggestions extends StatelessWidget {
           ),
         ...items.map(
           (item) => ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
             leading: Icon(
               history.contains(item) ? Icons.history : Icons.search,
+              size: 20,
             ),
-            title: Text(item),
-            trailing: const Icon(Icons.north_west_rounded, size: 18),
+            title: Text(item, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: const Icon(Icons.north_west_rounded, size: 16),
             onTap: () => onSelected(item),
           ),
         ),

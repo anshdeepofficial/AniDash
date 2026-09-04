@@ -20,6 +20,7 @@ import 'package:ani_dash/features/browse/view/section_screen.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
+import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -39,6 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _setupNewsListener();
+    Future.microtask(_syncAccountWatchProgress);
   }
 
   void _setupNewsListener() {
@@ -96,6 +98,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final isOpen = state == AppLifecycleState.resumed;
     _setAppOpenStatus(isOpen);
+    if (isOpen) {
+      _syncAccountWatchProgress();
+    }
+  }
+
+  Future<void> _syncAccountWatchProgress() async {
+    try {
+      final auth = ref.read(authProvider);
+      if (!auth.isAniListAuthenticated && !auth.isMalAuthenticated) return;
+
+      final repo = ref.read(animeRepositoryProvider);
+      final response = await repo.getUserAnimeList(
+        type: 'ANIME',
+        status: 'CURRENT',
+        page: 1,
+        perPage: 50,
+      );
+
+      if (response.data.isEmpty) return;
+
+      final progressRepo = ref.read(watchProgressRepositoryProvider);
+
+      for (final entry in response.data) {
+        final media = entry.media;
+        final mediaId = media.id;
+        final targetProgress = entry.progress;
+
+        if (targetProgress <= 0) continue;
+
+        final local = progressRepo.getProgress(mediaId);
+
+        if (local != null && local.currentEpisode >= targetProgress) {
+          continue;
+        }
+
+        final episodesMap =
+            Map<int, EpisodeProgress>.from(local?.episodesProgress ?? {});
+
+        for (int i = 1; i <= targetProgress; i++) {
+          final existing = episodesMap[i];
+          if (existing == null || !existing.isCompleted) {
+            episodesMap[i] = EpisodeProgress(
+              episodeNumber: i,
+              episodeTitle: existing?.episodeTitle ?? 'Episode $i',
+              episodeThumbnail: existing?.episodeThumbnail,
+              progressInSeconds: existing?.progressInSeconds ?? 1440,
+              durationInSeconds: existing?.durationInSeconds ?? 1440,
+              isCompleted: true,
+              watchedAt: existing?.watchedAt ?? DateTime.now(),
+            );
+          }
+        }
+
+        final title = media.title.english ??
+            media.title.romaji ??
+            media.title.native ??
+            '';
+        final cover =
+            media.coverImage.large ?? media.coverImage.medium ?? '';
+
+        final updated = (local ??
+                AnimeWatchProgressEntry(
+                  animeId: mediaId,
+                  animeTitle: title,
+                  animeFormat: media.format,
+                  animeCover: cover,
+                  totalEpisodes: media.episodes ?? 0,
+                  episodesProgress: episodesMap,
+                  lastUpdated: DateTime.now(),
+                  currentEpisode: targetProgress,
+                  status: 'watching',
+                ))
+            .copyWith(
+              episodesProgress: episodesMap,
+              currentEpisode: targetProgress,
+              lastUpdated: DateTime.now(),
+              status: 'watching',
+              animeTitle: title.isNotEmpty ? title : null,
+              animeCover: cover.isNotEmpty ? cover : null,
+            );
+
+        await progressRepo.saveProgress(updated);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -106,7 +192,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: () => ref.read(homepageProvider.notifier).fetchHomePage(),
+        onRefresh: () async {
+          await Future.wait([
+            ref.read(homepageProvider.notifier).fetchHomePage(),
+            _syncAccountWatchProgress(),
+          ]);
+        },
         child: Stack(
           children: [
             ListView.builder(

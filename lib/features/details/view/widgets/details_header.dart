@@ -10,6 +10,10 @@ import 'package:ani_dash/features/details/view/widgets/tracker/track_bottom_shee
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
+import 'package:ani_dash/features/browse/view/section_screen.dart';
+import 'package:ani_dash/features/browse/model/search_filter.dart';
+import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
+import 'package:ani_dash/core/models/universal/universal_page_response.dart';
 
 class DetailsHeader extends ConsumerStatefulWidget {
   final UniversalMedia anime;
@@ -292,7 +296,7 @@ class GenreTags extends StatelessWidget {
 }
 
 /// Individual tag widget for genres and status
-class GenreTag extends StatelessWidget {
+class GenreTag extends ConsumerWidget {
   final String text;
   final Color? color;
   final bool isStatus;
@@ -305,7 +309,7 @@ class GenreTag extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -319,7 +323,7 @@ class GenreTag extends StatelessWidget {
 
     final textColor = color ?? (isDark ? Colors.white : colorScheme.onSurface);
 
-    return Container(
+    final tagContainer = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
@@ -341,6 +345,43 @@ class GenreTag extends StatelessWidget {
           letterSpacing: 0.2,
         ),
       ),
+    );
+
+    if (isStatus) return tagContainer;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (_) => SectionScreen(
+                  title: text,
+                  fetchItems: ({page = 1, perPage = 25}) async {
+                    final repo = ref.read(animeRepositoryProvider);
+                    final list = await repo.searchAnime(
+                      '',
+                      page: page,
+                      perPage: perPage,
+                      filter: SearchFilter(genres: [text]),
+                    );
+                    return UniversalPageResponse(
+                      pageInfo: UniversalPageInfo(
+                        total: list.length,
+                        perPage: perPage,
+                        currentPage: page,
+                        lastPage: list.length >= perPage ? page + 1 : page,
+                        hasNextPage: list.length >= perPage,
+                      ),
+                      data: list,
+                    );
+                  },
+                ),
+          ),
+        );
+      },
+      child: tagContainer,
     );
   }
 }

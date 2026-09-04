@@ -112,10 +112,18 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
 
     final progressAsync = ref.watch(watchProgressStreamProvider);
     final allProgress = progressAsync.value ?? [];
+    final singleProgress =
+        ref.watch(animeWatchProgressProvider(widget.mediaId)).value;
 
-    final animeProgress = allProgress
-        .where((e) => e.animeId == widget.mediaId)
-        .firstOrNull;
+    final animeProgress = singleProgress ??
+        allProgress
+            .where((e) =>
+                e.animeId == widget.mediaId ||
+                (animeTitle != null &&
+                    e.animeTitle.trim().toLowerCase() ==
+                        animeTitle.trim().toLowerCase()))
+            .firstOrNull ??
+        ref.read(watchProgressRepositoryProvider).getProgress(widget.mediaId);
 
     return Material(
       color: Colors.transparent,
@@ -171,9 +179,13 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                     final actualIndex = startIdx + i;
 
                     final epNum = episode.number ?? (actualIndex + 1);
-                    final isCompleted =
-                        animeProgress?.episodesProgress[epNum]?.isCompleted ??
-                        false;
+                    final epProgress = animeProgress?.episodesProgress[epNum];
+                    final isCompleted = epProgress?.isCompleted ?? false;
+                    final duration = epProgress?.durationInSeconds ?? 0;
+                    final progressSec = epProgress?.progressInSeconds ?? 0;
+                    final watchProgress = (duration > 0)
+                        ? (progressSec / duration).clamp(0.0, 1.0)
+                        : (isCompleted ? 1.0 : 0.0);
 
                     final downloadState = ref.watch(downloadsProvider);
                     final download = downloadState.downloads.firstWhereOrNull(
@@ -185,14 +197,15 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                     return EpisodeTile(
                       isFiller: episode.isFiller ?? false,
                       isCompleted: isCompleted,
+                      watchProgress: watchProgress,
                       episodeNumber: episode.number?.toString() ?? "?",
                       episodeTitle:
                           episode.title ?? "Episode ${episode.number}",
                       isSelected: episode.number == selectedEp,
                       download: download,
                       onTap: () {
-                          episodeNotifier.changeEpisode(episode.number);
-                          widget.panelAnimation.reverse();
+                        episodeNotifier.changeEpisode(episode.number);
+                        widget.panelAnimation.reverse();
                       },
                     );
                   },
@@ -209,6 +222,7 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
 class EpisodeTile extends StatelessWidget {
   final bool isFiller;
   final bool isCompleted;
+  final double watchProgress;
   final String episodeNumber;
   final String episodeTitle;
   final bool isSelected;
@@ -219,6 +233,7 @@ class EpisodeTile extends StatelessWidget {
     super.key,
     required this.isFiller,
     required this.isCompleted,
+    this.watchProgress = 0.0,
     required this.episodeNumber,
     required this.episodeTitle,
     required this.isSelected,
@@ -230,20 +245,20 @@ class EpisodeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Using grey for completed episodes if not selected
+    // Dim text if watched and not currently selected
     final textColor = isSelected
         ? theme.colorScheme.onPrimary
         : isCompleted
-        ? theme.colorScheme.outline
-        : theme.colorScheme.onSurfaceVariant;
+            ? theme.colorScheme.outline
+            : theme.colorScheme.onSurfaceVariant;
 
     final bgColor = isSelected
         ? theme.colorScheme.primary
         : isFiller
-        ? theme.colorScheme.errorContainer
-        : isCompleted
-        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-        : theme.colorScheme.surfaceContainerHighest;
+            ? theme.colorScheme.errorContainer
+            : isCompleted
+                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                : theme.colorScheme.surfaceContainerHighest;
 
     return InkWell(
       onTap: onTap,
@@ -257,47 +272,118 @@ class EpisodeTile extends StatelessWidget {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                episodeNumber,
-                style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
-              ),
+            Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : isCompleted
+                                ? theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.6)
+                                : bgColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        episodeNumber,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? theme.colorScheme.onPrimary
+                              : isCompleted
+                                  ? theme.colorScheme.primary
+                                  : textColor,
+                        ),
+                      ),
+                    ),
+                    if (isCompleted && !isSelected)
+                      Positioned(
+                        top: -3,
+                        right: -3,
+                        child: Container(
+                          padding: const EdgeInsets.all(1.5),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            size: 9,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    episodeTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? theme.colorScheme.onSurface
+                          : isCompleted
+                              ? theme.colorScheme.outline
+                              : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (isCompleted)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Watched',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                if (isSelected)
+                  Icon(Iconsax.play5, size: 18, color: theme.colorScheme.primary)
+                else if (download != null)
+                  _buildDownloadIndicator(theme, download!)
+                else if (isCompleted)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                episodeTitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? theme.colorScheme.onSurface
-                      : isCompleted
-                      ? theme.colorScheme.outline
-                      : theme.colorScheme.onSurface,
+            if (watchProgress > 0) ...[
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: watchProgress,
+                  minHeight: 2.5,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  color: isCompleted
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.secondary,
                 ),
               ),
-            ),
-            if (isSelected)
-              Icon(Iconsax.play5, size: 18, color: theme.colorScheme.primary)
-            else if (download != null)
-              _buildDownloadIndicator(theme, download!)
-            else if (isCompleted)
-              Icon(
-                Iconsax.tick_circle,
-                size: 18,
-                color: theme.colorScheme.secondary,
-              ),
+            ],
           ],
         ),
       ),

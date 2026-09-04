@@ -170,44 +170,156 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
     Future<void> Function(List<String> repoUrl, ItemType type) onRepoSaved,
   ) {
     final controller = TextEditingController();
+    final presets = [
+      (
+        name: 'Kohi-den (Standard Anime)',
+        url: 'https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json',
+        type: ItemType.anime,
+        is18Plus: false,
+      ),
+      (
+        name: 'Yuzono (18+ & Anime Sources)',
+        url: 'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
+        type: ItemType.anime,
+        is18Plus: true,
+      ),
+      (
+        name: 'Secozzi Aniyomi Extensions',
+        url: 'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
+        type: ItemType.anime,
+        is18Plus: false,
+      ),
+    ];
+
     showDialog(
       context: context,
       builder: (context) {
         ItemType selectedType = ItemType.anime;
         return StatefulBuilder(
           builder: (context, setState) {
+            final theme = Theme.of(context);
+            final colorScheme = theme.colorScheme;
+
             return AlertDialog(
               title: const Text('Add Repository'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<ItemType>(
-                    value: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Extension Type',
-                    ),
-                    items: ItemType.values
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type.name.toUpperCase()),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<ItemType>(
+                        value: selectedType,
+                        decoration: const InputDecoration(
+                          labelText: 'Extension Type',
+                        ),
+                        items: ItemType.values
+                            .map(
+                              (type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(type.name.toUpperCase()),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedType = val);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          labelText: 'Repository URL',
+                          hintText: 'https://...',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Community & 18+ Repositories:',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...presets.map((preset) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: preset.is18Plus
+                                  ? Colors.redAccent.withValues(alpha: 0.6)
+                                  : colorScheme.outlineVariant,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color: preset.is18Plus
+                                ? Colors.redAccent.withValues(alpha: 0.05)
+                                : null,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => selectedType = val);
-                    },
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 2,
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    preset.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                if (preset.is18Plus)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '18+',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            subtitle: Text(
+                              preset.url,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                            trailing: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  controller.text = preset.url;
+                                  selectedType = preset.type;
+                                });
+                              },
+                              child: const Text('Select'),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'Repository URL',
-                      hintText: 'https://...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(

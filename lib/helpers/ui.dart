@@ -4,8 +4,50 @@ import 'package:window_manager/window_manager.dart';
 
 class UIHelper {
   static const _orientationChannel = MethodChannel('shonenx/orientation');
+  static const _volumeChannel = MethodChannel('shonenx/volume');
   static bool _isFullscreen = false;
   static bool get _isDesktop => !Platform.isAndroid && !Platform.isIOS;
+
+  /// Enable intercepting physical volume buttons to suppress system UI
+  static Future<void> enableVolumeInterception() async {
+    if (Platform.isAndroid) {
+      try {
+        await _volumeChannel.invokeMethod('enableIntercept');
+      } catch (_) {}
+    }
+  }
+
+  /// Disable intercepting physical volume buttons
+  static Future<void> disableVolumeInterception() async {
+    if (Platform.isAndroid) {
+      try {
+        await _volumeChannel.invokeMethod('disableIntercept');
+      } catch (_) {}
+    }
+  }
+
+  /// Set handler for hardware volume buttons
+  static void setVolumeKeyHandler({
+    required VoidCallback onVolumeUp,
+    required VoidCallback onVolumeDown,
+  }) {
+    if (Platform.isAndroid) {
+      _volumeChannel.setMethodCallHandler((call) async {
+        if (call.method == 'volumeUp') {
+          onVolumeUp();
+        } else if (call.method == 'volumeDown') {
+          onVolumeDown();
+        }
+      });
+    }
+  }
+
+  /// Clear handler for hardware volume buttons
+  static void removeVolumeKeyHandler() {
+    if (Platform.isAndroid) {
+      _volumeChannel.setMethodCallHandler(null);
+    }
+  }
 
   /// Toggle fullscreen mode (cross-platform)
   static Future<void> handleToggleFullscreen({
@@ -29,29 +71,55 @@ class UIHelper {
     if (afterCallback != null) afterCallback();
   }
 
+  static DeviceOrientation _currentLandscape = DeviceOrientation.landscapeLeft;
+
   /// Force landscape orientation (mobile only)
   static Future<void> forceLandscape() async {
     if (Platform.isAndroid) {
-      // Leave portrait even when the device-wide auto-rotate toggle is off,
-      // then allow the player to follow either landscape side.
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-      ]);
-      await Future<void>.delayed(const Duration(milliseconds: 180));
       try {
         await _orientationChannel.invokeMethod('sensorLandscape');
       } on PlatformException {
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
+        // Fall through
       }
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
     } else if (Platform.isIOS) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
     }
+  }
+
+  /// Toggle / flip between landscape orientations
+  static Future<void> toggleLandscape() async {
+    if (Platform.isAndroid) {
+      try {
+        await _orientationChannel.invokeMethod('toggleLandscape');
+      } catch (_) {}
+    }
+
+    if (_currentLandscape == DeviceOrientation.landscapeLeft) {
+      _currentLandscape = DeviceOrientation.landscapeRight;
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      _currentLandscape = DeviceOrientation.landscapeLeft;
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+      ]);
+    }
+
+    // Allow sensor to freely follow both landscape sides after toggle
+    Future.delayed(const Duration(milliseconds: 600), () {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    });
   }
 
   /// Force portrait orientation (mobile only)

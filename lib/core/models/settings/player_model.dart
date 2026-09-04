@@ -18,7 +18,7 @@ class PlayerModel {
     this.preferDub = true,
     this.bufferSize = 32,
     this.seekDuration = 10,
-    this.autoHideDuration = 4,
+    this.autoHideDuration = 5,
     this.showNextPrevButtons = true,
     this.mpvSettings = const {},
   });

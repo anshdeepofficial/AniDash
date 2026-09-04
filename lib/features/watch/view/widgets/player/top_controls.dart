@@ -170,7 +170,7 @@ class TopControls extends ConsumerWidget {
                   _TopIconButton(
                     icon: Icons.screen_rotation_rounded,
                     onTap: () async {
-                      await UIHelper.forceLandscape();
+                      await UIHelper.toggleLandscape();
                       onInteraction();
                     },
                   ),

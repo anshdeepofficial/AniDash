@@ -71,10 +71,13 @@ class PlayerUIController extends _$PlayerUIController {
 
   void restartHideTimer() {
     _hideTimer?.cancel();
-    if (state.isLocked || !state.isVisible) return;
+    if (!state.isVisible) return;
 
     final settings = ref.read(playerSettingsProvider);
-    _hideTimer = Timer(Duration(seconds: settings.autoHideDuration), () {
+    final duration = state.isLocked
+        ? 5
+        : (settings.autoHideDuration < 5 ? 5 : settings.autoHideDuration);
+    _hideTimer = Timer(Duration(seconds: duration), () {
       state = state.copyWith(isVisible: false);
     });
   }
@@ -92,9 +95,12 @@ class PlayerUIController extends _$PlayerUIController {
   }
 
   Future<void> setVolume(double value) async {
-    final v = value.clamp(0.0, 1.0);
+    final v = value.clamp(0.0, 2.0);
     state = state.copyWith(volume: v);
-    await FlutterVolumeController.setVolume(v);
+    try {
+      await FlutterVolumeController.updateShowSystemUI(false);
+      await FlutterVolumeController.setVolume(v.clamp(0.0, 1.0));
+    } catch (_) {}
   }
 
   Future<void> setBrightness(double value) async {
