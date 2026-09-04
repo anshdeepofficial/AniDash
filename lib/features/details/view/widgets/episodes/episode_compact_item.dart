@@ -13,6 +13,10 @@ class EpisodeCompactItem extends StatelessWidget {
   final EpisodeProgress? episodeProgress;
   final Function() onTap;
   final Function() onMoreOptions;
+  final VoidCallback? onDownload;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const EpisodeCompactItem({
     super.key,
@@ -24,6 +28,10 @@ class EpisodeCompactItem extends StatelessWidget {
     this.episodeProgress,
     required this.onTap,
     required this.onMoreOptions,
+    this.onDownload,
+    this.onLongPress,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -35,20 +43,38 @@ class EpisodeCompactItem extends StatelessWidget {
         ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
-          leading: SizedBox(
-            width: 40,
-            child: Center(
-              child: Text(
-                '${episode.number ?? index + 1}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isWatched
-                      ? theme.hintColor
-                      : theme.colorScheme.primary,
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: Icon(
+                    isSelected
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
+                    size: 20,
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.hintColor,
+                  ),
+                ),
+              SizedBox(
+                width: 36,
+                child: Center(
+                  child: Text(
+                    '${episode.number ?? index + 1}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isWatched
+                          ? theme.hintColor
+                          : theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
           title: Text(
             episode.title ?? 'Episode ${episode.number ?? index + 1}',
@@ -75,11 +101,26 @@ class EpisodeCompactItem extends StatelessWidget {
                   ],
                 )
               : null,
-          trailing: IconButton(
-            icon: const Icon(Icons.more_vert, size: 20),
-            onPressed: onMoreOptions,
-          ),
+          trailing: isSelectionMode
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onDownload != null)
+                      IconButton(
+                        icon: const Icon(Icons.download_rounded, size: 20),
+                        tooltip: 'Download',
+                        onPressed: onDownload,
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, size: 20),
+                      tooltip: 'More options',
+                      onPressed: onMoreOptions,
+                    ),
+                  ],
+                ),
           onTap: onTap,
+          onLongPress: onLongPress,
         ),
         if (watchProgress > 0)
           LinearProgressIndicator(

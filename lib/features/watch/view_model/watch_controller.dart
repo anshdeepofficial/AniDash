@@ -114,7 +114,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .stream
         .completed
         .listen((completed) {
-      if (completed && !_isDisposed) {
+      if (completed && !_isDisposed && _dur > 30 && _pos >= _dur - 5) {
         ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
       }
     });

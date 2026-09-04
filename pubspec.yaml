@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.8.0+13
+version: 1.8.1+14
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -113,7 +113,9 @@ flutter:
 
 flutter_launcher_icons:
   android: true
-  image_path_android: "assets/icons/app_icon-modified-2.png"
+  image_path: "assets/icons/app_icon-modified-2.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icons/app_icon-modified-2.png"
   windows:
     generate: true
     image_path: "assets/icons/app_icon-modified-2.png"

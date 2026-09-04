@@ -15,6 +15,9 @@ class EpisodeGridItem extends StatelessWidget {
   final String fallbackCover;
   final Function() onTap;
   final Function() onLongPress;
+  final VoidCallback? onDownload;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const EpisodeGridItem({
     super.key,
@@ -27,6 +30,9 @@ class EpisodeGridItem extends StatelessWidget {
     required this.fallbackCover,
     required this.onTap,
     required this.onLongPress,
+    this.onDownload,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -58,7 +64,28 @@ class EpisodeGridItem extends StatelessWidget {
                     aspectRatio: 16 /
                         9, // Let parent constraint handle it but default typical video ratio
                   ),
-                  if (download != null)
+                  if (isSelectionMode)
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(
+                          isSelected
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          size: 18,
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : Colors.white,
+                        ),
+                      ),
+                    )
+                  else if (download != null)
                     Positioned(
                       top: 4,
                       right: 4,
@@ -74,6 +101,26 @@ class EpisodeGridItem extends StatelessWidget {
                               : Icons.downloading,
                           size: 14,
                           color: Colors.white,
+                        ),
+                      ),
+                    )
+                  else if (onDownload != null)
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: InkWell(
+                        onTap: onDownload,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.download_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

@@ -16,6 +16,10 @@ class EpisodeListItem extends StatelessWidget {
   final String fallbackCover;
   final Function() onTap;
   final Function() onMoreOptions;
+  final VoidCallback? onDownload;
+  final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const EpisodeListItem({
     super.key,
@@ -28,6 +32,10 @@ class EpisodeListItem extends StatelessWidget {
     required this.fallbackCover,
     required this.onTap,
     required this.onMoreOptions,
+    this.onDownload,
+    this.onLongPress,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -40,12 +48,29 @@ class EpisodeListItem extends StatelessWidget {
         children: [
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
-            leading: SizedBox(
-              width: 90,
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: _buildThumbnail(context),
-              ),
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelectionMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      isSelected
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.hintColor,
+                    ),
+                  ),
+                SizedBox(
+                  width: 90,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _buildThumbnail(context),
+                  ),
+                ),
+              ],
             ),
             title: Text(
               episode.title ?? 'Episode ${episode.number ?? index + 1}',
@@ -74,12 +99,26 @@ class EpisodeListItem extends StatelessWidget {
                 ],
               ],
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.more_vert),
-              tooltip: 'More options',
-              onPressed: onMoreOptions,
-            ),
+            trailing: isSelectionMode
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onDownload != null)
+                        IconButton(
+                          icon: const Icon(Icons.download_rounded),
+                          tooltip: 'Download',
+                          onPressed: onDownload,
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.more_vert),
+                        tooltip: 'More options',
+                        onPressed: onMoreOptions,
+                      ),
+                    ],
+                  ),
             onTap: onTap,
+            onLongPress: onLongPress,
           ),
           if (watchProgress > 0)
             Padding(

@@ -346,7 +346,7 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
                                   source.isM3U8,
                                 ),
                         );
-                      }).toList()
+                      })
                     else if (!isExtracting)
                       const Padding(
                         padding: EdgeInsets.all(16.0),

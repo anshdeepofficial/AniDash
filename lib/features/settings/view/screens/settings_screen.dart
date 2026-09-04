@@ -1,17 +1,11 @@
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/features/settings/view/screens/data_settings_screen.dart';
-import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/features/settings/view/screens/home_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:go_router/go_router.dart';
-import 'package:ani_dash/shared/providers/update_provider.dart';
-import 'package:ani_dash/core/utils/updater.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -20,7 +14,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final experimental = ref.watch(experimentalProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton.filledTonal(
@@ -90,17 +83,16 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                if (experimental.useExtensions)
-                  NormalSettingsItem(
-                    icon: Icon(
-                      Icons.extension_outlined,
-                      color: colorScheme.primary,
-                    ),
-                    accent: colorScheme.primary,
-                    title: 'Extensions (💀)',
-                    description: 'Manage your extensions',
-                    onTap: () => context.push('/settings/extensions'),
+                NormalSettingsItem(
+                  icon: Icon(
+                    Icons.extension_outlined,
+                    color: colorScheme.primary,
                   ),
+                  accent: colorScheme.primary,
+                  title: 'Extensions',
+                  description: 'Manage your extensions',
+                  onTap: () => context.push('/settings/extensions'),
+                ),
                 NormalSettingsItem(
                   icon: Icon(Iconsax.video_play, color: colorScheme.primary),
                   accent: colorScheme.primary,
@@ -185,14 +177,6 @@ class SettingsScreen extends ConsumerWidget {
               titleColor: colorScheme.primary,
               onTap: () {},
               children: [
-                if (experimental.debugMode)
-                  NormalSettingsItem(
-                    icon: Icon(Iconsax.code, color: colorScheme.primary),
-                    accent: colorScheme.primary,
-                    title: 'Debug Menu',
-                    description: 'Developer tools and testing',
-                    onTap: () => context.push('/settings/debug'),
-                  ),
                 NormalSettingsItem(
                   icon: Icon(Iconsax.danger, color: colorScheme.primary),
                   accent: colorScheme.primary,
@@ -208,34 +192,11 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/settings/permissions'),
                 ),
                 NormalSettingsItem(
-                  icon: Icon(Iconsax.info_circle, color: colorScheme.primary),
+                  icon: Icon(Iconsax.refresh, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'Check for updates',
-                  description: 'Manually check for latest release',
-                  onTap: () => checkForUpdates(
-                    context,
-                    debugMode: kDebugMode,
-                    useTestReleases: experimental.useTestReleases,
-                  ),
-                ),
-                Consumer(
-                  builder: (context, ref, child) {
-                    final isAuto = ref.watch(automaticUpdatesProvider);
-                    final updateNotifier = ref.read(
-                      automaticUpdatesProvider.notifier,
-                    );
-                    return ToggleableSettingsItem(
-                      icon: Icon(
-                        Icons.replay_outlined,
-                        color: colorScheme.primary,
-                      ),
-                      accent: colorScheme.primary,
-                      title: 'Automatic updates',
-                      description: 'Automatically check for latest release',
-                      value: isAuto,
-                      onChanged: (val) => updateNotifier.toggle(),
-                    );
-                  },
+                  description: 'Release channel, auto-check & update settings',
+                  onTap: () => context.push('/settings/update'),
                 ),
               ],
             ),

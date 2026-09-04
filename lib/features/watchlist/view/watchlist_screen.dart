@@ -181,21 +181,8 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
               )
             : null,
         title: isSelectionMode
-            ? Text(
-                '${selected.length} Selected',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            : Text(
-                'Your Library',
-                style: theme.textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-        backgroundColor: theme.colorScheme.surface,
-        elevation: 0,
+            ? Text('${selected.length} Selected')
+            : const Text('Your Library'),
         actions: [
           if (isSelectionMode)
             IconButton(
@@ -208,27 +195,15 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
               child: _ModeSwitch(isLocal: isLocal),
             ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60.0),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-            child: TabBar(
-              controller: _controller,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-              labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              unselectedLabelStyle: const TextStyle(fontSize: 14),
-              indicator: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              onTap: (i) => _fetch(i),
-              tabs: _statuses.map((s) => Tab(text: _label(s))).toList(),
-            ),
-          ),
+        bottom: TabBar(
+          controller: _controller,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          indicatorColor: theme.colorScheme.primary,
+          labelColor: theme.colorScheme.primary,
+          unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+          onTap: (i) => _fetch(i),
+          tabs: _statuses.map((s) => Tab(text: _label(s))).toList(),
         ),
       ),
       body: TabBarView(

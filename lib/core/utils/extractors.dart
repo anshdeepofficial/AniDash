@@ -13,11 +13,13 @@ Future<List<Map<String, dynamic>>> extractQualities(
   }
 
   try {
-    final response = await UniversalHttpClient.instance.get(
-      Uri.parse(url),
-      headers: headers,
-      cacheConfig: CacheConfig.long,
-    );
+    final response = await UniversalHttpClient.instance
+        .get(
+          Uri.parse(url),
+          headers: headers,
+          cacheConfig: CacheConfig.long,
+        )
+        .timeout(const Duration(seconds: 4));
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return _parseM3U8(response.body, url);

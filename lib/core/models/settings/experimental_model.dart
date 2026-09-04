@@ -11,7 +11,7 @@ class ExperimentalFeaturesModel {
     this.episodeTitleSync = true,
     this.useExtensions = true,
     this.useTestReleases = false,
-    this.newUI = false,
+    this.newUI = true,
     this.debugMode = false,
   });
 
@@ -44,10 +44,10 @@ class ExperimentalFeaturesModel {
   factory ExperimentalFeaturesModel.fromMap(Map<String, dynamic> map) {
     return ExperimentalFeaturesModel(
       episodeTitleSync: map['episodeTitleSync'] ?? true,
-      useExtensions: map['useMangayomiExtensions'] ?? true,
+      useExtensions: true,
       useTestReleases: map['useTestReleases'] ?? false,
-      newUI: map['newUI'] ?? false,
-      debugMode: map['debugMode'] ?? false,
+      newUI: map['newUI'] ?? true,
+      debugMode: false,
     );
   }
 

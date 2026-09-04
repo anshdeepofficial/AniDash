@@ -6,7 +6,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/tracker/tracker_type.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/services/auth_provider_enum.dart';
-import 'package:ani_dash/features/details/view/widgets/comments_bottom_sheet.dart';
 import 'package:ani_dash/features/details/view/widgets/tracker/track_bottom_sheet.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
@@ -217,16 +216,6 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
         onPressed: () => context.pop(),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(
-            Icons.comment_outlined,
-            color: Colors.white,
-            size: 30,
-          ),
-          onPressed: () => CommentsBottomSheet.show(context, widget.anime),
-        ),
-        const SizedBox(width: 4),
-        const SizedBox(width: 4),
         TrackerStatusWidget(anime: widget.anime),
         const SizedBox(width: 4),
         isLoading

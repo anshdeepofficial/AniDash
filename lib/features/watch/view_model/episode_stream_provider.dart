@@ -1,8 +1,12 @@
 // ignore_for_file: constant_identifier_names
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:collection/collection.dart';
+import 'package:ani_dash/features/downloads/model/download_item.dart';
+import 'package:ani_dash/features/downloads/model/download_status.dart';
+import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Source;
 import 'package:flutter/material.dart';
@@ -292,6 +296,87 @@ class EpisodeData extends _$EpisodeData {
     }
   }
 
+  Future<void> downloadBatchEpisodes(
+    BuildContext context,
+    List<int> epNums,
+  ) async {
+    final epModels = _epList.episodes
+        .where((e) => e.number != null && epNums.contains(e.number))
+        .toList()
+      ..sort((a, b) => (a.number ?? 0).compareTo(b.number ?? 0));
+
+    if (epModels.isEmpty) return;
+
+    final animeTitle = _epList.animeTitle ?? 'Unknown';
+    int queuedCount = 0;
+
+    for (final ep in epModels) {
+      try {
+        final epNum = ep.number!;
+        final data = await _fetchSourceData(ep);
+        if (data == null || data.sources.isEmpty) {
+          AppLogger.w('Batch download: No sources for Ep $epNum');
+          continue;
+        }
+
+        final preferDub = ref.read(playerSettingsProvider).preferDub;
+        var source = data.sources.firstWhereOrNull((s) => s.isDub == preferDub);
+        source ??= data.sources.firstOrNull;
+
+        if (source == null || source.url == null || source.url!.isEmpty) {
+          continue;
+        }
+
+        final isM3U8 = source.isM3U8;
+        final quality = source.quality ?? 'Default';
+        final ext = isM3U8 ? 'ts' : 'mp4';
+        final sanitizedTitle = animeTitle.replaceAll(
+          RegExp(r'[\\/:*?"<>|]'),
+          '_',
+        );
+        final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
+
+        final item = DownloadItem(
+          animeTitle: animeTitle,
+          episodeTitle: ep.title ?? 'Episode $epNum',
+          episodeNumber: epNum,
+          thumbnail: ep.thumbnail ?? '',
+          state: DownloadStatus.queued,
+          progress: 0,
+          downloadUrl: source.url!,
+          quality: quality,
+          filePath: fileName,
+          subtitles: data.tracks.map((s) => jsonEncode(s.toJson())).toList(),
+          contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            ...?source.headers,
+          },
+        );
+
+        ref.read(downloadsProvider.notifier).addDownload(item);
+        queuedCount++;
+      } catch (e) {
+        AppLogger.e('Error batch downloading Ep ${ep.number}', e);
+      }
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Queued $queuedCount of ${epModels.length} episodes for download',
+          ),
+          backgroundColor: queuedCount > 0
+              ? Colors.green.shade700
+              : Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
   void reset() => state = const EpisodeDataState();
 
   bool _isValidEp(int ep) => _epList.episodes.any((i) => i.number == ep);
@@ -496,67 +581,75 @@ class EpisodeData extends _$EpisodeData {
     ServerData? server,
   }) async {
     AppLogger.d('Fetching source data via ${server?.name ?? "Extension"} (${server?.isDub == true ? "DUB" : "SUB"})');
-    if (_exp.useExtensions && ep.url != null) {
-      final res = await _srcNotifier.getSources(
-        DEpisode(episodeNumber: ep.number.toString(), url: ep.url),
-      );
-      final isDubRequested = server?.isDub == true;
-      var sources = res
-          .map(
-            (s) => Source(
-              url: s?.url,
-              isM3U8: s?.url?.contains('.m3u8') ?? false,
-              quality: "${s?.title ?? ''} ${s?.quality ?? ''}".trim(),
-              isDub: s?.url?.toLowerCase().contains('dub') == true ||
-                  s?.title?.toLowerCase().contains('dub') == true ||
-                  s?.quality?.toLowerCase().contains('dub') == true,
-            ),
-          )
-          .where((s) => s.url != null && s.url!.isNotEmpty)
-          .toList();
+    final epTargetUrl = (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
+    if (_exp.useExtensions && epTargetUrl != null && epTargetUrl.isNotEmpty) {
+      try {
+        final res = await _srcNotifier.getSources(
+          DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
+        );
+        final isDubRequested = server?.isDub == true;
+        final extractedHeaders = res.firstWhereOrNull((v) => v?.headers != null && v!.headers!.isNotEmpty)?.headers ??
+            res.firstOrNull?.headers;
 
-      if (isDubRequested) {
-        final dubSources = sources.where((s) => s.isDub).toList();
-        if (dubSources.isNotEmpty) sources = dubSources;
-      }
+        var sources = res
+            .map(
+              (s) => Source(
+                url: s?.url,
+                isM3U8: s?.url?.contains('.m3u8') == true,
+                quality: "${s?.title ?? ''} ${s?.quality ?? ''}".trim(),
+                headers: s?.headers ?? extractedHeaders,
+                isDub: s?.url?.toLowerCase().contains('dub') == true ||
+                    s?.title?.toLowerCase().contains('dub') == true ||
+                    s?.quality?.toLowerCase().contains('dub') == true,
+              ),
+            )
+            .where((s) => s.url != null && s.url!.isNotEmpty)
+            .toList();
 
-      final extractedHeaders = res.firstWhereOrNull((v) => v?.headers != null && v!.headers!.isNotEmpty)?.headers ??
-          res.firstOrNull?.headers;
+        if (isDubRequested) {
+          final dubSources = sources.where((s) => s.isDub).toList();
+          if (dubSources.isNotEmpty) sources = dubSources;
+        }
 
-      final allTracks = <Subtitle>[];
-      final seenUrls = <String>{};
-      final langCount = <String, int>{};
+        if (sources.isNotEmpty) {
+          final allTracks = <Subtitle>[];
+          final seenUrls = <String>{};
+          final langCount = <String, int>{};
 
-      for (final v in res) {
-        if (v?.subtitles != null) {
-          for (final t in v!.subtitles!) {
-            if (t.file != null && !seenUrls.contains(t.file)) {
-              seenUrls.add(t.file!);
-              String label = t.label?.trim() ?? 'Unknown';
-              final baseKey = label.toLowerCase();
-              langCount[baseKey] = (langCount[baseKey] ?? 0) + 1;
-              
-              // If there are duplicate languages, disambiguate
-              if (langCount[baseKey]! > 1) {
-                if (t.file!.toLowerCase().contains('sign') ||
-                    label.toLowerCase().contains('sign')) {
-                  label = '$label (Signs & Songs)';
-                } else {
-                  label = '$label (Track ${langCount[baseKey]})';
+          for (final v in res) {
+            if (v?.subtitles != null) {
+              for (final t in v!.subtitles!) {
+                if (t.file != null && !seenUrls.contains(t.file)) {
+                  seenUrls.add(t.file!);
+                  String label = t.label?.trim() ?? 'Unknown';
+                  final baseKey = label.toLowerCase();
+                  langCount[baseKey] = (langCount[baseKey] ?? 0) + 1;
+                  
+                  // If there are duplicate languages, disambiguate
+                  if (langCount[baseKey]! > 1) {
+                    if (t.file!.toLowerCase().contains('sign') ||
+                        label.toLowerCase().contains('sign')) {
+                      label = '$label (Signs & Songs)';
+                    } else {
+                      label = '$label (Track ${langCount[baseKey]})';
+                    }
+                  }
+
+                  allTracks.add(Subtitle(url: t.file, lang: label, isSub: true));
                 }
               }
-
-              allTracks.add(Subtitle(url: t.file, lang: label, isSub: true));
             }
           }
-        }
-      }
 
-      return BaseSourcesModel(
-        sources: sources,
-        headers: extractedHeaders,
-        tracks: allTracks,
-      );
+          return BaseSourcesModel(
+            sources: sources,
+            headers: extractedHeaders,
+            tracks: allTracks,
+          );
+        }
+      } catch (err) {
+        AppLogger.e('Extension source fetch failed, trying legacy provider: $err');
+      }
     }
 
     final category = server?.isDub == true ? 'dub' : 'sub';
@@ -573,10 +666,11 @@ class EpisodeData extends _$EpisodeData {
     Map<String, String>? headers,
   ) async {
     if (src.url == null) return [];
-    if (!src.isM3U8)
+    if (!src.isM3U8) {
       return [
         {'quality': src.quality ?? 'Default', 'url': src.url},
       ];
+    }
 
     try {
       AppLogger.d('Extracting M3U8 qualities...');

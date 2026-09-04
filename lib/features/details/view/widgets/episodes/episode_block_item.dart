@@ -11,6 +11,9 @@ class EpisodeBlockItem extends StatelessWidget {
   final DownloadItem? download;
   final Function() onTap;
   final Function() onLongPress;
+  final VoidCallback? onDownload;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const EpisodeBlockItem({
     super.key,
@@ -21,6 +24,9 @@ class EpisodeBlockItem extends StatelessWidget {
     this.download,
     required this.onTap,
     required this.onLongPress,
+    this.onDownload,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -34,11 +40,15 @@ class EpisodeBlockItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         decoration: BoxDecoration(
-          color: isWatched
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
+              : isWatched
               ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
               : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
-          border: episode.isFiller == true
+          border: isSelected
+              ? Border.all(color: theme.colorScheme.primary, width: 2)
+              : episode.isFiller == true
               ? Border.all(color: Colors.orange.shade700, width: 2)
               : null,
         ),
@@ -56,6 +66,21 @@ class EpisodeBlockItem extends StatelessWidget {
                 ),
               ),
             ),
+
+            if (isSelectionMode)
+              Positioned(
+                top: 4,
+                left: 4,
+                child: Icon(
+                  isSelected
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
+                  size: 16,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.hintColor,
+                ),
+              ),
 
             // Download Icon
             if (download != null)
