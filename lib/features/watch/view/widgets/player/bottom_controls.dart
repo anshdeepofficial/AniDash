@@ -42,6 +42,7 @@ class BottomControls extends ConsumerStatefulWidget {
 class _BottomControlsState extends ConsumerState<BottomControls> {
   double? _draggedValue;
   double _dragPositionX = 0.0;
+  bool _showRemainingTime = false;
 
   // VoidCallback _wrap(VoidCallback? cb) {
   //   return () {
@@ -213,28 +214,29 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
             widget.onInteraction();
           },
           child: SizedBox(
-            height: 10,
+            height: 14,
             child: Stack(
               alignment: Alignment.centerLeft,
               clipBehavior: Clip.none,
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 100),
-                  height: isDragging ? 6 : 3,
+                  height: isDragging ? 7 : 4,
                   width: double.infinity,
                   color: Colors.white24,
                   child: Stack(
                     alignment: Alignment.centerLeft,
+                    clipBehavior: Clip.none,
                     children: [
                       FractionallySizedBox(
                         widthFactor: buffer / max,
                         child: Container(color: Colors.white38),
                       ),
-                      ..._buildHighlights(scheme, max, constraints.maxWidth),
                       FractionallySizedBox(
                         widthFactor: value / max,
                         child: Container(color: scheme.primary),
                       ),
+                      ..._buildHighlights(scheme, max, constraints.maxWidth),
                     ],
                   ),
                 ),
@@ -247,6 +249,13 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                       decoration: BoxDecoration(
                         color: scheme.primary,
                         shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -280,8 +289,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
     double maxWidth,
   ) {
     final skips = ref.watch(aniSkipProvider);
-    final settings = ref.watch(playerSettingsProvider);
-    if (!settings.enableAniSkip || skips.isEmpty || total <= 0) return [];
+    if (skips.isEmpty || total <= 0) return [];
 
     return skips.map((skip) {
       if (skip.interval == null) return const SizedBox.shrink();
@@ -289,14 +297,53 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       final end = (skip.interval!.endTime * 1000).clamp(0, total);
       if (end <= start) return const SizedBox.shrink();
 
+      final isOp = skip.skipType == SkipType.op;
+      // Vibrant Amber for Opening/Intro, Vivid Cyan for Ending/Outro, Orange for Recap/Mixed
+      final highlightColor = isOp
+          ? const Color(0xFFFFB300)
+          : (skip.skipType == SkipType.ed
+              ? const Color(0xFF00E5FF)
+              : const Color(0xFFFF7043));
+
+      final startRatio = start / total;
+      final endRatio = end / total;
+      final width = (endRatio - startRatio) * maxWidth;
+
+      final label = isOp
+          ? 'INTRO'
+          : (skip.skipType == SkipType.ed ? 'OUTRO' : 'SKIP');
+
       return Positioned(
-        left: (start / total) * maxWidth,
-        width: ((end - start) / total) * maxWidth,
-        top: 0,
-        bottom: 0,
+        left: startRatio * maxWidth,
+        width: width,
+        top: -1.5,
+        bottom: -1.5,
         child: Container(
-          color:
-              skip.skipType == SkipType.op ? scheme.tertiary : scheme.secondary,
+          decoration: BoxDecoration(
+            color: highlightColor.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(
+                color: highlightColor.withValues(alpha: 0.6),
+                blurRadius: 4,
+                spreadRadius: 0.5,
+              ),
+            ],
+          ),
+          child: Center(
+            child: width > 36
+                ? Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.2,
+                      height: 1.0,
+                    ),
+                  )
+                : null,
+          ),
         ),
       );
     }).toList();
@@ -326,37 +373,52 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       playerStateProvider.select((p) => (p.position, p.duration)),
     );
 
-    return Text.rich(
-      TextSpan(
-        children: [
+    final remaining = dur > pos ? dur - pos : Duration.zero;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        setState(() => _showRemainingTime = !_showRemainingTime);
+        widget.onInteraction();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Text.rich(
           TextSpan(
-            text: formatDuration(pos),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
+            children: [
+              TextSpan(
+                text: formatDuration(pos),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const TextSpan(
+                text: '  /  ',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              TextSpan(
+                text: _showRemainingTime
+                    ? '-${formatDuration(remaining)}'
+                    : formatDuration(dur),
+                style: TextStyle(
+                  color: _showRemainingTime
+                      ? Colors.amberAccent
+                      : Colors.white60,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const TextSpan(
-            text: '  /  ',
-            style: TextStyle(
-              color: Colors.white38,
-              fontWeight: FontWeight.w500,
-            ),
+          style: const TextStyle(
+            fontSize: 12,
+            letterSpacing: 0.5,
+            fontFeatures: [FontFeature.tabularFigures()],
           ),
-          TextSpan(
-            text: formatDuration(dur),
-            style: const TextStyle(
-              color: Colors.white60,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-      style: const TextStyle(
-        fontSize: 12,
-        letterSpacing: 0.5,
-        // tabularFigures ensures the text width doesn't jump around as seconds tick
-        fontFeatures: [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }

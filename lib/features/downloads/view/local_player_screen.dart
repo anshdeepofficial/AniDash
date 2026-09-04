@@ -28,7 +28,6 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
   void dispose() {
     UIHelper.forcePortrait();
     UIHelper.exitImmersiveMode();
-    UIHelper.enableAutoRotate();
     super.dispose();
   }
 
