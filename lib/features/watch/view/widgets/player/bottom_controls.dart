@@ -297,53 +297,95 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       final end = (skip.interval!.endTime * 1000).clamp(0, total);
       if (end <= start) return const SizedBox.shrink();
 
-      final isOp = skip.skipType == SkipType.op;
-      // Vibrant Amber for Opening/Intro, Vivid Cyan for Ending/Outro, Orange for Recap/Mixed
+      final isOp = skip.skipType == SkipType.op ||
+          (skip.skipType == SkipType.mixed && start < total * 0.5);
+      final isEd = skip.skipType == SkipType.ed ||
+          (skip.skipType == SkipType.mixed && start >= total * 0.5) ||
+          (!isOp && start >= total * 0.6);
+
+      // Vibrant Amber for Opening/Intro, Vivid Cyan for Ending/Outro, Orange for other
       final highlightColor = isOp
           ? const Color(0xFFFFB300)
-          : (skip.skipType == SkipType.ed
+          : (isEd
               ? const Color(0xFF00E5FF)
               : const Color(0xFFFF7043));
 
       final startRatio = start / total;
       final endRatio = end / total;
       final width = (endRatio - startRatio) * maxWidth;
+      final displayWidth = width.clamp(6.0, maxWidth);
 
-      final label = isOp
-          ? 'INTRO'
-          : (skip.skipType == SkipType.ed ? 'OUTRO' : 'SKIP');
+      final label = isOp ? 'INTRO' : (isEd ? 'OUTRO' : 'SKIP');
 
       return Positioned(
         left: startRatio * maxWidth,
-        width: width,
-        top: -1.5,
-        bottom: -1.5,
-        child: Container(
-          decoration: BoxDecoration(
-            color: highlightColor.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(2),
-            boxShadow: [
-              BoxShadow(
-                color: highlightColor.withValues(alpha: 0.6),
-                blurRadius: 4,
-                spreadRadius: 0.5,
+        width: displayWidth,
+        top: -2,
+        bottom: -2,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: highlightColor.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: highlightColor.withValues(alpha: 0.7),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Center(
-            child: width > 36
-                ? Text(
+              child: width >= 34
+                  ? Center(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.2,
+                          height: 1.0,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            // Floating badge above the bar for narrow segments (e.g. short Outro)
+            if (width < 34)
+              Positioned(
+                top: -14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: highlightColor,
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black54,
+                        blurRadius: 3,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Text(
                     label,
                     style: const TextStyle(
                       color: Colors.black,
-                      fontSize: 7.5,
+                      fontSize: 7,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.2,
                       height: 1.0,
                     ),
-                  )
-                : null,
-          ),
+                  ),
+                ),
+              ),
+          ],
         ),
       );
     }).toList();
@@ -446,8 +488,14 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
 
     if (currentSkip.interval == null) return const SizedBox.shrink();
 
+    final isOp = currentSkip.skipType == SkipType.op ||
+        (currentSkip.skipType == SkipType.mixed &&
+            currentSkip.interval!.startTime < 700);
+    final skipLabel = isOp ? 'INTRO' : 'OUTRO';
+    final skipColor = isOp ? const Color(0xFFFFB300) : const Color(0xFF00E5FF);
+
     return _FlatActionBtn(
-      text: 'Skip ${currentSkip.skipType.name.toUpperCase()}',
+      text: 'Skip $skipLabel',
       icon: Icons.fast_forward_rounded,
       onTap: () {
         ref
@@ -455,8 +503,8 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
             .seek(Duration(seconds: currentSkip.interval!.endTime.toInt() + 1));
         widget.onInteraction();
       },
-      color: scheme.primary,
-      textColor: scheme.onPrimary,
+      color: skipColor,
+      textColor: Colors.black,
     );
   }
 }

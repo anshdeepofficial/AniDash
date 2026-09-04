@@ -84,7 +84,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _player = Player(
       configuration: PlayerConfiguration(
         bufferSize: bufferSize.toInt() * 1024 * 1024,
-        logLevel: MPVLogLevel.v,
+        logLevel: MPVLogLevel.warn,
         vo: vo,
       ),
     );

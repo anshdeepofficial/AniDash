@@ -667,13 +667,14 @@ class EpisodeData extends _$EpisodeData {
 
       // Check if the primary source is M3U8 (master playlist with multiple qualities)
       final primarySrc = state.sources[sourceIdx];
+      final streamHeaders = {...?state.headers, ...?primarySrc.headers};
+
       if (primarySrc.isM3U8) {
-        // M3U8 master playlist — extract qualities from the playlist itself
-        final extracted = await _getQualities(
-          primarySrc,
-          state.headers,
-        ).timeout(const Duration(seconds: 12));
-        allQualities.addAll(extracted);
+        // Start with Auto/primary quality immediately so playback launches in 1-2s
+        allQualities.add({
+          'quality': primarySrc.quality ?? 'Auto',
+          'url': primarySrc.url,
+        });
       } else {
         // Non-M3U8 sources: each Source object IS a quality variant
         // Aggregate all sources that share the same dub/sub type
@@ -730,7 +731,6 @@ class EpisodeData extends _$EpisodeData {
         'Opening stream: ${allQualities[qIdx]['quality']} '
         '(${allQualities.length} quality options available)',
       );
-      final streamHeaders = {...?state.headers, ...?primarySrc.headers};
 
       await _player
           .open(
@@ -753,6 +753,28 @@ class EpisodeData extends _$EpisodeData {
         selectedSourceIdx: sourceIdx,
         selectedQualityIdx: qIdx,
       );
+
+      // In background, extract sub-qualities for M3U8 without delaying playback start
+      if (primarySrc.isM3U8) {
+        _getQualities(primarySrc, state.headers).then((extracted) {
+          if (extracted.isNotEmpty) {
+            final merged = [
+              {'quality': 'Auto', 'url': primarySrc.url},
+              ...extracted,
+            ];
+            final seenUrls = <String>{};
+            merged.retainWhere((m) {
+              final u = m['url'] as String?;
+              if (u == null || seenUrls.contains(u)) return false;
+              seenUrls.add(u);
+              return true;
+            });
+            state = state.copyWith(qualityOptions: merged);
+          }
+        }).catchError((e) {
+          AppLogger.d('Background quality extraction completed: $e');
+        });
+      }
     } finally {
       state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
     }

@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -141,20 +141,15 @@ class UIHelper {
     }
   }
 
-  /// Enable auto-rotate (allow all orientations)
+  /// Lock app to portrait (outside video player)
   static Future<void> enableAutoRotate() async {
     if (!_isDesktop) {
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
+      await forcePortrait();
     }
   }
 
-  /// Reset orientation to allow all (alias for enableAutoRotate)
-  static Future<void> resetOrientation() => enableAutoRotate();
+  /// Reset orientation to portrait (outside video player)
+  static Future<void> resetOrientation() => forcePortrait();
 
   /// Enable immersive mode (hide system UI)
   static Future<void> enableImmersiveMode() async {

@@ -8,6 +8,7 @@ import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/repositories/source_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/models/settings/source_model.dart';
+import 'package:ani_dash/main.dart';
 
 part 'source_notifier.g.dart';
 
@@ -176,8 +177,13 @@ class SourceNotifier extends _$SourceNotifier {
   Future<void> fetchSources(ItemType mediaType) async {
     final manager = Get.find<ExtensionManager>().currentManager;
     if (mediaType == ItemType.anime) {
-      if (state.activeAnimeRepo.isEmpty) return;
-      await manager.fetchAvailableAnimeExtensions([state.activeAnimeRepo]);
+      final savedList = sharedPrefs.getStringList('saved_anime_repos');
+      final repos = (savedList != null && savedList.isNotEmpty)
+          ? savedList
+          : (state.activeAnimeRepo.isNotEmpty
+              ? [state.activeAnimeRepo]
+              : ["https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json"]);
+      await manager.fetchAvailableAnimeExtensions(repos);
     } else if (mediaType == ItemType.manga) {
       if (state.activeMangaRepo.isEmpty) return;
       await manager.fetchAvailableMangaExtensions([state.activeMangaRepo]);

@@ -11,9 +11,12 @@ class BrandLogo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeSettingsProvider.select((s) => s.logoMode));
+    final isDark = Theme.of(context).brightness == Brightness.dark ||
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     final useWhite =
         mode == 'white' ||
-        (mode == 'dynamic' && Theme.of(context).brightness == Brightness.dark);
+        (mode == 'dynamic' && isDark) ||
+        (mode != 'black' && isDark);
     final asset =
         useWhite
             ? 'assets/icons/anidash_logo_dark.png'

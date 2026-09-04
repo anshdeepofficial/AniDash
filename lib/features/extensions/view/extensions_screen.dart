@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ani_dash/main.dart';
 
 class ExtensionScreen extends StatefulWidget {
   const ExtensionScreen({super.key});
@@ -28,6 +29,16 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
           selectedLanguage: selectedLanguage,
         );
       };
+
+  List<String> _getSavedAnimeRepos() {
+    final saved = sharedPrefs.getStringList('saved_anime_repos');
+    if (saved != null && saved.isNotEmpty) {
+      return saved;
+    }
+    return [
+      "https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json",
+    ];
+  }
 
   @override
   List<Widget> extensionActions(
@@ -76,10 +87,9 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
       ),
       IconButton(
         onPressed: () async {
+          final repos = _getSavedAnimeRepos();
           await Get.find<ExtensionManager>().currentManager
-              .fetchAvailableAnimeExtensions([
-                "https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json",
-              ]);
+              .fetchAvailableAnimeExtensions(repos);
         },
         icon: const Icon(Iconsax.refresh),
         tooltip: 'Refresh',
@@ -327,11 +337,14 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final url = controller.text.trim();
                     if (url.isNotEmpty) {
-                      onRepoSaved([url], selectedType);
-                      Navigator.pop(context);
+                      final currentRepos = _getSavedAnimeRepos();
+                      final updated = {...currentRepos, url}.toList();
+                      await sharedPrefs.setStringList('saved_anime_repos', updated);
+                      onRepoSaved(updated, selectedType);
+                      if (context.mounted) Navigator.pop(context);
                     }
                   },
                   child: const Text('Add'),

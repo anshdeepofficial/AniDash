@@ -154,39 +154,49 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
       }
     });
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: OrientationBuilder(
-        builder: (_, orientation) {
-          final player = AniDashVideoPlayer(
-            onEpisodesPressed: _togglePanel,
-            onPanelCloseRequest: () => _panelController.reverse(),
-            screenshotController: _screenshotController,
-          );
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _resetSystemUI();
+        if (context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: OrientationBuilder(
+          builder: (_, orientation) {
+            final player = AniDashVideoPlayer(
+              onEpisodesPressed: _togglePanel,
+              onPanelCloseRequest: () => _panelController.reverse(),
+              screenshotController: _screenshotController,
+            );
 
-          if (orientation == Orientation.landscape) {
-            return Row(
-              children: [
-                Expanded(child: player),
-                SizeTransition(
-                  sizeFactor: _panelAnimation,
-                  axis: Axis.horizontal,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.35,
-                    child: EpisodesPanel(
-                      panelAnimation: _panelController,
-                      mediaId: widget.mediaId,
+            if (orientation == Orientation.landscape) {
+              return Row(
+                children: [
+                  Expanded(child: player),
+                  SizeTransition(
+                    sizeFactor: _panelAnimation,
+                    axis: Axis.horizontal,
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.35,
+                      child: EpisodesPanel(
+                        panelAnimation: _panelController,
+                        mediaId: widget.mediaId,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          }
+                ],
+              );
+            }
 
-          // Never expose a separate portrait player layout while Android is
-          // completing its landscape transition.
-          return SizedBox.expand(child: player);
-        },
+            // Never expose a separate portrait player layout while Android is
+            // completing its landscape transition.
+            return SizedBox.expand(child: player);
+          },
+        ),
       ),
     );
   }

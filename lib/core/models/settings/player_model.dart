@@ -7,6 +7,7 @@ class PlayerModel {
   final bool preferDub;
   final int seekDuration;
   final int autoHideDuration;
+  final int lockAutoHideDuration;
   final bool showNextPrevButtons;
   final double bufferSize;
   final Map<String, String> mpvSettings;
@@ -19,6 +20,7 @@ class PlayerModel {
     this.bufferSize = 32,
     this.seekDuration = 10,
     this.autoHideDuration = 5,
+    this.lockAutoHideDuration = 3,
     this.showNextPrevButtons = true,
     this.mpvSettings = const {},
   });
@@ -30,6 +32,7 @@ class PlayerModel {
     bool? preferDub,
     int? seekDuration,
     int? autoHideDuration,
+    int? lockAutoHideDuration,
     double? bufferSize,
     bool? showNextPrevButtons,
     Map<String, String>? mpvSettings,
@@ -41,6 +44,7 @@ class PlayerModel {
       preferDub: preferDub ?? this.preferDub,
       seekDuration: seekDuration ?? this.seekDuration,
       autoHideDuration: autoHideDuration ?? this.autoHideDuration,
+      lockAutoHideDuration: lockAutoHideDuration ?? this.lockAutoHideDuration,
       bufferSize: bufferSize ?? this.bufferSize,
       showNextPrevButtons: showNextPrevButtons ?? this.showNextPrevButtons,
       mpvSettings: mpvSettings ?? this.mpvSettings,
@@ -56,6 +60,7 @@ class PlayerModel {
       'seekDuration': seekDuration,
       'bufferSize': bufferSize,
       'autoHideDuration': autoHideDuration,
+      'lockAutoHideDuration': lockAutoHideDuration,
       'showNextPrevButtons': showNextPrevButtons,
       'mpvSettings': mpvSettings,
     };
@@ -68,7 +73,8 @@ class PlayerModel {
       enableAutoSkip: map['enableAutoSkip'] ?? false,
       preferDub: map['preferDub'] ?? true,
       seekDuration: map['seekDuration'] ?? 10,
-      autoHideDuration: map['autoHideDuration'] ?? 4,
+      autoHideDuration: map['autoHideDuration'] ?? 5,
+      lockAutoHideDuration: map['lockAutoHideDuration'] ?? 3,
       bufferSize: map['bufferSize'] ?? 32,
       showNextPrevButtons: map['showNextPrevButtons'] ?? true,
       mpvSettings: Map<String, String>.from(map['mpvSettings'] ?? {}),

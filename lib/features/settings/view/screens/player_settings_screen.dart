@@ -138,6 +138,19 @@ class PlayerSettingsScreen extends ConsumerWidget {
                     (prev) => prev.copyWith(autoHideDuration: val.toInt()),
                   ),
                 ),
+                SliderSettingsItem(
+                  icon: Icon(Icons.lock_clock_outlined, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Lock Button Auto Hide',
+                  description: '${playerSettings.lockAutoHideDuration}s',
+                  value: playerSettings.lockAutoHideDuration.toDouble().clamp(2.0, 30.0),
+                  min: 2,
+                  max: 30,
+                  divisions: 28,
+                  onChanged: (val) => playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(lockAutoHideDuration: val.toInt()),
+                  ),
+                ),
               ],
             ),
             SettingsSection(

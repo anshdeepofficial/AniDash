@@ -194,7 +194,7 @@ class AppInitializer {
       }
     } else {
       await UIHelper.exitImmersiveMode();
-      await UIHelper.enableAutoRotate();
+      await UIHelper.forcePortrait();
       SystemChrome.setSystemUIOverlayStyle(
         const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
       );

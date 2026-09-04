@@ -33,11 +33,20 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: AniDashVideoPlayer(
-        localFilePath: widget.filePath,
-        localTitle: widget.title,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await UIHelper.forcePortrait();
+        await UIHelper.exitImmersiveMode();
+        if (context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: AniDashVideoPlayer(
+          localFilePath: widget.filePath,
+          localTitle: widget.title,
+        ),
       ),
     );
   }

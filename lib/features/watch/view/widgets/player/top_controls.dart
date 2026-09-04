@@ -81,7 +81,11 @@ class TopControls extends ConsumerWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: _wrap(() => context.pop()),
+                  onTap: _wrap(() async {
+                    await UIHelper.forcePortrait();
+                    await UIHelper.exitImmersiveMode();
+                    if (context.mounted) context.pop();
+                  }),
                   customBorder: const CircleBorder(),
                   child: const Padding(
                     padding: EdgeInsets.all(8.0),

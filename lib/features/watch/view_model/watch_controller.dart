@@ -33,6 +33,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   int _lastSavedPos = -1;
   int _lastScreenshotPos = -1;
   bool _trackingTriggered = false;
+  bool _hasAutoAdvanced = false;
 
   @override
   void build() {
@@ -115,7 +116,12 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .stream
         .completed
         .listen((completed) {
-          if (completed && !_isDisposed && _dur > 30 && _pos >= _dur - 5) {
+          if (completed &&
+              !_isDisposed &&
+              !_hasAutoAdvanced &&
+              _dur > 120 &&
+              _pos >= _dur - 2) {
+            _hasAutoAdvanced = true;
             ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
           }
         });
@@ -175,6 +181,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         _pos = 0;
         _dur = 0;
         _trackingTriggered = false;
+        _hasAutoAdvanced = false;
         _isPlayerReady = false;
         ref.read(watchProgressProvider.notifier).resetLastSavedPosition();
 
@@ -256,7 +263,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     for (final skip in skips) {
       if (skip.interval == null) continue;
       final start = Duration(seconds: skip.interval!.startTime.toInt());
-      final end = Duration(seconds: skip.interval!.endTime.toInt());
+      final end = Duration(seconds: skip.interval!.endTime.toInt() + 1);
 
       if (position >= start && position < end) {
         ref.read(playerStateProvider.notifier).seek(end);

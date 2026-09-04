@@ -75,8 +75,8 @@ class PlayerUIController extends _$PlayerUIController {
 
     final settings = ref.read(playerSettingsProvider);
     final duration = state.isLocked
-        ? 5
-        : (settings.autoHideDuration < 5 ? 5 : settings.autoHideDuration);
+        ? settings.lockAutoHideDuration.clamp(2, 30)
+        : (settings.autoHideDuration < 2 ? 2 : settings.autoHideDuration);
     _hideTimer = Timer(Duration(seconds: duration), () {
       state = state.copyWith(isVisible: false);
     });
