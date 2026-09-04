@@ -20,7 +20,7 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    UIHelper.enableImmersiveMode();
+    UIHelper.hideNavigationBarOnly();
     UIHelper.forceLandscape();
   }
 

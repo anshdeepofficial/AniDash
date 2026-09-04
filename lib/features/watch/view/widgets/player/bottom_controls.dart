@@ -135,48 +135,6 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                 isAccent: true,
                                 scheme: scheme,
                               ),
-                            if (!widget.isLocal)
-                              _FlatTextBtn(
-                                text: ref.watch(
-                                  episodeDataProvider.select(
-                                    (s) =>
-                                        s.selectedServer?.id?.toUpperCase() ??
-                                        'SERVER',
-                                  ),
-                                ),
-                                onTap: widget.onServerPressed,
-                              ),
-                            if (!widget.isLocal)
-                              _FlatTextBtn(
-                                text: ref.watch(
-                                  episodeDataProvider.select((s) {
-                                    if (s.selectedQualityIdx != null &&
-                                        s.selectedQualityIdx! <
-                                            s.qualityOptions.length) {
-                                      final q =
-                                          s
-                                              .qualityOptions[s
-                                                  .selectedQualityIdx!]['quality']
-                                              ?.toString();
-                                      if (q != null && q.isNotEmpty)
-                                        return q.toUpperCase();
-                                    }
-                                    if (s.selectedSourceIdx != null &&
-                                        s.selectedSourceIdx! <
-                                            s.sources.length) {
-                                      final q =
-                                          s
-                                              .sources[s.selectedSourceIdx!]
-                                              .quality;
-                                      if (q != null &&
-                                          q.toLowerCase() != 'default')
-                                        return q.toUpperCase();
-                                    }
-                                    return 'AUTO';
-                                  }),
-                                ),
-                                onTap: widget.onSourcePressed,
-                              ),
                             _ToolbarIcon(
                               icon: Icons.lock_outline_rounded,
                               onTap: widget.onLockPressed,

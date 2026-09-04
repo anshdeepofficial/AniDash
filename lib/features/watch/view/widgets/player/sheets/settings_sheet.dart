@@ -27,12 +27,15 @@ class SettingsSheetContent extends ConsumerWidget {
     final playerSettings = ref.watch(playerSettingsProvider);
     final playerNotifier = ref.read(playerSettingsProvider.notifier);
 
-    final currentQuality = streamData.selectedQualityIdx != null &&
-            streamData.qualityOptions.isNotEmpty &&
-            streamData.selectedQualityIdx! < streamData.qualityOptions.length
-        ? streamData.qualityOptions[streamData.selectedQualityIdx!]['quality']
-            ?.toString()
-        : 'Auto';
+    final currentQuality =
+        streamData.selectedQualityIdx != null &&
+                streamData.qualityOptions.isNotEmpty &&
+                streamData.selectedQualityIdx! <
+                    streamData.qualityOptions.length
+            ? streamData
+                .qualityOptions[streamData.selectedQualityIdx!]['quality']
+                ?.toString()
+            : 'Auto';
 
     final isDub = streamData.selectedServer?.isDub == true;
 
@@ -44,7 +47,10 @@ class SettingsSheetContent extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Settings", style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                "Settings",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const Divider(height: 24),
               ListTile(
                 leading: const Icon(Icons.high_quality_rounded),
@@ -54,32 +60,41 @@ class SettingsSheetContent extends ConsumerWidget {
                   if (streamData.qualityOptions.isNotEmpty) {
                     _showDialog(
                       context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text("Select Quality"),
-                        content: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(
-                              streamData.qualityOptions.length,
-                              (index) {
-                                final opt = streamData.qualityOptions[index];
-                                final isSelected =
-                                    streamData.selectedQualityIdx == index;
-                                return ListTile(
-                                  title: Text(opt['quality']?.toString() ?? 'Option $index'),
-                                  trailing: isSelected
-                                      ? const Icon(Icons.check, color: Colors.green)
-                                      : null,
-                                  onTap: () {
-                                    Navigator.pop(ctx);
-                                    streamNotifier.changeQuality(index);
+                      builder:
+                          (ctx) => AlertDialog(
+                            title: const Text("Select Quality"),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  streamData.qualityOptions.length,
+                                  (index) {
+                                    final opt =
+                                        streamData.qualityOptions[index];
+                                    final isSelected =
+                                        streamData.selectedQualityIdx == index;
+                                    return ListTile(
+                                      title: Text(
+                                        opt['quality']?.toString() ??
+                                            'Option $index',
+                                      ),
+                                      trailing:
+                                          isSelected
+                                              ? const Icon(
+                                                Icons.check,
+                                                color: Colors.green,
+                                              )
+                                              : null,
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        streamNotifier.changeQuality(index);
+                                      },
+                                    );
                                   },
-                                );
-                              },
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
                     );
                   }
                 },
@@ -89,6 +104,100 @@ class SettingsSheetContent extends ConsumerWidget {
                 title: const Text("Audio Track"),
                 trailing: Text(isDub ? 'DUB' : 'SUB'),
                 onTap: () => streamNotifier.toggleDubSub(),
+              ),
+              ListTile(
+                leading: const Icon(Icons.dns_rounded),
+                title: const Text("Server"),
+                trailing: Text(
+                  streamData.selectedServer?.id?.toUpperCase() ?? 'Auto',
+                ),
+                onTap:
+                    streamData.servers.isEmpty
+                        ? null
+                        : () => _showDialog(
+                          context,
+                          builder:
+                              (ctx) => AlertDialog(
+                                title: const Text("Select Server"),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children:
+                                        streamData.servers
+                                            .map(
+                                              (server) => ListTile(
+                                                title: Text(
+                                                  (server.id ??
+                                                          server.name ??
+                                                          'Server')
+                                                      .toUpperCase(),
+                                                ),
+                                                subtitle: Text(
+                                                  server.isDub ? 'DUB' : 'SUB',
+                                                ),
+                                                onTap: () {
+                                                  Navigator.pop(ctx);
+                                                  streamNotifier.changeServer(
+                                                    server,
+                                                  );
+                                                },
+                                              ),
+                                            )
+                                            .toList(),
+                                  ),
+                                ),
+                              ),
+                        ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.source_rounded),
+                title: const Text("Source"),
+                trailing: Text(
+                  streamData.selectedSourceIdx != null &&
+                          streamData.selectedSourceIdx! <
+                              streamData.sources.length
+                      ? (streamData
+                              .sources[streamData.selectedSourceIdx!]
+                              .quality ??
+                          'Auto')
+                      : 'Auto',
+                ),
+                onTap:
+                    streamData.sources.isEmpty
+                        ? null
+                        : () => _showDialog(
+                          context,
+                          builder:
+                              (ctx) => AlertDialog(
+                                title: const Text("Select Source"),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: List.generate(
+                                      streamData.sources.length,
+                                      (index) => ListTile(
+                                        title: Text(
+                                          streamData.sources[index].quality ??
+                                              'Source ${index + 1}',
+                                        ),
+                                        trailing:
+                                            streamData.selectedSourceIdx ==
+                                                    index
+                                                ? const Icon(
+                                                  Icons.check,
+                                                  color: Colors.green,
+                                                )
+                                                : null,
+                                        onTap: () {
+                                          Navigator.pop(ctx);
+                                          streamNotifier.changeSource(index);
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                        ),
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.fast_forward_rounded),
@@ -106,8 +215,11 @@ class SettingsSheetContent extends ConsumerWidget {
                 trailing: Text(
                   "${ref.watch(playerStateProvider.select((p) => p.playbackSpeed))}x",
                 ),
-                onTap: () =>
-                    _showDialog(context, builder: (ctx) => const SpeedDialog()),
+                onTap:
+                    () => _showDialog(
+                      context,
+                      builder: (ctx) => const SpeedDialog(),
+                    ),
               ),
               ListTile(
                 leading: const Icon(Iconsax.crop),
@@ -117,8 +229,11 @@ class SettingsSheetContent extends ConsumerWidget {
                     ref.watch(playerStateProvider.select((p) => p.fit)),
                   ),
                 ),
-                onTap: () =>
-                    _showDialog(context, builder: (ctx) => const FitDialog()),
+                onTap:
+                    () => _showDialog(
+                      context,
+                      builder: (ctx) => const FitDialog(),
+                    ),
               ),
             ],
           ),
@@ -151,17 +266,18 @@ class _SpeedDialogState extends ConsumerState<SpeedDialog> {
       content: Wrap(
         spacing: 8.0,
         runSpacing: 4.0,
-        children: [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
-            .map(
-              (speed) => ChoiceChip(
-                label: Text("${speed}x"),
-                selected: _selectedSpeed == speed,
-                onSelected: (isSelected) {
-                  if (isSelected) setState(() => _selectedSpeed = speed);
-                },
-              ),
-            )
-            .toList(),
+        children:
+            [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
+                .map(
+                  (speed) => ChoiceChip(
+                    label: Text("${speed}x"),
+                    selected: _selectedSpeed == speed,
+                    onSelected: (isSelected) {
+                      if (isSelected) setState(() => _selectedSpeed = speed);
+                    },
+                  ),
+                )
+                .toList(),
       ),
       actions: [
         TextButton(
@@ -203,18 +319,19 @@ class _FitDialogState extends ConsumerState<FitDialog> {
       title: const Text("Video Fit"),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        children: fitModes
-            .map(
-              (fit) => RadioListTile<BoxFit>(
-                title: Text(_fitModeToString(fit)),
-                value: fit,
-                groupValue: _selectedFit,
-                onChanged: (value) {
-                  if (value != null) setState(() => _selectedFit = value);
-                },
-              ),
-            )
-            .toList(),
+        children:
+            fitModes
+                .map(
+                  (fit) => RadioListTile<BoxFit>(
+                    title: Text(_fitModeToString(fit)),
+                    value: fit,
+                    groupValue: _selectedFit,
+                    onChanged: (value) {
+                      if (value != null) setState(() => _selectedFit = value);
+                    },
+                  ),
+                )
+                .toList(),
       ),
       actions: [
         TextButton(

@@ -83,7 +83,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   Future<void> _setupSystemUI() async {
     await Future.wait([
-      UIHelper.enableImmersiveMode(),
+      UIHelper.hideNavigationBarOnly(),
       UIHelper.forceLandscape(),
     ]);
   }
@@ -130,22 +130,23 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('Update Progress?'),
-          content: Text(
-            'Do you want to update your list progress to Episode $episodeNum?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('No'),
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Update Progress?'),
+              content: Text(
+                'Do you want to update your list progress to Episode $episodeNum?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('No'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Yes'),
+                ),
+              ],
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
       );
 
       if (confirmed == true && context.mounted) {
@@ -184,21 +185,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             );
           }
 
-          return Column(
-            children: [
-              AspectRatio(aspectRatio: 16 / 9, child: player),
-              Expanded(
-                child: SizeTransition(
-                  sizeFactor: _panelAnimation,
-                  axis: Axis.vertical,
-                  child: EpisodesPanel(
-                    panelAnimation: _panelController,
-                    mediaId: widget.mediaId,
-                  ),
-                ),
-              ),
-            ],
-          );
+          // Never expose a separate portrait player layout while Android is
+          // completing its landscape transition.
+          return SizedBox.expand(child: player);
         },
       ),
     );

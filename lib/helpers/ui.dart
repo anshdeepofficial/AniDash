@@ -32,7 +32,20 @@ class UIHelper {
   /// Force landscape orientation (mobile only)
   static Future<void> forceLandscape() async {
     if (Platform.isAndroid) {
-      await _orientationChannel.invokeMethod('sensorLandscape');
+      // Leave portrait even when the device-wide auto-rotate toggle is off,
+      // then allow the player to follow either landscape side.
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      try {
+        await _orientationChannel.invokeMethod('sensorLandscape');
+      } on PlatformException {
+        await SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      }
     } else if (Platform.isIOS) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -43,7 +56,11 @@ class UIHelper {
 
   /// Force portrait orientation (mobile only)
   static Future<void> forcePortrait() async {
-    if (!_isDesktop) {
+    if (Platform.isAndroid) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } else if (Platform.isIOS) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
