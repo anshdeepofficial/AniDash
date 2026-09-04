@@ -52,7 +52,6 @@ class _TrackBottomSheetState extends ConsumerState<TrackBottomSheet> {
     }
 
     final hasAnilist = state.bindings.any((b) => b.type == TrackerType.anilist);
-    final hasMal = state.bindings.any((b) => b.type == TrackerType.mal);
 
     return SafeArea(
       child: Padding(

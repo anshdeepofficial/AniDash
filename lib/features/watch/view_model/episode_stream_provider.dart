@@ -22,6 +22,7 @@ import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
+import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/core/models/settings/experimental_model.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
@@ -241,6 +242,17 @@ class EpisodeData extends _$EpisodeData {
     final ep = _epList.episodes.firstWhereOrNull((i) => i.number == epNum);
     if (ep == null) return;
 
+    final dlSettings = ref.read(downloadSettingsProvider);
+    if (dlSettings.rememberDownloadPreferences) {
+      await _directDownloadSingle(
+        context,
+        ep,
+        dlSettings.preferredLanguage,
+        dlSettings.preferredQuality,
+      );
+      return;
+    }
+
     final link = ref.keepAlive();
     AppLogger.section('Initializing Download for Ep $epNum');
 
@@ -270,24 +282,17 @@ class EpisodeData extends _$EpisodeData {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (c) => DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
           maxChildSize: 0.9,
           expand: false,
-          builder: (c, controller) => Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            child: DownloadSourceSelector(
-              animeTitle: _epList.animeTitle ?? 'Unknown',
-              episode: ep,
-              server: selected,
-              fetchSources: () => _fetchSourceData(ep, server: selected),
-              scrollController: controller,
-            ),
+          builder: (c, controller) => DownloadSourceSelector(
+            animeTitle: _epList.animeTitle ?? 'Unknown',
+            episode: ep,
+            episodeCount: 1,
+            server: selected,
+            fetchSources: () => _fetchSourceData(ep, server: selected),
+            scrollController: controller,
           ),
         ),
       );
@@ -296,10 +301,111 @@ class EpisodeData extends _$EpisodeData {
     }
   }
 
+  Future<void> _directDownloadSingle(
+    BuildContext context,
+    EpisodeDataModel ep,
+    String language,
+    String quality,
+  ) async {
+    final epNum = ep.number ?? 0;
+    final animeTitle = _epList.animeTitle ?? 'Unknown';
+
+    try {
+      _showLoading(context);
+      final data = await _fetchSourceData(ep);
+      if (!context.mounted) return;
+      Navigator.pop(context);
+
+      if (data == null || data.sources.isEmpty) {
+        return _showSnack(context, "No download sources available for Ep $epNum");
+      }
+
+      Source? matchedSource;
+      if (language == 'hindi') {
+        matchedSource = data.sources.firstWhereOrNull(
+          (s) =>
+              s.quality?.toLowerCase().contains('hindi') == true ||
+              s.url?.toLowerCase().contains('hindi') == true,
+        );
+      } else if (language == 'dub') {
+        matchedSource = data.sources.firstWhereOrNull((s) => s.isDub);
+      } else {
+        matchedSource = data.sources.firstWhereOrNull((s) => !s.isDub);
+      }
+      matchedSource ??= data.sources.firstOrNull;
+
+      if (matchedSource == null ||
+          matchedSource.url == null ||
+          matchedSource.url!.isEmpty) {
+        return _showSnack(context, "Could not find stream for Ep $epNum");
+      }
+
+      String downloadUrl = matchedSource.url!;
+      final isM3U8 = matchedSource.isM3U8 || downloadUrl.contains('.m3u8');
+
+      if (isM3U8) {
+        try {
+          final extracted = await extractor
+              .extractQualities(
+                matchedSource.url!,
+                matchedSource.headers ?? {},
+                true,
+              )
+              .timeout(const Duration(seconds: 6));
+
+          final target = extracted.firstWhereOrNull(
+            (q) => (q['quality'] as String).contains(quality),
+          );
+          if (target != null &&
+              target['url'] != null &&
+              (target['url'] as String).isNotEmpty) {
+            downloadUrl = target['url'] as String;
+          }
+        } catch (_) {}
+      }
+
+      final ext = isM3U8 ? 'ts' : 'mp4';
+      final sanitizedTitle =
+          animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
+
+      final item = DownloadItem(
+        animeTitle: animeTitle,
+        episodeTitle: ep.title ?? 'Episode $epNum',
+        episodeNumber: epNum,
+        thumbnail: ep.thumbnail ?? '',
+        state: DownloadStatus.queued,
+        progress: 0,
+        downloadUrl: downloadUrl,
+        quality: quality,
+        filePath: fileName,
+        subtitles: data.tracks.map((s) => jsonEncode(s.toJson())).toList(),
+        contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          ...?matchedSource.headers,
+        },
+      );
+
+      ref.read(downloadsProvider.notifier).addDownload(item);
+      if (context.mounted) {
+        _showSnack(context, "Download queued for Ep $epNum ($quality)");
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showSnack(context, "Download failed: $e");
+      }
+    }
+  }
+
   Future<void> downloadBatchEpisodes(
     BuildContext context,
-    List<int> epNums,
-  ) async {
+    List<int> epNums, {
+    String? preferredLanguage,
+    String? preferredQuality,
+  }) async {
     final epModels = _epList.episodes
         .where((e) => e.number != null && epNums.contains(e.number))
         .toList()
@@ -308,6 +414,9 @@ class EpisodeData extends _$EpisodeData {
     if (epModels.isEmpty) return;
 
     final animeTitle = _epList.animeTitle ?? 'Unknown';
+    final dlSettings = ref.read(downloadSettingsProvider);
+    final targetLang = preferredLanguage ?? dlSettings.preferredLanguage;
+    final targetQuality = preferredQuality ?? dlSettings.preferredQuality;
     int queuedCount = 0;
 
     for (final ep in epModels) {
@@ -319,22 +428,55 @@ class EpisodeData extends _$EpisodeData {
           continue;
         }
 
-        final preferDub = ref.read(playerSettingsProvider).preferDub;
-        var source = data.sources.firstWhereOrNull((s) => s.isDub == preferDub);
+        Source? source;
+        if (targetLang == 'hindi') {
+          source = data.sources.firstWhereOrNull(
+            (s) =>
+                s.quality?.toLowerCase().contains('hindi') == true ||
+                s.url?.toLowerCase().contains('hindi') == true,
+          );
+        } else if (targetLang == 'dub') {
+          source = data.sources.firstWhereOrNull((s) => s.isDub);
+        } else {
+          source = data.sources.firstWhereOrNull((s) => !s.isDub);
+        }
         source ??= data.sources.firstOrNull;
 
         if (source == null || source.url == null || source.url!.isEmpty) {
           continue;
         }
 
-        final isM3U8 = source.isM3U8;
-        final quality = source.quality ?? 'Default';
+        String downloadUrl = source.url!;
+        final isM3U8 = source.isM3U8 || downloadUrl.contains('.m3u8');
+
+        if (isM3U8) {
+          try {
+            final extracted = await extractor
+                .extractQualities(
+                  source.url!,
+                  source.headers ?? {},
+                  true,
+                )
+                .timeout(const Duration(seconds: 5));
+
+            final target = extracted.firstWhereOrNull(
+              (q) => (q['quality'] as String).contains(targetQuality),
+            );
+            if (target != null &&
+                target['url'] != null &&
+                (target['url'] as String).isNotEmpty) {
+              downloadUrl = target['url'] as String;
+            }
+          } catch (_) {}
+        }
+
         final ext = isM3U8 ? 'ts' : 'mp4';
         final sanitizedTitle = animeTitle.replaceAll(
           RegExp(r'[\\/:*?"<>|]'),
           '_',
         );
-        final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+        final qualityName =
+            targetQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
         final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
         final item = DownloadItem(
@@ -344,8 +486,8 @@ class EpisodeData extends _$EpisodeData {
           thumbnail: ep.thumbnail ?? '',
           state: DownloadStatus.queued,
           progress: 0,
-          downloadUrl: source.url!,
-          quality: quality,
+          downloadUrl: downloadUrl,
+          quality: targetQuality,
           filePath: fileName,
           subtitles: data.tracks.map((s) => jsonEncode(s.toJson())).toList(),
           contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
@@ -367,7 +509,7 @@ class EpisodeData extends _$EpisodeData {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Queued $queuedCount of ${epModels.length} episodes for download',
+            'Queued $queuedCount of ${epModels.length} episodes ($targetLang, $targetQuality)',
           ),
           backgroundColor: queuedCount > 0
               ? Colors.green.shade700
@@ -554,10 +696,15 @@ class EpisodeData extends _$EpisodeData {
       'Opening stream: ${allQualities[qIdx]['quality']} '
       '(${allQualities.length} quality options available)',
     );
+    final streamHeaders = {
+      ...?state.headers,
+      ...?primarySrc.headers,
+    };
+
     _player.open(
       allQualities[qIdx]['url'] as String,
       startAt,
-      headers: state.headers,
+      headers: streamHeaders,
     );
 
     final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
@@ -592,18 +739,29 @@ class EpisodeData extends _$EpisodeData {
             res.firstOrNull?.headers;
 
         var sources = res
-            .map(
-              (s) => Source(
-                url: s?.url,
-                isM3U8: s?.url?.contains('.m3u8') == true,
-                quality: "${s?.title ?? ''} ${s?.quality ?? ''}".trim(),
-                headers: s?.headers ?? extractedHeaders,
-                isDub: s?.url?.toLowerCase().contains('dub') == true ||
-                    s?.title?.toLowerCase().contains('dub') == true ||
-                    s?.quality?.toLowerCase().contains('dub') == true,
-              ),
-            )
-            .where((s) => s.url != null && s.url!.isNotEmpty)
+            .where((s) => s != null && s.url.isNotEmpty)
+            .map((s) {
+              final item = s!;
+              final title = item.title?.trim() ?? '';
+              final quality = item.quality.trim();
+              final cleanQ = title.isEmpty
+                  ? (quality.isEmpty ? 'Default' : quality)
+                  : (quality.isEmpty || title == quality || title.contains(quality))
+                      ? title
+                      : (quality.contains(title) ? quality : '$title $quality');
+
+              final isDubSource = item.url.toLowerCase().contains('dub') ||
+                  item.title?.toLowerCase().contains('dub') == true ||
+                  item.quality.toLowerCase().contains('dub');
+
+              return Source(
+                url: item.url,
+                isM3U8: item.url.contains('.m3u8'),
+                quality: cleanQ,
+                headers: item.headers ?? extractedHeaders,
+                isDub: isDubSource,
+              );
+            })
             .toList();
 
         if (isDubRequested) {

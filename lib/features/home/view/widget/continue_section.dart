@@ -241,12 +241,12 @@ class ContinueSection extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               isCurrentCompleted
-                                  ? (displayEp?.episodeTitle.isNotEmpty == true
-                                      ? displayEp!.episodeTitle
+                                  ? (entry.episodesProgress[nextEpisodeNum]?.episodeTitle.isNotEmpty == true
+                                      ? entry.episodesProgress[nextEpisodeNum]!.episodeTitle
                                       : 'Episode $nextEpisodeNum')
                                   : (currentEp?.episodeTitle.isNotEmpty == true
                                       ? currentEp!.episodeTitle
-                                      : 'Continue Watching'),
+                                      : 'Episode ${entry.currentEpisode}'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodySmall?.copyWith(

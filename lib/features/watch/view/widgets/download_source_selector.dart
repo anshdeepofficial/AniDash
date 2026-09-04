@@ -1,77 +1,100 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/core/utils/extractors.dart' as extractor;
 
-class DownloadSourceSelector extends StatefulWidget {
+class DownloadSourceSelector extends ConsumerStatefulWidget {
   final String animeTitle;
-  final EpisodeDataModel episode;
+  final EpisodeDataModel? episode;
+  final int episodeCount;
   final ServerData? server;
-  final Future<BaseSourcesModel?> Function() fetchSources;
+  final Future<BaseSourcesModel?> Function()? fetchSources;
   final ScrollController scrollController;
+  final Future<void> Function(String language, String quality, bool doNotAskAgain)?
+      onConfirmBatchDownload;
 
   const DownloadSourceSelector({
     super.key,
     required this.animeTitle,
-    required this.episode,
-    required this.server,
-    required this.fetchSources,
+    this.episode,
+    this.episodeCount = 1,
+    this.server,
+    this.fetchSources,
     required this.scrollController,
+    this.onConfirmBatchDownload,
   });
 
   @override
-  State<DownloadSourceSelector> createState() => _DownloadSourceSelectorState();
+  ConsumerState<DownloadSourceSelector> createState() =>
+      _DownloadSourceSelectorState();
 }
 
-class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
-  bool _loading = true;
+class _DownloadSourceSelectorState
+    extends ConsumerState<DownloadSourceSelector> {
+  bool _loading = false;
   String? _error;
   List<Source> _sources = [];
   List<Subtitle> _subtitles = [];
 
-  final Map<int, List<Map<String, dynamic>>> _extractedCache = {};
-  final Set<int> _extractingIndices = {};
-  int? _expandedIndex;
-  String _filter = 'All';
+  late String _selectedLanguage;
+  late String _selectedQuality;
+  bool _rememberChoice = false;
+  bool _hasHindi = false;
+  bool _hasDub = true;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    final downloadSettings = ref.read(downloadSettingsProvider);
+    _selectedLanguage = downloadSettings.preferredLanguage;
+    _selectedQuality = downloadSettings.preferredQuality;
+    _rememberChoice = downloadSettings.rememberDownloadPreferences;
+
+    if (widget.fetchSources != null) {
+      _initSources();
+    }
   }
 
-  Future<void> _init() async {
-    if (!mounted) return;
+  Future<void> _initSources() async {
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final data = await widget.fetchSources();
+      final data = await widget.fetchSources!();
       if (!mounted) return;
 
-      if (data == null) {
+      if (data != null && data.sources.isNotEmpty) {
+        final hasHindi = data.sources.any(
+              (s) =>
+                  s.quality?.toLowerCase().contains('hindi') == true ||
+                  s.url?.toLowerCase().contains('hindi') == true,
+            ) ||
+            data.tracks.any(
+              (t) => t.lang?.toLowerCase().contains('hin') == true,
+            );
+
+        final hasDub = data.sources.any((s) => s.isDub);
+
         setState(() {
-          _error = "No sources available";
+          _sources = data.sources;
+          _subtitles = data.tracks;
+          _hasHindi = hasHindi;
+          _hasDub = hasDub;
           _loading = false;
         });
-        return;
+      } else {
+        setState(() => _loading = false);
       }
-
-      setState(() {
-        _sources = data.sources;
-        _subtitles = data.tracks;
-        _loading = false;
-        if (_sources.isEmpty) _error = "No video sources found";
-      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -81,285 +104,601 @@ class _DownloadSourceSelectorState extends State<DownloadSourceSelector> {
     }
   }
 
-  Future<void> _expandSource(int index, Source source) async {
-    if (_expandedIndex == index) {
-      setState(() => _expandedIndex = null);
-      return;
+  String _formatSize(int mb) {
+    if (mb >= 1024) {
+      return '~${(mb / 1024).toStringAsFixed(1)} GB';
     }
+    return '~$mb MB';
+  }
 
-    setState(() => _expandedIndex = index);
-
-    if (_extractedCache.containsKey(index)) return;
-
-    setState(() => _extractingIndices.add(index));
-
-    try {
-      final url = source.url;
-      if (url == null || url.isEmpty) throw Exception("URL missing");
-
-      List<Map<String, dynamic>> result = [];
-      if (source.isM3U8) {
-        result = await extractor
-            .extractQualities(url, source.headers ?? {}, source.isM3U8)
-            .timeout(const Duration(seconds: 15));
-      } else {
-        result = [
-          {'quality': source.quality ?? 'Default', 'url': url},
-        ];
-      }
-
-      if (mounted) {
-        setState(() => _extractedCache[index] = result);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _extractedCache[index] = [
-            {'quality': 'Error loading qualities', 'url': ''},
-          ];
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _extractingIndices.remove(index));
-      }
+  int _getQualitySize(String quality) {
+    switch (quality) {
+      case '1080p':
+        return 350;
+      case '720p':
+        return 200;
+      case '480p':
+        return 100;
+      case '360p':
+        return 60;
+      default:
+        return 200;
     }
   }
 
-  Future<void> _triggerDownload(
-    String? url,
-    String quality,
-    Map<String, String>? headers,
-    bool isM3U8,
-  ) async {
-    if (url == null || url.isEmpty) return;
+  Future<void> _startDownload() async {
+    // 1. Save preferences if remember was checked
+    if (_rememberChoice) {
+      ref.read(downloadSettingsProvider.notifier).saveDownloadPreferences(
+            remember: true,
+            language: _selectedLanguage,
+            quality: _selectedQuality,
+          );
+    }
 
-    try {
-      final providerContext = ProviderScope.containerOf(context);
-      final notifier = providerContext.read(downloadsProvider.notifier);
-      final epNum = widget.episode.number ?? 0;
-
-      final ext = isM3U8 ? 'ts' : 'mp4';
-      final sanitizedTitle = widget.animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
-
-      final item = DownloadItem(
-        animeTitle: widget.animeTitle,
-        episodeTitle: widget.episode.title ?? 'Episode $epNum',
-        episodeNumber: epNum,
-        thumbnail: widget.episode.thumbnail ?? '',
-        state: DownloadStatus.queued,
-        progress: 0,
-        downloadUrl: url,
-        quality: quality,
-        filePath: fileName,
-        subtitles: _subtitles.map((s) => jsonEncode(s.toJson())).toList(),
-        contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          ...?headers,
-        },
+    // 2. Batch download callback
+    if (widget.onConfirmBatchDownload != null) {
+      Navigator.pop(context);
+      await widget.onConfirmBatchDownload!(
+        _selectedLanguage,
+        _selectedQuality,
+        _rememberChoice,
       );
+      return;
+    }
 
-      notifier.addDownload(item);
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Download started')));
+    // 3. Single episode direct download
+    if (widget.episode == null) return;
+
+    final epNum = widget.episode!.number ?? 0;
+    Source? matchedSource;
+
+    if (_sources.isNotEmpty) {
+      if (_selectedLanguage == 'hindi') {
+        matchedSource = _sources.firstWhere(
+          (s) =>
+              s.quality?.toLowerCase().contains('hindi') == true ||
+              s.url?.toLowerCase().contains('hindi') == true,
+          orElse: () => _sources.first,
+        );
+      } else if (_selectedLanguage == 'dub') {
+        matchedSource = _sources.firstWhere(
+          (s) => s.isDub,
+          orElse: () => _sources.first,
+        );
+      } else {
+        matchedSource = _sources.firstWhere(
+          (s) => !s.isDub,
+          orElse: () => _sources.first,
+        );
       }
-    } catch (e) {
-      debugPrint(e.toString());
+    }
+
+    String downloadUrl = matchedSource?.url ?? '';
+    final isM3U8 = matchedSource?.isM3U8 ?? downloadUrl.contains('.m3u8');
+
+    // If source is M3U8, try to extract matching quality sub-playlist
+    if (matchedSource != null && isM3U8) {
+      try {
+        final extracted = await extractor
+            .extractQualities(
+              matchedSource.url!,
+              matchedSource.headers ?? {},
+              true,
+            )
+            .timeout(const Duration(seconds: 8));
+
+        final target = extracted.firstWhere(
+          (q) => (q['quality'] as String).contains(_selectedQuality),
+          orElse: () => extracted.first,
+        );
+        if (target['url'] != null && (target['url'] as String).isNotEmpty) {
+          downloadUrl = target['url'] as String;
+        }
+      } catch (_) {}
+    }
+
+    final ext = isM3U8 ? 'ts' : 'mp4';
+    final sanitizedTitle =
+        widget.animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final qualityName =
+        _selectedQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
+
+    final item = DownloadItem(
+      animeTitle: widget.animeTitle,
+      episodeTitle: widget.episode!.title ?? 'Episode $epNum',
+      episodeNumber: epNum,
+      thumbnail: widget.episode!.thumbnail ?? '',
+      state: DownloadStatus.queued,
+      progress: 0,
+      downloadUrl: downloadUrl,
+      quality: _selectedQuality,
+      filePath: fileName,
+      subtitles: _subtitles.map((s) => jsonEncode(s.toJson())).toList(),
+      contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        ...?matchedSource?.headers,
+      },
+    );
+
+    ref.read(downloadsProvider.notifier).addDownload(item);
+
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Download queued for Episode $epNum ($_selectedQuality)',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isBatch = widget.episodeCount > 1;
 
-    if (_loading) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+    final basePerEpSize = _getQualitySize(_selectedQuality);
+    final totalSizeMB = basePerEpSize * widget.episodeCount;
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          controller: widget.scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              TextButton(onPressed: _init, child: Text("Retry")),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Select Source',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
               Row(
-                children: ['All', 'Sub', 'Dub'].map((type) => Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: FilterChip(
-                    label: Text(type),
-                    selected: _filter == type,
-                    onSelected: (selected) {
-                      if (selected) setState(() => _filter = type);
-                    },
-                    padding: EdgeInsets.zero,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.download_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 24,
+                    ),
                   ),
-                )).toList(),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isBatch
+                              ? 'Download ${widget.episodeCount} Episodes'
+                              : 'Download Episode ${widget.episode?.number ?? 1}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.animeTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: () {
-            final filteredSources = _sources.where((s) {
-              if (_filter == 'All') return true;
-              if (_filter == 'Sub') return !s.isDub;
-              if (_filter == 'Dub') return s.isDub;
-              return true;
-            }).toList();
-
-            return ListView.separated(
-              controller: widget.scrollController,
-              itemCount: filteredSources.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final source = filteredSources[index];
-                  final originalIndex = _sources.indexOf(source);
-                  final isExpanded = _expandedIndex == originalIndex;
-                  final cachedQualities = _extractedCache[originalIndex] ?? [];
-                  final isExtracting = _extractingIndices.contains(originalIndex);
-
-                  return Theme(
-                    data: Theme.of(
-                      context,
-                    ).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      maintainState: true,
-                      initiallyExpanded: isExpanded,
-                      onExpansionChanged: (val) => _expandSource(originalIndex, source),
-                      title: Row(
+              const SizedBox(height: 18),
+              const Divider(height: 1),
+              if (_loading) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        source.quality ?? 'Source ${index + 1}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      Icon(Icons.error_outline, color: colorScheme.error, size: 20),
                       const SizedBox(width: 8),
-                      Badge(
-                        label: Text(source.isDub ? 'DUB' : 'SUB'),
-                        backgroundColor: source.isDub
-                            ? colorScheme.secondary
-                            : colorScheme.primary,
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 13),
+                        ),
                       ),
                     ],
                   ),
-                  trailing: isExtracting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
+                ),
+              ],
+              const SizedBox(height: 18),
+              Text(
+                'Language / Audio',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _LanguageChip(
+                    label: 'Japanese (Sub)',
+                    icon: Iconsax.translate,
+                    isSelected: _selectedLanguage == 'sub',
+                    onTap: () => setState(() => _selectedLanguage = 'sub'),
+                  ),
+                  if (_hasDub)
+                    _LanguageChip(
+                      label: 'English (Dub)',
+                      icon: Iconsax.volume_high,
+                      isSelected: _selectedLanguage == 'dub',
+                      onTap: () => setState(() => _selectedLanguage = 'dub'),
+                    ),
+                  if (_hasHindi)
+                    _LanguageChip(
+                      label: 'Hindi',
+                      icon: Iconsax.language_square,
+                      isSelected: _selectedLanguage == 'hindi',
+                      onTap: () => setState(() => _selectedLanguage = 'hindi'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Quality',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _QualityCard(
+                quality: '1080p',
+                title: '1080p (Full HD)',
+                sizeDescription: isBatch
+                    ? '${_formatSize(350)} / ep • ${_formatSize(350 * widget.episodeCount)} Total'
+                    : _formatSize(350),
+                isSelected: _selectedQuality == '1080p',
+                onTap: () => setState(() => _selectedQuality = '1080p'),
+              ),
+              const SizedBox(height: 8),
+              _QualityCard(
+                quality: '720p',
+                title: '720p (High Definition)',
+                sizeDescription: isBatch
+                    ? '${_formatSize(200)} / ep • ${_formatSize(200 * widget.episodeCount)} Total'
+                    : _formatSize(200),
+                isSelected: _selectedQuality == '720p',
+                onTap: () => setState(() => _selectedQuality = '720p'),
+              ),
+              const SizedBox(height: 8),
+              _QualityCard(
+                quality: '480p',
+                title: '480p (Standard)',
+                sizeDescription: isBatch
+                    ? '${_formatSize(100)} / ep • ${_formatSize(100 * widget.episodeCount)} Total'
+                    : _formatSize(100),
+                isSelected: _selectedQuality == '480p',
+                onTap: () => setState(() => _selectedQuality = '480p'),
+              ),
+              const SizedBox(height: 8),
+              _QualityCard(
+                quality: '360p',
+                title: '360p (Data Saver)',
+                sizeDescription: isBatch
+                    ? '${_formatSize(60)} / ep • ${_formatSize(60 * widget.episodeCount)} Total'
+                    : _formatSize(60),
+                isSelected: _selectedQuality == '360p',
+                onTap: () => setState(() => _selectedQuality = '360p'),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   children: [
-                    if (cachedQualities.isNotEmpty)
-                      ...cachedQualities.map((q) {
-                        final isErr = q['quality'].toString().contains('Error');
-                        return ListTile(
-                          dense: true,
-                          contentPadding: const EdgeInsets.only(
-                            left: 32,
-                            right: 16,
-                          ),
-                          title: Text(q['quality']),
-                          trailing: isErr
-                              ? null
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.copy, size: 20),
-                                      onPressed: () {
-                                        Clipboard.setData(
-                                          ClipboardData(text: q['url']),
-                                        );
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'URL copied to clipboard',
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.download,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _triggerDownload(
-                                        q['url'],
-                                        q['quality'],
-                                        source.headers,
-                                        source.isM3U8,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                          onTap: isErr
-                              ? null
-                              : () => _triggerDownload(
-                                  q['url'],
-                                  q['quality'],
-                                  source.headers,
-                                  source.isM3U8,
-                                ),
-                        );
-                      })
-                    else if (!isExtracting)
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text("Loading quality options..."),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isBatch
+                            ? 'Estimated download size: ${_formatSize(totalSizeMB)} for ${widget.episodeCount} episodes'
+                            : 'Estimated file size: ${_formatSize(basePerEpSize)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+                    ),
                   ],
                 ),
-              );
-            },
-          );
-        }(),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => setState(() => _rememberChoice = !_rememberChoice),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _rememberChoice,
+                        onChanged: (val) =>
+                            setState(() => _rememberChoice = val ?? false),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Remember choice (Do not ask again)',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Future downloads will use this language & quality automatically.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: _loading ? null : _startDownload,
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.download_rounded),
+                  label: Text(
+                    isBatch
+                        ? 'Download ${widget.episodeCount} Episodes (${_formatSize(totalSizeMB)})'
+                        : 'Download Episode (${_formatSize(basePerEpSize)})',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-    ],
-  );
+    );
+  }
+}
+
+class _LanguageChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _LanguageChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              width: isSelected ? 1.5 : 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurface,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QualityCard extends StatelessWidget {
+  final String quality;
+  final String title;
+  final String sizeDescription;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _QualityCard({
+    required this.quality,
+    required this.title,
+    required this.sizeDescription,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.7)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+            width: isSelected ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 14,
+                      color: isSelected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sizeDescription,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSelected
+                          ? colorScheme.onPrimaryContainer.withValues(alpha: 0.8)
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                quality,
+                style: TextStyle(
+                  color: isSelected
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -12,14 +12,29 @@ Future<List<Map<String, dynamic>>> extractQualities(
     ];
   }
 
+  final effectiveHeaders = <String, String>{
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    ...?headers,
+  };
+
+  if (!effectiveHeaders.containsKey('Referer')) {
+    try {
+      final uri = Uri.parse(url);
+      if (uri.scheme.startsWith('http')) {
+        effectiveHeaders['Referer'] = '${uri.scheme}://${uri.host}/';
+      }
+    } catch (_) {}
+  }
+
   try {
     final response = await UniversalHttpClient.instance
         .get(
           Uri.parse(url),
-          headers: headers,
-          cacheConfig: CacheConfig.long,
+          headers: effectiveHeaders,
+          cacheConfig: CacheConfig.none,
         )
-        .timeout(const Duration(seconds: 4));
+        .timeout(const Duration(seconds: 12));
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return _parseM3U8(response.body, url);

@@ -7,6 +7,9 @@ class DownloadSettingsModel {
   final int parallelDownloads;
   final int speedLimitKBps;
   final bool wifiOnly;
+  final bool rememberDownloadPreferences;
+  final String preferredLanguage; // 'sub', 'dub', 'hindi'
+  final String preferredQuality;  // '1080p', '720p', '480p', '360p'
 
   DownloadSettingsModel({
     this.customDownloadPath,
@@ -15,6 +18,9 @@ class DownloadSettingsModel {
     this.parallelDownloads = 5,
     this.speedLimitKBps = 0,
     this.wifiOnly = false,
+    this.rememberDownloadPreferences = false,
+    this.preferredLanguage = 'sub',
+    this.preferredQuality = '1080p',
   });
 
   DownloadSettingsModel copyWith({
@@ -24,6 +30,9 @@ class DownloadSettingsModel {
     int? parallelDownloads,
     int? speedLimitKBps,
     bool? wifiOnly,
+    bool? rememberDownloadPreferences,
+    String? preferredLanguage,
+    String? preferredQuality,
   }) {
     return DownloadSettingsModel(
       customDownloadPath: customDownloadPath ?? this.customDownloadPath,
@@ -32,6 +41,10 @@ class DownloadSettingsModel {
       parallelDownloads: parallelDownloads ?? this.parallelDownloads,
       speedLimitKBps: speedLimitKBps ?? this.speedLimitKBps,
       wifiOnly: wifiOnly ?? this.wifiOnly,
+      rememberDownloadPreferences:
+          rememberDownloadPreferences ?? this.rememberDownloadPreferences,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      preferredQuality: preferredQuality ?? this.preferredQuality,
     );
   }
 
@@ -43,6 +56,9 @@ class DownloadSettingsModel {
       'parallelDownloads': parallelDownloads,
       'speedLimitKBps': speedLimitKBps,
       'wifiOnly': wifiOnly,
+      'rememberDownloadPreferences': rememberDownloadPreferences,
+      'preferredLanguage': preferredLanguage,
+      'preferredQuality': preferredQuality,
     };
   }
 
@@ -54,6 +70,10 @@ class DownloadSettingsModel {
       parallelDownloads: map['parallelDownloads']?.toInt() ?? 5,
       speedLimitKBps: map['speedLimitKBps']?.toInt() ?? 0,
       wifiOnly: map['wifiOnly'] ?? false,
+      rememberDownloadPreferences:
+          map['rememberDownloadPreferences'] ?? false,
+      preferredLanguage: map['preferredLanguage'] ?? 'sub',
+      preferredQuality: map['preferredQuality'] ?? '1080p',
     );
   }
 

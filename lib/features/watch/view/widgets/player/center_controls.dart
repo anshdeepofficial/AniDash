@@ -27,6 +27,12 @@ class CenterControls extends ConsumerWidget {
     final playerNotifier = ref.read(playerStateProvider.notifier);
     final settings = ref.watch(playerSettingsProvider);
 
+    final isBusy = isBuffering ||
+        episodesLoading ||
+        episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
+        episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
+        episodeStreamState.contains(EpisodeStreamState.QUALITY_LOADING);
+
     return Center(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -59,13 +65,19 @@ class CenterControls extends ConsumerWidget {
                   child: FadeTransition(opacity: animation, child: child),
                 );
               },
-              child: isBuffering
+              child: isBusy
                   ? _BorderlessLoading(
                       key: const ValueKey('loading'),
                       scheme: scheme,
                       sourceLoading: episodeStreamState.contains(
-                        EpisodeStreamState.SOURCE_LOADING,
-                      ),
+                            EpisodeStreamState.SOURCE_LOADING,
+                          ) ||
+                          episodeStreamState.contains(
+                            EpisodeStreamState.SERVER_LOADING,
+                          ) ||
+                          episodeStreamState.contains(
+                            EpisodeStreamState.QUALITY_LOADING,
+                          ),
                       episodesLoading: episodesLoading,
                     )
                   : _ShadowIconButton(

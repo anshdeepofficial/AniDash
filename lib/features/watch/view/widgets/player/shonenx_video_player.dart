@@ -18,6 +18,7 @@ import 'package:ani_dash/features/watch/view/widgets/player/sheets/subtitle_sele
 import 'package:ani_dash/features/watch/view/widgets/player/speed_indicator_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/subtitle_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/volume_brightness_overlay.dart';
+import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_ui_controller.dart';
@@ -336,6 +337,18 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final uiState = ref.watch(playerUIControllerProvider);
     final uiController = ref.watch(playerUIControllerProvider.notifier);
 
+    final episodeStreamState = ref.watch(
+      episodeDataProvider.select((e) => e.states),
+    );
+    final episodesLoading = ref.watch(
+      episodeListProvider.select((e) => e.isLoading),
+    );
+    final isBusy = state.isBuffering ||
+        episodesLoading ||
+        episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
+        episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
+        episodeStreamState.contains(EpisodeStreamState.QUALITY_LOADING);
+
     Widget videoView = Video(
       controller: notifier.videoController,
       fit: state.fit,
@@ -415,6 +428,21 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 onSubtitlePressed: _openSubtitle,
                 onFullScreenPressed: _toggleFullScreen,
               ),
+
+              // Standalone Loading Indicator when controls are hidden
+              if (isBusy && !uiState.isVisible)
+                const Center(
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
 
               // Seek Indicator (Dynamic)
               if (uiState.seekAmount != 0)

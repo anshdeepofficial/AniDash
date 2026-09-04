@@ -67,4 +67,24 @@ class DownloadSettingsNotifier extends Notifier<DownloadSettingsModel> {
   void toggleWifiOnly(bool wifiOnly) {
     updateSettings((s) => s.copyWith(wifiOnly: wifiOnly));
   }
+
+  void saveDownloadPreferences({
+    required bool remember,
+    required String language,
+    required String quality,
+  }) {
+    updateSettings(
+      (s) => s.copyWith(
+        rememberDownloadPreferences: remember,
+        preferredLanguage: language,
+        preferredQuality: quality,
+      ),
+    );
+  }
+
+  void resetDownloadPreferences() {
+    updateSettings(
+      (s) => s.copyWith(rememberDownloadPreferences: false),
+    );
+  }
 }

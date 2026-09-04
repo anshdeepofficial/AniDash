@@ -31,7 +31,6 @@ class _TrackingSettingsScreenState
     final auth = ref.watch(authProvider);
 
     final isAnilistLoggedIn = auth.isAniListAuthenticated;
-    final isMalLoggedIn = auth.isMalAuthenticated;
 
     final noSyncTargets = !syncNotifier.hasAnySyncTarget;
 
@@ -124,7 +123,7 @@ class _TrackingSettingsScreenState
                 description: _syncModeDescription(syncSettings.syncMode),
                 selectedValue: syncSettings.syncMode,
                 children: const {
-                  'realtime': Text('Real-Time (Recommended)'),
+                  'realtime': Text('Real-Time'),
                   'background': Text('Background'),
                 },
                 onValueChanged: (dynamic val) {
@@ -227,7 +226,7 @@ class _TrackingSettingsScreenState
   String _syncModeDescription(String mode) {
     switch (mode) {
       case 'realtime':
-        return 'Sync immediately on every change';
+        return 'Sync immediately on every change (Recommended)';
       case 'background':
         return 'Sync at defined intervals';
       default:

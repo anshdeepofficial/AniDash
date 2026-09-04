@@ -21,6 +21,8 @@ import 'package:ani_dash/features/details/view/widgets/episodes/episode_compact_
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_grid_item.dart';
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_list_item.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
+import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 
@@ -109,42 +111,67 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Batch Download'),
-        content: Text(
-          'Queue download for ${selectedNums.length} episodes (${selectedNums.first} - ${selectedNums.last})?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Download ${selectedNums.length} Episodes'),
-          ),
-        ],
-      ),
-    );
+    final downloadSettings = ref.read(downloadSettingsProvider);
+    final animeTitle = ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
+        widget.mediaTitle.english ??
+        widget.mediaTitle.romaji ??
+        'Anime';
 
-    if (confirmed != true || !mounted) return;
+    if (downloadSettings.rememberDownloadPreferences) {
+      _exitSelectionMode();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Starting batch download for ${selectedNums.length} episodes (${downloadSettings.preferredLanguage.toUpperCase()}, ${downloadSettings.preferredQuality})...',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      await ref.read(episodeDataProvider.notifier).downloadBatchEpisodes(
+            context,
+            selectedNums,
+            preferredLanguage: downloadSettings.preferredLanguage,
+            preferredQuality: downloadSettings.preferredQuality,
+          );
+      return;
+    }
 
     _exitSelectionMode();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Starting batch download for ${selectedNums.length} episodes...',
+    if (!context.mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (c) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (c, controller) => DownloadSourceSelector(
+          animeTitle: animeTitle,
+          episodeCount: selectedNums.length,
+          scrollController: controller,
+          onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Queueing ${selectedNums.length} episodes ($lang, $quality)...',
+                ),
+              ),
+            );
+            await ref.read(episodeDataProvider.notifier).downloadBatchEpisodes(
+                  context,
+                  selectedNums,
+                  preferredLanguage: lang,
+                  preferredQuality: quality,
+                );
+          },
         ),
-        duration: const Duration(seconds: 3),
       ),
     );
-
-    await ref
-        .read(episodeDataProvider.notifier)
-        .downloadBatchEpisodes(context, selectedNums);
   }
 
   @override
@@ -579,25 +606,25 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
       final fallbackCover = widget.mediaCover;
 
-      final onDownloadItem = () {
+      void onDownloadItem() {
         ref.read(episodeDataProvider.notifier).downloadEpisode(context, epNum);
-      };
+      }
 
-      final onLongPressItem = () {
+      void onLongPressItem() {
         if (_isSelectionMode) {
           _toggleSelection(epNum);
         } else {
           _enterSelectionMode(epNum);
         }
-      };
+      }
 
-      final onItemTap = () {
+      void onItemTap() {
         if (_isSelectionMode) {
           _toggleSelection(epNum);
         } else {
           _navigateToWatch(ep, allEpisodes, animeIdForSource ?? '');
         }
-      };
+      }
 
       switch (viewMode) {
         case EpisodeViewMode.grid:

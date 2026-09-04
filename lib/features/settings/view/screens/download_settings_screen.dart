@@ -124,6 +124,69 @@ class DownloadSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          SettingsSection(
+            title: 'Download Preferences',
+            titleColor: colorScheme.primary,
+            onTap: () {},
+            children: [
+              ToggleableSettingsItem(
+                icon: Icon(Iconsax.tick_circle, color: colorScheme.primary),
+                accent: colorScheme.primary,
+                title: 'Remember Preferences',
+                description: settings.rememberDownloadPreferences
+                    ? 'Downloads auto-start with saved language & quality'
+                    : 'Prompt for language & quality every time',
+                value: settings.rememberDownloadPreferences,
+                onChanged: (val) {
+                  notifier.updateSettings(
+                    (s) => s.copyWith(rememberDownloadPreferences: val),
+                  );
+                },
+              ),
+              if (settings.rememberDownloadPreferences) ...[
+                DropdownSettingsItem(
+                  icon: Icon(Iconsax.translate),
+                  accent: colorScheme.primary,
+                  title: 'Default Language',
+                  description: 'Preferred audio / subtitle language',
+                  value: settings.preferredLanguage,
+                  items: const [
+                    DropdownMenuItem(value: 'sub', child: Text('Japanese (Sub)')),
+                    DropdownMenuItem(value: 'dub', child: Text('English (Dub)')),
+                    DropdownMenuItem(value: 'hindi', child: Text('Hindi (Dub)')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      notifier.updateSettings(
+                        (s) => s.copyWith(preferredLanguage: val),
+                      );
+                    }
+                  },
+                ),
+                DropdownSettingsItem(
+                  icon: Icon(Iconsax.video),
+                  accent: colorScheme.primary,
+                  title: 'Default Quality',
+                  description: 'Preferred video resolution',
+                  value: settings.preferredQuality,
+                  items: const [
+                    DropdownMenuItem(value: '1080p', child: Text('1080p (FHD)')),
+                    DropdownMenuItem(value: '720p', child: Text('720p (HD)')),
+                    DropdownMenuItem(value: '480p', child: Text('480p (SD)')),
+                    DropdownMenuItem(value: '360p', child: Text('360p (Data Saver)')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      notifier.updateSettings(
+                        (s) => s.copyWith(preferredQuality: val),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 50),
         ],
       ),
