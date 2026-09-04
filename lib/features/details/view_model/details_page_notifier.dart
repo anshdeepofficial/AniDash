@@ -137,7 +137,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
             ? null
             : await ref
                   .read(animeMatchServiceProvider)
-                  .restoreSource(animeId, showSnackbar: true);
+                  .restoreSource(animeId, showSnackbar: false);
 
         if (!ref.mounted) return;
 
@@ -182,6 +182,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
             animeTitle: state.bestMatchName!,
             animeId: state.animeIdForSource,
             force: force,
+            malId: int.tryParse(state.details.value?.idMal ?? ''),
             media: DMedia(
               title: state.bestMatchName,
               url: state.animeIdForSource,

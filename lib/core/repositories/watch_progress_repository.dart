@@ -159,13 +159,17 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     String animeId,
     EpisodeProgress episodeProgress,
   ) async {
-    final entry = getProgress(animeId);
-    if (entry == null) {
-      AppLogger.w(
-        'Cannot update episode progress: Entry not found for anime ID $animeId',
-      );
-      return;
-    }
+    var entry = getProgress(animeId);
+    entry ??= AnimeWatchProgressEntry(
+      animeId: animeId,
+      animeTitle: '',
+      animeFormat: '',
+      animeCover: '',
+      totalEpisodes: 0,
+      lastUpdated: DateTime.now(),
+      currentEpisode: episodeProgress.episodeNumber,
+      episodesProgress: {},
+    );
 
     final updatedEpisodes = Map<int, EpisodeProgress>.from(
       entry.episodesProgress,
@@ -182,6 +186,52 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       episodesProgress: updatedEpisodes,
       lastUpdated: DateTime.now(),
       currentEpisode: episodeProgress.episodeNumber,
+    );
+
+    await saveProgress(updatedEntry);
+  }
+
+  @override
+  Future<void> markPreviousEpisodesWatched({
+    required String animeId,
+    required String animeTitle,
+    required String animeCover,
+    required String animeFormat,
+    required int upToEpisodeNumber,
+  }) async {
+    var entry = getProgress(animeId);
+    entry ??= AnimeWatchProgressEntry(
+      animeId: animeId,
+      animeTitle: animeTitle,
+      animeFormat: animeFormat,
+      animeCover: animeCover,
+      totalEpisodes: 0,
+      lastUpdated: DateTime.now(),
+      currentEpisode: upToEpisodeNumber,
+      episodesProgress: {},
+    );
+
+    final updatedEpisodes = Map<int, EpisodeProgress>.from(
+      entry.episodesProgress,
+    );
+
+    for (int i = 1; i <= upToEpisodeNumber; i++) {
+      final existing = updatedEpisodes[i];
+      updatedEpisodes[i] = EpisodeProgress(
+        episodeNumber: i,
+        episodeTitle: existing?.episodeTitle ?? 'Episode $i',
+        episodeThumbnail: existing?.episodeThumbnail,
+        isCompleted: true,
+        watchedAt: DateTime.now(),
+      );
+    }
+
+    final updatedEntry = entry.copyWith(
+      episodesProgress: updatedEpisodes,
+      lastUpdated: DateTime.now(),
+      currentEpisode: upToEpisodeNumber,
+      animeTitle: animeTitle.isNotEmpty ? animeTitle : entry.animeTitle,
+      animeCover: animeCover.isNotEmpty ? animeCover : entry.animeCover,
     );
 
     await saveProgress(updatedEntry);

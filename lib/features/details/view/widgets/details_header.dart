@@ -286,19 +286,37 @@ class GenreTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgColor = color != null
+        ? color!.withValues(alpha: 0.25)
+        : (isDark
+            ? Colors.black54
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.9));
+
+    final textColor = color ?? (isDark ? Colors.white : colorScheme.onSurface);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color:
-            color?.withValues(alpha: 0.2) ??
-            Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color?.withValues(alpha: 0.5) ??
+              (isDark
+                  ? Colors.white24
+                  : colorScheme.outlineVariant.withValues(alpha: 0.6)),
+          width: 0.8,
+        ),
       ),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color ?? Colors.white.withValues(alpha: 0.9),
-          fontWeight: isStatus ? FontWeight.w600 : FontWeight.w500,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.2,
         ),
       ),
     );

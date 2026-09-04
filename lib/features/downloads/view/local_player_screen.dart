@@ -25,7 +25,7 @@ class _LocalPlayerScreenState extends State<LocalPlayerScreen> {
   void initState() {
     super.initState();
     UIHelper.enableImmersiveMode();
-    UIHelper.enableAutoRotate();
+    UIHelper.forceLandscape();
     _initializePlayer();
   }
 

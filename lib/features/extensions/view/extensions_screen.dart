@@ -344,7 +344,34 @@ class ExtensionListItem extends StatelessWidget {
                   child: const Icon(Icons.extension, size: 20),
                 ),
         ),
-        title: Text(source.name ?? 'Unknown'),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                source.name ?? 'Unknown',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (source.isNsfw == true) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade900.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '18+',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         subtitle: Text('v${source.version ?? "?"} • ${source.lang ?? "?"}'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

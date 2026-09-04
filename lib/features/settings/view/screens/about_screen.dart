@@ -46,10 +46,13 @@ class AboutScreen extends StatelessWidget {
                     color: colorScheme.surface.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Image.asset(
-                    'assets/icons/app_icon-modified-2.png',
-                    height: 120,
-                    width: 120,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/icons/app_icon-modified-2.png',
+                      height: 120,
+                      width: 120,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

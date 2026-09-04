@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,20 +78,46 @@ class DownloadCard extends ConsumerWidget {
   }
 
   Widget _buildThumbnail(ThemeData theme, bool isCompleted) {
+    Widget imageWidget;
+    final thumb = item.thumbnail.trim();
+
+    if (thumb.startsWith('http://') || thumb.startsWith('https://')) {
+      imageWidget = CachedNetworkImage(
+        imageUrl: thumb,
+        height: 64,
+        width: 64,
+        fit: BoxFit.cover,
+        placeholder: (_, _) =>
+            Container(color: theme.colorScheme.surfaceContainerHigh),
+        errorWidget: (_, _, _) => Container(
+          height: 64,
+          width: 64,
+          color: theme.colorScheme.surfaceContainerHigh,
+          child: const Icon(Iconsax.image, size: 24),
+        ),
+      );
+    } else if (thumb.isNotEmpty && File(thumb).existsSync()) {
+      imageWidget = Image.file(
+        File(thumb),
+        height: 64,
+        width: 64,
+        fit: BoxFit.cover,
+      );
+    } else {
+      imageWidget = Container(
+        height: 64,
+        width: 64,
+        color: theme.colorScheme.surfaceContainerHigh,
+        child: const Icon(Iconsax.video_play, size: 24),
+      );
+    }
+
     return Stack(
       alignment: Alignment.center,
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl: item.thumbnail,
-            height: 64,
-            width: 64,
-            fit: BoxFit.cover,
-            placeholder: (_, _) =>
-                Container(color: theme.colorScheme.surfaceContainerHigh),
-            errorWidget: (_, _, _) => const Icon(Iconsax.image),
-          ),
+          child: imageWidget,
         ),
         if (isCompleted)
           Container(

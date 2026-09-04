@@ -17,6 +17,7 @@ class DownloadItem {
   final String? contentType;
   final List<dynamic>? subtitles;
   final int? totalSegments;
+  final int? downloadedBytes;
 
   final int speed;
   final Duration? eta;
@@ -44,6 +45,7 @@ class DownloadItem {
     this.error,
     this.subtitles,
     this.totalSegments,
+    this.downloadedBytes,
   }) : id = id ?? randomId();
 
   DownloadItem copyWith({
@@ -64,6 +66,7 @@ class DownloadItem {
     dynamic error,
     String? contentType,
     int? totalSegments,
+    int? downloadedBytes,
     List<dynamic>? subtitles,
   }) {
     return DownloadItem(
@@ -84,6 +87,7 @@ class DownloadItem {
       error: error ?? this.error,
       contentType: contentType ?? this.contentType,
       totalSegments: totalSegments ?? this.totalSegments,
+      downloadedBytes: downloadedBytes ?? this.downloadedBytes,
       subtitles: subtitles ?? this.subtitles,
     );
   }
@@ -119,8 +123,16 @@ extension DownloadItemLogic on DownloadItem {
       final currentMB = (progress / 1024 / 1024).toStringAsFixed(1);
       final totalMB = (size! / 1024 / 1024).toStringAsFixed(1);
       return '$currentMB / $totalMB MB';
+    } else if (downloadedBytes != null && downloadedBytes! > 0) {
+      final currentMB = (downloadedBytes! / 1024 / 1024).toStringAsFixed(1);
+      if (hasSegmentCount && progress > 0) {
+        final estTotal = (downloadedBytes! / progress * totalSegments! / 1024 / 1024).toStringAsFixed(1);
+        return '$currentMB / $estTotal MB';
+      }
+      return '$currentMB MB';
     } else if (hasSegmentCount) {
-      return '$progress / $totalSegments segments';
+      final percent = ((progress / totalSegments!) * 100).toStringAsFixed(0);
+      return '$percent%';
     }
     return 'Downloading...';
   }

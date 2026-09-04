@@ -4,7 +4,6 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/repositories/source_preference_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/helpers/matcher.dart';
-import 'package:ani_dash/main.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/content_settings_notifier.dart';
@@ -122,9 +121,6 @@ class AnimeMatchService {
           final provider = _ref.read(selectedAnimeProvider);
           if (provider != null) {
             AppLogger.d('Auto-Restore: Success');
-            if (showSnackbar) {
-              showAppSnackBar('Smart Source', 'Restored previous source.');
-            }
             return BaseAnimeModel(
               id: selection.matchedAnimeId,
               name: selection.matchedAnimeTitle,
@@ -148,9 +144,6 @@ class AnimeMatchService {
           if (source != null) {
             sourceNotifier.setActiveSource(source);
             AppLogger.d('Auto-Restore: Success');
-            if (showSnackbar) {
-              showAppSnackBar('Smart Source', 'Restored previous source.');
-            }
             return BaseAnimeModel(
               id: selection.matchedAnimeId,
               name: selection.matchedAnimeTitle,

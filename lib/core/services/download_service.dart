@@ -123,7 +123,7 @@ class DownloadService {
               id: notifId,
               animeTitle: msg.animeTitle,
               episodeNumber: msg.episodeNumber,
-              progress: msg.progress / 100.0,
+              progress: msg.progressPercentage,
             );
           }
         } else if (msg is String) {
@@ -276,10 +276,15 @@ Future<DownloadItem> _processM3U8(
       ? task.settings.parallelDownloads
       : 3;
   int completed = 0;
+  int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();
 
   for (var s in segments) {
-    if (File(p.join(tempDir.path, '${s.index}.ts')).existsSync()) completed++;
+    final f = File(p.join(tempDir.path, '${s.index}.ts'));
+    if (f.existsSync()) {
+      completed++;
+      downloadedBytesTotal += f.lengthSync();
+    }
   }
 
   final throttler = _Throttler(task.settings.speedLimitKBps);
@@ -305,13 +310,17 @@ Future<DownloadItem> _processM3U8(
               : bytes;
           await file.writeAsBytes(data);
           completed++;
+          downloadedBytesTotal += data.length;
           await throttler.throttle(data.length);
         }
       }),
     );
 
     if (DateTime.now().difference(lastLog).inMilliseconds > 1000) {
-      task.port.send(currentItem.copyWith(progress: completed));
+      task.port.send(currentItem.copyWith(
+        progress: completed,
+        downloadedBytes: downloadedBytesTotal,
+      ));
       lastLog = DateTime.now();
     }
   }
@@ -335,6 +344,7 @@ Future<DownloadItem> _processM3U8(
   return currentItem.copyWith(
     state: DownloadStatus.downloaded,
     size: totalSize,
+    downloadedBytes: totalSize,
     progress: totalSize,
   );
 }

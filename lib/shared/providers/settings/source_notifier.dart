@@ -119,6 +119,8 @@ class SourceNotifier extends _$SourceNotifier {
       ) ?? state.installedAnimeExtensions.firstOrNull,
       activeMangaSource: state.installedMangaExtensions.firstWhereOrNull(
         (s) => s.id == _repo.getActiveMangaSourceId(),
+      ) ?? state.installedMangaExtensions.firstWhereOrNull(
+        (s) => s.name?.toLowerCase().contains('mangadex') == true,
       ) ?? state.installedMangaExtensions.firstOrNull,
       activeNovelSource: state.installedNovelExtensions.firstWhereOrNull(
         (s) => s.id == _repo.getActiveNovelSourceId(),

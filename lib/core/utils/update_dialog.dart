@@ -38,10 +38,21 @@ class _UpdateDialogState extends State<UpdateDialog> {
   final String _linuxCmd =
       'bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/AniDash/main/install.sh)';
 
+  String? get _effectiveApkUrl {
+    if (widget.apkDownloadUrl != null && widget.apkDownloadUrl!.isNotEmpty) {
+      return widget.apkDownloadUrl;
+    }
+    final tag = widget.latestVersion.startsWith('v')
+        ? widget.latestVersion
+        : 'v${widget.latestVersion}';
+    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/app-release.apk';
+  }
+
   Future<void> _handleUpdateAction() async {
     if (Platform.isAndroid) {
-      if (widget.apkDownloadUrl == null) return;
-      await _downloadAndInstall();
+      final url = _effectiveApkUrl;
+      if (url == null) return;
+      await _downloadAndInstall(url);
     } else if (Platform.isLinux) {
       await Clipboard.setData(ClipboardData(text: _linuxCmd));
       if (mounted) {
@@ -53,15 +64,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
         );
       }
     } else if (Platform.isWindows) {
-      if (widget.apkDownloadUrl == null) return;
+      final url = _effectiveApkUrl;
+      if (url == null) return;
       await launchUrl(
-        Uri.parse(widget.apkDownloadUrl!),
+        Uri.parse(url),
         mode: LaunchMode.externalApplication,
       );
     }
   }
 
-  Future<void> _downloadAndInstall() async {
+  Future<void> _downloadAndInstall(String downloadUrl) async {
     setState(() {
       _downloading = true;
       _progress = 0;
@@ -76,7 +88,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       final file = File(savePath);
       if (await file.exists()) await file.delete();
 
-      final request = http.Request('GET', Uri.parse(widget.apkDownloadUrl!));
+      final request = http.Request('GET', Uri.parse(downloadUrl));
       final response = await client.send(request);
 
       if (response.statusCode >= 400) {
@@ -94,11 +106,21 @@ class _UpdateDialogState extends State<UpdateDialog> {
               sink.add(chunk);
               received += chunk.length;
 
-              if (mounted && contentLength != -1) {
+              if (mounted) {
                 setState(() {
-                  _progress = received / contentLength;
-                  _statusMessage =
-                      "Downloading... ${(_progress * 100).toStringAsFixed(0)}%";
+                  if (contentLength > 0) {
+                    _progress = received / contentLength;
+                    final receivedMB =
+                        (received / (1024 * 1024)).toStringAsFixed(1);
+                    final totalMB =
+                        (contentLength / (1024 * 1024)).toStringAsFixed(1);
+                    _statusMessage =
+                        "Downloading... ${(_progress * 100).toInt()}% ($receivedMB MB / $totalMB MB)";
+                  } else {
+                    final receivedMB =
+                        (received / (1024 * 1024)).toStringAsFixed(1);
+                    _statusMessage = "Downloading... $receivedMB MB";
+                  }
                 });
               }
             },
@@ -307,7 +329,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     child: FilledButton.icon(
                       onPressed:
                           (_downloading ||
-                              (widget.apkDownloadUrl == null && !isLinux))
+                              (_effectiveApkUrl == null && !isLinux))
                           ? null
                           : _handleUpdateAction,
                       icon: Icon(

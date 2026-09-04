@@ -70,7 +70,18 @@ class MediaTracker extends _$MediaTracker {
   }
 
   Future<void> _loadLocalBindings() async {
-    final bindings = await _repo.getBindings(mediaId);
+    var bindings = await _repo.getBindings(mediaId);
+    if (bindings.isEmpty) {
+      final anilistId = int.tryParse(mediaId);
+      if (anilistId != null) {
+        final defaultBinding = TrackerBinding(
+          type: TrackerType.anilist,
+          remoteId: mediaId,
+        );
+        bindings = [defaultBinding];
+        await _repo.addBinding(mediaId, TrackerType.anilist, mediaId);
+      }
+    }
     state = state.copyWith(bindings: bindings);
     await fetchRemoteEntries();
   }
@@ -299,41 +310,73 @@ class MediaTracker extends _$MediaTracker {
           ? TrackerType.anilist
           : TrackerType.mal;
 
-      final entry = entries[activeType];
-      if (entry == null || entry.progress <= 0) return;
+      final entry = entries[activeType] ??
+          entries[TrackerType.anilist] ??
+          entries[TrackerType.mal];
+      if (entry == null) return;
+
+      final media = entry.media;
+      final isCompleted = entry.status.toUpperCase() == 'COMPLETED';
+      final int targetProgress;
+      if (isCompleted && (media.episodes != null && media.episodes! > 0)) {
+        targetProgress = media.episodes!;
+      } else {
+        targetProgress = entry.progress;
+      }
+
+      if (targetProgress <= 0) return;
 
       final repo = ref.read(watchProgressRepositoryProvider);
       final local = repo.getProgress(mediaId);
 
-      if (local != null && local.currentEpisode >= entry.progress) return;
+      final episodesMap =
+          Map<int, EpisodeProgress>.from(local?.episodesProgress ?? {});
 
-      final media = entry.media;
-      final updated =
-          (local ??
-                  AnimeWatchProgressEntry(
-                    animeId: mediaId,
-                    animeTitle:
-                        media.title.english ??
-                        media.title.romaji ??
-                        media.title.native ??
-                        '',
-                    animeFormat: media.format,
-                    animeCover:
-                        media.coverImage.large ?? media.coverImage.medium ?? '',
-                    totalEpisodes: media.episodes ?? 0,
-                    episodesProgress: const {},
-                    lastUpdated: DateTime.now(),
-                    currentEpisode: entry.progress,
-                    status: 'watching',
-                  ))
-              .copyWith(
-                currentEpisode: entry.progress,
+      // Mark all episodes up to targetProgress as watched
+      for (int i = 1; i <= targetProgress; i++) {
+        final existing = episodesMap[i];
+        if (existing == null || !existing.isCompleted) {
+          episodesMap[i] = EpisodeProgress(
+            episodeNumber: i,
+            episodeTitle: existing?.episodeTitle ?? 'Episode $i',
+            episodeThumbnail: existing?.episodeThumbnail,
+            progressInSeconds: existing?.progressInSeconds ??
+                (existing?.durationInSeconds ?? 1440),
+            durationInSeconds: existing?.durationInSeconds ?? 1440,
+            isCompleted: true,
+            watchedAt: existing?.watchedAt ?? DateTime.now(),
+          );
+        }
+      }
+
+      final updated = (local ??
+              AnimeWatchProgressEntry(
+                animeId: mediaId,
+                animeTitle: media.title.english ??
+                    media.title.romaji ??
+                    media.title.native ??
+                    '',
+                animeFormat: media.format,
+                animeCover:
+                    media.coverImage.large ?? media.coverImage.medium ?? '',
+                totalEpisodes: media.episodes ?? 0,
+                episodesProgress: episodesMap,
                 lastUpdated: DateTime.now(),
-              );
+                currentEpisode: targetProgress,
+                status: isCompleted ? 'completed' : 'watching',
+              ))
+          .copyWith(
+            episodesProgress: episodesMap,
+            currentEpisode: targetProgress > (local?.currentEpisode ?? 0)
+                ? targetProgress
+                : local?.currentEpisode,
+            lastUpdated: DateTime.now(),
+            status: isCompleted ? 'completed' : null,
+          );
 
       await repo.saveProgress(updated);
       AppLogger.d(
-        'Synced local progress from ${activeType.name}: ep ${entry.progress}',
+        'Synced local progress from ${activeType.name}: $targetProgress episodes marked as watched',
       );
     } catch (e) {
       AppLogger.e('Failed to sync local progress from tracker', e);

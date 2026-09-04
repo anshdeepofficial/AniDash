@@ -23,6 +23,8 @@ part 'episode_list_provider.g.dart';
 class EpisodeListState {
   final String? animeId;
   final String? animeTitle;
+  final String? animeCover;
+  final int? malId;
   final List<EpisodeDataModel> episodes;
   final List<({JikanMedia result, double similarity})> jikanMatches;
   final bool isLoading;
@@ -32,6 +34,8 @@ class EpisodeListState {
   const EpisodeListState({
     this.animeId,
     this.animeTitle,
+    this.animeCover,
+    this.malId,
     this.episodes = const [],
     this.jikanMatches = const [],
     this.isLoading = false,
@@ -42,6 +46,8 @@ class EpisodeListState {
   EpisodeListState copyWith({
     String? animeId,
     String? animeTitle,
+    String? animeCover,
+    int? malId,
     List<EpisodeDataModel>? episodes,
     List<({JikanMedia result, double similarity})>? jikanMatches,
     bool? isLoading,
@@ -51,6 +57,8 @@ class EpisodeListState {
     return EpisodeListState(
       animeId: animeId ?? this.animeId,
       animeTitle: animeTitle ?? this.animeTitle,
+      animeCover: animeCover ?? this.animeCover,
+      malId: malId ?? this.malId,
       episodes: episodes ?? this.episodes,
       jikanMatches: jikanMatches ?? this.jikanMatches,
       isLoading: isLoading ?? this.isLoading,
@@ -78,9 +86,11 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   Future<List<EpisodeDataModel>> fetchEpisodes({
     required String animeTitle,
     String? animeId,
+    String? animeCover,
     required bool force,
     List<EpisodeDataModel> episodes = const [],
     DMedia? media,
+    int? malId,
   }) async {
     // 1. Check Cache
     if (!force && state.episodes.isNotEmpty && state.animeId == animeId) {
@@ -88,7 +98,14 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       return state.episodes;
     }
 
-    state = state.copyWith(isLoading: true, error: null, animeId: animeId, animeTitle: animeTitle);
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      animeId: animeId,
+      animeTitle: animeTitle,
+      animeCover: animeCover ?? media?.cover,
+      malId: malId,
+    );
     AppLogger.section('Fetching Episodes: $animeTitle');
 
     // 2. Use provided episodes if available
@@ -199,27 +216,38 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
   Future<void> _syncWithJikan() async {
     try {
-      var matches = state.jikanMatches;
+      int? malId = state.malId;
 
-      // Only search Jikan if we haven't already cached the matches
-      if (matches.isEmpty) {
-        final searchResults = await _jikan.getSearch(title: state.animeTitle!, limit: 10);
-        matches = getBestMatches<JikanMedia>(
-          results: searchResults,
-          title: state.animeTitle!,
-          nameSelector: (e) => e.title,
-          idSelector: (e) => e.malId.toString(),
-        );
+      if (malId == null) {
+        var matches = state.jikanMatches;
+
+        // Only search Jikan if we haven't already cached the matches
+        if (matches.isEmpty) {
+          final cleanedTitle = state.animeTitle!
+              .replaceAll(RegExp(r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)', caseSensitive: false), '')
+              .replaceAll(RegExp(r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]', caseSensitive: false), '')
+              .replaceAll(RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false), '')
+              .trim();
+          final searchTitle = cleanedTitle.isNotEmpty ? cleanedTitle : state.animeTitle!;
+
+          final searchResults = await _jikan.getSearch(title: searchTitle, limit: 10);
+          matches = getBestMatches<JikanMedia>(
+            results: searchResults,
+            title: searchTitle,
+            nameSelector: (e) => e.title,
+            idSelector: (e) => e.malId.toString(),
+          );
+        }
+
+        if (matches.isEmpty || matches.first.similarity < 0.55) {
+          AppLogger.warning('No strong Jikan match found for title sync. Aborting sync.');
+          return;
+        }
+
+        state = state.copyWith(jikanMatches: matches);
+        malId = matches.first.result.malId;
       }
 
-      if (matches.isEmpty || matches.first.similarity < 0.55) {
-        AppLogger.warning('No strong Jikan match found for title sync. Aborting sync.');
-        return;
-      }
-
-      state = state.copyWith(jikanMatches: matches);
-      final malId = matches.first.result.malId;
-      
       AppLogger.d('Fetching MAL episode data for ID: $malId');
       final allJikanEpisodes = <JikanEpisode>[];
       int page = 1;

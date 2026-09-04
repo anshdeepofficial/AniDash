@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:ani_dash/main.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/core/services/anilist/auth_service.dart';
 import 'package:ani_dash/core/services/myanimelist/auth_service.dart';
@@ -132,17 +134,40 @@ class Auth extends _$Auth {
     final token = await _secureStorage.read(key: 'anilist-token');
     if (token?.isNotEmpty != true) return;
 
+    // Immediately restore cached profile offline
+    final cachedUserJson = sharedPrefs.getString('anilist-user-cache');
+    if (cachedUserJson != null && cachedUserJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(cachedUserJson) as Map<String, dynamic>;
+        state = state.copyWith(
+          anilistAccessToken: token,
+          anilistUser: _buildAnilistUser(decoded),
+        );
+      } catch (_) {}
+    } else {
+      state = state.copyWith(anilistAccessToken: token);
+    }
+
     state = state.copyWith(anilistLoading: true);
     try {
       final userData = await ref
           .read(anilistServiceProvider)
           .getUserProfile(token!);
+      await sharedPrefs.setString('anilist-user-cache', jsonEncode(userData));
       state = state.copyWith(
         anilistAccessToken: token,
         anilistUser: _buildAnilistUser(userData),
       );
-    } catch (_) {
-      await _secureStorage.delete(key: 'anilist-token');
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      // Only delete credentials if explicitly 401 Unauthorized / Invalid Token
+      if (errStr.contains('401') ||
+          errStr.contains('unauthorized') ||
+          errStr.contains('invalid token')) {
+        await _secureStorage.delete(key: 'anilist-token');
+        await sharedPrefs.remove('anilist-user-cache');
+        state = state.copyWith(anilistAccessToken: null, anilistUser: null);
+      }
     } finally {
       state = state.copyWith(anilistLoading: false);
     }
@@ -167,6 +192,7 @@ class Auth extends _$Auth {
       final userData = await ref
           .read(anilistServiceProvider)
           .getUserProfile(token);
+      await sharedPrefs.setString('anilist-user-cache', jsonEncode(userData));
 
       // Login to Commentum
       try {
@@ -285,6 +311,7 @@ class Auth extends _$Auth {
     switch (platform) {
       case AuthPlatform.anilist:
         await _secureStorage.delete(key: 'anilist-token');
+        await sharedPrefs.remove('anilist-user-cache');
         await commentumClient.logout(CommentumProvider.anilist);
         state = state.copyWith(anilistAccessToken: null, anilistUser: null);
         break;

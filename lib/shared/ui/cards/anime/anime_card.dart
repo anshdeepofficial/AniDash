@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/shared/ui/cards/anime/anime_card_mode.dart';
+import 'package:ani_dash/shared/ui/cards/anime/anime_card_components.dart';
 
 class AnimeCard extends StatefulWidget {
   final UniversalMedia anime;
@@ -49,14 +50,24 @@ class _AnimeCardState extends State<AnimeCard> {
                 top: _isHovered ? 0 : 4,
                 bottom: _isHovered ? 4 : 0,
               ),
-              child: widget.mode.build(
-                anime: widget.anime.copyWith(
-                  averageScore: widget.anime.averageScore == null
-                      ? null
-                      : widget.anime.averageScore! / 10,
-                ),
-                tag: widget.tag,
-                isHovered: _isHovered,
+              child: Stack(
+                children: [
+                  widget.mode.build(
+                    anime: widget.anime.copyWith(
+                      averageScore: widget.anime.averageScore == null
+                          ? null
+                          : widget.anime.averageScore! / 10,
+                    ),
+                    tag: widget.tag,
+                    isHovered: _isHovered,
+                  ),
+                  if (widget.anime.isAdult)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: AdultBadge(anime: widget.anime),
+                    ),
+                ],
               ),
             ),
           );

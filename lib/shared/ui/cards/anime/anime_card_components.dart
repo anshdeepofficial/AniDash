@@ -228,3 +228,42 @@ class AnimeCardShimmer extends StatelessWidget {
     );
   }
 }
+
+class AdultBadge extends StatelessWidget {
+  final UniversalMedia? anime;
+
+  const AdultBadge({super.key, required this.anime});
+
+  @override
+  Widget build(BuildContext context) {
+    if (anime?.isAdult != true) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red.shade900.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Colors.redAccent.withValues(alpha: 0.5),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: const Text(
+        '18+',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}

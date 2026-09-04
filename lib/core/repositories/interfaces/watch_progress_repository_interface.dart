@@ -8,6 +8,13 @@ abstract class WatchProgressRepositoryInterface {
     String animeId,
     EpisodeProgress episodeProgress,
   );
+  Future<void> markPreviousEpisodesWatched({
+    required String animeId,
+    required String animeTitle,
+    required String animeCover,
+    required String animeFormat,
+    required int upToEpisodeNumber,
+  });
   Future<void> deleteProgress(String animeId);
   Future<void> deleteEpisodeProgress(String animeId, int episodeNumber);
   Future<void> deleteMultipleProgress(List<String> animeIds);

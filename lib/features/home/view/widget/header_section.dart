@@ -11,7 +11,6 @@ import 'package:ani_dash/features/home/view/widget/search_model.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/core/utils/greeting_methods.dart';
 
-import 'package:ani_dash/features/home/view/widget/tutorial_sheet.dart';
 
 class HeaderSection extends ConsumerWidget {
   final bool isDesktop;
@@ -77,11 +76,7 @@ class HeaderSection extends ConsumerWidget {
                 ),
                 const Spacer(),
                 const _NewsActionBadge(),
-                const SizedBox(width: 8),
-                _ActionButton(
-                  icon: Icons.help_outline,
-                  onTap: () => showTutorialSheet(context),
-                ),
+
                 const SizedBox(width: 8),
                 _ActionButton(
                   icon: Icons.settings_outlined,
@@ -297,11 +292,7 @@ class ActionPanel extends StatelessWidget {
         children: [
           if (!isDesktop) ...[
             const _NewsActionBadge(),
-            const SizedBox(width: 8),
-            _ActionButton(
-              icon: Icons.help_outline,
-              onTap: () => showTutorialSheet(context),
-            ),
+
             const SizedBox(width: 8),
           ],
           const _ActionButton(icon: Iconsax.setting_2, route: '/settings'),

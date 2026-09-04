@@ -7,12 +7,14 @@ import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
+import 'package:ani_dash/features/downloads/view/downloads_screen.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/core/utils/extractors.dart' as extractor;
 
 class DownloadSourceSelector extends ConsumerStatefulWidget {
   final String animeTitle;
+  final String? animeCover;
   final EpisodeDataModel? episode;
   final int episodeCount;
   final ServerData? server;
@@ -24,6 +26,7 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
   const DownloadSourceSelector({
     super.key,
     required this.animeTitle,
+    this.animeCover,
     this.episode,
     this.episodeCount = 1,
     this.server,
@@ -205,11 +208,16 @@ class _DownloadSourceSelectorState
         _selectedQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
     final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
+    final thumb = (widget.episode?.thumbnail != null &&
+            widget.episode!.thumbnail!.isNotEmpty)
+        ? widget.episode!.thumbnail!
+        : (widget.animeCover ?? '');
+
     final item = DownloadItem(
       animeTitle: widget.animeTitle,
       episodeTitle: widget.episode!.title ?? 'Episode $epNum',
       episodeNumber: epNum,
-      thumbnail: widget.episode!.thumbnail ?? '',
+      thumbnail: thumb,
       state: DownloadStatus.queued,
       progress: 0,
       downloadUrl: downloadUrl,
@@ -234,6 +242,14 @@ class _DownloadSourceSelectorState
             'Download queued for Episode $epNum ($_selectedQuality)',
           ),
           behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'View Downloads',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+              );
+            },
+          ),
         ),
       );
     }

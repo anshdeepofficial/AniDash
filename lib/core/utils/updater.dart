@@ -99,17 +99,31 @@ Future<void> checkForUpdates(
 }
 
 String? _getPlatformSpecificAsset(List<dynamic> assets) {
+  if (Platform.isAndroid) {
+    // 1. First look for arm64-v8a specific apk if available
+    for (final a in assets) {
+      final name = (a['name'] as String).toLowerCase();
+      final url = a['browser_download_url'] as String;
+      if (name.contains('arm64') && name.endsWith('.apk')) return url;
+    }
+    // 2. Fallback to any apk (such as app-release.apk)
+    for (final a in assets) {
+      final name = (a['name'] as String).toLowerCase();
+      final url = a['browser_download_url'] as String;
+      if (name.endsWith('.apk')) return url;
+    }
+  }
+
   for (final a in assets) {
     final name = (a['name'] as String).toLowerCase();
     final url = a['browser_download_url'] as String;
 
-    if (Platform.isAndroid &&
-        name.contains('arm64-v8a') &&
-        name.endsWith('.apk'))
-      return url;
     if (Platform.isWindows &&
-        (name.endsWith('-setup.exe') || name.contains('windows-portable.zip')))
+        (name.endsWith('-setup.exe') ||
+            name.contains('windows-portable.zip') ||
+            name.endsWith('.zip'))) {
       return url;
+    }
     if (Platform.isLinux && name.contains('linux.zip')) return url;
   }
   return null;

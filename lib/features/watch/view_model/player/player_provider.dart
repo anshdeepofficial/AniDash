@@ -163,36 +163,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     Duration? startAt, {
     Map<String, String>? headers,
   }) async {
-    final effectiveHeaders = <String, String>{
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      ...?headers,
-    };
-
-    if (!effectiveHeaders.containsKey('Referer') ||
-        (effectiveHeaders['Referer']?.isEmpty ?? true)) {
-      try {
-        final uri = Uri.parse(url);
-        if (uri.scheme.startsWith('http')) {
-          effectiveHeaders['Referer'] = '${uri.scheme}://${uri.host}/';
-        }
-      } catch (_) {}
-    }
-
-    try {
-      (_player.platform as dynamic).setProperty(
-        'user-agent',
-        effectiveHeaders['User-Agent']!,
-      );
-      if (effectiveHeaders.containsKey('Referer')) {
-        (_player.platform as dynamic).setProperty(
-          'referrer',
-          effectiveHeaders['Referer']!,
-        );
-      }
-    } catch (_) {}
-
-    await _player.open(Media(url, httpHeaders: effectiveHeaders, start: startAt));
+    await _player.open(Media(url, httpHeaders: headers, start: startAt));
 
     if (startAt == null || startAt == Duration.zero) return;
 

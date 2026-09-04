@@ -20,6 +20,7 @@ import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/features/downloads/view/downloads_screen.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
@@ -288,6 +289,7 @@ class EpisodeData extends _$EpisodeData {
           expand: false,
           builder: (c, controller) => DownloadSourceSelector(
             animeTitle: _epList.animeTitle ?? 'Unknown',
+            animeCover: _epList.animeCover,
             episode: ep,
             episodeCount: 1,
             server: selected,
@@ -370,11 +372,16 @@ class EpisodeData extends _$EpisodeData {
       final qualityName = quality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
+      final animeCover = _epList.animeCover ?? '';
+      final thumb = (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
+          ? ep.thumbnail!
+          : animeCover;
+
       final item = DownloadItem(
         animeTitle: animeTitle,
         episodeTitle: ep.title ?? 'Episode $epNum',
         episodeNumber: epNum,
-        thumbnail: ep.thumbnail ?? '',
+        thumbnail: thumb,
         state: DownloadStatus.queued,
         progress: 0,
         downloadUrl: downloadUrl,
@@ -391,7 +398,11 @@ class EpisodeData extends _$EpisodeData {
 
       ref.read(downloadsProvider.notifier).addDownload(item);
       if (context.mounted) {
-        _showSnack(context, "Download queued for Ep $epNum ($quality)");
+        _showSnack(
+          context,
+          "Download queued for Ep $epNum ($quality)",
+          showDownloadsAction: true,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -479,11 +490,16 @@ class EpisodeData extends _$EpisodeData {
             targetQuality.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
         final fileName = '${sanitizedTitle}_EP${epNum}_$qualityName.$ext';
 
+        final animeCover = _epList.animeCover ?? '';
+        final thumb = (ep.thumbnail != null && ep.thumbnail!.isNotEmpty)
+            ? ep.thumbnail!
+            : animeCover;
+
         final item = DownloadItem(
           animeTitle: animeTitle,
           episodeTitle: ep.title ?? 'Episode $epNum',
           episodeNumber: epNum,
-          thumbnail: ep.thumbnail ?? '',
+          thumbnail: thumb,
           state: DownloadStatus.queued,
           progress: 0,
           downloadUrl: downloadUrl,
@@ -514,6 +530,16 @@ class EpisodeData extends _$EpisodeData {
           backgroundColor: queuedCount > 0
               ? Colors.green.shade700
               : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'View Downloads',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+              );
+            },
+          ),
         ),
       );
     }
@@ -851,8 +877,26 @@ class EpisodeData extends _$EpisodeData {
     builder: (_) => const Center(child: CircularProgressIndicator()),
   );
 
-  void _showSnack(BuildContext context, String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  void _showSnack(
+    BuildContext context,
+    String msg, {
+    bool showDownloadsAction = false,
+  }) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(msg),
+      behavior: SnackBarBehavior.floating,
+      action: showDownloadsAction
+          ? SnackBarAction(
+              label: 'View Downloads',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+                );
+              },
+            )
+          : null,
+    ),
+  );
 
   Future<ServerData?> _showServerSheet(
     BuildContext context,

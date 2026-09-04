@@ -84,7 +84,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   Future<void> _setupSystemUI() async {
     await Future.wait([
       UIHelper.enableImmersiveMode(),
-      UIHelper.enableAutoRotate(),
+      UIHelper.forceLandscape(),
     ]);
   }
 
