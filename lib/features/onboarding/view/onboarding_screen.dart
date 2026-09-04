@@ -86,9 +86,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       height: 4,
                       margin: const EdgeInsets.symmetric(horizontal: 2),
                       decoration: BoxDecoration(
-                        color: isActive
-                            ? colorScheme.primary
-                            : colorScheme.surfaceContainerHighest,
+                        color:
+                            isActive
+                                ? colorScheme.primary
+                                : colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -237,15 +238,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       iconColor: colorScheme.primary,
                       title: 'Mode',
                       description: 'Select base theme',
-                      selectedValue: theme.themeMode == 'light'
-                          ? 1
-                          : theme.themeMode == 'dark'
+                      selectedValue:
+                          theme.themeMode == 'light'
+                              ? 1
+                              : theme.themeMode == 'dark'
                               ? 2
                               : 0,
                       onValueChanged: (index) {
-                        final mode = index == 0
-                            ? 'system'
-                            : index == 1
+                        final mode =
+                            index == 0
+                                ? 'system'
+                                : index == 1
                                 ? 'light'
                                 : 'dark';
                         themeNotifier.updateSettings(
@@ -279,9 +282,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         title: 'True Black',
                         description: 'OLED optimization',
                         value: theme.amoled,
-                        onChanged: (v) => themeNotifier.updateSettings(
-                          (p) => p.copyWith(amoled: v),
-                        ),
+                        onChanged:
+                            (v) => themeNotifier.updateSettings(
+                              (p) => p.copyWith(amoled: v),
+                            ),
                       ),
                     NormalSettingsItem(
                       icon: Icon(
@@ -291,8 +295,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       accent: colorScheme.primary,
                       title: 'Color Scheme',
                       description: _formatSchemeName(theme.flexScheme ?? ''),
-                      onTap: () =>
-                          _showColorSchemeSheet(context, ref, themeNotifier),
+                      onTap:
+                          () => _showColorSchemeSheet(
+                            context,
+                            ref,
+                            themeNotifier,
+                          ),
                     ),
                   ],
                 ),
@@ -306,7 +314,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _buildSourceStep(BuildContext context, WidgetRef ref) {
     final selectedAnimeSource = ref.watch(selectedAnimeProvider);
-    final animeSources = ref.read(animeSourceRegistryProvider).keys.toList();
+    const preferredOrder = ['justanime', 'hianime', 'anikoto'];
+    final registry = ref.read(animeSourceRegistryProvider);
+    final animeSources = preferredOrder.where(registry.has).toList();
     final providerStatus = ref.watch(providerStatusProvider);
 
     return Column(
@@ -319,30 +329,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         Expanded(
           child: providerStatus.when(
-            data: (statusData) => ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: animeSources.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final provider = animeSources[index];
-                final status = statusData[provider]?['status'] as String?;
-                final isSelected =
-                    selectedAnimeSource?.providerName == provider.toLowerCase();
+            data:
+                (statusData) => ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: animeSources.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final provider = animeSources[index];
+                    final status = statusData[provider]?['status'] as String?;
+                    final isSelected =
+                        selectedAnimeSource?.providerName ==
+                        provider.toLowerCase();
 
-                return SelectableSettingsItem(
-                  icon: Icon(_getStatusIcon(status)),
-                  iconColor: _getStatusColor(status),
-                  accent: _getStatusColor(status),
-                  title: provider.toUpperCase(),
-                  description: status?.toUpperCase() ?? 'UNKNOWN',
-                  isInSelectionMode: true,
-                  isSelected: isSelected,
-                  onTap: () => ref
-                      .read(selectedProviderKeyProvider.notifier)
-                      .select(provider),
-                );
-              },
-            ),
+                    return SelectableSettingsItem(
+                      icon: Icon(_getStatusIcon(status)),
+                      iconColor: _getStatusColor(status),
+                      accent: _getStatusColor(status),
+                      title:
+                          provider == 'justanime'
+                              ? 'JUSTANIME  •  RECOMMENDED'
+                              : provider.toUpperCase(),
+                      description:
+                          provider == 'justanime'
+                              ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
+                              : status?.toUpperCase() ?? 'UNKNOWN',
+                      isInSelectionMode: true,
+                      isSelected: isSelected,
+                      onTap:
+                          () => ref
+                              .read(selectedProviderKeyProvider.notifier)
+                              .select(provider),
+                    );
+                  },
+                ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Center(child: Text('Error: $e')),
           ),
@@ -363,7 +382,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               uiSettingsProvider.select((s) => s.cardStyle.name),
             ),
             onChanged: (val) {
-              ref.read(uiSettingsProvider.notifier).updateSettings(
+              ref
+                  .read(uiSettingsProvider.notifier)
+                  .updateSettings(
                     (s) =>
                         s.copyWith(cardStyle: AnimeCardMode.values.byName(val)),
                   );
@@ -390,7 +411,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               uiSettingsProvider.select((s) => s.spotlightCardStyle.name),
             ),
             onChanged: (val) {
-              ref.read(uiSettingsProvider.notifier).updateSettings(
+              ref
+                  .read(uiSettingsProvider.notifier)
+                  .updateSettings(
                     (s) => s.copyWith(
                       spotlightCardStyle: SpotlightCardMode.values.byName(val),
                     ),
@@ -436,8 +459,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             title: 'Automatic Updates',
             description: 'Check for new features on startup',
             value: isAuto,
-            onChanged: (val) =>
-                ref.read(automaticUpdatesProvider.notifier).toggle(),
+            onChanged:
+                (val) => ref.read(automaticUpdatesProvider.notifier).toggle(),
           ),
         ),
       ],
@@ -467,7 +490,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             value: permissionsState.storage,
             onChanged: (val) async {
               if (val == false) return;
-              await ref.read(permissionsProvider.notifier).requestStoragePermission();
+              await ref
+                  .read(permissionsProvider.notifier)
+                  .requestStoragePermission();
             },
           ),
         ),
@@ -482,7 +507,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             value: permissionsState.notification,
             onChanged: (val) async {
               if (val == false) return;
-              await ref.read(permissionsProvider.notifier).requestNotificationPermission();
+              await ref
+                  .read(permissionsProvider.notifier)
+                  .requestNotificationPermission();
             },
           ),
         ),
@@ -535,27 +562,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                            onTap: () => themeNotifier.updateSettings(
-                              (p) => p.copyWith(flexScheme: scheme.name),
-                            ),
+                            onTap:
+                                () => themeNotifier.updateSettings(
+                                  (p) => p.copyWith(flexScheme: scheme.name),
+                                ),
                             leading: _buildMinimalPreview(scheme),
                             title: Text(_formatSchemeName(scheme.name)),
-                            trailing: isSelected
-                                ? Icon(
-                                    Iconsax.tick_circle,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  )
-                                : null,
+                            trailing:
+                                isSelected
+                                    ? Icon(
+                                      Iconsax.tick_circle,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    )
+                                    : null,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            tileColor: isSelected
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.secondaryContainer
-                                : null,
+                            tileColor:
+                                isSelected
+                                    ? Theme.of(
+                                      context,
+                                    ).colorScheme.secondaryContainer
+                                    : null,
                           ),
                         );
                       },
@@ -604,15 +633,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w)
       .join(' ');
 
-  Color _getStatusColor(String? status) => status?.toLowerCase() == 'online'
-      ? Colors.green
-      : status?.toLowerCase() == 'offline'
+  Color _getStatusColor(String? status) =>
+      status?.toLowerCase() == 'online'
+          ? Colors.green
+          : status?.toLowerCase() == 'offline'
           ? Colors.red
           : Colors.orange;
 
-  IconData _getStatusIcon(String? status) => status?.toLowerCase() == 'online'
-      ? Iconsax.health
-      : status?.toLowerCase() == 'offline'
+  IconData _getStatusIcon(String? status) =>
+      status?.toLowerCase() == 'online'
+          ? Iconsax.health
+          : status?.toLowerCase() == 'offline'
           ? Iconsax.danger
           : Iconsax.warning_2;
 }

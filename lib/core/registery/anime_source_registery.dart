@@ -1,5 +1,8 @@
-﻿import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
+import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/registery/sources/anime/justanime.dart';
+import 'package:ani_dash/core/registery/sources/anime/aniwatch/hianime.dart';
+import 'package:ani_dash/core/registery/sources/anime/anikoto.dart';
 
 enum RegistryStatus { uninitialized, initializing, initialized, error }
 
@@ -26,7 +29,9 @@ class AnimeSourceRegistry {
   AnimeSourceRegistry _init() {
     setStatus(RegistryStatus.initializing);
     try {
-      // All built-in providers removed as per user request.
+      register('justanime', JustAnimeProvider());
+      register('hianime', HiAnimeProvider());
+      register('anikoto', AnikotoProvider());
       setStatus(RegistryStatus.initialized);
       return this;
     } catch (e, stackTrace) {

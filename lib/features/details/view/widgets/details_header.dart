@@ -11,7 +11,6 @@ import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 
-
 class DetailsHeader extends ConsumerStatefulWidget {
   final UniversalMedia anime;
   final String tag;
@@ -86,14 +85,14 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
             CachedNetworkImage(
               imageUrl:
                   widget.anime.bannerImage != null &&
-                      widget.anime.bannerImage!.isNotEmpty
-                  ? widget.anime.bannerImage!
-                  : widget.anime.coverImage.large ??
-                        widget.anime.coverImage.medium ??
-                        '',
+                          widget.anime.bannerImage!.isNotEmpty
+                      ? widget.anime.bannerImage!
+                      : widget.anime.coverImage.large ??
+                          widget.anime.coverImage.medium ??
+                          '',
               fit: BoxFit.cover,
-              placeholder: (_, _) =>
-                  Container(color: colorScheme.surfaceContainer),
+              placeholder:
+                  (_, _) => Container(color: colorScheme.surfaceContainer),
             ),
             Container(
               decoration: BoxDecoration(
@@ -158,6 +157,27 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                             ),
                           ),
                         const SizedBox(height: 12),
+                        if (widget.anime.isMature) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '18+  MATURE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         // Metadata Row
                         Row(
                           children: [
@@ -220,27 +240,26 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
         const SizedBox(width: 4),
         isLoading
             ? const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-              )
-            : IconButton(
-                icon: Icon(
-                  isFavorite ? Iconsax.heart5 : Iconsax.heart,
+              padding: EdgeInsets.all(12.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
                   color: Colors.white,
-                  size: 30,
                 ),
-                tooltip: isFavorite
-                    ? 'Remove from favourites'
-                    : 'Add to favourites',
-                onPressed: toggleFavorite,
               ),
+            )
+            : IconButton(
+              icon: Icon(
+                isFavorite ? Iconsax.heart5 : Iconsax.heart,
+                color: Colors.white,
+                size: 30,
+              ),
+              tooltip:
+                  isFavorite ? 'Remove from favourites' : 'Add to favourites',
+              onPressed: toggleFavorite,
+            ),
         const SizedBox(width: 8),
       ],
     );
@@ -258,14 +277,15 @@ class GenreTags extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: genres
-            .map(
-              (genre) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GenreTag(text: genre),
-              ),
-            )
-            .toList(),
+        children:
+            genres
+                .map(
+                  (genre) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GenreTag(text: genre),
+                  ),
+                )
+                .toList(),
       ),
     );
   }
@@ -290,11 +310,12 @@ class GenreTag extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final bgColor = color != null
-        ? color!.withValues(alpha: 0.25)
-        : (isDark
-            ? Colors.black54
-            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.9));
+    final bgColor =
+        color != null
+            ? color!.withValues(alpha: 0.25)
+            : (isDark
+                ? Colors.black54
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.9));
 
     final textColor = color ?? (isDark ? Colors.white : colorScheme.onSurface);
 
@@ -304,7 +325,8 @@ class GenreTag extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: color?.withValues(alpha: 0.5) ??
+          color:
+              color?.withValues(alpha: 0.5) ??
               (isDark
                   ? Colors.white24
                   : colorScheme.outlineVariant.withValues(alpha: 0.6)),
@@ -340,9 +362,10 @@ class TrackerStatusWidget extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final activePlatform = authState.activePlatform;
-    final trackerType = activePlatform == AuthPlatform.anilist
-        ? TrackerType.anilist
-        : TrackerType.mal;
+    final trackerType =
+        activePlatform == AuthPlatform.anilist
+            ? TrackerType.anilist
+            : TrackerType.mal;
 
     final entry = trackerState.entries[trackerType];
 
@@ -360,9 +383,8 @@ class TrackerStatusWidget extends ConsumerWidget {
       final statusText = _formatStatus(entry.status);
       final progressText = entry.progress > 0 ? ' ${entry.progress}' : '';
       final totalEps = anime.episodes != null ? '/${anime.episodes}' : '';
-      final displayProgress = entry.progress > 0
-          ? '$progressText$totalEps'
-          : '';
+      final displayProgress =
+          entry.progress > 0 ? '$progressText$totalEps' : '';
 
       content = Row(
         mainAxisSize: MainAxisSize.min,
@@ -403,14 +425,16 @@ class TrackerStatusWidget extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isActive
-                ? theme.colorScheme.primary.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.15),
+            color:
+                isActive
+                    ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isActive
-                  ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.2),
+              color:
+                  isActive
+                      ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -420,7 +444,6 @@ class TrackerStatusWidget extends ConsumerWidget {
     );
   }
 }
-
 
 /// Floating watch button widget
 class WatchButton extends StatelessWidget {
@@ -444,23 +467,22 @@ class WatchButton extends StatelessWidget {
         onPressed: onPressed,
         label: Text(
           'Watch Now',
-          style: Theme.of(context)
-              .textTheme
-              .labelLarge
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
-        icon: isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Iconsax.play_circle),
+        icon:
+            isLoading
+                ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: Colors.white,
+                  ),
+                )
+                : const Icon(Iconsax.play_circle),
       ),
     );
   }
 }
-

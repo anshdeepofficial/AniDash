@@ -29,13 +29,14 @@ class _AnimeCardState extends State<AnimeCard> {
     return RepaintBoundary(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final targetWidth = constraints.hasBoundedWidth && constraints.isTight
-              ? constraints.maxWidth
-              : dimensions.width;
+          final targetWidth =
+              constraints.hasBoundedWidth && constraints.isTight
+                  ? constraints.maxWidth
+                  : dimensions.width;
           final targetHeight =
               constraints.hasBoundedHeight && constraints.isTight
-              ? constraints.maxHeight
-              : dimensions.height;
+                  ? constraints.maxHeight
+                  : dimensions.height;
 
           return MouseRegion(
             cursor: SystemMouseCursors.click,
@@ -54,14 +55,15 @@ class _AnimeCardState extends State<AnimeCard> {
                 children: [
                   widget.mode.build(
                     anime: widget.anime.copyWith(
-                      averageScore: widget.anime.averageScore == null
-                          ? null
-                          : widget.anime.averageScore! / 10,
+                      averageScore:
+                          widget.anime.averageScore == null
+                              ? null
+                              : widget.anime.averageScore! / 10,
                     ),
                     tag: widget.tag,
                     isHovered: _isHovered,
                   ),
-                  if (widget.anime.isAdult)
+                  if (widget.anime.isMature)
                     Positioned(
                       top: 8,
                       left: 8,

@@ -20,6 +20,7 @@ class BottomControls extends ConsumerStatefulWidget {
   final VoidCallback onForwardPressed;
   final VoidCallback? onEpisodePressed;
   final VoidCallback? onFullScreenPressed;
+  final bool isLocal;
 
   const BottomControls({
     super.key,
@@ -31,6 +32,7 @@ class BottomControls extends ConsumerStatefulWidget {
     required this.onForwardPressed,
     required this.onFullScreenPressed,
     this.onEpisodePressed,
+    this.isLocal = false,
   });
 
   @override
@@ -74,7 +76,10 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -104,81 +109,102 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                   children: [
                     _buildTimeDisplay(),
 
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      physics: const ClampingScrollPhysics(),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _FlatTextBtn(
-                            text: ref.watch(
-                              episodeDataProvider.select(
-                                (s) => s.selectedServer?.isDub == true
-                                    ? 'DUB'
-                                    : 'SUB',
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        reverse: true,
+                        physics: const ClampingScrollPhysics(),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!widget.isLocal)
+                              _FlatTextBtn(
+                                text: ref.watch(
+                                  episodeDataProvider.select(
+                                    (s) =>
+                                        s.selectedServer?.isDub == true
+                                            ? 'DUB'
+                                            : 'SUB',
+                                  ),
+                                ),
+                                onTap:
+                                    () =>
+                                        ref
+                                            .read(episodeDataProvider.notifier)
+                                            .toggleDubSub(),
+                                isAccent: true,
+                                scheme: scheme,
                               ),
-                            ),
-                            onTap: () => ref
-                                .read(episodeDataProvider.notifier)
-                                .toggleDubSub(),
-                            isAccent: true,
-                            scheme: scheme,
-                          ),
-                          _FlatTextBtn(
-                            text: ref.watch(
-                              episodeDataProvider.select(
-                                (s) =>
-                                    s.selectedServer?.id?.toUpperCase() ??
-                                    'SERVER',
+                            if (!widget.isLocal)
+                              _FlatTextBtn(
+                                text: ref.watch(
+                                  episodeDataProvider.select(
+                                    (s) =>
+                                        s.selectedServer?.id?.toUpperCase() ??
+                                        'SERVER',
+                                  ),
+                                ),
+                                onTap: widget.onServerPressed,
                               ),
-                            ),
-                            onTap: widget.onServerPressed,
-                          ),
-                          _FlatTextBtn(
-                            text: ref.watch(
-                              episodeDataProvider.select((s) {
-                                if (s.selectedQualityIdx != null &&
-                                    s.selectedQualityIdx! < s.qualityOptions.length) {
-                                  final q = s.qualityOptions[s.selectedQualityIdx!]['quality']?.toString();
-                                  if (q != null && q.isNotEmpty) return q.toUpperCase();
-                                }
-                                if (s.selectedSourceIdx != null && s.selectedSourceIdx! < s.sources.length) {
-                                  final q = s.sources[s.selectedSourceIdx!].quality;
-                                  if (q != null && q.toLowerCase() != 'default') return q.toUpperCase();
-                                }
-                                return 'AUTO';
-                              }),
-                            ),
-                            onTap: widget.onSourcePressed,
-                          ),
-                          _ToolbarIcon(
-                            icon: Icons.lock_outline_rounded,
-                            onTap: widget.onLockPressed,
-                          ),
-                          _ToolbarIcon(
-                            icon: Icons.subtitles_rounded,
-                            onTap: widget.onSubtitlePressed,
-                            onHold: () => showSubtitleSettings(context),
-                          ),
-                          _ToolbarIcon(
-                            icon: Icons.view_list_rounded,
-                            onTap: widget.onEpisodePressed,
-                          ),
-                          if (!(Platform.isAndroid || Platform.isIOS))
+                            if (!widget.isLocal)
+                              _FlatTextBtn(
+                                text: ref.watch(
+                                  episodeDataProvider.select((s) {
+                                    if (s.selectedQualityIdx != null &&
+                                        s.selectedQualityIdx! <
+                                            s.qualityOptions.length) {
+                                      final q =
+                                          s
+                                              .qualityOptions[s
+                                                  .selectedQualityIdx!]['quality']
+                                              ?.toString();
+                                      if (q != null && q.isNotEmpty)
+                                        return q.toUpperCase();
+                                    }
+                                    if (s.selectedSourceIdx != null &&
+                                        s.selectedSourceIdx! <
+                                            s.sources.length) {
+                                      final q =
+                                          s
+                                              .sources[s.selectedSourceIdx!]
+                                              .quality;
+                                      if (q != null &&
+                                          q.toLowerCase() != 'default')
+                                        return q.toUpperCase();
+                                    }
+                                    return 'AUTO';
+                                  }),
+                                ),
+                                onTap: widget.onSourcePressed,
+                              ),
                             _ToolbarIcon(
-                              icon: Icons.fullscreen_rounded,
-                              onTap: widget.onFullScreenPressed,
+                              icon: Icons.lock_outline_rounded,
+                              onTap: widget.onLockPressed,
                             ),
-                        ],
+                            if (!widget.isLocal)
+                              _ToolbarIcon(
+                                icon: Icons.subtitles_rounded,
+                                onTap: widget.onSubtitlePressed,
+                                onHold: () => showSubtitleSettings(context),
+                              ),
+                            if (!widget.isLocal)
+                              _ToolbarIcon(
+                                icon: Icons.view_list_rounded,
+                                onTap: widget.onEpisodePressed,
+                              ),
+                            if (!(Platform.isAndroid || Platform.isIOS))
+                              _ToolbarIcon(
+                                icon: Icons.fullscreen_rounded,
+                                onTap: widget.onFullScreenPressed,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),
@@ -311,9 +337,8 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
         top: 0,
         bottom: 0,
         child: Container(
-          color: skip.skipType == SkipType.op
-              ? scheme.tertiary
-              : scheme.secondary,
+          color:
+              skip.skipType == SkipType.op ? scheme.tertiary : scheme.secondary,
         ),
       );
     }).toList();
@@ -391,11 +416,12 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
           s.interval != null &&
           pos >= Duration(seconds: s.interval!.startTime.toInt()) &&
           pos < Duration(seconds: s.interval!.endTime.toInt()),
-      orElse: () => const AniSkipResultItem(
-        skipType: SkipType.unknown,
-        action: '',
-        episodeLength: 0,
-      ),
+      orElse:
+          () => const AniSkipResultItem(
+            skipType: SkipType.unknown,
+            action: '',
+            episodeLength: 0,
+          ),
     );
 
     if (currentSkip.interval == null) return const SizedBox.shrink();
@@ -457,9 +483,10 @@ class _FlatTextBtn extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Material(
-        color: isAccent
-            ? scheme?.primary.withValues(alpha: 0.15)
-            : Colors.transparent,
+        color:
+            isAccent
+                ? scheme?.primary.withValues(alpha: 0.15)
+                : Colors.transparent,
         borderRadius: BorderRadius.circular(4),
         child: InkWell(
           onTap: onTap,

@@ -37,16 +37,18 @@ class DownloadCard extends ConsumerWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isCompleted
-            ? () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => LocalPlayerScreen(
-                    filePath: item.filePath,
-                    title: '${item.animeTitle} - ${item.episodeTitle}',
+        onTap:
+            isCompleted
+                ? () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(
+                    builder:
+                        (context) => LocalPlayerScreen(
+                          filePath: item.filePath,
+                          title: '${item.animeTitle} - ${item.episodeTitle}',
+                        ),
                   ),
-                ),
-              )
-            : null,
+                )
+                : null,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
@@ -87,14 +89,15 @@ class DownloadCard extends ConsumerWidget {
         height: 64,
         width: 64,
         fit: BoxFit.cover,
-        placeholder: (_, _) =>
-            Container(color: theme.colorScheme.surfaceContainerHigh),
-        errorWidget: (_, _, _) => Container(
-          height: 64,
-          width: 64,
-          color: theme.colorScheme.surfaceContainerHigh,
-          child: const Icon(Iconsax.image, size: 24),
-        ),
+        placeholder:
+            (_, _) => Container(color: theme.colorScheme.surfaceContainerHigh),
+        errorWidget:
+            (_, _, _) => Container(
+              height: 64,
+              width: 64,
+              color: theme.colorScheme.surfaceContainerHigh,
+              child: const Icon(Iconsax.image, size: 24),
+            ),
       );
     } else if (thumb.isNotEmpty && File(thumb).existsSync()) {
       imageWidget = Image.file(
@@ -115,10 +118,7 @@ class DownloadCard extends ConsumerWidget {
     return Stack(
       alignment: Alignment.center,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: imageWidget,
-        ),
+        ClipRRect(borderRadius: BorderRadius.circular(8), child: imageWidget),
         if (isCompleted)
           Container(
             decoration: const BoxDecoration(

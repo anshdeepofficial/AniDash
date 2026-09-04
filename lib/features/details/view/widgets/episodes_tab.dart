@@ -90,9 +90,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
   void _toggleSelection(int epNum) {
     final s = _selectionNotifier.value;
-    _selectionNotifier.value = s.contains(epNum)
-        ? (Set<int>.from(s)..remove(epNum))
-        : (Set<int>.from(s)..add(epNum));
+    _selectionNotifier.value =
+        s.contains(epNum)
+            ? (Set<int>.from(s)..remove(epNum))
+            : (Set<int>.from(s)..add(epNum));
   }
 
   void _exitSelectionMode() {
@@ -112,13 +113,16 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final repo = ref.read(watchProgressRepositoryProvider);
     final animeId = widget.mediaId;
-    final animeTitle = ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
+    final animeTitle =
+        ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
         widget.mediaTitle.english ??
         widget.mediaTitle.romaji ??
         'Anime';
 
     final currentEntry = repo.getProgress(animeId);
-    final episodesMap = Map<int, EpisodeProgress>.from(currentEntry?.episodesProgress ?? {});
+    final episodesMap = Map<int, EpisodeProgress>.from(
+      currentEntry?.episodesProgress ?? {},
+    );
 
     for (final epNum in _selectedEpisodes) {
       final existing = episodesMap[epNum];
@@ -133,17 +137,19 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       );
     }
 
-    final updatedEntry = (currentEntry ?? AnimeWatchProgressEntry(
-      animeId: animeId,
-      animeTitle: animeTitle,
-      animeCover: widget.mediaCover,
-      animeFormat: widget.mediaFormat,
-      totalEpisodes: _selectedEpisodes.length,
-    )).copyWith(
-      episodesProgress: episodesMap,
-      lastUpdated: DateTime.now(),
-      currentEpisode: _selectedEpisodes.reduce((a, b) => a > b ? a : b),
-    );
+    final updatedEntry = (currentEntry ??
+            AnimeWatchProgressEntry(
+              animeId: animeId,
+              animeTitle: animeTitle,
+              animeCover: widget.mediaCover,
+              animeFormat: widget.mediaFormat,
+              totalEpisodes: _selectedEpisodes.length,
+            ))
+        .copyWith(
+          episodesProgress: episodesMap,
+          lastUpdated: DateTime.now(),
+          currentEpisode: _selectedEpisodes.reduce((a, b) => a > b ? a : b),
+        );
 
     await repo.saveProgress(updatedEntry);
 
@@ -177,7 +183,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     }
 
     final downloadSettings = ref.read(downloadSettingsProvider);
-    final animeTitle = ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
+    final animeTitle =
+        ref.read(detailsPageProvider(widget.mediaId)).bestMatchName ??
         widget.mediaTitle.english ??
         widget.mediaTitle.romaji ??
         'Anime';
@@ -193,7 +200,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
         ),
       );
 
-      await ref.read(episodeDataProvider.notifier).downloadBatchEpisodes(
+      await ref
+          .read(episodeDataProvider.notifier)
+          .downloadBatchEpisodes(
             context,
             selectedNums,
             preferredLanguage: downloadSettings.preferredLanguage,
@@ -210,38 +219,42 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (c) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (c, controller) => DownloadSourceSelector(
-          animeTitle: animeTitle,
-          animeCover: widget.mediaCover,
-          episodeCount: selectedNums.length,
-          scrollController: controller,
-          onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Queueing ${selectedNums.length} episodes ($lang, $quality)...',
+      builder:
+          (c) => DraggableScrollableSheet(
+            initialChildSize: 0.65,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            expand: false,
+            builder:
+                (c, controller) => DownloadSourceSelector(
+                  animeTitle: animeTitle,
+                  animeCover: widget.mediaCover,
+                  episodeCount: selectedNums.length,
+                  scrollController: controller,
+                  onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Queueing ${selectedNums.length} episodes ($lang, $quality)...',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(
+                          label: 'View Downloads',
+                          onPressed: () => context.push('/downloads'),
+                        ),
+                      ),
+                    );
+                    await ref
+                        .read(episodeDataProvider.notifier)
+                        .downloadBatchEpisodes(
+                          context,
+                          selectedNums,
+                          preferredLanguage: lang,
+                          preferredQuality: quality,
+                        );
+                  },
                 ),
-                behavior: SnackBarBehavior.floating,
-                action: SnackBarAction(
-                  label: 'View Downloads',
-                  onPressed: () => context.push('/downloads'),
-                ),
-              ),
-            );
-            await ref.read(episodeDataProvider.notifier).downloadBatchEpisodes(
-                  context,
-                  selectedNums,
-                  preferredLanguage: lang,
-                  preferredQuality: quality,
-                );
-          },
-        ),
-      ),
+          ),
     );
   }
 
@@ -291,9 +304,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       });
     }
 
-    final episodes = isMatchingAnime
-        ? episodeListState.episodes
-        : <EpisodeDataModel>[];
+    final episodes =
+        isMatchingAnime ? episodeListState.episodes : <EpisodeDataModel>[];
     final loading =
         episodeListState.isLoading || (!isMatchingAnime && hasSourceMatch);
     final error = isMatchingAnime ? episodeListState.error : null;
@@ -346,9 +358,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                           exposedName ?? 'None',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: exposedName == null ? theme.hintColor : null,
-                            fontStyle: exposedName == null
-                                ? FontStyle.italic
-                                : FontStyle.normal,
+                            fontStyle:
+                                exposedName == null
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -362,8 +375,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       color: theme.hintColor,
                     ),
                     tooltip: 'Change Source',
-                    onPressed: () =>
-                        _showSourceSelectionDialog(context, ref, notifier),
+                    onPressed:
+                        () =>
+                            _showSourceSelectionDialog(context, ref, notifier),
                   ),
                   IconButton(
                     icon: Icon(
@@ -415,8 +429,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         spacing: 8,
                         children: [
                           ElevatedButton.icon(
-                            onPressed: () =>
-                                _handleWrongMatch(context, ref, notifier),
+                            onPressed:
+                                () => _handleWrongMatch(context, ref, notifier),
                             icon: const Icon(Icons.search),
                             label: const Text('Manual Selection'),
                           ),
@@ -448,187 +462,210 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                        child: _isSelectionMode
-                            ? Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.close),
-                                    onPressed: _exitSelectionMode,
-                                    tooltip: 'Cancel',
-                                  ),
-                                  Text(
-                                    '${_selectedEpisodes.length}',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                        child:
+                            _isSelectionMode
+                                ? Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: _exitSelectionMode,
+                                      tooltip: 'Cancel',
+                                    ),
+                                    Text(
+                                      '${_selectedEpisodes.length}',
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.check_circle_outline,
+                                      ),
+                                      tooltip: 'Mark as Watched',
                                       color: theme.colorScheme.primary,
+                                      onPressed:
+                                          _selectedEpisodes.isEmpty
+                                              ? null
+                                              : () => _markSelectedAsWatched(
+                                                watched: true,
+                                              ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(Icons.check_circle_outline),
-                                    tooltip: 'Mark as Watched',
-                                    color: theme.colorScheme.primary,
-                                    onPressed: _selectedEpisodes.isEmpty
-                                        ? null
-                                        : () => _markSelectedAsWatched(watched: true),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert),
-                                    tooltip: 'More actions',
-                                    onSelected: (val) {
-                                      if (val == 'unwatch') {
-                                        _markSelectedAsWatched(watched: false);
-                                      } else if (val == 'select_all') {
-                                        _toggleSelectAll(visibleEpisodes);
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: 'select_all',
-                                        child: Text(
-                                          _selectedEpisodes.length >=
-                                                      visibleEpisodes.length &&
-                                                  visibleEpisodes.isNotEmpty
-                                              ? 'Deselect All'
-                                              : 'Select All',
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'unwatch',
-                                        child: Text('Mark as Unwatched'),
-                                      ),
-                                    ],
-                                  ),
-                                  FilledButton.icon(
-                                    onPressed: _selectedEpisodes.isEmpty
-                                        ? null
-                                        : () => _handleBatchDownload(
-                                              context,
-                                              ref,
-                                              visibleEpisodes,
-                                            ),
-                                    icon: const Icon(
-                                      Icons.download_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      'Download (${_selectedEpisodes.length})',
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      visualDensity: VisualDensity.compact,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Text(
-                                    '$totalEpisodes Episodes',
-                                    style: theme.textTheme.titleSmall,
-                                  ),
-                                  const Spacer(),
-                                  IconButton(
-                                    icon: const Icon(Icons.sync_rounded),
-                                    tooltip: 'Sync with AniList',
-                                    onPressed: () async {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Syncing watched episodes from AniList...'),
-                                          duration: Duration(seconds: 1),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                      await ref
-                                          .read(mediaTrackerProvider(widget.mediaId).notifier)
-                                          .fetchRemoteEntries();
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.checklist_rounded),
-                                    tooltip: 'Select Episodes',
-                                    onPressed: () {
-                                      final firstEp = visibleEpisodes
-                                          .firstOrNull
-                                          ?.number;
-                                      if (firstEp != null) {
-                                        _enterSelectionMode(firstEp);
-                                      }
-                                    },
-                                  ),
-                                  // View Mode Toggle
-                                  PopupMenuButton<EpisodeViewMode>(
-                                    icon: const Icon(Icons.view_agenda_outlined),
-                                    tooltip: 'View Mode',
-                                    initialValue: viewMode,
-                                    onSelected: (mode) {
-                                      ref
-                                          .read(uiSettingsProvider.notifier)
-                                          .updateSettings(
-                                            (s) => s.copyWith(
-                                              episodeViewMode: mode.name,
-                                            ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert),
+                                      tooltip: 'More actions',
+                                      onSelected: (val) {
+                                        if (val == 'unwatch') {
+                                          _markSelectedAsWatched(
+                                            watched: false,
                                           );
-                                    },
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: EpisodeViewMode.list,
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.view_list),
-                                            SizedBox(width: 8),
-                                            Text('List'),
+                                        } else if (val == 'select_all') {
+                                          _toggleSelectAll(visibleEpisodes);
+                                        }
+                                      },
+                                      itemBuilder:
+                                          (context) => [
+                                            PopupMenuItem(
+                                              value: 'select_all',
+                                              child: Text(
+                                                _selectedEpisodes.length >=
+                                                            visibleEpisodes
+                                                                .length &&
+                                                        visibleEpisodes
+                                                            .isNotEmpty
+                                                    ? 'Deselect All'
+                                                    : 'Select All',
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'unwatch',
+                                              child: Text('Mark as Unwatched'),
+                                            ),
                                           ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: EpisodeViewMode.grid,
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.grid_view),
-                                            SizedBox(width: 8),
-                                            Text('Grid'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: EpisodeViewMode.compact,
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.view_headline),
-                                            SizedBox(width: 8),
-                                            Text('Compact'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: EpisodeViewMode.block,
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.view_module),
-                                            SizedBox(width: 8),
-                                            Text('Block'),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      state.isSortedDescending
-                                          ? Icons.arrow_downward_rounded
-                                          : Icons.arrow_upward_rounded,
                                     ),
-                                    tooltip: state.isSortedDescending
-                                        ? 'Sort Ascending'
-                                        : 'Sort Descending',
-                                    onPressed: () => notifier.toggleSort(),
-                                  ),
-                                ],
-                              ),
+                                    FilledButton.icon(
+                                      onPressed:
+                                          _selectedEpisodes.isEmpty
+                                              ? null
+                                              : () => _handleBatchDownload(
+                                                context,
+                                                ref,
+                                                visibleEpisodes,
+                                              ),
+                                      icon: const Icon(
+                                        Icons.download_rounded,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        'Download (${_selectedEpisodes.length})',
+                                      ),
+                                      style: FilledButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                : Row(
+                                  children: [
+                                    Text(
+                                      '$totalEpisodes Episodes',
+                                      style: theme.textTheme.titleSmall,
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: const Icon(Icons.sync_rounded),
+                                      tooltip: 'Sync with AniList',
+                                      onPressed: () async {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Syncing watched episodes from AniList...',
+                                            ),
+                                            duration: Duration(seconds: 1),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        await ref
+                                            .read(
+                                              mediaTrackerProvider(
+                                                widget.mediaId,
+                                              ).notifier,
+                                            )
+                                            .fetchRemoteEntries();
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.checklist_rounded),
+                                      tooltip: 'Select Episodes',
+                                      onPressed: () {
+                                        final firstEp =
+                                            visibleEpisodes.firstOrNull?.number;
+                                        if (firstEp != null) {
+                                          _enterSelectionMode(firstEp);
+                                        }
+                                      },
+                                    ),
+                                    // View Mode Toggle
+                                    PopupMenuButton<EpisodeViewMode>(
+                                      icon: const Icon(
+                                        Icons.view_agenda_outlined,
+                                      ),
+                                      tooltip: 'View Mode',
+                                      initialValue: viewMode,
+                                      onSelected: (mode) {
+                                        ref
+                                            .read(uiSettingsProvider.notifier)
+                                            .updateSettings(
+                                              (s) => s.copyWith(
+                                                episodeViewMode: mode.name,
+                                              ),
+                                            );
+                                      },
+                                      itemBuilder:
+                                          (context) => [
+                                            const PopupMenuItem(
+                                              value: EpisodeViewMode.list,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.view_list),
+                                                  SizedBox(width: 8),
+                                                  Text('List'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: EpisodeViewMode.grid,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.grid_view),
+                                                  SizedBox(width: 8),
+                                                  Text('Grid'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: EpisodeViewMode.compact,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.view_headline),
+                                                  SizedBox(width: 8),
+                                                  Text('Compact'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: EpisodeViewMode.block,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.view_module),
+                                                  SizedBox(width: 8),
+                                                  Text('Block'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        state.isSortedDescending
+                                            ? Icons.arrow_downward_rounded
+                                            : Icons.arrow_upward_rounded,
+                                      ),
+                                      tooltip:
+                                          state.isSortedDescending
+                                              ? 'Sort Ascending'
+                                              : 'Sort Descending',
+                                      onPressed: () => notifier.toggleSort(),
+                                    ),
+                                  ],
+                                ),
                       ),
                       SizedBox(
                         height: 50,
@@ -701,9 +738,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       final isWatched = epProgress?.isCompleted ?? false;
       final duration = epProgress?.durationInSeconds ?? 0;
       final progressSec = epProgress?.progressInSeconds ?? 0;
-      final watchProgress = (duration > 0)
-          ? (progressSec / duration).clamp(0.0, 1.0)
-          : 0.0;
+      final watchProgress =
+          (duration > 0) ? (progressSec / duration).clamp(0.0, 1.0) : 0.0;
 
       final downloadState = ref.watch(downloadsProvider);
       final download = downloadState.downloads.firstWhereOrNull(
@@ -757,7 +793,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             download: download,
             episodeProgress: epProgress,
             onTap: onItemTap,
-            onMoreOptions: () => _showEpisodeMenu(context, ep, isWatched, download: download),
+            onMoreOptions:
+                () => _showEpisodeMenu(
+                  context,
+                  ep,
+                  isWatched,
+                  download: download,
+                ),
             onDownload: onDownloadItem,
             onLongPress: onLongPressItem,
             isSelected: isSelected,
@@ -786,7 +828,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             episodeProgress: epProgress,
             fallbackCover: fallbackCover,
             onTap: onItemTap,
-            onMoreOptions: () => _showEpisodeMenu(context, ep, isWatched, download: download),
+            onMoreOptions:
+                () => _showEpisodeMenu(
+                  context,
+                  ep,
+                  isWatched,
+                  download: download,
+                ),
             onDownload: onDownloadItem,
             onLongPress: onLongPressItem,
             isSelected: isSelected,
@@ -860,8 +908,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       animeId: animeIdForSource,
       animeName:
           (widget.mediaTitle.english ??
-          widget.mediaTitle.romaji ??
-          widget.mediaTitle.native)!,
+              widget.mediaTitle.romaji ??
+              widget.mediaTitle.native)!,
       animeFormat: widget.mediaFormat,
       animeCover: widget.mediaCover,
       context: context,
@@ -897,9 +945,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               builder: (context, setState) {
                 return Consumer(
                   builder: (context, ref, _) {
-                    final useExtensions = ref
-                        .watch(experimentalProvider)
-                        .useExtensions;
+                    final useExtensions =
+                        ref.watch(experimentalProvider).useExtensions;
 
                     return Column(
                       children: [
@@ -970,19 +1017,20 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         ),
                         const Divider(height: 1),
                         Expanded(
-                          child: useExtensions
-                              ? _buildExtensionSourceList(
-                                  ref,
-                                  scrollController,
-                                  notifier,
-                                  searchQuery,
-                                )
-                              : _buildLegacySourceList(
-                                  ref,
-                                  scrollController,
-                                  notifier,
-                                  searchQuery,
-                                ),
+                          child:
+                              useExtensions
+                                  ? _buildExtensionSourceList(
+                                    ref,
+                                    scrollController,
+                                    notifier,
+                                    searchQuery,
+                                  )
+                                  : _buildLegacySourceList(
+                                    ref,
+                                    scrollController,
+                                    notifier,
+                                    searchQuery,
+                                  ),
                         ),
                       ],
                     );
@@ -1003,10 +1051,17 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     String query,
   ) {
     final sourceState = ref.watch(sourceProvider);
-    final sources = sourceState.installedAnimeExtensions.where((s) {
-      if (query.isEmpty) return true;
-      return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
-    }).toList();
+    final sources =
+        sourceState.installedAnimeExtensions.where((s) {
+            if (query.isEmpty) return true;
+            return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
+          }).toList()
+          ..sort((a, b) {
+            final aRecommended = a.name?.toLowerCase() == 'justanime';
+            final bRecommended = b.name?.toLowerCase() == 'justanime';
+            if (aRecommended != bRecommended) return aRecommended ? -1 : 1;
+            return (a.name ?? '').compareTo(b.name ?? '');
+          });
 
     final activeId = sourceState.activeAnimeSource?.id;
 
@@ -1029,28 +1084,35 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
             clipBehavior: Clip.antiAlias,
-            child: source.iconUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: source.iconUrl!,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, _, _) =>
-                        const Icon(Icons.extension, size: 20),
-                  )
-                : const Icon(Icons.extension, size: 20),
+            child:
+                source.iconUrl != null
+                    ? CachedNetworkImage(
+                      imageUrl: source.iconUrl!,
+                      fit: BoxFit.cover,
+                      errorWidget:
+                          (_, _, _) => const Icon(Icons.extension, size: 20),
+                    )
+                    : const Icon(Icons.extension, size: 20),
           ),
           title: Text(source.name ?? 'Unknown'),
-          subtitle: Text(source.lang ?? ''),
+          subtitle: Text(
+            source.name?.toLowerCase() == 'justanime'
+                ? '${source.lang ?? ''} • Recommended'
+                : source.lang ?? '',
+          ),
           selected: isSelected,
-          trailing: isSelected
-              ? IconButton(
-                  icon: Icon(Icons.settings_rounded),
-                  color: Theme.of(context).colorScheme.primary,
-                  onPressed: () => context.push(
-                    '/settings/extensions/extension-preference',
-                    extra: source,
-                  ),
-                )
-              : null,
+          trailing:
+              isSelected
+                  ? IconButton(
+                    icon: Icon(Icons.settings_rounded),
+                    color: Theme.of(context).colorScheme.primary,
+                    onPressed:
+                        () => context.push(
+                          '/settings/extensions/extension-preference',
+                          extra: source,
+                        ),
+                  )
+                  : null,
 
           onTap: () {
             ref.read(sourceProvider.notifier).setActiveSource(source);
@@ -1070,10 +1132,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   ) {
     final registry = ref.read(animeSourceRegistryProvider);
     final selectedAnimeSource = ref.watch(selectedAnimeProvider);
-    final sources = registry.keys.where((s) {
-      if (query.isEmpty) return true;
-      return s.toLowerCase().contains(query.toLowerCase());
-    }).toList();
+    final sources =
+        registry.keys.where((s) {
+          if (query.isEmpty) return true;
+          return s.toLowerCase().contains(query.toLowerCase());
+        }).toList();
 
     if (sources.isEmpty) {
       return const Center(child: Text('No legacy sources found.'));
@@ -1092,12 +1155,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             child: Icon(Icons.public, size: 20),
           ),
           title: Text(source),
-          trailing: isSelected
-              ? Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              : null,
+          trailing:
+              isSelected
+                  ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                  : null,
           onTap: () {
             ref.read(selectedProviderKeyProvider.notifier).select(source);
             Navigator.pop(context);
@@ -1152,7 +1216,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final epNum = episode.number ?? 1;
     final isDownloaded =
         download != null && download.state == DownloadStatus.downloaded;
-    final animeTitle = widget.mediaTitle.english ??
+    final animeTitle =
+        widget.mediaTitle.english ??
         widget.mediaTitle.romaji ??
         widget.mediaTitle.native ??
         'Unknown';
@@ -1167,7 +1232,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1185,9 +1253,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 ),
                 Text(
                   episode.title ?? 'Episode $epNum',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1221,7 +1289,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       EpisodeProgress(
                         episodeNumber: epNum,
                         episodeTitle: episode.title ?? 'Episode $epNum',
-                        episodeThumbnail: episode.thumbnail ?? widget.mediaCover,
+                        episodeThumbnail:
+                            episode.thumbnail ?? widget.mediaCover,
                         isCompleted: !isWatched,
                       ),
                     );
@@ -1237,7 +1306,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     'Mark All Previous Episodes (1–$epNum)',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text('Marks all previous episodes as watched'),
+                  subtitle: const Text(
+                    'Marks all previous episodes as watched',
+                  ),
                   onTap: () async {
                     await repo.markPreviousEpisodesWatched(
                       animeId: widget.mediaId,
@@ -1250,7 +1321,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Marked episodes 1 to $epNum as watched'),
+                          content: Text(
+                            'Marked episodes 1 to $epNum as watched',
+                          ),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
@@ -1259,13 +1332,21 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 ),
                 if (isDownloaded)
                   ListTile(
-                    leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.red,
+                    ),
                     title: const Text(
                       'Remove Download',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     onTap: () {
-                      ref.read(downloadsProvider.notifier).deleteDownload(download);
+                      ref
+                          .read(downloadsProvider.notifier)
+                          .deleteDownload(download);
                       Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:ani_dash/router/router_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
@@ -258,7 +258,7 @@ class _DownloadSourceSelectorState
                 ),
               ),
               TextButton(
-                onPressed: () => context.go('/downloads'),
+                onPressed: () => routerConfig.go('/downloads'),
                 child: const Text('View Downloads'),
               ),
             ],

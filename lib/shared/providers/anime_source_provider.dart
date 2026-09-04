@@ -32,6 +32,10 @@ class SelectedProviderKeyNotifier extends Notifier<String?> {
     }
     final selectedKey = sharedPrefs.getString(selectedProvider);
     AppLogger.w("[Registery] Selected $selectedKey");
+    if (selectedKey == null || selectedKey.isEmpty) {
+      sharedPrefs.setString(selectedProvider, 'justanime');
+      return 'justanime';
+    }
     return selectedKey;
   }
 
@@ -52,7 +56,8 @@ final selectedAnimeProvider = Provider<AnimeProvider?>((ref) {
     final p = registry.get(key);
     if (p != null) return p;
   }
-  return registry.get('hianime') ??
+  return registry.get('justanime') ??
+      registry.get('hianime') ??
       registry.get('aniwatch') ??
       registry.get('gojo') ??
       registry.values.firstOrNull;

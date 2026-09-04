@@ -63,7 +63,23 @@ class UniversalMedia {
     this.siteUrl,
   });
 
-
+  bool get isMature {
+    if (isAdult) return true;
+    final values = <String>[
+      ...genres,
+      ...tags,
+      title.english ?? '',
+      title.romaji ?? '',
+    ].map((e) => e.toLowerCase());
+    const markers = {
+      'nudity',
+      'sexual content',
+      'explicit sex',
+      'borderline hentai',
+      'high school dxd',
+    };
+    return values.any((value) => markers.any(value.contains));
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -176,8 +192,6 @@ class UniversalTitle {
 
   String get userPreferred => english ?? romaji ?? native ?? 'Unknown';
 
-
-
   Map<String, dynamic> toJson() => {
     'romaji': romaji,
     'english': english,
@@ -193,8 +207,6 @@ class UniversalCoverImage {
 
   const UniversalCoverImage({this.large, this.medium});
 
-
-
   Map<String, dynamic> toJson() => {'large': large, 'medium': medium};
 }
 
@@ -208,8 +220,6 @@ class UniversalNextAiringEpisode {
     this.airingAt,
     this.timeUntilAiring,
   });
-
-
 
   Map<String, dynamic> toJson() => {
     'episode': episode,
@@ -235,8 +245,6 @@ class UniversalMediaRanking {
     required this.allTime,
   });
 
-
-
   Map<String, dynamic> toJson() => {
     'rank': rank,
     'type': type,
@@ -260,8 +268,6 @@ class UniversalCharacter {
     this.role,
   });
 
-
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -278,8 +284,6 @@ class UniversalStaff {
 
   const UniversalStaff({this.id, this.name, this.image, this.role});
 
-
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name?.toJson(),
@@ -294,8 +298,6 @@ class UniversalStaffName {
 
   const UniversalStaffName({this.full, this.native});
 
-
-
   Map<String, dynamic> toJson() => {'full': full, 'native': native};
 }
 
@@ -304,8 +306,6 @@ class UniversalStaffImage {
   final String? medium;
 
   const UniversalStaffImage({this.large, this.medium});
-
-
 
   Map<String, dynamic> toJson() => {'large': large, 'medium': medium};
 }
@@ -319,8 +319,6 @@ class UniversalMediaRelation {
     required this.media,
   });
 
-
-
   Map<String, dynamic> toJson() => {
     'relationType': relationType,
     'media': media.toJson(),
@@ -333,8 +331,6 @@ class UniversalStudio {
 
   const UniversalStudio({required this.name, required this.isMain});
 
-
-
   Map<String, dynamic> toJson() => {'name': name, 'isMain': isMain};
 }
 
@@ -344,8 +340,6 @@ class UniversalTrailer {
   final String? thumbnail;
 
   const UniversalTrailer({required this.id, this.site, this.thumbnail});
-
-
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -360,8 +354,6 @@ class UniversalFuzzyDate {
   final int? day;
 
   const UniversalFuzzyDate({this.year, this.month, this.day});
-
-
 
   Map<String, dynamic> toJson() => {'year': year, 'month': month, 'day': day};
 }

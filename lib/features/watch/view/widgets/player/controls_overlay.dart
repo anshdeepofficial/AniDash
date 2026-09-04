@@ -17,6 +17,8 @@ class ControlsOverlay extends ConsumerWidget {
   final VoidCallback onServerPressed;
   final VoidCallback onSubtitlePressed;
   final VoidCallback onFullScreenPressed;
+  final String? localTitle;
+  final bool isLocal;
 
   const ControlsOverlay({
     super.key,
@@ -31,6 +33,8 @@ class ControlsOverlay extends ConsumerWidget {
     required this.onServerPressed,
     required this.onSubtitlePressed,
     required this.onFullScreenPressed,
+    this.localTitle,
+    this.isLocal = false,
   });
 
   @override
@@ -79,6 +83,9 @@ class ControlsOverlay extends ConsumerWidget {
               onEpisodesPressed: onEpisodesPressed,
               onSettingsPressed: onSettingsPressed,
               onQualityPressed: onQualityPressed,
+              titleOverride: localTitle,
+              sourceOverride: isLocal ? 'DOWNLOADED' : null,
+              isLocal: isLocal,
             ),
           ),
           AnimatedPositioned(
@@ -96,6 +103,7 @@ class ControlsOverlay extends ConsumerWidget {
               onSubtitlePressed: onSubtitlePressed,
               onServerPressed: onServerPressed,
               onFullScreenPressed: onFullScreenPressed,
+              isLocal: isLocal,
             ),
           ),
         ],

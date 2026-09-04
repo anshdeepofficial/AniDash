@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 
-class BrandLogo extends StatelessWidget {
+class BrandLogo extends ConsumerWidget {
   final double size;
   final BorderRadius? borderRadius;
 
   const BrandLogo({super.key, this.size = 40, this.borderRadius});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeSettingsProvider.select((s) => s.logoMode));
+    final useWhite =
+        mode == 'white' ||
+        (mode == 'dynamic' && Theme.of(context).brightness == Brightness.dark);
     final asset =
-        Theme.of(context).brightness == Brightness.dark
+        useWhite
             ? 'assets/icons/anidash_logo_dark.png'
             : 'assets/icons/anidash_logo_light.png';
 

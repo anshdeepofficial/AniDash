@@ -15,6 +15,7 @@ import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/features/browse/view/widgets/filter_bottom_sheet.dart';
 import 'package:ani_dash/features/browse/view/section_screen.dart';
+import 'package:ani_dash/main.dart';
 
 class BrowseScreen extends ConsumerStatefulWidget {
   final String? keyword;
@@ -37,6 +38,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     vsync: this,
   );
   Timer? _debounce;
+  static const _historyKey = 'anime_search_history';
+  List<String> _searchHistory = [];
 
   // State variables
   List<UniversalMedia> _results = [];
@@ -56,6 +59,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   void initState() {
     super.initState();
     _animationController.forward();
+    _searchHistory = sharedPrefs.getStringList(_historyKey) ?? [];
     if (widget.keyword?.isNotEmpty == true || !_currentFilter.isEmpty) {
       _search();
     } else {
@@ -151,10 +155,48 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   }
 
   void _onSearchChanged(String query) {
+    setState(() {});
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       _search();
     });
+  }
+
+  Future<void> _submitSearch() async {
+    final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      _searchHistory =
+          [
+            query,
+            ..._searchHistory.where(
+              (item) => item.toLowerCase() != query.toLowerCase(),
+            ),
+          ].take(10).toList();
+      await sharedPrefs.setStringList(_historyKey, _searchHistory);
+    }
+    await _search();
+  }
+
+  void _selectSuggestion(String value) {
+    _searchController.text = value;
+    _searchController.selection = TextSelection.collapsed(offset: value.length);
+    _submitSearch();
+  }
+
+  List<String> get _suggestions {
+    final query = _searchController.text.trim().toLowerCase();
+    final titles = [..._trending, ..._popular, ..._upcoming]
+        .map((anime) => anime.title.userPreferred)
+        .where((title) => title.isNotEmpty);
+    final candidates = <String>[..._searchHistory, ...titles];
+    final seen = <String>{};
+    return candidates
+        .where((title) {
+          final key = title.toLowerCase();
+          return seen.add(key) && (query.isEmpty || key.contains(query));
+        })
+        .take(8)
+        .toList();
   }
 
   Future<void> _search() async {
@@ -220,34 +262,86 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
           _Header(
             controller: _searchController,
             animation: _animationController,
-            onSearch: _search,
-            onFocusChange: (focused) =>
-                setState(() => _isSearchFocused = focused),
+            onSearch: _submitSearch,
+            onFocusChange:
+                (focused) => setState(() => _isSearchFocused = focused),
             isSearchFocused: _isSearchFocused,
             onSearchChanged: _onSearchChanged,
             onFilter: _openFilter,
             hasFilter: !_currentFilter.isEmpty,
           ),
           Expanded(
-            child: _searchController.text.isEmpty && _currentFilter.isEmpty
-                ? _ExploreView(
-                    trending: _trending,
-                    popular: _popular,
-                    upcoming: _upcoming,
-                    isLoading: _isExploreLoading,
-                  )
-                : _results.isEmpty && !_isLoading
-                ? _EmptyState()
-                : _ResultsGrid(
-                    results: _results,
-                    scrollController: _scrollController,
-                    columnCount: _getColumnCount(),
-                    isLoading: _isLoading,
-                    animation: _animationController,
-                  ),
+            child:
+                _isSearchFocused && _suggestions.isNotEmpty
+                    ? _SearchSuggestions(
+                      items: _suggestions,
+                      history: _searchHistory.toSet(),
+                      onSelected: _selectSuggestion,
+                      onClear: () async {
+                        await sharedPrefs.setStringList(_historyKey, []);
+                        setState(() => _searchHistory = []);
+                      },
+                    )
+                    : _searchController.text.isEmpty && _currentFilter.isEmpty
+                    ? _ExploreView(
+                      trending: _trending,
+                      popular: _popular,
+                      upcoming: _upcoming,
+                      isLoading: _isExploreLoading,
+                    )
+                    : _results.isEmpty && !_isLoading
+                    ? _EmptyState()
+                    : _ResultsGrid(
+                      results: _results,
+                      scrollController: _scrollController,
+                      columnCount: _getColumnCount(),
+                      isLoading: _isLoading,
+                      animation: _animationController,
+                    ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SearchSuggestions extends StatelessWidget {
+  final List<String> items;
+  final Set<String> history;
+  final ValueChanged<String> onSelected;
+  final VoidCallback onClear;
+
+  const _SearchSuggestions({
+    required this.items,
+    required this.history,
+    required this.onSelected,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      children: [
+        if (history.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onClear,
+              child: const Text('Clear history'),
+            ),
+          ),
+        ...items.map(
+          (item) => ListTile(
+            leading: Icon(
+              history.contains(item) ? Icons.history : Icons.search,
+            ),
+            title: Text(item),
+            trailing: const Icon(Icons.north_west_rounded, size: 18),
+            onTap: () => onSelected(item),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -349,9 +443,12 @@ class _SearchBar extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSearchFocused
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          color:
+              isSearchFocused
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
           width: isSearchFocused ? 2 : 1,
         ),
       ),
@@ -370,11 +467,12 @@ class _SearchBar extends StatelessWidget {
             ),
             prefixIcon: Icon(
               Iconsax.search_normal,
-              color: isSearchFocused
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
+              color:
+                  isSearchFocused
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
@@ -390,11 +488,12 @@ class _SearchBar extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     Iconsax.setting_4,
-                    color: hasFilter
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    color:
+                        hasFilter
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                   onPressed: onFilter,
                 ),
@@ -473,11 +572,12 @@ class _ResultsGrid extends ConsumerWidget {
                     }
                     final anime = results[index];
                     return GestureDetector(
-                      onTap: () => navigateToDetail(
-                        context,
-                        anime,
-                        'browse_grid_${anime.id}',
-                      ),
+                      onTap:
+                          () => navigateToDetail(
+                            context,
+                            anime,
+                            'browse_grid_${anime.id}',
+                          ),
                       child: AnimeCard(
                         anime: anime,
                         mode: mode,
@@ -667,8 +767,11 @@ class _HorizontalSection extends ConsumerWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            SectionScreen(title: title, fetchItems: fetcher!),
+                        builder:
+                            (_) => SectionScreen(
+                              title: title,
+                              fetchItems: fetcher!,
+                            ),
                       ),
                     );
                   }

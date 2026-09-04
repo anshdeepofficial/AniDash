@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
@@ -7,6 +8,7 @@ import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart'
 import 'package:go_router/go_router.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
+import 'package:ani_dash/helpers/ui.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -14,6 +16,9 @@ class TopControls extends ConsumerWidget {
   final VoidCallback? onQualityPressed;
   final VoidCallback? onSettingsPressed;
   final VoidCallback? onSubtitlePressed;
+  final String? titleOverride;
+  final String? sourceOverride;
+  final bool isLocal;
 
   const TopControls({
     super.key,
@@ -22,6 +27,9 @@ class TopControls extends ConsumerWidget {
     this.onQualityPressed,
     this.onSettingsPressed,
     this.onSubtitlePressed,
+    this.titleOverride,
+    this.sourceOverride,
+    this.isLocal = false,
   });
 
   VoidCallback? _wrap(VoidCallback? action) {
@@ -47,8 +55,10 @@ class TopControls extends ConsumerWidget {
 
     final episodeTitle = ref.watch(
       episodeListProvider.select((s) {
-        if (selectedEp == null || selectedEp > s.episodes.length) return null;
-        return s.episodes.firstWhere((i) => i.number == selectedEp).title;
+        if (selectedEp == null) return null;
+        return s.episodes
+            .firstWhereOrNull((i) => i.number == selectedEp)
+            ?.title;
       }),
     );
 
@@ -91,7 +101,7 @@ class TopControls extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _getSourceName(ref).toUpperCase(),
+                      sourceOverride ?? _getSourceName(ref).toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white54,
                         fontSize: 10,
@@ -99,9 +109,10 @@ class TopControls extends ConsumerWidget {
                         letterSpacing: 1.0,
                       ),
                     ),
-                    if (selectedEp != null && sources.isNotEmpty)
+                    if (titleOverride != null ||
+                        (selectedEp != null && sources.isNotEmpty))
                       Text(
-                        episodeTitle ?? 'Episode $selectedEp',
+                        titleOverride ?? episodeTitle ?? 'Episode $selectedEp',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -119,18 +130,20 @@ class TopControls extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (onSubtitlePressed != null)
+                  if (!isLocal && onSubtitlePressed != null)
                     _TopIconButton(
-                      icon: hasSubtitles
-                          ? Icons.closed_caption_rounded
-                          : Icons.closed_caption_off_rounded,
+                      icon:
+                          hasSubtitles
+                              ? Icons.closed_caption_rounded
+                              : Icons.closed_caption_off_rounded,
                       onTap: _wrap(onSubtitlePressed),
-                      color: hasSubtitles
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.white,
+                      color:
+                          hasSubtitles
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.white,
                     ),
 
-                  if (qualityOptions.isNotEmpty)
+                  if (!isLocal && qualityOptions.isNotEmpty)
                     _TopIconButton(
                       icon: Icons.high_quality_rounded,
                       onTap: _wrap(onQualityPressed),
@@ -150,6 +163,14 @@ class TopControls extends ConsumerWidget {
                         fitModes[(fitModes.indexOf(currentFit) + 1) %
                             fitModes.length],
                       );
+                      onInteraction();
+                    },
+                  ),
+
+                  _TopIconButton(
+                    icon: Icons.screen_rotation_rounded,
+                    onTap: () async {
+                      await UIHelper.forceLandscape();
                       onInteraction();
                     },
                   ),

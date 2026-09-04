@@ -67,7 +67,8 @@ class EpisodeListState {
     );
   }
 
-  EpisodeDataModel? getEpisode(int episode) => episodes.firstWhereOrNull((e) => e.number == episode);
+  EpisodeDataModel? getEpisode(int episode) =>
+      episodes.firstWhereOrNull((e) => e.number == episode);
 }
 
 @Riverpod(keepAlive: true)
@@ -128,7 +129,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     AppLogger.success('Successfully loaded ${fetched.length} episodes');
     state = state.copyWith(episodes: fetched, isLoading: false);
     _syncJikanIfEnabled();
-    
+
     return fetched;
   }
 
@@ -144,14 +145,21 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
   // --- Internal Source Routing ---
 
-  Future<List<EpisodeDataModel>> _fetchEpisodesInternal(String? animeId, {DMedia? media}) async {
+  Future<List<EpisodeDataModel>> _fetchEpisodesInternal(
+    String? animeId, {
+    DMedia? media,
+  }) async {
     try {
-      return _exp.useExtensions 
-          ? await _fetchExtensionEpisodes(media) 
+      return _exp.useExtensions
+          ? await _fetchExtensionEpisodes(media)
           : await _fetchLegacyEpisodes(animeId);
     } catch (e, st) {
       AppLogger.e('Episode fetch pipeline failed', e, st);
-      showAppSnackBar('Episode Fetch', 'Failed to load episodes', type: ContentType.failure);
+      showAppSnackBar(
+        'Episode Fetch',
+        'Failed to load episodes',
+        type: ContentType.failure,
+      );
       reset();
       return [];
     }
@@ -165,19 +173,21 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     final details = await _sourceNotifier.getDetails(media);
     final chapters = details?.episodes ?? [];
 
-    final mapped = chapters.map((ch) {
-      // Safely extract episode number string before parsing
-      final numStr = ch.episodeNumber.isNotEmpty 
-          ? ch.episodeNumber 
-          : RegExp(r'\d+').firstMatch(ch.name ?? '')?.group(0) ?? '';
-          
-      return EpisodeDataModel(
-        title: ch.name,
-        url: ch.url,
-        isFiller: false,
-        number: int.tryParse(numStr),
-      );
-    }).toList();
+    final mapped =
+        chapters.map((ch) {
+          // Safely extract episode number string before parsing
+          final numStr =
+              ch.episodeNumber.isNotEmpty
+                  ? ch.episodeNumber
+                  : RegExp(r'\d+').firstMatch(ch.name ?? '')?.group(0) ?? '';
+
+          return EpisodeDataModel(
+            title: ch.name,
+            url: ch.url,
+            isFiller: false,
+            number: int.tryParse(numStr),
+          );
+        }).toList();
 
     // Sort ascending if valid numbers exist
     if (mapped.isNotEmpty && mapped.first.number != null) {
@@ -201,16 +211,18 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   // --- Jikan Metadata Syncing ---
 
   void _syncJikanIfEnabled() {
-    if (!_exp.episodeTitleSync || state.episodes.isEmpty || state.animeTitle == null) {
+    if (state.episodes.isEmpty || state.animeTitle == null) {
       return;
     }
 
     state = state.copyWith(isJikanSyncing: true);
     AppLogger.i('Initializing Jikan title sync for: ${state.animeTitle}');
-    
+
     // unawaited ensures Riverpod doesn't block while fetching non-critical metadata
     unawaited(
-      _syncWithJikan().whenComplete(() => state = state.copyWith(isJikanSyncing: false)),
+      _syncWithJikan().whenComplete(
+        () => state = state.copyWith(isJikanSyncing: false),
+      ),
     );
   }
 
@@ -223,14 +235,34 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
         // Only search Jikan if we haven't already cached the matches
         if (matches.isEmpty) {
-          final cleanedTitle = state.animeTitle!
-              .replaceAll(RegExp(r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)', caseSensitive: false), '')
-              .replaceAll(RegExp(r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]', caseSensitive: false), '')
-              .replaceAll(RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false), '')
-              .trim();
-          final searchTitle = cleanedTitle.isNotEmpty ? cleanedTitle : state.animeTitle!;
+          final cleanedTitle =
+              state.animeTitle!
+                  .replaceAll(
+                    RegExp(
+                      r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)',
+                      caseSensitive: false,
+                    ),
+                    '',
+                  )
+                  .replaceAll(
+                    RegExp(
+                      r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]',
+                      caseSensitive: false,
+                    ),
+                    '',
+                  )
+                  .replaceAll(
+                    RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false),
+                    '',
+                  )
+                  .trim();
+          final searchTitle =
+              cleanedTitle.isNotEmpty ? cleanedTitle : state.animeTitle!;
 
-          final searchResults = await _jikan.getSearch(title: searchTitle, limit: 10);
+          final searchResults = await _jikan.getSearch(
+            title: searchTitle,
+            limit: 10,
+          );
           matches = getBestMatches<JikanMedia>(
             results: searchResults,
             title: searchTitle,
@@ -240,7 +272,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
         }
 
         if (matches.isEmpty || matches.first.similarity < 0.55) {
-          AppLogger.warning('No strong Jikan match found for title sync. Aborting sync.');
+          AppLogger.warning(
+            'No strong Jikan match found for title sync. Aborting sync.',
+          );
           return;
         }
 
@@ -267,7 +301,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       // Create a lookup by malId (episode number in Jikan)
       final titleByEpNum = <int, String>{};
       for (final jEp in allJikanEpisodes) {
-        if (jEp.title.isNotEmpty && !jEp.title.toLowerCase().startsWith('episode ')) {
+        if (jEp.title.isNotEmpty &&
+            !jEp.title.toLowerCase().startsWith('episode ')) {
           titleByEpNum[jEp.malId] = jEp.title;
         } else if (jEp.title.isNotEmpty) {
           titleByEpNum[jEp.malId] = jEp.title;
@@ -284,9 +319,12 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
         if (syncedTitle != null && syncedTitle.isNotEmpty) {
           // If extension already gave a real title (not just "Episode X"), keep it or enrich it
           final currentTitle = updated[i].title ?? '';
-          final isGeneric = currentTitle.isEmpty ||
-              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
-                  .hasMatch(currentTitle.trim());
+          final isGeneric =
+              currentTitle.isEmpty ||
+              RegExp(
+                r'^(episode|ep\.?)\s*\d+$',
+                caseSensitive: false,
+              ).hasMatch(currentTitle.trim());
 
           if (isGeneric) {
             updated[i] = updated[i].copyWith(title: 'EP $epNum - $syncedTitle');
@@ -295,12 +333,12 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
         }
       }
 
-      AppLogger.success('Successfully synced $syncedCount episode titles from Jikan');
+      AppLogger.success(
+        'Successfully synced $syncedCount episode titles from Jikan',
+      );
       state = state.copyWith(episodes: updated);
-      
     } catch (e, st) {
       AppLogger.w('Jikan sync failed dynamically', e, st);
     }
   }
 }
-

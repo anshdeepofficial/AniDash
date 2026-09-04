@@ -30,12 +30,16 @@ class AniDashVideoPlayer extends ConsumerStatefulWidget {
   final VoidCallback? onEpisodesPressed;
   final VoidCallback? onPanelCloseRequest;
   final ScreenshotController? screenshotController;
+  final String? localFilePath;
+  final String? localTitle;
 
   const AniDashVideoPlayer({
     super.key,
     this.onEpisodesPressed,
     this.onPanelCloseRequest,
     this.screenshotController,
+    this.localFilePath,
+    this.localTitle,
   });
 
   @override
@@ -61,6 +65,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       if (mounted) {
         _focusNode.requestFocus();
         ref.read(playerUIControllerProvider.notifier).restartHideTimer();
+        final path = widget.localFilePath;
+        if (path != null) {
+          ref.read(playerStateProvider.notifier).open(path, Duration.zero);
+        }
       }
     });
   }
@@ -146,26 +154,27 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     if (ModalRoute.of(context)?.isCurrent != true) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('High Volume Warning'),
-        content: const Text(
-          'Boost volume above 100%? This may damage hearing or speakers.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('High Volume Warning'),
+            content: const Text(
+              'Boost volume above 100%? This may damage hearing or speakers.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => _allowBoost = true);
+                },
+                child: const Text('Boost'),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _allowBoost = true);
-            },
-            child: const Text('Boost'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -278,18 +287,21 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     if (data.servers.isEmpty) return;
 
     final selectedIdx = data.servers.indexWhere(
-      (s) => s.id == data.selectedServer?.id && s.isDub == data.selectedServer?.isDub,
+      (s) =>
+          s.id == data.selectedServer?.id &&
+          s.isDub == data.selectedServer?.isDub,
     );
 
     _sheet(
       GenericSelectionSheet<String>(
         title: 'Server',
-        items: data.servers
-            .map(
-              (e) =>
-                  '${(e.id ?? 'Server').toUpperCase()}${e.name?.isNotEmpty == true && e.name != e.id ? ' (${e.name})' : ''} [${e.isDub ? 'DUB' : 'SUB'}]',
-            )
-            .toList(),
+        items:
+            data.servers
+                .map(
+                  (e) =>
+                      '${(e.id ?? 'Server').toUpperCase()}${e.name?.isNotEmpty == true && e.name != e.id ? ' (${e.name})' : ''} [${e.isDub ? 'DUB' : 'SUB'}]',
+                )
+                .toList(),
         selectedIndex: selectedIdx != -1 ? selectedIdx : 0,
         displayBuilder: (e) => e,
         onItemSelected: (i) {
@@ -343,7 +355,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final episodesLoading = ref.watch(
       episodeListProvider.select((e) => e.isLoading),
     );
-    final isBusy = state.isBuffering ||
+    final isBusy =
+        state.isBuffering ||
         episodesLoading ||
         episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
         episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
@@ -368,9 +381,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     }
 
     return MouseRegion(
-      cursor: !uiState.isVisible
-          ? SystemMouseCursors.none
-          : SystemMouseCursors.click,
+      cursor:
+          !uiState.isVisible
+              ? SystemMouseCursors.none
+              : SystemMouseCursors.click,
       onHover: (_) => uiController.toggleVisibility(override: true),
       child: CallbackShortcuts(
         bindings: {
@@ -378,10 +392,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
           const SingleActivator(LogicalKeyboardKey.keyK): notifier.togglePlay,
           const SingleActivator(LogicalKeyboardKey.keyL):
               uiController.toggleLock,
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-              notifier.rewind(10),
-          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-              notifier.forward(10),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft):
+              () => notifier.rewind(10),
+          const SingleActivator(LogicalKeyboardKey.arrowRight):
+              () => notifier.forward(10),
           const SingleActivator(LogicalKeyboardKey.keyM): notifier.toggleMute,
           const SingleActivator(LogicalKeyboardKey.f11): _toggleFullScreen,
           const SingleActivator(LogicalKeyboardKey.keyF): _toggleFullScreen,
@@ -427,6 +441,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 onServerPressed: _openServer,
                 onSubtitlePressed: _openSubtitle,
                 onFullScreenPressed: _toggleFullScreen,
+                localTitle: widget.localTitle,
+                isLocal: widget.localFilePath != null,
               ),
 
               // Standalone Loading Indicator when controls are hidden
@@ -448,9 +464,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (uiState.seekAmount != 0)
                 Positioned.fill(
                   child: Align(
-                    alignment: uiState.isSeekForward
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
+                    alignment:
+                        uiState.isSeekForward
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
                     child: SeekIndicatorOverlay(
                       isForward: uiState.isSeekForward,
                       seconds: uiState.seekAmount.abs(),

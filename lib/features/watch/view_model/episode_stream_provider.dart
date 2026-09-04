@@ -10,7 +10,7 @@ import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Source;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:ani_dash/router/router_config.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -548,7 +548,7 @@ class EpisodeData extends _$EpisodeData {
           action: SnackBarAction(
             label: 'View Downloads',
             textColor: Colors.white,
-            onPressed: () => context.go('/downloads'),
+            onPressed: () => routerConfig.go('/downloads'),
           ),
         ),
       );
@@ -913,7 +913,7 @@ class EpisodeData extends _$EpisodeData {
                 children: [
                   Expanded(child: Text(msg)),
                   TextButton(
-                    onPressed: () => context.go('/downloads'),
+                    onPressed: () => routerConfig.go('/downloads'),
                     child: const Text('View Downloads'),
                   ),
                 ],
@@ -927,7 +927,7 @@ class EpisodeData extends _$EpisodeData {
                 onPressed:
                     () =>
                         downloadId == null
-                            ? context.go('/downloads')
+                            ? routerConfig.go('/downloads')
                             : ref
                                 .read(downloadsProvider.notifier)
                                 .cancelDownload(downloadId),

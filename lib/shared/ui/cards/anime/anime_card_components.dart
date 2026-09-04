@@ -67,15 +67,16 @@ class Tag extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: hasShadow
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ]
-            : null,
+        boxShadow:
+            hasShadow
+                ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+                : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -236,7 +237,7 @@ class AdultBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (anime?.isAdult != true) return const SizedBox.shrink();
+    if (anime?.isMature != true) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

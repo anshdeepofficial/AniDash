@@ -39,14 +39,45 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 title: 'Appearance',
                 titleColor: colorScheme.primary,
                 children: [
+                  SegmentedToggleSettingsItem<dynamic>(
+                    accent: colorScheme.primary,
+                    iconColor: colorScheme.primary,
+                    title: 'Adaptive App Logo',
+                    description: 'Choose automatic, white, or black logo',
+                    selectedValue:
+                        theme.logoMode == 'white'
+                            ? 1
+                            : theme.logoMode == 'black'
+                            ? 2
+                            : 0,
+                    onValueChanged: (value) {
+                      final index = value as int;
+                      themeNotifier.updateSettings(
+                        (prev) => prev.copyWith(
+                          logoMode:
+                              index == 1
+                                  ? 'white'
+                                  : index == 2
+                                  ? 'black'
+                                  : 'dynamic',
+                        ),
+                      );
+                    },
+                    children: const {
+                      0: Icon(Icons.brightness_auto_rounded),
+                      1: Icon(Icons.light_mode_rounded),
+                      2: Icon(Icons.dark_mode_rounded),
+                    },
+                    labels: const {0: 'Dynamic', 1: 'White', 2: 'Black'},
+                    icon: const Icon(Icons.apps_rounded),
+                  ),
                   NormalSettingsItem(
                     leading: BrandLogo(
                       size: 36,
                       borderRadius: BorderRadius.circular(9),
                     ),
-                    title: 'Adaptive App Logo',
-                    description:
-                        'Black on light themes and white on dark themes',
+                    title: 'Logo Preview',
+                    description: 'Current logo selection',
                     trailingWidgets: const [Icon(Icons.check_circle_rounded)],
                   ),
                   SegmentedToggleSettingsItem<dynamic>(

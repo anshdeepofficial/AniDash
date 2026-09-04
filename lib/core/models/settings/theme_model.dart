@@ -9,6 +9,7 @@ class ThemeModel {
   final bool swapColors;
   final bool useMaterial3;
   final bool useDynamicColors;
+  final String logoMode;
 
   ThemeModel({
     this.themeMode = 'system',
@@ -18,6 +19,7 @@ class ThemeModel {
     this.swapColors = false,
     this.useMaterial3 = true,
     this.useDynamicColors = false,
+    this.logoMode = 'dynamic',
   });
 
   ThemeModel copyWith({
@@ -28,6 +30,7 @@ class ThemeModel {
     bool? swapColors,
     bool? useMaterial3,
     bool? useDynamicColors,
+    String? logoMode,
   }) {
     return ThemeModel(
       themeMode: themeMode ?? this.themeMode,
@@ -37,6 +40,7 @@ class ThemeModel {
       swapColors: swapColors ?? this.swapColors,
       useMaterial3: useMaterial3 ?? this.useMaterial3,
       useDynamicColors: useDynamicColors ?? this.useDynamicColors,
+      logoMode: logoMode ?? this.logoMode,
     );
   }
 
@@ -53,6 +57,7 @@ class ThemeModel {
       'swapColors': swapColors,
       'useMaterial3': useMaterial3,
       'useDynamicColors': useDynamicColors,
+      'logoMode': logoMode,
     };
   }
 
@@ -65,6 +70,7 @@ class ThemeModel {
       swapColors: map['swapColors'] ?? false,
       useMaterial3: map['useMaterial3'] ?? true,
       useDynamicColors: map['useDynamicColors'] ?? false,
+      logoMode: map['logoMode'] ?? 'dynamic',
     );
   }
 

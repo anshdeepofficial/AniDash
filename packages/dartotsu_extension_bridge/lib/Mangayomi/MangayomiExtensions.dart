@@ -31,43 +31,71 @@ class MangayomiExtensions extends Extension {
 
   Future<void> _autoInstallDefaults() async {
     try {
-      final installedNames = getInstalledRx(ItemType.anime).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
+      final installedNames =
+          getInstalledRx(
+            ItemType.anime,
+          ).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
       final available = getAvailableRx(ItemType.anime).value;
       const targetNames = ['justanime', 'hianime', 'anikoto'];
 
       for (final target in targetNames) {
         if (!installedNames.contains(target)) {
-          final match = available.firstWhereOrNull(
-            (s) => s.name?.toLowerCase() == target &&
-                   (target != 'hianime' || s.version == '0.4.11' || (s.version != null && s.version!.compareTo('0.4') >= 0)),
-          ) ?? available.firstWhereOrNull(
-            (s) => s.name?.toLowerCase() == target,
-          );
+          final match =
+              available.firstWhereOrNull(
+                (s) =>
+                    s.name?.toLowerCase() == target &&
+                    (target != 'hianime' ||
+                        s.version == '0.4.11' ||
+                        (s.version != null &&
+                            s.version!.compareTo('0.4') >= 0)),
+              ) ??
+              available.firstWhereOrNull(
+                (s) => s.name?.toLowerCase() == target,
+              );
 
           if (match != null) {
             match.itemType = ItemType.anime;
-            print('[EXT_AUTO_INSTALL] Installing default anime extension: ${match.name} (${match.version})');
+            print(
+              '[EXT_AUTO_INSTALL] Installing default anime extension: ${match.name} (${match.version})',
+            );
             await installSource(match);
           }
         }
       }
 
       // Auto-install default verified Manga extensions
-      final installedManga = getInstalledRx(ItemType.manga).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
+      final installedManga =
+          getInstalledRx(
+            ItemType.manga,
+          ).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
       final availableManga = getAvailableRx(ItemType.manga).value;
-      const targetManga = ['mangadex', 'mangakakalot'];
+      const targetManga = ['mangadex'];
+
+      for (final source in List<Source>.from(
+        getInstalledRx(ItemType.manga).value,
+      )) {
+        if (source.name?.toLowerCase() != 'mangadex') {
+          await uninstallSource(source);
+        }
+      }
 
       for (final target in targetManga) {
         if (!installedManga.contains(target)) {
-          final match = availableManga.firstWhereOrNull(
-            (s) => s.name?.toLowerCase() == target && (s.lang == 'en' || s.lang == 'all'),
-          ) ?? availableManga.firstWhereOrNull(
-            (s) => s.name?.toLowerCase() == target,
-          );
+          final match =
+              availableManga.firstWhereOrNull(
+                (s) =>
+                    s.name?.toLowerCase() == target &&
+                    (s.lang == 'en' || s.lang == 'all'),
+              ) ??
+              availableManga.firstWhereOrNull(
+                (s) => s.name?.toLowerCase() == target,
+              );
 
           if (match != null) {
             match.itemType = ItemType.manga;
-            print('[EXT_AUTO_INSTALL] Installing default manga extension: ${match.name} (${match.version})');
+            print(
+              '[EXT_AUTO_INSTALL] Installing default manga extension: ${match.name} (${match.version})',
+            );
             await installSource(match);
           }
         }
@@ -111,15 +139,16 @@ class MangayomiExtensions extends Extension {
     final sources = await _manager.fetchAvailableExtensionsStream(type, repos);
     final installedIds = getInstalledRx(type).value.map((e) => e.id).toSet();
 
-    final list = sources
-        .map((e) {
-          var map = e.toJson();
-          map['extensionType'] = 0;
-          map["id"] = e.sourceId;
-          return Source.fromJson(map);
-        })
-        .where((s) => !installedIds.contains(s.id))
-        .toList();
+    final list =
+        sources
+            .map((e) {
+              var map = e.toJson();
+              map['extensionType'] = 0;
+              map["id"] = e.sourceId;
+              return Source.fromJson(map);
+            })
+            .where((s) => !installedIds.contains(s.id))
+            .toList();
 
     getAvailableRx(type).value = list;
     checkForUpdates(type);
@@ -139,17 +168,19 @@ class MangayomiExtensions extends Extension {
       _getInstalled(ItemType.novel);
 
   Future<List<Source>> _getInstalled(ItemType type) async {
-    final stream = _manager
-        .getExtensionsStream(type)
-        .map(
-          (sources) => sources.map((s) {
-            var map = s.toJson();
-            map['extensionType'] = 0;
-            map["id"] = s.sourceId;
-            return Source.fromJson(map);
-          }).toList(),
-        )
-        .asBroadcastStream();
+    final stream =
+        _manager
+            .getExtensionsStream(type)
+            .map(
+              (sources) =>
+                  sources.map((s) {
+                    var map = s.toJson();
+                    map['extensionType'] = 0;
+                    map["id"] = s.sourceId;
+                    return Source.fromJson(map);
+                  }).toList(),
+            )
+            .asBroadcastStream();
 
     getInstalledRx(type).bindStream(stream);
     return stream.first;
@@ -192,18 +223,19 @@ class MangayomiExtensions extends Extension {
   Future<void> checkForUpdates(ItemType type) async {
     final availableMap = {for (var s in _getAvailableList(type)) s.id: s};
 
-    final updated = getInstalledRx(type).value.map((installed) {
-      final avail = availableMap[int.tryParse(installed.id ?? '')];
-      if (avail != null &&
-          installed.version != null &&
-          avail.version != null &&
-          compareVersions(installed.version!, avail.version!) < 0) {
-        return installed
-          ..hasUpdate = true
-          ..versionLast = avail.version;
-      }
-      return installed;
-    }).toList();
+    final updated =
+        getInstalledRx(type).value.map((installed) {
+          final avail = availableMap[int.tryParse(installed.id ?? '')];
+          if (avail != null &&
+              installed.version != null &&
+              avail.version != null &&
+              compareVersions(installed.version!, avail.version!) < 0) {
+            return installed
+              ..hasUpdate = true
+              ..versionLast = avail.version;
+          }
+          return installed;
+        }).toList();
 
     getInstalledRx(type).value = updated;
   }
