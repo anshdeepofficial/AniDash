@@ -136,7 +136,11 @@ class EpisodeData extends _$EpisodeData {
     }
 
     AppLogger.section('Loading Episode $ep');
-    state = state.copyWith(selectedEpisode: ep, clearError: true);
+    state = state.copyWith(
+      selectedEpisode: ep,
+      addState: play ? EpisodeStreamState.SOURCE_LOADING : null,
+      clearError: true,
+    );
 
     // Fast-path: Reuse existing servers immediately to cut episode transition delay
     if (state.servers.isNotEmpty && state.selectedServer != null) {
@@ -145,9 +149,7 @@ class EpisodeData extends _$EpisodeData {
       await _fetchServers(ep);
     }
 
-    if (play) {
-      await _playCurrent(startAt ?? Duration.zero);
-    }
+    if (play) await _playCurrent(startAt ?? Duration.zero);
   }
 
   Future<void> changeEpisode(int? ep, {Duration? startAt, int by = 0}) async {
