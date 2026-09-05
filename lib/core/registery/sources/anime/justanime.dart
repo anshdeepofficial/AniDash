@@ -44,33 +44,69 @@ class JustAnimeProvider extends AnimeProvider {
 
   @override
   Future<SearchPage> getSearch(String keyword, String? type, int page) async {
-    final url = Uri.parse('$apiUrl/search').replace(
-      queryParameters: {'query': keyword.replaceAll('-', ' '), 'page': '$page'},
-    );
-    final res = await UniversalHttpClient.instance
-        .get(url, headers: headers)
-        .timeout(const Duration(seconds: 20));
-    final Map<String, dynamic> decoded = json.decode(res.body);
-    final results = (decoded['results'] as List<dynamic>? ?? const []);
-    return SearchPage(
-      results:
-          results.map((raw) {
-            final item = Map<String, dynamic>.from(raw as Map);
-            final title = Map<String, dynamic>.from(
-              item['title'] as Map? ?? {},
-            );
-            return BaseAnimeModel(
-              id: item['id']?.toString(),
-              anilistId: int.tryParse(item['id']?.toString() ?? ''),
-              name: title['english'] ?? title['romaji'] ?? 'Unknown',
-              jname: title['romaji'],
-              type: item['type'],
-              poster: item['cover'],
-              releaseDate: item['year']?.toString(),
-              number: item['episodes'],
-            );
-          }).toList(),
-    );
+    Future<SearchPage> doSearch(String q) async {
+      try {
+        final url = Uri.parse('$apiUrl/search').replace(
+          queryParameters: {'query': q, 'page': '$page'},
+        );
+        final res = await UniversalHttpClient.instance
+            .get(url, headers: headers)
+            .timeout(const Duration(seconds: 20));
+        final Map<String, dynamic> decoded = json.decode(res.body);
+        final results = (decoded['results'] as List<dynamic>? ?? const []);
+        return SearchPage(
+          results:
+              results.map((raw) {
+                final item = Map<String, dynamic>.from(raw as Map);
+                final title = Map<String, dynamic>.from(
+                  item['title'] as Map? ?? {},
+                );
+                return BaseAnimeModel(
+                  id: item['id']?.toString(),
+                  anilistId: int.tryParse(item['id']?.toString() ?? ''),
+                  name: title['english'] ?? title['romaji'] ?? 'Unknown',
+                  jname: title['romaji'],
+                  type: item['type'],
+                  poster: item['cover'],
+                  releaseDate: item['year']?.toString(),
+                  number: item['episodes'],
+                );
+              }).toList(),
+        );
+      } catch (_) {
+        return SearchPage(results: []);
+      }
+    }
+
+    // 1. Cleaned query: remove colons, dashes, special punctuation that break JustAnime API
+    final cleaned = keyword
+        .replaceAll('-', ' ')
+        .replaceAll(':', ' ')
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    var searchPage = await doSearch(cleaned);
+    if (searchPage.results.isNotEmpty) return searchPage;
+
+    // 2. Try lowercased query (API can fail on all-caps titles)
+    final lower = cleaned.toLowerCase();
+    if (lower != cleaned) {
+      searchPage = await doSearch(lower);
+      if (searchPage.results.isNotEmpty) return searchPage;
+    }
+
+    // 3. Try removing common movie prefixes/suffixes: "the movie", "movie", "film"
+    final stripped = lower
+        .replaceAll(RegExp(r'\b(the\s+movie|movie|film)\b'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (stripped.isNotEmpty && stripped != lower && stripped != cleaned) {
+      searchPage = await doSearch(stripped);
+      if (searchPage.results.isNotEmpty) return searchPage;
+    }
+
+    return searchPage;
   }
 
   @override
@@ -129,9 +165,9 @@ class JustAnimeProvider extends AnimeProvider {
               final item = Map<String, dynamic>.from(raw as Map);
               final number = (item['number'] as num?)?.toInt();
               return EpisodeDataModel(
-                id: number?.toString(),
-                number: number,
-                title: item['title'] ?? 'Episode ${number ?? ''}',
+                id: number?.toString() ?? '1',
+                number: number ?? 1,
+                title: item['title'] ?? 'Episode ${number ?? 1}',
                 thumbnail: item['image'],
                 description: item['description'],
                 date: item['airDate'],
@@ -141,6 +177,18 @@ class JustAnimeProvider extends AnimeProvider {
             .where((episode) => episode.number != null)
             .toList()
           ..sort((a, b) => a.number!.compareTo(b.number!));
+
+    // For movies, if episodes list was empty, synthesize Episode 1
+    if (episodes.isEmpty) {
+      episodes.add(
+        EpisodeDataModel(
+          id: '1',
+          number: 1,
+          title: 'Full Movie',
+        ),
+      );
+    }
+
     return BaseEpisodeModel(episodes: episodes, totalEpisodes: episodes.length);
   }
 
@@ -152,8 +200,7 @@ class JustAnimeProvider extends AnimeProvider {
     String? category,
   ) async {
     final rawEp = episodeId.split('+').last.replaceAll(RegExp(r'[^0-9]'), '');
-    final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId);
-    if (episode == null) throw Exception('Invalid episode ID: $episodeId');
+    final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId) ?? 1;
     final audio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
 
     Future<Map<String, dynamic>?> request(String path) async {

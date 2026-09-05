@@ -152,8 +152,12 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   ) {
     void triggerAutoAdvance() {
       if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
+      final epList = ref.read(episodeListProvider).episodes;
+      final effectiveTotal = _totalEps > 0 ? _totalEps : epList.length;
+      if (effectiveTotal <= 1) return;
       _hasAutoAdvanced = true;
       var target = (_epNum ?? 0) + 1;
+      if (target > effectiveTotal) return;
       if (ref.read(playerSettingsProvider).skipFillerEpisodes) {
         while (target <= _totalEps) {
           EpisodeDataModel? episode;

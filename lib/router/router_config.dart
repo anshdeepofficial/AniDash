@@ -166,7 +166,11 @@ final routerConfig = GoRouter(
             animeCover: state.uri.queryParameters['animeCover']!,
             episode:
                 int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
-            episodes: state.extra as List<EpisodeDataModel>,
+            episodes: (state.extra is List<EpisodeDataModel>)
+                ? state.extra as List<EpisodeDataModel>
+                : ((state.extra is List)
+                    ? (state.extra as List).whereType<EpisodeDataModel>().toList()
+                    : const <EpisodeDataModel>[]),
           ),
     ),
     AnimatedGoRoute(

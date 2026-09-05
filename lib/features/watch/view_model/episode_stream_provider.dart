@@ -618,7 +618,13 @@ class EpisodeData extends _$EpisodeData {
 
   void reset() => state = const EpisodeDataState();
 
-  bool _isValidEp(int ep) => _epList.episodes.any((i) => i.number == ep);
+  bool _isValidEp(int ep) {
+    if (_epList.episodes.isEmpty) {
+      // Allow episode 1 for movies/single-episode media
+      return ep == 1;
+    }
+    return _epList.episodes.any((i) => i.number == ep) || (ep == 1 && _epList.episodes.isEmpty);
+  }
 
   Future<List<ServerData>> _getRawServers(EpisodeDataModel ep) async {
     if (!_isNativeProvider && _exp.useExtensions) {
@@ -644,8 +650,12 @@ class EpisodeData extends _$EpisodeData {
     );
 
     try {
-      final ep = _epList.episodes.firstWhereOrNull((e) => e.number == epNum);
-      if (ep == null) return;
+      var ep = _epList.episodes.firstWhereOrNull((e) => e.number == epNum);
+      ep ??= EpisodeDataModel(
+        id: epNum.toString(),
+        number: epNum,
+        title: _epList.animeTitle ?? 'Episode $epNum',
+      );
 
       var list = await _getRawServers(ep).timeout(const Duration(seconds: 15));
       if (list.isEmpty) {
@@ -687,8 +697,13 @@ class EpisodeData extends _$EpisodeData {
     );
 
     try {
-      final epModel = _epList.getEpisode(epNum);
-      if (epModel == null) throw StateError('Episode $epNum was not found');
+      var epModel = _epList.getEpisode(epNum);
+      epModel ??= EpisodeDataModel(
+        id: epNum.toString(),
+        number: epNum,
+        title: _epList.animeTitle ?? 'Movie',
+        thumbnail: _epList.animeCover,
+      );
 
       BaseSourcesModel? data;
       if (epNum == _prefetchedEpNum && _prefetchedSourceData != null) {
@@ -1059,7 +1074,7 @@ class EpisodeData extends _$EpisodeData {
     final targetEpId =
         (ep.id != null && ep.id!.isNotEmpty)
             ? ep.id!
-            : (ep.number?.toString() ?? '');
+            : (ep.number?.toString() ?? '1');
 
     // Fallback order: put JustAnime first because it has working HLS
     final candidateKeys = [
@@ -1072,6 +1087,13 @@ class EpisodeData extends _$EpisodeData {
     final result = Completer<BaseSourcesModel?>();
     var completed = 0;
 
+    final cleanTitle = (_epList.animeTitle ?? '')
+        .replaceAll(':', ' ')
+        .replaceAll('-', ' ')
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
     for (final altKey in candidateKeys) {
       () async {
         try {
@@ -1079,7 +1101,7 @@ class EpisodeData extends _$EpisodeData {
           if (altProvider == null) return;
           AppLogger.w('Trying fallback provider for stream: $altKey');
           final altSearch = await altProvider.getSearch(
-            _epList.animeTitle ?? '',
+            cleanTitle.isNotEmpty ? cleanTitle : (_epList.animeTitle ?? ''),
             null,
             1,
           );
@@ -1089,9 +1111,11 @@ class EpisodeData extends _$EpisodeData {
           final targetEp = altEps.episodes?.firstWhereOrNull(
             (e) => e.number == ep.number,
           );
+          final resolvedEpId =
+              targetEp?.id ?? altEps.episodes?.firstOrNull?.id ?? targetEpId;
           final altSources = await altProvider.getSources(
             altMatch.id!,
-            targetEp?.id ?? targetEpId,
+            resolvedEpId,
             null,
             category,
           );

@@ -124,9 +124,29 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     }
 
     // 3. Fetch from remote sources
-    final fetched = await _fetchEpisodesInternal(animeId, media: media);
+    var fetched = await _fetchEpisodesInternal(animeId, media: media);
 
     if (fetched.isEmpty) {
+      final titleLow = animeTitle.toLowerCase();
+      final isLikelyMovie = titleLow.contains('movie') ||
+          titleLow.contains('film') ||
+          (media?.title?.toLowerCase().contains('movie') == true) ||
+          (media?.title?.toLowerCase().contains('film') == true);
+
+      if (isLikelyMovie) {
+        final synth = [
+          EpisodeDataModel(
+            id: '1',
+            number: 1,
+            title: animeTitle,
+            thumbnail: animeCover ?? media?.cover,
+          ),
+        ];
+        AppLogger.success('Synthesized single movie episode for $animeTitle');
+        state = state.copyWith(episodes: synth, isLoading: false);
+        return synth;
+      }
+
       AppLogger.fail('No episodes found for $animeTitle');
       state = state.copyWith(isLoading: false, error: 'No episodes found');
       return [];
@@ -176,16 +196,23 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
           ...registry.keys.where((k) => k != currentKey && k != 'justanime'),
         ];
 
+        final cleanTitle = state.animeTitle!
+            .replaceAll(':', ' ')
+            .replaceAll('-', ' ')
+            .replaceAll(RegExp(r'[^\w\s]'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+
         for (final altKey in candidateKeys) {
           final altProvider = registry.get(altKey);
           if (altProvider == null) continue;
 
           try {
             AppLogger.w(
-              'Resolving episodes by title on: $altKey for "${state.animeTitle}"',
+              'Resolving episodes by title on: $altKey for "$cleanTitle"',
             );
             final searchResults = await altProvider
-                .getSearch(state.animeTitle!, null, 1)
+                .getSearch(cleanTitle.isNotEmpty ? cleanTitle : state.animeTitle!, null, 1)
                 .timeout(const Duration(seconds: 8));
             final altMatch = searchResults.results.firstOrNull;
             final matchId = altMatch?.id;
