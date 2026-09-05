@@ -10,6 +10,8 @@ import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
+import 'package:ani_dash/features/watch/view_model/player/orientation_lock_provider.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/sheets/cast_bottom_sheet.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -218,12 +220,42 @@ class TopControls extends ConsumerWidget {
                     },
                   ),
 
-                  _TopIconButton(
-                    icon: Icons.screen_rotation_rounded,
-                    onTap: () async {
-                      await UIHelper.toggleLandscape();
-                      onInteraction();
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final lockMode = ref.watch(orientationLockProvider);
+                      IconData lockIcon = Icons.screen_rotation_rounded;
+                      Color iconColor = Colors.white;
+                      String tooltipText = 'Auto-Rotate Landscape (Tap to lock)';
+
+                      if (lockMode == OrientationLockMode.lockedLandscape) {
+                        lockIcon = Icons.screen_lock_landscape_rounded;
+                        iconColor = Theme.of(context).colorScheme.primary;
+                        tooltipText = 'Landscape Locked (Tap to unlock)';
+                      }
+
+                      return _TopIconButton(
+                        icon: lockIcon,
+                        color: iconColor,
+                        tooltip: tooltipText,
+                        onTap: () async {
+                          await ref
+                              .read(orientationLockProvider.notifier)
+                              .toggle();
+                          onInteraction();
+                        },
+                        onLongPress: () {
+                          _showRotationSheet(context, ref);
+                          onInteraction();
+                        },
+                      );
                     },
+                  ),
+
+                  _TopIconButton(
+                    icon: Icons.cast_rounded,
+                    onTap: _wrap(() {
+                      CastBottomSheet.show(context);
+                    }),
                   ),
 
                   _TopIconButton(
@@ -239,6 +271,103 @@ class TopControls extends ConsumerWidget {
     );
   }
 
+  void _showRotationSheet(BuildContext context, WidgetRef ref) {
+    final currentMode = ref.read(orientationLockProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.screen_rotation_rounded, color: scheme.primary, size: 22),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Landscape Screen Rotation',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildRotationOption(
+                context: ctx,
+                ref: ref,
+                mode: OrientationLockMode.unlocked,
+                title: 'Auto-Rotate Landscape (Sensor)',
+                subtitle: 'Screen freely flips between both landscape sides following sensor',
+                icon: Icons.screen_rotation_rounded,
+                isSelected: currentMode == OrientationLockMode.unlocked,
+              ),
+              _buildRotationOption(
+                context: ctx,
+                ref: ref,
+                mode: OrientationLockMode.lockedLandscape,
+                title: 'Lock Landscape',
+                subtitle: 'Screen remains strictly locked in current landscape direction',
+                icon: Icons.stay_current_landscape_rounded,
+                isSelected: currentMode == OrientationLockMode.lockedLandscape,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRotationOption({
+    required BuildContext context,
+    required WidgetRef ref,
+    required OrientationLockMode mode,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? scheme.primary : Colors.white70),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? scheme.primary : Colors.white,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle_rounded, color: scheme.primary, size: 22)
+          : null,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onTap: () async {
+        Navigator.pop(context);
+        await ref.read(orientationLockProvider.notifier).setMode(mode);
+        onInteraction();
+      },
+    );
+  }
+
   String _getSourceName(WidgetRef ref) {
     if (!ref.watch(experimentalProvider).useExtensions) {
       return ref.watch(selectedAnimeProvider)?.providerName ?? "Legacy";
@@ -251,20 +380,25 @@ class TopControls extends ConsumerWidget {
 class _TopIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final String? tooltip;
   final Color color;
 
   const _TopIconButton({
     required this.icon,
     this.onTap,
+    this.onLongPress,
+    this.tooltip,
     this.color = Colors.white,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    Widget button = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -272,5 +406,15 @@ class _TopIconButton extends StatelessWidget {
         ),
       ),
     );
+
+    if (tooltip != null) {
+      button = Tooltip(
+        message: tooltip!,
+        preferBelow: false,
+        child: button,
+      );
+    }
+
+    return button;
   }
 }

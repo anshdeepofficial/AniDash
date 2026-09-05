@@ -89,11 +89,29 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Apply MPV settings
+    // Apply optimized fast-seeking and stream cache defaults
+    final fastProperties = <String, String>{
+      'cache': 'yes',
+      'demuxer-max-bytes': '${(bufferSize.toInt() * 1024 * 1024).clamp(32 * 1024 * 1024, 128 * 1024 * 1024)}',
+      'demuxer-readahead-secs': '25',
+      'hr-seek': 'default',
+      'hr-seek-framedrop': 'yes',
+      'force-seekable': 'yes',
+      'network-timeout': '10',
+    };
+
+    final platform = _player.platform as dynamic;
+    for (final entry in fastProperties.entries) {
+      try {
+        platform.setProperty(entry.key, entry.value);
+      } catch (_) {}
+    }
+
+    // Apply user custom MPV settings
     for (final entry in mpvSettings.entries) {
       if (entry.key == 'vo') continue;
       try {
-        (_player.platform as dynamic).setProperty(entry.key, entry.value);
+        platform.setProperty(entry.key, entry.value);
       } catch (_) {}
     }
 

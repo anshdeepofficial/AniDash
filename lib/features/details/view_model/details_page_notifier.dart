@@ -148,9 +148,11 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
           );
         } else {
           // Fallback to search if restoration failed
+          final isAdultMedia = state.details.value?.isAdult == true ||
+              state.details.value?.isMature == true;
           final match = await ref
               .read(animeMatchServiceProvider)
-              .findBestMatch(mediaTitle);
+              .findBestMatch(mediaTitle, isAdult: isAdultMedia);
 
           if (!ref.mounted) return;
 

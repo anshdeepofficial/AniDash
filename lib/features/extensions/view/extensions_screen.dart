@@ -17,24 +17,9 @@ class ExtensionScreen extends StatefulWidget {
 }
 
 class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
-  ExtensionType? _previousManager;
-
   @override
   void initState() {
     super.initState();
-    if (widget.adultOnly) {
-      final controller = Get.find<ExtensionManager>();
-      _previousManager = ExtensionType.fromManager(controller.currentManager);
-      controller.setCurrentManager(ExtensionType.aniyomi);
-    }
-  }
-
-  @override
-  void dispose() {
-    if (_previousManager != null) {
-      Get.find<ExtensionManager>().setCurrentManager(_previousManager!);
-    }
-    super.dispose();
   }
 
   @override
@@ -509,11 +494,19 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
 
     if (source == null) return const SizedBox.shrink();
     final normalizedName = (source.name ?? '').toLowerCase();
-    if (widget.adultOnly &&
-        source.isNsfw != true &&
-        !normalizedName.contains('hentai') &&
-        !normalizedName.contains('hanime') &&
-        !normalizedName.contains('adult')) {
+    final normalizedId = (source.id ?? '').toLowerCase();
+    final is18 = source.isNsfw == true ||
+        normalizedName.contains('hentai') ||
+        normalizedName.contains('hanime') ||
+        normalizedName.contains('18+') ||
+        normalizedName.contains('adult') ||
+        normalizedId.contains('hanime') ||
+        normalizedId.contains('hentai');
+
+    if (widget.adultOnly && !is18) {
+      return const SizedBox.shrink();
+    }
+    if (!widget.adultOnly && is18) {
       return const SizedBox.shrink();
     }
 

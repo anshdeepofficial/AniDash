@@ -39,6 +39,7 @@ import 'package:ani_dash/features/debug/view/debug_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/permissions_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/notification_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/security_settings_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
 class AnimatedGoRoute extends GoRoute {
@@ -270,6 +271,10 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'permissions',
           contentBuilder: (_, _) => const PermissionsSettingsScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'security',
+          contentBuilder: (_, _) => const SecuritySettingsScreen(),
         ),
       ],
     ),

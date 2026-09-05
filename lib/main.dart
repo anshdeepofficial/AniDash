@@ -13,6 +13,7 @@ import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/router/router_config.dart';
+import 'package:ani_dash/shared/ui/security_gate.dart';
 
 late Isar isar;
 late SharedPreferencesWithCache sharedPrefs;
@@ -100,7 +101,7 @@ class MyApp extends ConsumerWidget {
                 textScaler: TextScaler.linear(scale),
                 size: scaledSize,
               ),
-              child: child!,
+              child: SecurityGate(child: child!),
             );
           },
           theme: lightTheme,

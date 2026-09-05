@@ -25,6 +25,8 @@ import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart'
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_ui_controller.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -58,6 +60,12 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
+
+  bool _isDraggingSeek = false;
+  Duration _dragStartPos = Duration.zero;
+  Duration _dragTargetPos = Duration.zero;
+  Duration _dragDiff = Duration.zero;
+  bool _isDragSeekForward = true;
 
   @override
   void initState() {
@@ -197,6 +205,53 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       _isChangingBrightness = false;
       _isChangingVolume = false;
     });
+  }
+
+  void _onHorizontalDragStart(DragStartDetails details) {
+    if (ref.read(playerUIControllerProvider).isLocked) return;
+    final playerState = ref.read(playerStateProvider);
+    _dragStartPos = playerState.position;
+    _dragTargetPos = playerState.position;
+    _dragDiff = Duration.zero;
+    setState(() {
+      _isDraggingSeek = true;
+    });
+    ref
+        .read(playerUIControllerProvider.notifier)
+        .toggleVisibility(override: false);
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!_isDraggingSeek) return;
+    final w = MediaQuery.of(context).size.width;
+    final playerState = ref.read(playerStateProvider);
+    final total = playerState.duration;
+
+    final deltaSec = (details.primaryDelta! / w) * 120;
+    final currentTargetSec = _dragTargetPos.inMilliseconds / 1000.0 + deltaSec;
+    final clampedSec = currentTargetSec.clamp(
+      0.0,
+      total.inSeconds > 0 ? total.inSeconds.toDouble() : 3600.0,
+    );
+
+    final newTarget = Duration(milliseconds: (clampedSec * 1000).toInt());
+    final diff = Duration(
+      milliseconds: newTarget.inMilliseconds - _dragStartPos.inMilliseconds,
+    );
+
+    setState(() {
+      _dragTargetPos = newTarget;
+      _dragDiff = diff;
+      _isDragSeekForward = diff.inMilliseconds >= 0;
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (!_isDraggingSeek) return;
+    setState(() {
+      _isDraggingSeek = false;
+    });
+    ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
   }
 
   void _onDoubleTap(bool forward) {
@@ -444,6 +499,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                   onVerticalDragStart: _onVerticalDragStart,
                   onVerticalDragUpdate: _onVerticalDragUpdate,
                   onVerticalDragEnd: _onVerticalDragEnd,
+                  onHorizontalDragStart: _onHorizontalDragStart,
+                  onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                  onHorizontalDragEnd: _onHorizontalDragEnd,
                   onEpisodesPressed: widget.onEpisodesPressed,
                   child: Container(color: Colors.transparent),
                 ),
@@ -470,15 +528,17 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (isBusy && !uiState.isVisible)
                 const Center(
                   child: IgnorePointer(
-                    child: SizedBox(
-                      width: 52,
-                      height: 52,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3.5,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: FetchingProgressBadge(isEpisode: false),
                   ),
+                ),
+
+              // VLC-style Horizontal Swipe Seek Indicator
+              if (_isDraggingSeek)
+                VlcSeekOverlay(
+                  targetPosition: _dragTargetPos,
+                  totalDuration: ref.read(playerStateProvider).duration,
+                  diffDuration: _dragDiff,
+                  isForward: _isDragSeekForward,
                 ),
 
               // Seek Indicator (Dynamic)

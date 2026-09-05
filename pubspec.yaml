@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.8.15+29
+version: 1.8.16+30
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -30,6 +30,7 @@ dependencies:
 
   device_info_plus: ^11.2.1
   dynamic_color: 1.7.0
+  crypto: ^3.0.6
   encrypt: ^5.0.3
   file_picker: ^10.2.0
   flex_color_picker: any

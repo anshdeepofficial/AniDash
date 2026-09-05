@@ -137,7 +137,13 @@ class EpisodeData extends _$EpisodeData {
 
     AppLogger.section('Loading Episode $ep');
     state = state.copyWith(selectedEpisode: ep, clearError: true);
-    await _fetchServers(ep);
+
+    // Fast-path: Reuse existing servers immediately to cut episode transition delay
+    if (state.servers.isNotEmpty && state.selectedServer != null) {
+      _fetchServers(ep); // refresh in background
+    } else {
+      await _fetchServers(ep);
+    }
 
     if (play) {
       await _playCurrent(startAt ?? Duration.zero);
@@ -771,7 +777,7 @@ class EpisodeData extends _$EpisodeData {
           _player.videoController.player.stream.duration.firstWhere(
             (duration) => duration > Duration.zero,
           ),
-        ]).timeout(const Duration(seconds: 15));
+        ]).timeout(const Duration(milliseconds: 800));
       } catch (_) {
         AppLogger.d('Stream startup probe passed without blocking');
       }

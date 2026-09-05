@@ -8,6 +8,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
@@ -133,6 +134,13 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     String animeName,
     List<EpisodeDataModel> episodes,
   ) {
+    void triggerAutoAdvance() {
+      if (_isDisposed || _hasAutoAdvanced) return;
+      _hasAutoAdvanced = true;
+      AppLogger.i('Auto-advancing to next episode instantly');
+      ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+    }
+
     _completedSubscription?.cancel();
     _completedSubscription = ref
         .read(playerStateProvider.notifier)
@@ -141,13 +149,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .stream
         .completed
         .listen((completed) {
-          if (completed &&
-              !_isDisposed &&
-              !_hasAutoAdvanced &&
-              _dur > 120 &&
-              _pos >= _dur - 2) {
-            _hasAutoAdvanced = true;
-            ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+          if (completed && !_hasAutoAdvanced && !_isDisposed) {
+            triggerAutoAdvance();
           }
         });
 
@@ -177,6 +180,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);
       _checkAutoSkip(next.position);
+      if (_dur > 30 && _pos >= _dur - 1) triggerAutoAdvance();
 
       final syncPercentage = ref.read(syncSettingsProvider).syncPercentage;
       if (!_trackingTriggered &&
@@ -188,18 +192,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
               .read(watchSyncProvider.notifier)
               .handleTrackingUpdate(mediaId: mediaId, episodeNum: _epNum!);
         }
-      }
-
-      if (prev == null || prev.isPlaying != next.isPlaying) {
-        try {
-          NotificationService().showPlaybackNotification(
-            animeTitle: animeName,
-            episodeTitle: _epTitle ?? 'Episode ${_epNum ?? 1}',
-            episodeNumber: _epNum ?? 1,
-            isPlaying: next.isPlaying,
-            posterUrl: _animeCover,
-          );
-        } catch (_) {}
       }
 
       _handlePeriodicSave();
@@ -226,16 +218,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           final epInfo = episodes.firstWhere((e) => e.number == next);
           _epTitle = epInfo.title;
           _epThumb = epInfo.thumbnail;
-        } catch (_) {}
-
-        try {
-          NotificationService().showPlaybackNotification(
-            animeTitle: animeName,
-            episodeTitle: _epTitle ?? 'Episode $next',
-            episodeNumber: next,
-            isPlaying: ref.read(playerStateProvider).isPlaying,
-            posterUrl: _animeCover,
-          );
         } catch (_) {}
       }
     });

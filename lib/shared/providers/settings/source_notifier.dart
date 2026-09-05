@@ -55,7 +55,7 @@ class SourceNotifier extends _$SourceNotifier {
     }
     _extensionSubscriptions.clear();
 
-    // Subscribe to installed extension changes
+    // Subscribe to installed extension changes from current manager
     _extensionSubscriptions.addAll([
       manager.installedAnimeExtensions.listen(
         (extensions) => _updateExtensions(ItemType.anime, extensions),
@@ -73,18 +73,42 @@ class SourceNotifier extends _$SourceNotifier {
     fetchSources(ItemType.manga);
 
     for (final type in [ItemType.anime, ItemType.manga]) {
-      List<Source> extensions = [];
-      switch (type) {
-        case ItemType.anime:
-          extensions = await manager.getInstalledAnimeExtensions();
-          break;
-        case ItemType.manga:
-          extensions = await manager.getInstalledMangaExtensions();
-          break;
-        case ItemType.novel:
-          extensions = await manager.getInstalledNovelExtensions();
-          break;
+      final Set<String> seen = {};
+      final List<Source> extensions = [];
+
+      Future<void> addExtensions(Extension m) async {
+        try {
+          List<Source> list = [];
+          switch (type) {
+            case ItemType.anime:
+              list = await m.getInstalledAnimeExtensions();
+              break;
+            case ItemType.manga:
+              list = await m.getInstalledMangaExtensions();
+              break;
+            case ItemType.novel:
+              list = await m.getInstalledNovelExtensions();
+              break;
+          }
+          for (final s in list) {
+            final key = s.id ?? s.name ?? '';
+            if (key.isNotEmpty && seen.add(key)) {
+              extensions.add(s);
+            }
+          }
+        } catch (_) {}
       }
+
+      await addExtensions(manager);
+      // Also collect from other extension manager so extensions are never lost
+      try {
+        final currentType = ExtensionType.fromManager(manager);
+        final other = currentType == ExtensionType.aniyomi
+            ? ExtensionType.mangayomi.getManager()
+            : ExtensionType.aniyomi.getManager();
+        await addExtensions(other);
+      } catch (_) {}
+
       _updateExtensions(type, extensions);
     }
 
@@ -98,13 +122,53 @@ class SourceNotifier extends _$SourceNotifier {
     _restoreActiveSources();
   }
 
+  bool _isAdultSource(Source s) {
+    final name = (s.name ?? '').toLowerCase();
+    final id = (s.id ?? '').toLowerCase();
+    return s.isNsfw == true ||
+        name.contains('hanime') ||
+        name.contains('hentai') ||
+        name.contains('18+') ||
+        name.contains('adult') ||
+        id.contains('hanime') ||
+        id.contains('hentai');
+  }
+
   void _updateExtensions(ItemType type, List<Source> extensions) {
     switch (type) {
       case ItemType.anime:
-        state = state.copyWith(installedAnimeExtensions: extensions);
+        final merged = <String, Source>{};
+        for (final s in [
+          ...state.installedAnimeExtensions,
+          ...state.installedAdultAnimeExtensions,
+          ...extensions,
+        ]) {
+          final key = s.id ?? s.name ?? '';
+          if (key.isNotEmpty) merged[key] = s;
+        }
+        final normal = merged.values.where((s) => !_isAdultSource(s)).toList();
+        final adult = merged.values.where((s) => _isAdultSource(s)).toList();
+        state = state.copyWith(
+          installedAnimeExtensions: normal,
+          installedAdultAnimeExtensions: adult,
+        );
         break;
       case ItemType.manga:
-        state = state.copyWith(installedMangaExtensions: extensions);
+        final merged = <String, Source>{};
+        for (final s in [
+          ...state.installedMangaExtensions,
+          ...state.installedAdultMangaExtensions,
+          ...extensions,
+        ]) {
+          final key = s.id ?? s.name ?? '';
+          if (key.isNotEmpty) merged[key] = s;
+        }
+        final normal = merged.values.where((s) => !_isAdultSource(s)).toList();
+        final adult = merged.values.where((s) => _isAdultSource(s)).toList();
+        state = state.copyWith(
+          installedMangaExtensions: normal,
+          installedAdultMangaExtensions: adult,
+        );
         break;
       case ItemType.novel:
         state = state.copyWith(installedNovelExtensions: extensions);
@@ -114,22 +178,44 @@ class SourceNotifier extends _$SourceNotifier {
   }
 
   void _restoreActiveSources() {
+    final savedAnimeId = _repo.getActiveAnimeSourceId();
+    final activeAnime =
+        state.installedAnimeExtensions.firstWhereOrNull(
+          (s) => s.id == savedAnimeId && !_isAdultSource(s),
+        ) ??
+        state.installedAnimeExtensions.firstWhereOrNull(
+          (s) => (s.name ?? '').toLowerCase().contains('justanime'),
+        ) ??
+        state.installedAnimeExtensions.firstOrNull;
+
+    final activeAdult = state.installedAdultAnimeExtensions.firstOrNull;
+
     state = state.copyWith(
-      activeAnimeSource: state.installedAnimeExtensions.firstWhereOrNull(
-        (s) => s.id == _repo.getActiveAnimeSourceId(),
-      ) ?? state.installedAnimeExtensions.firstOrNull,
-      activeMangaSource: state.installedMangaExtensions.firstWhereOrNull(
-        (s) => s.id == _repo.getActiveMangaSourceId(),
-      ) ?? state.installedMangaExtensions.firstWhereOrNull(
-        (s) => s.name?.toLowerCase().contains('mangadex') == true,
-      ) ?? state.installedMangaExtensions.firstOrNull,
-      activeNovelSource: state.installedNovelExtensions.firstWhereOrNull(
-        (s) => s.id == _repo.getActiveNovelSourceId(),
-      ) ?? state.installedNovelExtensions.firstOrNull,
+      activeAnimeSource: activeAnime,
+      activeAdultAnimeSource: activeAdult,
+      activeMangaSource:
+          state.installedMangaExtensions.firstWhereOrNull(
+            (s) => s.id == _repo.getActiveMangaSourceId() && !_isAdultSource(s),
+          ) ??
+          state.installedMangaExtensions.firstWhereOrNull(
+            (s) => s.name?.toLowerCase().contains('mangadex') == true,
+          ) ??
+          state.installedMangaExtensions.firstOrNull,
+      activeNovelSource:
+          state.installedNovelExtensions.firstWhereOrNull(
+            (s) => s.id == _repo.getActiveNovelSourceId(),
+          ) ??
+          state.installedNovelExtensions.firstOrNull,
     );
   }
 
   void setActiveSource(Source source) {
+    if (_isAdultSource(source)) {
+      if (source.itemType == ItemType.anime) {
+        state = state.copyWith(activeAdultAnimeSource: source);
+      }
+      return;
+    }
     switch (source.itemType) {
       case ItemType.anime:
         state = state.copyWith(

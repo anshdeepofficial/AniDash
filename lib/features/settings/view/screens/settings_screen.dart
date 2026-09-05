@@ -39,6 +39,13 @@ class SettingsScreen extends ConsumerWidget {
                   description: 'AniList integration, account preferences',
                   onTap: () => context.push('/settings/account'),
                 ),
+                NormalSettingsItem(
+                  icon: Icon(Icons.security_rounded, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Security & Privacy',
+                  description: 'App lock, adult hub lock, screenshot privacy',
+                  onTap: () => context.push('/settings/security'),
+                ),
               ],
             ),
             const SizedBox(height: 10),

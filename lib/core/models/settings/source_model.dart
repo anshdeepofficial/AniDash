@@ -8,6 +8,8 @@ class SourceState {
   final List<Source> installedAnimeExtensions;
   final List<Source> installedMangaExtensions;
   final List<Source> installedNovelExtensions;
+  final List<Source> installedAdultAnimeExtensions;
+  final List<Source> installedAdultMangaExtensions;
 
   // Fetched Extension Lists
   final List<Source> fetchedAnimeExtensions;
@@ -18,6 +20,7 @@ class SourceState {
   final Source? activeAnimeSource;
   final Source? activeMangaSource;
   final Source? activeNovelSource;
+  final Source? activeAdultAnimeSource;
 
   // Other State
   final String lastUpdatedSourceType; // 'ANIME', 'MANGA', 'NOVEL'
@@ -30,12 +33,15 @@ class SourceState {
     this.installedAnimeExtensions = const [],
     this.installedMangaExtensions = const [],
     this.installedNovelExtensions = const [],
+    this.installedAdultAnimeExtensions = const [],
+    this.installedAdultMangaExtensions = const [],
     this.fetchedAnimeExtensions = const [],
     this.fetchedMangaExtensions = const [],
     this.fetchedNovelExtensions = const [],
     this.activeAnimeSource,
     this.activeMangaSource,
     this.activeNovelSource,
+    this.activeAdultAnimeSource,
     this.lastUpdatedSourceType = '',
     this.activeAnimeRepo = '',
     this.activeMangaRepo = '',
@@ -47,12 +53,15 @@ class SourceState {
     List<Source>? installedAnimeExtensions,
     List<Source>? installedMangaExtensions,
     List<Source>? installedNovelExtensions,
+    List<Source>? installedAdultAnimeExtensions,
+    List<Source>? installedAdultMangaExtensions,
     List<Source>? fetchedAnimeExtensions,
     List<Source>? fetchedMangaExtensions,
     List<Source>? fetchedNovelExtensions,
     Source? activeAnimeSource,
     Source? activeMangaSource,
     Source? activeNovelSource,
+    Source? activeAdultAnimeSource,
     String? lastUpdatedSourceType,
     String? activeAnimeRepo,
     String? activeMangaRepo,
@@ -66,6 +75,10 @@ class SourceState {
           installedMangaExtensions ?? this.installedMangaExtensions,
       installedNovelExtensions:
           installedNovelExtensions ?? this.installedNovelExtensions,
+      installedAdultAnimeExtensions:
+          installedAdultAnimeExtensions ?? this.installedAdultAnimeExtensions,
+      installedAdultMangaExtensions:
+          installedAdultMangaExtensions ?? this.installedAdultMangaExtensions,
       fetchedAnimeExtensions:
           fetchedAnimeExtensions ?? this.fetchedAnimeExtensions,
       fetchedMangaExtensions:
@@ -75,6 +88,8 @@ class SourceState {
       activeAnimeSource: activeAnimeSource ?? this.activeAnimeSource,
       activeMangaSource: activeMangaSource ?? this.activeMangaSource,
       activeNovelSource: activeNovelSource ?? this.activeNovelSource,
+      activeAdultAnimeSource:
+          activeAdultAnimeSource ?? this.activeAdultAnimeSource,
       lastUpdatedSourceType:
           lastUpdatedSourceType ?? this.lastUpdatedSourceType,
       activeAnimeRepo: activeAnimeRepo ?? this.activeAnimeRepo,

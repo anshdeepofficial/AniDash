@@ -86,6 +86,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   }
 
   Future<void> _setupSystemUI() async {
+    UIHelper.setWatchInitialLockMode();
     await Future.wait([
       UIHelper.enableImmersiveMode(),
       UIHelper.forceLandscape(),
@@ -93,7 +94,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   }
 
   Future<void> _resetSystemUI() async {
-    await UIHelper.forcePortrait();
+    await UIHelper.resetOrientation();
     await UIHelper.exitImmersiveMode();
   }
 
@@ -159,11 +160,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     });
 
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        await _resetSystemUI();
-        if (context.mounted) {
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        _resetSystemUI();
+        if (!didPop && context.mounted) {
           Navigator.pop(context);
         }
       },

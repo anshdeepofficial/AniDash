@@ -82,17 +82,40 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/security")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setSecureFlag" -> {
+                        val enable = call.argument<Boolean>("enable") ?: false
+                        if (enable) {
+                            window.setFlags(
+                                android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                                android.view.WindowManager.LayoutParams.FLAG_SECURE
+                            )
+                        } else {
+                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                        }
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (interceptVolumeKeys && event.action == KeyEvent.ACTION_DOWN) {
+        if (interceptVolumeKeys) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_VOLUME_UP -> {
-                    volumeChannel?.invokeMethod("volumeUp", null)
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        volumeChannel?.invokeMethod("volumeUp", null)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    volumeChannel?.invokeMethod("volumeDown", null)
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        volumeChannel?.invokeMethod("volumeDown", null)
+                    }
                     return true
                 }
             }

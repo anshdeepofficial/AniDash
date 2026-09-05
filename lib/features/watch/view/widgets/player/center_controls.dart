@@ -4,6 +4,7 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 
 class CenterControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -159,47 +160,8 @@ class _BorderlessLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = _text();
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 48,
-          height: 48,
-          child: CircularProgressIndicator(
-            strokeWidth: 3.5,
-            color: scheme.primary,
-            strokeCap: StrokeCap.round,
-          ),
-        ),
-        if (text != null) ...[
-          const SizedBox(height: 16),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-              shadows: [
-                Shadow(
-                  color: Colors.black87,
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
+    return FetchingProgressBadge(
+      isEpisode: episodesLoading,
     );
-  }
-
-  String? _text() {
-    if (sourceLoading && episodesLoading) return 'Fetching...';
-    if (sourceLoading) return 'Source...';
-    if (episodesLoading) return 'Episodes...';
-    return null;
   }
 }

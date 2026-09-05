@@ -1140,15 +1140,22 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   ) {
     final detailsMedia =
         ref.watch(detailsPageProvider(widget.mediaId)).details.value;
-    final isMature = widget.fromHentaiHub && detailsMedia?.isMature == true;
+    final isMature = widget.fromHentaiHub ||
+        detailsMedia?.isMature == true ||
+        detailsMedia?.isAdult == true;
 
     final sourceState = ref.watch(sourceProvider);
-    final sources =
-        sourceState.installedAnimeExtensions.where((s) {
-            final is18 = _isSource18Plus(s);
-            if (isMature && !is18) return false;
-            if (!isMature && is18) return false;
+    final allAvailable = isMature
+        ? [
+            ...sourceState.installedAdultAnimeExtensions,
+            ...sourceState.installedAnimeExtensions.where((s) => _isSource18Plus(s)),
+          ]
+        : sourceState.installedAnimeExtensions
+            .where((s) => !_isSource18Plus(s))
+            .toList();
 
+    final sources =
+        allAvailable.where((s) {
             if (query.isEmpty) return true;
             return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
           }).toList()
@@ -1159,7 +1166,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             return (a.name ?? '').compareTo(b.name ?? '');
           });
 
-    final activeId = sourceState.activeAnimeSource?.id;
+    final activeId = isMature
+        ? (sourceState.activeAdultAnimeSource?.id ?? sourceState.activeAnimeSource?.id)
+        : sourceState.activeAnimeSource?.id;
 
     if (sources.isEmpty) {
       return Center(

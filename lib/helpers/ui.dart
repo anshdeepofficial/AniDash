@@ -2,6 +2,11 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+enum OrientationLockMode {
+  unlocked, // Sensor landscape (freely rotates between both landscape sides)
+  lockedLandscape, // Locked in current landscape
+}
+
 class UIHelper {
   static const _orientationChannel = MethodChannel('shonenx/orientation');
   static const _volumeChannel = MethodChannel('shonenx/volume');
@@ -141,6 +146,28 @@ class UIHelper {
     }
   }
 
+  static OrientationLockMode _lockMode = OrientationLockMode.unlocked;
+  static OrientationLockMode get orientationLockMode => _lockMode;
+
+  /// Set initial lock mode when entering watch screen
+  static void setWatchInitialLockMode() {
+    _lockMode = OrientationLockMode.unlocked;
+  }
+
+  /// Enable landscape sensor auto-rotate (flips between both landscape sides with sensor)
+  static Future<void> enableLandscapeAutoRotate() async {
+    _lockMode = OrientationLockMode.unlocked;
+    await forceLandscape();
+  }
+
+  /// Lock to current landscape orientation
+  static Future<void> lockCurrentLandscape() async {
+    _lockMode = OrientationLockMode.lockedLandscape;
+    await SystemChrome.setPreferredOrientations([
+      _currentLandscape,
+    ]);
+  }
+
   /// Lock app to portrait (outside video player)
   static Future<void> enableAutoRotate() async {
     if (!_isDesktop) {
@@ -149,7 +176,10 @@ class UIHelper {
   }
 
   /// Reset orientation to portrait (outside video player)
-  static Future<void> resetOrientation() => forcePortrait();
+  static Future<void> resetOrientation() {
+    _lockMode = OrientationLockMode.unlocked;
+    return forcePortrait();
+  }
 
   /// Enable immersive mode (hide system UI)
   static Future<void> enableImmersiveMode() async {
