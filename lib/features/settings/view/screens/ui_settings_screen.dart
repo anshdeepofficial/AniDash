@@ -66,6 +66,7 @@ class UiSettingsScreen extends ConsumerWidget {
                       ),
                       DropdownMenuItem(value: 'grid', child: Text('Grid')),
                       DropdownMenuItem(value: 'block', child: Text('Block')),
+                      DropdownMenuItem(value: 'banner', child: Text('Banner')),
                     ],
                     onChanged: (value) {
                       if (value != null) {

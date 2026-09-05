@@ -328,6 +328,43 @@ class ThemeSettingsScreen extends ConsumerWidget {
                       },
                     ),
                   ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.check_rounded),
+                          label: const Text(
+                            'Done',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             );

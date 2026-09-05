@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -78,8 +78,8 @@ class UIHelper {
     if (Platform.isAndroid) {
       try {
         await _orientationChannel.invokeMethod('sensorLandscape');
-      } on PlatformException {
-        // Fall through
+      } catch (_) {
+        // Fall through to Flutter's orientation API.
       }
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -127,7 +127,7 @@ class UIHelper {
     if (Platform.isAndroid) {
       try {
         await _orientationChannel.invokeMethod('portrait');
-      } on PlatformException {
+      } catch (_) {
         // Fall through to Flutter's orientation API.
       }
       await SystemChrome.setPreferredOrientations([

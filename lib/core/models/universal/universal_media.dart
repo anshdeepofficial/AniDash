@@ -65,11 +65,18 @@ class UniversalMedia {
 
   bool get isMature {
     if (isAdult) return true;
+    final lowerGenres = genres.map((e) => e.toLowerCase()).toSet();
+    if (lowerGenres.contains('ecchi') ||
+        lowerGenres.contains('erotica') ||
+        lowerGenres.contains('hentai')) {
+      return true;
+    }
     final values = <String>[
       ...genres,
       ...tags,
       title.english ?? '',
       title.romaji ?? '',
+      title.native ?? '',
     ].map((e) => e.toLowerCase());
     const markers = {
       'nudity',
@@ -77,6 +84,25 @@ class UniversalMedia {
       'explicit sex',
       'borderline hentai',
       'high school dxd',
+      'shinmai maou',
+      'testament of sister new devil',
+      'redo of healer',
+      'yosuga no sora',
+      'interspecies reviewer',
+      'to love ru',
+      'valkyrie drive',
+      'seikon no qwaser',
+      'aki sora',
+      'kiss x sis',
+      'prison school',
+      'shimoneta',
+      'ishuzoku',
+      'world\'s end harem',
+      'eromanga',
+      'mature',
+      '18+',
+      'nsfw',
+      'smut',
     };
     return values.any((value) => markers.any(value.contains));
   }

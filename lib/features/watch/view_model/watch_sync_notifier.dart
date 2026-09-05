@@ -8,6 +8,7 @@ import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
+import 'package:ani_dash/shared/providers/incognito_provider.dart';
 
 part 'watch_sync_notifier.g.dart';
 
@@ -21,6 +22,7 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
     required String mediaId,
     required int episodeNum,
   }) async {
+    if (IncognitoService.isIncognito(mediaId)) return;
     final syncSettings = ref.read(syncSettingsProvider);
     final syncNotifier = ref.read(syncSettingsProvider.notifier);
 
@@ -35,6 +37,10 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
     required String mediaId,
     required int episodeNum,
   }) async {
+    if (IncognitoService.isIncognito(mediaId)) {
+      AppLogger.d('Incognito active for $mediaId; skipping tracking sync.');
+      return;
+    }
     try {
       final syncSettings = ref.read(syncSettingsProvider);
       final syncNotifier = ref.read(syncSettingsProvider.notifier);

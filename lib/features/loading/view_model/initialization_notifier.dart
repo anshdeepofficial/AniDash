@@ -14,6 +14,7 @@ import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/main.dart';
 import 'package:ani_dash/storage_provider.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 part 'initialization_notifier.g.dart';
 
@@ -203,6 +204,11 @@ class Initialization extends _$Initialization {
     );
 
     isar = await StorageProvider.initDB(null, inspector: kDebugMode);
+    try {
+      await WatchProgressRepository().migrateFromHive();
+    } catch (e, st) {
+      AppLogger.e('Error migrating watch progress from Hive', e, st);
+    }
     final bridge = DartotsuExtensionBridge();
     await bridge.init(isar, 'AniDash');
 

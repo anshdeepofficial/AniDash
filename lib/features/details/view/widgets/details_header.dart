@@ -14,6 +14,7 @@ import 'package:ani_dash/features/browse/view/section_screen.dart';
 import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/core/models/universal/universal_page_response.dart';
+import 'package:ani_dash/shared/providers/incognito_provider.dart';
 
 class DetailsHeader extends ConsumerStatefulWidget {
   final UniversalMedia anime;
@@ -162,23 +163,31 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                           ),
                         const SizedBox(height: 12),
                         if (widget.anime.isMature) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade700,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              '18+  MATURE',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade700,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  '18+  MATURE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ),
-                            ),
+                              _IncognitoToggleBadge(mediaId: widget.anime.id),
+                            ],
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -527,3 +536,92 @@ class WatchButton extends StatelessWidget {
     );
   }
 }
+
+class _IncognitoToggleBadge extends ConsumerWidget {
+  final String mediaId;
+
+  const _IncognitoToggleBadge({required this.mediaId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isIncognito = ref.watch(incognitoProvider(mediaId));
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: () {
+        ref.read(incognitoNotifierProvider.notifier).toggle(mediaId);
+        final nowActive = !isIncognito;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: nowActive ? Colors.deepPurple.shade900 : Colors.grey.shade900,
+            content: Row(
+              children: [
+                Icon(
+                  nowActive ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  color: nowActive ? Colors.purpleAccent : Colors.white70,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    nowActive
+                        ? '🕶️ Incognito Mode ON: No watch history or progress will be saved.'
+                        : 'Incognito Mode OFF: Watch progress will be saved.',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isIncognito
+              ? Colors.purple.shade900.withValues(alpha: 0.9)
+              : Colors.black.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isIncognito ? Colors.purpleAccent : Colors.white30,
+            width: 1.0,
+          ),
+          boxShadow: isIncognito
+              ? [
+                  BoxShadow(
+                    color: Colors.purpleAccent.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isIncognito ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              color: isIncognito ? Colors.purpleAccent : Colors.white70,
+              size: 14,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isIncognito ? 'INCOGNITO: ON' : 'Incognito: OFF',
+              style: TextStyle(
+                color: isIncognito ? Colors.white : Colors.white70,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

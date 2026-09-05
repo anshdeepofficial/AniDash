@@ -51,6 +51,20 @@ class ExperimentalScreen extends ConsumerWidget {
                 );
               },
             ),
+            const SizedBox(height: 8),
+            ToggleableSettingsItem(
+              accent: colorScheme.primary,
+              icon: const Icon(Icons.video_collection_rounded),
+              title: 'Wide Episode Style (Banner)',
+              description:
+                  'Display episodes as wide image cards with banner thumbnails',
+              value: experimentalSettings.useEpisodeBannerStyle,
+              onChanged: (value) {
+                experimentalNotifier.updateSettings(
+                  (state) => state.copyWith(useEpisodeBannerStyle: value),
+                );
+              },
+            ),
           ],
         ),
       ),

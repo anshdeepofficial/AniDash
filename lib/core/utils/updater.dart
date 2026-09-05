@@ -139,42 +139,31 @@ UpdateType _determineUpdateType(String tag, bool prerelease) {
 }
 
 bool _isNewerVersion(String latestTag, String currentVersion) {
-  final latestClean = latestTag.startsWith('v')
-      ? latestTag.substring(1)
-      : latestTag;
+  final cleanLatest = latestTag.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
+  final cleanCurrent = currentVersion.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
 
-  if (latestClean == currentVersion) return false;
+  final lParts = cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  final cParts = cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
-  List<int> getNumbers(String v) {
-    return v
-        .replaceAll(RegExp(r'[a-zA-Z-]'), '.')
-        .split('.')
-        .where((s) => s.isNotEmpty)
-        .map((e) => int.tryParse(e) ?? 0)
-        .toList();
+  while (lParts.length < 3) lParts.add(0);
+  while (cParts.length < 3) cParts.add(0);
+
+  for (int i = 0; i < 3; i++) {
+    if (lParts[i] > cParts[i]) return true;
+    if (lParts[i] < cParts[i]) return false;
   }
 
-  final lNums = getNumbers(latestClean);
-  final cNums = getNumbers(currentVersion);
-
-  final maxLength = lNums.length > cNums.length ? lNums.length : cNums.length;
-
-  for (int i = 0; i < maxLength; i++) {
-    int l = i < lNums.length ? lNums[i] : 0;
-    int c = i < cNums.length ? cNums[i] : 0;
-
-    if (l > c) return true;
-    if (l < c) return false;
+  // If major.minor.patch are identical, check build numbers if available
+  int getBuild(String s) {
+    if (s.contains('+')) return int.tryParse(s.split('+').last) ?? 0;
+    if (s.contains('-')) return int.tryParse(s.split('-').last) ?? 0;
+    return 0;
   }
 
-  final bool latestHasSuffix = latestClean.contains('-');
-  final bool currentHasSuffix = currentVersion.contains('-');
-
-  if (latestHasSuffix && !currentHasSuffix) return true;
-  if (!latestHasSuffix && currentHasSuffix) return false;
-
-  if (latestHasSuffix && currentHasSuffix) {
-    return latestClean.compareTo(currentVersion) > 0;
+  final lBuild = getBuild(latestTag);
+  final cBuild = getBuild(currentVersion);
+  if (lBuild > 0 && cBuild > 0) {
+    return lBuild > cBuild;
   }
 
   return false;

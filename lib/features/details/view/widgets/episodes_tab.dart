@@ -22,6 +22,7 @@ import 'package:ani_dash/features/details/view/widgets/episodes/episode_block_it
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_compact_item.dart';
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_grid_item.dart';
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_list_item.dart';
+import 'package:ani_dash/features/details/view/widgets/episodes/episode_banner_item.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
@@ -29,7 +30,7 @@ import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 
-enum EpisodeViewMode { list, compact, grid, block }
+enum EpisodeViewMode { list, compact, grid, block, banner }
 
 final Map<String, ValueNotifier<Set<int>>> _episodesSelectionStore = {};
 ValueNotifier<Set<int>> _getEpisodesSelectionNotifier(String mediaId) {
@@ -267,11 +268,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final notifier = ref.read(detailsPageProvider(widget.mediaId).notifier);
     final state = ref.watch(detailsPageProvider(widget.mediaId));
+    final experimentalSettings = ref.watch(experimentalProvider);
     final uiSettings = ref.watch(uiSettingsProvider);
-    final viewMode = EpisodeViewMode.values.firstWhere(
-      (e) => e.name == uiSettings.episodeViewMode,
-      orElse: () => EpisodeViewMode.list,
-    );
+    final viewMode = experimentalSettings.useEpisodeBannerStyle
+        ? EpisodeViewMode.banner
+        : EpisodeViewMode.values.firstWhere(
+            (e) => e.name == uiSettings.episodeViewMode,
+            orElse: () => EpisodeViewMode.list,
+          );
 
     final episodeListState = ref.watch(episodeListProvider);
 
@@ -600,6 +604,23 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                       tooltip: 'View Mode',
                                       initialValue: viewMode,
                                       onSelected: (mode) {
+                                        if (mode == EpisodeViewMode.banner) {
+                                          ref
+                                              .read(experimentalProvider.notifier)
+                                              .updateSettings(
+                                                (s) => s.copyWith(
+                                                  useEpisodeBannerStyle: true,
+                                                ),
+                                              );
+                                        } else {
+                                          ref
+                                              .read(experimentalProvider.notifier)
+                                              .updateSettings(
+                                                (s) => s.copyWith(
+                                                  useEpisodeBannerStyle: false,
+                                                ),
+                                              );
+                                        }
                                         ref
                                             .read(uiSettingsProvider.notifier)
                                             .updateSettings(
@@ -647,6 +668,16 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                                   Icon(Icons.view_module),
                                                   SizedBox(width: 8),
                                                   Text('Block'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: EpisodeViewMode.banner,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.video_library),
+                                                  SizedBox(width: 8),
+                                                  Text('Banner'),
                                                 ],
                                               ),
                                             ),
@@ -720,10 +751,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     List<EpisodeDataModel> allEpisodes,
     String? animeIdForSource,
   ) {
-    final viewMode = EpisodeViewMode.values.firstWhere(
-      (e) => e.name == ref.watch(uiSettingsProvider).episodeViewMode,
-      orElse: () => EpisodeViewMode.list,
-    );
+    final experimentalSettings = ref.watch(experimentalProvider);
+    final viewMode = experimentalSettings.useEpisodeBannerStyle
+        ? EpisodeViewMode.banner
+        : EpisodeViewMode.values.firstWhere(
+            (e) => e.name == ref.watch(uiSettingsProvider).episodeViewMode,
+            orElse: () => EpisodeViewMode.list,
+          );
 
     Widget buildItem(BuildContext context, int index) {
       final ep = visibleEpisodes[index];
@@ -818,6 +852,28 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
           );
+        case EpisodeViewMode.banner:
+          return EpisodeBannerItem(
+            episode: ep,
+            index: index,
+            isWatched: isWatched,
+            watchProgress: watchProgress,
+            download: download,
+            episodeProgress: epProgress,
+            fallbackCover: fallbackCover,
+            onTap: onItemTap,
+            onMoreOptions:
+                () => _showEpisodeMenu(
+                  context,
+                  ep,
+                  isWatched,
+                  download: download,
+                ),
+            onDownload: onDownloadItem,
+            onLongPress: onLongPressItem,
+            isSelected: isSelected,
+            isSelectionMode: _isSelectionMode,
+          );
         case EpisodeViewMode.list:
           return EpisodeListItem(
             episode: ep,
@@ -869,6 +925,16 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
           ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => buildItem(context, index),
+            childCount: visibleEpisodes.length,
+          ),
+        ),
+      );
+    } else if (viewMode == EpisodeViewMode.banner) {
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(0, 6, 0, 100),
+        sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) => buildItem(context, index),
             childCount: visibleEpisodes.length,

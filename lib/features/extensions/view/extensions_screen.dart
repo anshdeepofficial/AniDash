@@ -32,12 +32,14 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
 
   List<String> _getSavedAnimeRepos() {
     final saved = sharedPrefs.getStringList('saved_anime_repos');
-    if (saved != null && saved.isNotEmpty) {
-      return saved;
-    }
-    return [
+    final repos = <String>{
       "https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json",
-    ];
+      "https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json",
+    };
+    if (saved != null && saved.isNotEmpty) {
+      repos.addAll(saved);
+    }
+    return repos.toList();
   }
 
   @override
@@ -439,6 +441,26 @@ class ExtensionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = source.iconUrl?.toLowerCase() ?? '';
+    final name = source.name?.toLowerCase() ?? '';
+    String repoName = 'Community';
+    Color repoColor = Theme.of(context).colorScheme.primaryContainer;
+    Color repoTextColor = Theme.of(context).colorScheme.onPrimaryContainer;
+
+    if (source.isNsfw == true || icon.contains('yuzono') || name.contains('yuzono')) {
+      repoName = 'Yuzono (18+)';
+      repoColor = Colors.red.shade900.withValues(alpha: 0.3);
+      repoTextColor = Colors.redAccent;
+    } else if (icon.contains('kohi-den') || icon.contains('kohiden') || name.contains('kohi')) {
+      repoName = 'Kohi-den';
+      repoColor = Colors.blue.shade900.withValues(alpha: 0.3);
+      repoTextColor = Colors.lightBlueAccent;
+    } else if (icon.contains('secozzi') || name.contains('secozzi')) {
+      repoName = 'Secozzi';
+      repoColor = Colors.purple.shade900.withValues(alpha: 0.3);
+      repoTextColor = Colors.purpleAccent;
+    }
+
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainer,
@@ -497,7 +519,27 @@ class ExtensionListItem extends StatelessWidget {
             ],
           ],
         ),
-        subtitle: Text('v${source.version ?? "?"} • ${source.lang ?? "?"}'),
+        subtitle: Row(
+          children: [
+            Text('v${source.version ?? "?"} • ${source.lang ?? "?"}'),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: repoColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                repoName,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: repoTextColor,
+                ),
+              ),
+            ),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

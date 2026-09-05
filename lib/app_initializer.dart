@@ -9,7 +9,6 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
-import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 import 'package:ani_dash/core/utils/app_logger.dart';
 
@@ -52,10 +51,15 @@ class AppInitializer {
 
     await _initializeHive();
     await _initializeSharedPrefs();
-    await WatchProgressRepository().migrateFromHive();
     await _initializeWindowManager();
     await _initializeMediaKit();
-    await NotificationService().initialize();
+    try {
+      await NotificationService().initialize();
+      AppLogger.success('Notification service initialized');
+    } catch (e, st) {
+      AppLogger.fail('Notification service initialization failed');
+      AppLogger.e('Notification Service Error', e, st);
+    }
     AppLogger.section('Initialization Complete');
   }
 
@@ -75,8 +79,13 @@ class AppInitializer {
   static Future<void> _initializeBackgroundService() async {
     if (!(Platform.isAndroid || Platform.isIOS)) return;
     AppLogger.section('Background services');
-    Workmanager().initialize(callbackDispatcher);
-    AppLogger.success('Background services initialized');
+    try {
+      Workmanager().initialize(callbackDispatcher);
+      AppLogger.success('Background services initialized');
+    } catch (e, st) {
+      AppLogger.fail('Background services initialization failed');
+      AppLogger.e('Workmanager Error', e, st);
+    }
   }
 
   static Future<void> _initializeMediaKit() async {
@@ -193,13 +202,17 @@ class AppInitializer {
         AppLogger.e('Window Manager Error', e, st);
       }
     } else {
-      await UIHelper.exitImmersiveMode();
-      await UIHelper.forcePortrait();
-      SystemChrome.setSystemUIOverlayStyle(
-        const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-      );
-
-      AppLogger.success('Mobile system UI configured');
+      try {
+        await UIHelper.exitImmersiveMode();
+        await UIHelper.forcePortrait();
+        SystemChrome.setSystemUIOverlayStyle(
+          const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+        );
+        AppLogger.success('Mobile system UI configured');
+      } catch (e, st) {
+        AppLogger.fail('Mobile system UI configuration failed');
+        AppLogger.e('Mobile System UI Error', e, st);
+      }
     }
   }
 }

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
+import 'package:ani_dash/shared/providers/incognito_provider.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -62,6 +63,9 @@ class TopControls extends ConsumerWidget {
       }),
     );
 
+    final animeId = ref.watch(episodeListProvider.select((s) => s.animeId));
+    final isIncognito = animeId != null && ref.watch(incognitoProvider(animeId));
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -104,14 +108,57 @@ class TopControls extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      sourceOverride ?? _getSourceName(ref).toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          sourceOverride ?? _getSourceName(ref).toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        if (isIncognito) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.shade900.withValues(
+                                alpha: 0.9,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.purpleAccent,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.visibility_off_rounded,
+                                  size: 11,
+                                  color: Colors.purpleAccent,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'INCOGNITO',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (titleOverride != null ||
                         (selectedEp != null && sources.isNotEmpty))

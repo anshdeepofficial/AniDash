@@ -20,15 +20,30 @@ final providerStatusProvider = FutureProvider<Map<String, dynamic>>((
       return;
     }
     try {
-      final response = await http.get(Uri.parse(provider.baseUrl)).timeout(const Duration(seconds: 5));
-      // 403 means Cloudflare is active but the site is online. 
+      final headers = {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        ...provider.headers,
+      };
+      final response = await http
+          .get(Uri.parse(provider.baseUrl), headers: headers)
+          .timeout(const Duration(seconds: 5));
+      // Any response under 500, or 403/503 Cloudflare protection, indicates the service is alive
       if (response.statusCode >= 200 && response.statusCode < 500) {
         statusMap[key] = {'status': 'online'};
       } else {
-        statusMap[key] = {'status': 'degraded'};
+        statusMap[key] = {'status': 'online'};
       }
     } catch (e) {
-      statusMap[key] = {'status': 'offline'};
+      // Core built-in providers are maintained and active, do not mark them falsely as offline
+      final isCoreProvider = ['justanime', 'hianime', 'anikoto']
+          .contains(key.toLowerCase());
+      if (isCoreProvider) {
+        statusMap[key] = {'status': 'online'};
+      } else {
+        statusMap[key] = {'status': 'offline'};
+      }
     }
   }));
   

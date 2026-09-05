@@ -38,20 +38,19 @@ class _UpdateDialogState extends State<UpdateDialog> {
   final String _linuxCmd =
       'bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/AniDash/main/install.sh)';
 
-  String? get _effectiveApkUrl {
+  String get _effectiveApkUrl {
     if (widget.apkDownloadUrl != null && widget.apkDownloadUrl!.isNotEmpty) {
-      return widget.apkDownloadUrl;
+      return widget.apkDownloadUrl!;
     }
     final tag = widget.latestVersion.startsWith('v')
         ? widget.latestVersion
         : 'v${widget.latestVersion}';
-    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/app-release.apk';
+    return 'https://github.com/anshdeepofficial/Anidash/releases/download/$tag/app-release.apk';
   }
 
   Future<void> _handleUpdateAction() async {
     if (Platform.isAndroid) {
       final url = _effectiveApkUrl;
-      if (url == null) return;
       await _downloadAndInstall(url);
     } else if (Platform.isLinux) {
       await Clipboard.setData(ClipboardData(text: _linuxCmd));
@@ -65,7 +64,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
       }
     } else if (Platform.isWindows) {
       final url = _effectiveApkUrl;
-      if (url == null) return;
       await launchUrl(
         Uri.parse(url),
         mode: LaunchMode.externalApplication,
@@ -327,11 +325,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed:
-                          (_downloading ||
-                              (_effectiveApkUrl == null && !isLinux))
-                          ? null
-                          : _handleUpdateAction,
+                      onPressed: _downloading ? null : _handleUpdateAction,
                       icon: Icon(
                         isLinux
                             ? Icons.content_copy_rounded

@@ -6,6 +6,7 @@ class ExperimentalFeaturesModel {
   bool useTestReleases;
   bool newUI;
   bool debugMode;
+  bool useEpisodeBannerStyle;
 
   ExperimentalFeaturesModel({
     this.episodeTitleSync = true,
@@ -13,6 +14,7 @@ class ExperimentalFeaturesModel {
     this.useTestReleases = false,
     this.newUI = true,
     this.debugMode = false,
+    this.useEpisodeBannerStyle = false,
   });
 
   ExperimentalFeaturesModel copyWith({
@@ -21,6 +23,7 @@ class ExperimentalFeaturesModel {
     bool? useTestReleases,
     bool? newUI,
     bool? debugMode,
+    bool? useEpisodeBannerStyle,
   }) {
     return ExperimentalFeaturesModel(
       episodeTitleSync: episodeTitleSync ?? this.episodeTitleSync,
@@ -28,6 +31,8 @@ class ExperimentalFeaturesModel {
       useTestReleases: useTestReleases ?? this.useTestReleases,
       newUI: newUI ?? this.newUI,
       debugMode: debugMode ?? this.debugMode,
+      useEpisodeBannerStyle:
+          useEpisodeBannerStyle ?? this.useEpisodeBannerStyle,
     );
   }
 
@@ -38,6 +43,7 @@ class ExperimentalFeaturesModel {
       'useTestReleases': useTestReleases,
       'newUI': newUI,
       'debugMode': debugMode,
+      'useEpisodeBannerStyle': useEpisodeBannerStyle,
     };
   }
 
@@ -48,6 +54,7 @@ class ExperimentalFeaturesModel {
       useTestReleases: map['useTestReleases'] ?? false,
       newUI: map['newUI'] ?? true,
       debugMode: false,
+      useEpisodeBannerStyle: map['useEpisodeBannerStyle'] ?? false,
     );
   }
 

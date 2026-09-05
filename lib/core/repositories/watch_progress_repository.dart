@@ -8,6 +8,7 @@ import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/data/isar/isar_anime_watch_progress.dart';
 import 'package:ani_dash/main.dart';
 import 'package:ani_dash/core/repositories/interfaces/watch_progress_repository_interface.dart';
+import 'package:ani_dash/shared/providers/incognito_provider.dart';
 
 final watchProgressRepositoryProvider = Provider<WatchProgressRepositoryInterface>((
   ref,
@@ -84,6 +85,12 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
   @override
   Future<void> saveProgress(AnimeWatchProgressEntry entry) async {
+    if (IncognitoService.isIncognito(entry.animeId)) {
+      AppLogger.d(
+        'Incognito active for anime: ${entry.animeTitle} (${entry.animeId}); skipping save.',
+      );
+      return;
+    }
     try {
       final isarEntry = IsarAnimeWatchProgress(
         id: fastHash(entry.animeId),
