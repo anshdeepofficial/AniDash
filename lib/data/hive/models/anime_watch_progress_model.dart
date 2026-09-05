@@ -10,6 +10,7 @@ class AnimeWatchProgressEntry {
   final DateTime? lastUpdated;
   final int currentEpisode;
   final String status;
+  final bool isAdult;
 
   AnimeWatchProgressEntry({
     required this.animeId,
@@ -21,6 +22,7 @@ class AnimeWatchProgressEntry {
     this.lastUpdated,
     this.currentEpisode = 1,
     this.status = 'watching',
+    this.isAdult = false,
   });
 
   AnimeWatchProgressEntry copyWith({
@@ -33,6 +35,7 @@ class AnimeWatchProgressEntry {
     DateTime? lastUpdated,
     int? currentEpisode,
     String? status,
+    bool? isAdult,
   }) {
     return AnimeWatchProgressEntry(
       animeId: animeId ?? this.animeId,
@@ -44,6 +47,7 @@ class AnimeWatchProgressEntry {
       lastUpdated: lastUpdated ?? this.lastUpdated,
       currentEpisode: currentEpisode ?? this.currentEpisode,
       status: status ?? this.status,
+      isAdult: isAdult ?? this.isAdult,
     );
   }
 
@@ -59,6 +63,7 @@ class AnimeWatchProgressEntry {
       coverImage: UniversalCoverImage(large: animeCover, medium: animeCover),
       episodes: totalEpisodes,
       status: status,
+      isAdult: isAdult,
       startDate: UniversalFuzzyDate(
         year: DateTime.now().year,
         month: DateTime.now().month,
@@ -85,6 +90,7 @@ class AnimeWatchProgressEntry {
       'lastUpdated': lastUpdated?.toIso8601String(),
       'currentEpisode': currentEpisode,
       'status': status,
+      'isAdult': isAdult,
     };
   }
 
@@ -108,6 +114,7 @@ class AnimeWatchProgressEntry {
           : null,
       currentEpisode: map['currentEpisode']?.toInt() ?? 1,
       status: map['status'] ?? 'watching',
+      isAdult: map['isAdult'] ?? false,
     );
   }
 }

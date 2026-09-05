@@ -11,12 +11,14 @@ class HomeSectionWidget extends ConsumerWidget {
   final String title;
   final List<UniversalMedia> mediaList;
   final VoidCallback? onTitleTap;
+  final bool fromHentaiHub;
 
   const HomeSectionWidget({
     super.key,
     required this.title,
     required this.mediaList,
     this.onTitleTap,
+    this.fromHentaiHub = false,
   });
 
   @override
@@ -59,7 +61,12 @@ class HomeSectionWidget extends ConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: GestureDetector(
-                  onTap: () => navigateToDetail(context, media, tag),
+                  onTap: () => navigateToDetail(
+                    context,
+                    media,
+                    tag,
+                    fromHentaiHub: fromHentaiHub || media.isAdult,
+                  ),
                   child: AnimeCard(anime: media, tag: tag, mode: mode),
                 ),
               );

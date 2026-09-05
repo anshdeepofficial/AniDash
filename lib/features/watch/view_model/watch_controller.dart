@@ -36,6 +36,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   int _lastScreenshotPos = -1;
   bool _trackingTriggered = false;
   bool _hasAutoAdvanced = false;
+  bool _fromHentaiHub = false;
 
   @override
   void build() {
@@ -90,6 +91,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     required String mediaId,
     required String? animeFormat,
     required String animeCover,
+    bool fromHentaiHub = false,
   }) async {
     if (_isDisposed) return;
 
@@ -98,6 +100,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _animeFormat = animeFormat;
     _animeCover = animeCover;
     _totalEps = episodes.length;
+    _fromHentaiHub = fromHentaiHub;
 
     await ref
         .read(episodeListProvider.notifier)
@@ -107,6 +110,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           animeCover: animeCover,
           episodes: episodes,
           force: false,
+          isAdult: fromHentaiHub,
         );
 
     await _initEpisode(mediaId, initialEpisode);
@@ -267,6 +271,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           pos: _pos,
           dur: _dur,
           takeScreenshot: takeScreenshot,
+          isAdult: _fromHentaiHub,
         );
 
     if (newThumb != null) _epThumb = newThumb;

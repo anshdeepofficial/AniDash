@@ -26,6 +26,7 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
     bool doNotAskAgain,
   )?
   onConfirmBatchDownload;
+  final bool isAdult;
 
   const DownloadSourceSelector({
     super.key,
@@ -37,6 +38,7 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
     this.fetchSources,
     required this.scrollController,
     this.onConfirmBatchDownload,
+    this.isAdult = false,
   });
 
   @override
@@ -242,14 +244,18 @@ class _DownloadSourceSelectorState
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         ...?matchedSource?.headers,
       },
+      isAdult: widget.isAdult,
     );
 
     await ref.read(downloadsProvider.notifier).addDownload(item);
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 5),
           content: Row(
             children: [
               Expanded(
@@ -258,7 +264,10 @@ class _DownloadSourceSelectorState
                 ),
               ),
               TextButton(
-                onPressed: () => routerConfig.go('/downloads'),
+                onPressed: () {
+                  messenger.hideCurrentSnackBar();
+                  routerConfig.go('/downloads');
+                },
                 child: const Text('View Downloads'),
               ),
             ],
@@ -266,10 +275,12 @@ class _DownloadSourceSelectorState
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'Cancel',
-            onPressed:
-                () => ref
-                    .read(downloadsProvider.notifier)
-                    .cancelDownload(item.id),
+            onPressed: () {
+              messenger.hideCurrentSnackBar();
+              ref
+                  .read(downloadsProvider.notifier)
+                  .cancelDownload(item.id);
+            },
           ),
         ),
       );

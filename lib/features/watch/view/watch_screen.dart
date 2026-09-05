@@ -28,7 +28,10 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.animeId,
     this.episode = 1,
     this.episodes = const [],
+    this.fromHentaiHub = false,
   });
+
+  final bool fromHentaiHub;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -68,6 +71,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             mediaId: widget.mediaId,
             animeFormat: widget.animeFormat,
             animeCover: widget.animeCover,
+            fromHentaiHub: widget.fromHentaiHub,
           );
       ref
           .read(watchControllerProvider.notifier)

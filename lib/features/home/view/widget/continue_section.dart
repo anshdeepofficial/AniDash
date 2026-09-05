@@ -12,12 +12,18 @@ import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
+  final bool isAdult;
 
-  const ContinueSection({super.key, required this.allProgress});
+  const ContinueSection({
+    super.key,
+    required this.allProgress,
+    this.isAdult = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final validEntries = allProgress.toList();
+    final validEntries =
+        allProgress.where((e) => isAdult ? e.isAdult : !e.isAdult).toList();
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 
@@ -149,10 +155,12 @@ class ContinueSection extends ConsumerWidget {
                                 large: entry.animeCover,
                                 medium: entry.animeCover,
                               ),
+                              isAdult: isAdult || entry.isAdult,
                             ),
                             startAt: nextEpisodeNum,
                             withAnimeMatch: true,
                             directAutoMatch: true,
+                            fromHentaiHub: isAdult || entry.isAdult,
                           );
                           if (context.mounted) {
                             setState(() => isLoading = false);

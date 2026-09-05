@@ -10,8 +10,14 @@ void navigateToDetail(
   UniversalMedia media,
   String tag, {
   bool forceFetch = false,
+  bool fromHentaiHub = false,
 }) {
-  context.push('/details?tag=$tag&forceFetch=$forceFetch', extra: media);
+  final hentaiParam =
+      fromHentaiHub || media.isAdult || media.isMature ? '&hentaiHub=true' : '';
+  context.push(
+    '/details?tag=$tag&forceFetch=$forceFetch$hentaiParam',
+    extra: media,
+  );
 }
 
 void navigateToBrowse(
@@ -35,6 +41,7 @@ void navigateToWatch({
   required int currentEpisode,
   String? animeId,
   int? startAt,
+  bool fromHentaiHub = false,
 }) {
   final queryParams = <String, String>{
     'animeName': animeName,
@@ -42,6 +49,10 @@ void navigateToWatch({
     'animeCover': animeCover,
     'episode': currentEpisode.toString(),
   };
+
+  if (fromHentaiHub) {
+    queryParams['hentaiHub'] = 'true';
+  }
 
   if (animeId != null) {
     queryParams['animeId'] = animeId;

@@ -38,6 +38,9 @@ class AnimeMatchService {
       return null;
     }
 
+    BaseAnimeModel? bestCandidate;
+    double bestSimilarity = 0.0;
+
     for (final title in titles) {
       try {
         final results = await search(title);
@@ -51,16 +54,32 @@ class AnimeMatchService {
           idSelector: (r) => r.id,
         );
 
-        if (matches.isNotEmpty && matches.first.similarity >= 0.75) {
-          AppLogger.d(
-            'High-confidence match found: ${matches.first.result.name} (via "$title")',
-          );
-          return matches.first.result;
+        if (matches.isNotEmpty) {
+          final topMatch = matches.first;
+          if (topMatch.similarity >= 0.75) {
+            AppLogger.d(
+              'High-confidence match found: ${topMatch.result.name} (via "$title")',
+            );
+            return topMatch.result;
+          }
+          if (topMatch.similarity > bestSimilarity) {
+            bestSimilarity = topMatch.similarity;
+            bestCandidate = topMatch.result;
+          }
+        } else if (bestCandidate == null && results.isNotEmpty) {
+          bestCandidate = results.first;
         }
       } catch (e) {
         AppLogger.e('Error searching for title: $title', e);
         // Continue to next title
       }
+    }
+
+    if (bestCandidate != null) {
+      AppLogger.d(
+        'Using closest match: ${bestCandidate.name} (similarity: ${bestSimilarity.toStringAsFixed(2)})',
+      );
+      return bestCandidate;
     }
 
     return null;
@@ -146,13 +165,9 @@ class AnimeMatchService {
 
       if (selection != null) {
         if (selection.sourceType == 'legacy') {
-          AppLogger.d(
-            'Auto-Restore: Restoring legacy source ${selection.sourceId}',
-          );
-          _ref
-              .read(selectedProviderKeyProvider.notifier)
-              .select(selection.sourceId!);
-          final provider = _ref.read(selectedAnimeProvider);
+          final targetSourceKey = selection.sourceId ?? 'justanime';
+          final registry = _ref.read(animeSourceRegistryProvider);
+          final provider = registry.get(targetSourceKey) ?? registry.get('justanime');
           final matchedId = selection.matchedAnimeId;
           if (provider != null && matchedId != null && matchedId.isNotEmpty) {
             try {
@@ -160,7 +175,10 @@ class AnimeMatchService {
                   .getEpisodes(matchedId)
                   .timeout(const Duration(seconds: 12));
               if (episodes.episodes?.isNotEmpty == true) {
-                AppLogger.d('Auto-Restore: Success');
+                _ref
+                    .read(selectedProviderKeyProvider.notifier)
+                    .select(provider.providerName);
+                AppLogger.d('Auto-Restore: Success with ${provider.providerName}');
                 return BaseAnimeModel(
                   id: matchedId,
                   name: selection.matchedAnimeTitle,
@@ -173,6 +191,8 @@ class AnimeMatchService {
           } else {
             AppLogger.w('Auto-Restore: Legacy provider not found');
           }
+          // Fallback to justanime if saved source is stale
+          _ref.read(selectedProviderKeyProvider.notifier).select('justanime');
         } else if (['mangayomi', 'aniyomi'].contains(selection.sourceType)) {
           AppLogger.d(
             'Auto-Restore: Restoring extension source ${selection.sourceId}',

@@ -60,9 +60,6 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

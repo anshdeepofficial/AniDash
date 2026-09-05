@@ -81,6 +81,19 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     }
   }
 
+  bool isAdultAnimeId(String animeId) {
+    final adultIds = sharedPrefs.getStringList('adult_anime_ids') ?? [];
+    return adultIds.contains(animeId);
+  }
+
+  Future<void> markAdultAnimeId(String animeId) async {
+    final adultIds = (sharedPrefs.getStringList('adult_anime_ids') ?? []).toSet();
+    if (!adultIds.contains(animeId)) {
+      adultIds.add(animeId);
+      await sharedPrefs.setStringList('adult_anime_ids', adultIds.toList());
+    }
+  }
+
   // --- Core CRUD ---
 
   @override
@@ -90,6 +103,9 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         'Incognito active for anime: ${entry.animeTitle} (${entry.animeId}); skipping save.',
       );
       return;
+    }
+    if (entry.isAdult) {
+      await markAdultAnimeId(entry.animeId);
     }
     try {
       final isarEntry = IsarAnimeWatchProgress(
@@ -135,6 +151,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   @override
   AnimeWatchProgressEntry? getProgress(String animeId) {
     final isarEntry = isar.isarAnimeWatchProgress.getSync(fastHash(animeId));
+    final isAdult = isAdultAnimeId(animeId);
     if (isarEntry != null) {
       return AnimeWatchProgressEntry(
         animeId: isarEntry.animeId,
@@ -145,6 +162,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         lastUpdated: isarEntry.lastUpdated,
         currentEpisode: isarEntry.currentEpisode,
         status: isarEntry.status,
+        isAdult: isAdult,
         episodesProgress: {
           for (var ep in isarEntry.episodesProgress)
             ep.episodeNumber: _fromIsarProgress(ep),
@@ -155,7 +173,11 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     try {
       if (Hive.isBoxOpen('anime_watch_progress')) {
         final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
-        return box.get(animeId);
+        final entry = box.get(animeId);
+        if (entry != null && isAdult && !entry.isAdult) {
+          return entry.copyWith(isAdult: true);
+        }
+        return entry;
       }
     } catch (_) {}
     return null;
@@ -178,6 +200,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     }
 
     return isarEntries.map((isarEntry) {
+      final isAdult = isAdultAnimeId(isarEntry.animeId);
       return AnimeWatchProgressEntry(
         animeId: isarEntry.animeId,
         animeTitle: isarEntry.animeTitle,
@@ -187,6 +210,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         lastUpdated: isarEntry.lastUpdated,
         currentEpisode: isarEntry.currentEpisode,
         status: isarEntry.status,
+        isAdult: isAdult,
         episodesProgress: {
           for (var ep in isarEntry.episodesProgress)
             ep.episodeNumber: _fromIsarProgress(ep),

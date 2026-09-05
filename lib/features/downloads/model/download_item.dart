@@ -22,6 +22,7 @@ class DownloadItem {
   final int speed;
   final Duration? eta;
   final dynamic error;
+  final bool isAdult;
 
   DownloadItem({
     String? id,
@@ -46,6 +47,7 @@ class DownloadItem {
     this.subtitles,
     this.totalSegments,
     this.downloadedBytes,
+    this.isAdult = false,
   }) : id = id ?? randomId();
 
   DownloadItem copyWith({
@@ -68,6 +70,7 @@ class DownloadItem {
     int? totalSegments,
     int? downloadedBytes,
     List<dynamic>? subtitles,
+    bool? isAdult,
   }) {
     return DownloadItem(
       id: id ?? this.id,
@@ -89,6 +92,7 @@ class DownloadItem {
       totalSegments: totalSegments ?? this.totalSegments,
       downloadedBytes: downloadedBytes ?? this.downloadedBytes,
       subtitles: subtitles ?? this.subtitles,
+      isAdult: isAdult ?? this.isAdult,
     );
   }
 

@@ -414,6 +414,7 @@ class EpisodeData extends _$EpisodeData {
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           ...?matchedSource.headers,
         },
+        isAdult: _epList.isAdult,
       );
 
       await ref.read(downloadsProvider.notifier).addDownload(item);
@@ -533,6 +534,7 @@ class EpisodeData extends _$EpisodeData {
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             ...?source.headers,
           },
+          isAdult: _epList.isAdult,
         );
 
         await ref.read(downloadsProvider.notifier).addDownload(item);
@@ -760,17 +762,19 @@ class EpisodeData extends _$EpisodeData {
           )
           .timeout(const Duration(seconds: 15));
 
-      // media_kit's open call can complete before the remote stream has
-      // delivered any media. Detect dead/expired URLs instead of showing an
-      // endless spinner, while allowing slow connections enough startup time.
-      await Future.any([
-        _player.videoController.player.stream.position.firstWhere(
-          (position) => position > Duration.zero,
-        ),
-        _player.videoController.player.stream.duration.firstWhere(
-          (duration) => duration > Duration.zero,
-        ),
-      ]).timeout(const Duration(seconds: 35));
+      // Probe stream to detect startup, without blocking playback if buffering
+      try {
+        await Future.any([
+          _player.videoController.player.stream.position.firstWhere(
+            (position) => position > Duration.zero,
+          ),
+          _player.videoController.player.stream.duration.firstWhere(
+            (duration) => duration > Duration.zero,
+          ),
+        ]).timeout(const Duration(seconds: 15));
+      } catch (_) {
+        AppLogger.d('Stream startup probe passed without blocking');
+      }
 
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
       if (!isDub) {
@@ -919,18 +923,52 @@ class EpisodeData extends _$EpisodeData {
     }
 
     final category = server?.isDub == true ? 'dub' : 'sub';
-    try {
-      final res = await _provider?.getSources(
-        _epList.animeId ?? '',
-        ep.id ?? '',
-        server?.id,
-        category,
-      );
-      if (res != null && res.sources.isNotEmpty) {
-        return res;
+    final targetEpId =
+        (ep.id != null && ep.id!.isNotEmpty)
+            ? ep.id!
+            : (ep.number?.toString() ?? '');
+
+    if (_provider != null) {
+      try {
+        final res = await _provider!.getSources(
+          _epList.animeId ?? '',
+          targetEpId,
+          server?.id,
+          category,
+        );
+        if (res.sources.isNotEmpty) {
+          return res;
+        }
+      } catch (e) {
+        AppLogger.e('Native provider direct source fetch failed: $e');
       }
-    } catch (e) {
-      AppLogger.e('Native provider source fetch failed', e);
+
+      // If direct animeId failed (e.g. animeId was an AniList ID or URL), resolve by title
+      if (_epList.animeTitle != null && _epList.animeTitle!.isNotEmpty) {
+        try {
+          AppLogger.w(
+            'Resolving anime title on ${_provider!.providerName}: "${_epList.animeTitle}"',
+          );
+          final searchRes = await _provider!
+              .getSearch(_epList.animeTitle!, null, 1)
+              .timeout(const Duration(seconds: 10));
+          final best = searchRes.results.firstOrNull;
+          if (best != null && best.id != null && best.id != _epList.animeId) {
+            final res = await _provider!.getSources(
+              best.id!,
+              targetEpId,
+              server?.id,
+              category,
+            ).timeout(const Duration(seconds: 15));
+            if (res.sources.isNotEmpty) {
+              AppLogger.success('Resolved stream on ${_provider!.providerName}');
+              return res;
+            }
+          }
+        } catch (e) {
+          AppLogger.d('Title recovery on active provider failed: $e');
+        }
+      }
     }
 
     return _fetchFallbackNativeSourceData(ep, category);
@@ -940,11 +978,21 @@ class EpisodeData extends _$EpisodeData {
     EpisodeDataModel ep,
     String category,
   ) async {
-    // If the selected provider is stale or its stream token has expired, find
-    // the same title/episode on another registered provider.
     final registry = ref.read(animeSourceRegistryProvider);
     final currentKey = ref.read(selectedProviderKeyProvider);
-    for (final altKey in registry.keys.where((k) => k != currentKey)) {
+    final targetEpId =
+        (ep.id != null && ep.id!.isNotEmpty)
+            ? ep.id!
+            : (ep.number?.toString() ?? '');
+
+    // Fallback order: put JustAnime first because it has working HLS
+    final candidateKeys = [
+      if (registry.has('justanime') && currentKey != 'justanime') 'justanime',
+      ...registry.keys.where((k) => k != currentKey && k != 'justanime'),
+      if (registry.has('justanime') && currentKey == 'justanime') 'justanime',
+    ];
+
+    for (final altKey in candidateKeys) {
       final altProvider = registry.get(altKey);
       if (altProvider == null) continue;
       try {
@@ -960,14 +1008,13 @@ class EpisodeData extends _$EpisodeData {
           final targetEp = altEps.episodes?.firstWhereOrNull(
             (e) => e.number == ep.number,
           );
-          if (targetEp != null && targetEp.id != null) {
-            final altSources = await altProvider
-                .getSources(altMatch.id!, targetEp.id!, null, category)
-                .timeout(const Duration(seconds: 30));
-            if (altSources.sources.isNotEmpty) {
-              AppLogger.success('Fallback provider $altKey found sources!');
-              return altSources;
-            }
+          final epToFetch = targetEp?.id ?? targetEpId;
+          final altSources = await altProvider
+              .getSources(altMatch.id!, epToFetch, null, category)
+              .timeout(const Duration(seconds: 25));
+          if (altSources.sources.isNotEmpty) {
+            AppLogger.success('Fallback provider $altKey found sources!');
+            return altSources;
           }
         }
       } catch (e) {
@@ -1015,36 +1062,47 @@ class EpisodeData extends _$EpisodeData {
     String msg, {
     bool showDownloadsAction = false,
     String? downloadId,
-  }) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content:
-          showDownloadsAction
-              ? Row(
-                children: [
-                  Expanded(child: Text(msg)),
-                  TextButton(
-                    onPressed: () => routerConfig.go('/downloads'),
-                    child: const Text('View Downloads'),
-                  ),
-                ],
-              )
-              : Text(msg),
-      behavior: SnackBarBehavior.floating,
-      action:
-          showDownloadsAction
-              ? SnackBarAction(
-                label: downloadId == null ? 'View Downloads' : 'Cancel',
-                onPressed:
-                    () =>
-                        downloadId == null
-                            ? routerConfig.go('/downloads')
-                            : ref
-                                .read(downloadsProvider.notifier)
-                                .cancelDownload(downloadId),
-              )
-              : null,
-    ),
-  );
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content:
+            showDownloadsAction
+                ? Row(
+                  children: [
+                    Expanded(child: Text(msg)),
+                    TextButton(
+                      onPressed: () {
+                        messenger.hideCurrentSnackBar();
+                        routerConfig.go('/downloads');
+                      },
+                      child: const Text('View Downloads'),
+                    ),
+                  ],
+                )
+                : Text(msg),
+        behavior: SnackBarBehavior.floating,
+        action:
+            showDownloadsAction
+                ? SnackBarAction(
+                  label: downloadId == null ? 'View Downloads' : 'Cancel',
+                  onPressed: () {
+                    messenger.hideCurrentSnackBar();
+                    if (downloadId == null) {
+                      routerConfig.go('/downloads');
+                    } else {
+                      ref
+                          .read(downloadsProvider.notifier)
+                          .cancelDownload(downloadId);
+                    }
+                  },
+                )
+                : null,
+      ),
+    );
+  }
 
   Future<ServerData?> _showServerSheet(
     BuildContext context,

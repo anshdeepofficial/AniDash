@@ -30,6 +30,7 @@ class EpisodeListState {
   final bool isLoading;
   final bool isJikanSyncing;
   final String? error;
+  final bool isAdult;
 
   const EpisodeListState({
     this.animeId,
@@ -41,6 +42,7 @@ class EpisodeListState {
     this.isLoading = false,
     this.isJikanSyncing = false,
     this.error,
+    this.isAdult = false,
   });
 
   EpisodeListState copyWith({
@@ -53,6 +55,7 @@ class EpisodeListState {
     bool? isLoading,
     bool? isJikanSyncing,
     String? error,
+    bool? isAdult,
   }) {
     return EpisodeListState(
       animeId: animeId ?? this.animeId,
@@ -63,7 +66,8 @@ class EpisodeListState {
       jikanMatches: jikanMatches ?? this.jikanMatches,
       isLoading: isLoading ?? this.isLoading,
       isJikanSyncing: isJikanSyncing ?? this.isJikanSyncing,
-      error: error,
+      error: error ?? this.error,
+      isAdult: isAdult ?? this.isAdult,
     );
   }
 
@@ -92,6 +96,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     List<EpisodeDataModel> episodes = const [],
     DMedia? media,
     int? malId,
+    bool isAdult = false,
   }) async {
     // 1. Check Cache
     if (!force && state.episodes.isNotEmpty && state.animeId == animeId) {
@@ -106,6 +111,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       animeTitle: animeTitle,
       animeCover: animeCover ?? media?.cover,
       malId: malId,
+      isAdult: isAdult,
     );
     AppLogger.section('Fetching Episodes: $animeTitle');
 
@@ -158,42 +164,47 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
           ? await _fetchExtensionEpisodes(media)
           : await _fetchLegacyEpisodes(animeId);
 
-      // Multi-Source Fallback: If 0 episodes returned, check other sources
-      if (eps.isEmpty) {
-        final otherKeys = registry.keys.where((k) => k != currentKey).toList();
+      // Multi-Source Fallback: If 0 episodes returned, search active and fallback sources by title
+      if (eps.isEmpty &&
+          state.animeTitle != null &&
+          state.animeTitle!.isNotEmpty) {
+        final candidateKeys = [
+          if (currentKey != null) currentKey,
+          if (registry.has('justanime') && currentKey != 'justanime')
+            'justanime',
+          ...registry.keys.where((k) => k != currentKey && k != 'justanime'),
+        ];
 
-        for (final altKey in otherKeys) {
-          AppLogger.w(
-            'Active source returned 0 episodes. Trying fallback source: $altKey',
-          );
+        for (final altKey in candidateKeys) {
           final altProvider = registry.get(altKey);
           if (altProvider == null) continue;
 
           try {
-            final searchResults = await altProvider.getSearch(
-              state.animeTitle ?? '',
-              null,
-              1,
+            AppLogger.w(
+              'Resolving episodes by title on: $altKey for "${state.animeTitle}"',
             );
+            final searchResults = await altProvider
+                .getSearch(state.animeTitle!, null, 1)
+                .timeout(const Duration(seconds: 8));
             final altMatch = searchResults.results.firstOrNull;
             final matchId = altMatch?.id;
             if (matchId != null && matchId.isNotEmpty) {
-              final altResult = await altProvider.getEpisodes(matchId);
+              final altResult = await altProvider
+                  .getEpisodes(matchId)
+                  .timeout(const Duration(seconds: 15));
               final altEps = altResult.episodes ?? [];
               if (altEps.isNotEmpty) {
                 AppLogger.success(
-                  'Fallback source $altKey found ${altEps.length} episodes!',
+                  'Source $altKey found ${altEps.length} episodes!',
                 );
                 ref.read(selectedProviderKeyProvider.notifier).select(altKey);
-                showAppSnackBar(
-                  'Auto-Switched Source',
-                  'Switched to $altKey (${altEps.length} episodes found)',
-                  type: ContentType.help,
-                );
+                state = state.copyWith(animeId: matchId);
                 return altEps;
               }
             }
-          } catch (_) {}
+          } catch (e) {
+            AppLogger.d('Fallback $altKey failed: $e');
+          }
         }
       }
 
@@ -250,7 +261,12 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     }
 
     AppLogger.d('Fetching episodes via Legacy Provider: $provider');
-    return (await provider.getEpisodes(animeId)).episodes ?? [];
+    try {
+      return (await provider.getEpisodes(animeId)).episodes ?? [];
+    } catch (e) {
+      AppLogger.w('Direct legacy episode fetch failed: $e');
+      return [];
+    }
   }
 
   // --- Jikan Metadata Syncing ---

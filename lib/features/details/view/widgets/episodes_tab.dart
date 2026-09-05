@@ -234,6 +234,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                   animeCover: widget.mediaCover,
                   episodeCount: selectedNums.length,
                   scrollController: controller,
+                  isAdult: widget.fromHentaiHub,
                   onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -307,6 +308,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 url: state.animeIdForSource,
                 cover: widget.mediaCover,
               ),
+              isAdult: widget.fromHentaiHub,
             );
       });
     }
@@ -989,6 +991,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       context: context,
       episodes: episodes,
       currentEpisode: ep.number ?? 1,
+      fromHentaiHub: widget.fromHentaiHub,
     );
   }
 

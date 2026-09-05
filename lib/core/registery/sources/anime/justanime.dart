@@ -1,29 +1,26 @@
 import 'dart:convert';
 import 'package:ani_dash/core/network/http_client.dart';
-import 'package:html/parser.dart' as html;
 import 'package:ani_dash/core/models/anime/anime_model.dep.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/models/anime/page_model.dart';
 import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
-import 'package:ani_dash/core/registery/sources/anime/deps/kwik.dart';
-import 'package:ani_dash/core/utils/app_logger.dart';
 
 class JustAnimeProvider extends AnimeProvider {
   static const String _userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36';
 
   final Map<String, String> _sourceHeaders = {
-    'Cookie': '__ddg1=;__ddg2_=',
-    'Referer': 'https://justanime.pw/',
+    'Origin': 'https://justanime.to',
+    'Referer': 'https://justanime.to/',
     'User-Agent': _userAgent,
   };
 
   JustAnimeProvider()
     : super(
-        baseUrl: "https://justanime.pw",
-        apiUrl: "https://justanime.pw/api",
+        baseUrl: "https://justanime.to",
+        apiUrl: "https://core.justanime.to/api",
         providerName: "justanime",
       );
 
@@ -47,36 +44,33 @@ class JustAnimeProvider extends AnimeProvider {
 
   @override
   Future<SearchPage> getSearch(String keyword, String? type, int page) async {
-    final query = keyword.replaceAll("-", " ");
-    final url = Uri.parse("$apiUrl?m=search&q=$query");
-
-    final res = await UniversalHttpClient.instance.get(url, headers: headers);
+    final url = Uri.parse('$apiUrl/search').replace(
+      queryParameters: {'query': keyword.replaceAll('-', ' '), 'page': '$page'},
+    );
+    final res = await UniversalHttpClient.instance
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 20));
     final Map<String, dynamic> decoded = json.decode(res.body);
-
-    final List<dynamic>? results = decoded['data'];
-    final List<BaseAnimeModel> searchResults = [];
-
-    if (results != null) {
-      for (final result in results) {
-        searchResults.add(
-          BaseAnimeModel(
-            id: result['session'],
-            anilistId: null,
-            name: result['title'],
-            jname: null,
-            type: result['type'],
-            description: null,
-            poster: result['poster'],
-            banner: null,
-            genres: [],
-            releaseDate: result['year']?.toString(),
-            number: result['episodes'],
-          ),
-        );
-      }
-    }
-
-    return SearchPage(results: searchResults);
+    final results = (decoded['results'] as List<dynamic>? ?? const []);
+    return SearchPage(
+      results:
+          results.map((raw) {
+            final item = Map<String, dynamic>.from(raw as Map);
+            final title = Map<String, dynamic>.from(
+              item['title'] as Map? ?? {},
+            );
+            return BaseAnimeModel(
+              id: item['id']?.toString(),
+              anilistId: int.tryParse(item['id']?.toString() ?? ''),
+              name: title['english'] ?? title['romaji'] ?? 'Unknown',
+              jname: title['romaji'],
+              type: item['type'],
+              poster: item['cover'],
+              releaseDate: item['year']?.toString(),
+              number: item['episodes'],
+            );
+          }).toList(),
+    );
   }
 
   @override
@@ -85,107 +79,68 @@ class JustAnimeProvider extends AnimeProvider {
     String? anilistId,
     String? malId,
   }) async {
-    List<dynamic> list = [];
-    String actualId = animeId;
-    String url = "$apiUrl?m=release&id=$actualId&sort=episode_asc";
-
-    var bodyDecoded = <String, dynamic>{};
-    try {
-      var res = await UniversalHttpClient.instance.get(
-        Uri.parse(url),
-        headers: headers,
-      );
-      bodyDecoded = json.decode(res.body);
-    } catch (e) {
-      bodyDecoded = {};
-    }
-
-    if (bodyDecoded['data'] == null ||
-        (bodyDecoded['data'] is List && bodyDecoded['data'].isEmpty)) {
-      try {
-        final searchRes = await getSearch(
-          animeId.replaceAll('-', ' '),
-          null,
-          1,
-        );
-        if (searchRes.results.isNotEmpty) {
-          actualId = searchRes.results.first.id ?? actualId;
-          url = "$apiUrl?m=release&id=$actualId&sort=episode_asc";
-          var res = await UniversalHttpClient.instance.get(
-            Uri.parse(url),
+    Future<Map<String, dynamic>> fetchPage(int page) async {
+      final response = await UniversalHttpClient.instance
+          .get(
+            Uri.parse('$apiUrl/anime/$animeId/episodes?page=$page'),
             headers: headers,
-          );
-          bodyDecoded = json.decode(res.body);
+            cacheConfig: CacheConfig.short,
+          )
+          .timeout(const Duration(seconds: 25));
+      return Map<String, dynamic>.from(json.decode(response.body) as Map);
+    }
+
+    final first = await fetchPage(1);
+    final pages = <Map<String, dynamic>>[first];
+    final firstEps = first['episodes'] as List<dynamic>? ?? const [];
+
+    int? totalPages = (first['totalPages'] as num?)?.toInt();
+    if (totalPages == null && first['pageInfo'] is Map) {
+      totalPages = (first['pageInfo']['lastPage'] as num?)?.toInt();
+    }
+
+    if (totalPages != null && totalPages > 1) {
+      pages.addAll(
+        await Future.wait([
+          for (var page = 2; page <= totalPages; page++) fetchPage(page),
+        ]),
+      );
+    } else if (firstEps.length >= 100) {
+      // Loop until less than 100 items or empty (up to max 25 pages)
+      int currentPage = 2;
+      while (currentPage <= 25) {
+        try {
+          final next = await fetchPage(currentPage);
+          final nextEps = next['episodes'] as List<dynamic>? ?? const [];
+          if (nextEps.isEmpty) break;
+          pages.add(next);
+          if (nextEps.length < 100) break;
+          currentPage++;
+        } catch (_) {
+          break;
         }
-      } catch (e) {
-        bodyDecoded = {};
       }
     }
 
-    if (bodyDecoded['data'] != null) {
-      list.add(bodyDecoded['data']);
-    }
-
-    final int totalPages = bodyDecoded['last_page'] ?? 1;
-
-    for (int i = 1; i < totalPages; i++) {
-      final nextRes = await UniversalHttpClient.instance.get(
-        Uri.parse("$url&page=${i + 1}"),
-        headers: headers,
-        cacheConfig:
-            (i == (totalPages - 1) || (i == 0 && i == (totalPages - 1)))
-                ? CacheConfig.short
-                : CacheConfig.year,
-      );
-      final nextBody = json.decode(nextRes.body);
-      if (nextBody['data'] != null) {
-        list.add(nextBody['data']);
-      }
-    }
-
-    final flatList = list.expand((item) => item as List<dynamic>).toList();
-    List<EpisodeDataModel> episodes = [];
-
-    for (int i = 0; i < flatList.length; i++) {
-      final item = flatList[i];
-      final String episodeSession = item['session'];
-      final String combinedId = "$animeId+$episodeSession";
-
-      final num? epNumFromApi = item['episode'];
-      final int calculatedEpNum =
-          (epNumFromApi != null) ? epNumFromApi.toInt() : (i + 1);
-
-      String? title = item['title'];
-      if (title != null && title.trim().isEmpty) {
-        title = null;
-      }
-
-      final String? thumbnail = item['snapshot'];
-      final bool isFiller = (item['filler'] ?? 0) != 0;
-
-      episodes.add(
-        EpisodeDataModel(
-          id: combinedId,
-          number: calculatedEpNum,
-          title: title ?? 'Episode $calculatedEpNum',
-          thumbnail: thumbnail,
-          isFiller: isFiller,
-        ),
-      );
-    }
-
-    episodes.sort((a, b) => (a.number ?? 0).compareTo(b.number ?? 0));
-
-    for (int i = 0; i < episodes.length; i++) {
-      episodes[i] = episodes[i].copyWith(
-        number: i + 1,
-        title:
-            episodes[i].title!.startsWith('Episode ')
-                ? 'Episode ${i + 1}'
-                : episodes[i].title,
-      );
-    }
-
+    final episodes =
+        pages
+            .expand((page) => page['episodes'] as List<dynamic>? ?? const [])
+            .map((raw) {
+              final item = Map<String, dynamic>.from(raw as Map);
+              final number = (item['number'] as num?)?.toInt();
+              return EpisodeDataModel(
+                id: number?.toString(),
+                number: number,
+                title: item['title'] ?? 'Episode ${number ?? ''}',
+                thumbnail: item['image'],
+                description: item['description'],
+                date: item['airDate'],
+                isFiller: item['filler'] == true,
+              );
+            })
+            .where((episode) => episode.number != null)
+            .toList()
+          ..sort((a, b) => a.number!.compareTo(b.number!));
     return BaseEpisodeModel(episodes: episodes, totalEpisodes: episodes.length);
   }
 
@@ -196,77 +151,125 @@ class JustAnimeProvider extends AnimeProvider {
     String? serverName,
     String? category,
   ) async {
-    final parts = episodeId.split("+");
-    if (parts.length < 2) throw Exception("Invalid ID format");
-    final String animeSession = parts[0];
-    final String epSession = parts[1];
+    final rawEp = episodeId.split('+').last.replaceAll(RegExp(r'[^0-9]'), '');
+    final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId);
+    if (episode == null) throw Exception('Invalid episode ID: $episodeId');
+    final audio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
 
-    final episodeUrl = "$baseUrl/play/$animeSession/$epSession";
-    final bool isRequestingDub = category?.toLowerCase() == 'dub';
-
-    final data = await UniversalHttpClient.instance.get(
-      Uri.parse(episodeUrl),
-      headers: headers,
-      // Playback pages contain short-lived Kwik tokens. Caching them causes an
-      // endless spinner when a user resumes an episode later.
-      cacheConfig: CacheConfig.none,
-    );
-    final document = html.parse(data.body);
-
-    final streams = document.querySelectorAll('div#resolutionMenu > button');
-
-    List<Source> sources = [];
-    List<Future<void>> extractTasks = [];
-
-    for (final e in streams) {
-      final link = e.attributes['data-src'] ?? '';
-      if (link.isEmpty) continue;
-
-      // Rely on the data-audio attribute for sub/dub filtering
-      final audioAttr = e.attributes['data-audio'] ?? '';
-      final bool isStreamDub = audioAttr == 'eng';
-
-      if (isStreamDub != isRequestingDub) continue;
-
-      final resAttr = e.attributes['data-resolution'];
-      final String quality = resAttr != null ? "${resAttr}p" : e.text.trim();
-
-      extractTasks.add(() async {
-        try {
-          final extracted = await Kwik()
-              .extract(link, server: 'Kwik', quality: quality)
-              .timeout(const Duration(seconds: 20));
-
-          if (extracted.isNotEmpty) {
-            sources.addAll(extracted.cast<Source>());
-          }
-        } catch (err) {
-          AppLogger.e(
-            "[justanime] Failed to extract Kwik stream for $quality: $err",
-          );
+    Future<Map<String, dynamic>?> request(String path) async {
+      try {
+        final response = await UniversalHttpClient.instance
+            .get(Uri.parse('$apiUrl$path'), headers: headers)
+            .timeout(const Duration(seconds: 25));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return null;
         }
-      }());
+        final decoded = json.decode(response.body);
+        if (decoded is! Map || decoded['error'] != null) return null;
+        return Map<String, dynamic>.from(decoded);
+      } catch (_) {
+        return null;
+      }
     }
 
-    await Future.wait(extractTasks);
+    // Default to AniNeko (HLS .m3u8 with subtitles, fast start) and fallback to AnimeGG (direct MP4)
+    final preferAnimeGG = serverName?.toLowerCase().contains('animegg') == true;
+    final endpoints =
+        preferAnimeGG
+            ? [
+              '/watch/$animeId/episode/$episode/animegg',
+              '/watch/$animeId/episode/$episode/anineko/$audio',
+            ]
+            : [
+              '/watch/$animeId/episode/$episode/anineko/$audio',
+              '/watch/$animeId/episode/$episode/animegg',
+            ];
 
-    return BaseSourcesModel(
-      sources: sources,
-      tracks: [],
-      intro: Intro(start: 0, end: 0),
-      outro: Intro(start: 0, end: 0),
-      headers: {'Referer': 'https://kwik.cx/', 'User-Agent': _userAgent},
-    );
+    for (final endpoint in endpoints) {
+      final payload = await request(endpoint);
+      if (payload == null) continue;
+      final raw =
+          endpoint.contains('animegg')
+              ? payload[audio] as Map<String, dynamic>?
+              : payload;
+      if (raw == null) continue;
+
+      final commonHeaders = Map<String, String>.from(
+        (raw['headers'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ) ??
+            (payload['headers'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ) ??
+            const {},
+      );
+
+      final sources =
+          (raw['sources'] as List<dynamic>? ?? const [])
+              .map((value) {
+                final item = Map<String, dynamic>.from(value as Map);
+                final sourceHeaders = Map<String, String>.from(
+                  (item['headers'] as Map?)?.map(
+                        (key, value) =>
+                            MapEntry(key.toString(), value.toString()),
+                      ) ??
+                      commonHeaders,
+                );
+                final urlStr = item['url']?.toString() ?? '';
+                return Source(
+                  url: urlStr,
+                  quality: item['quality']?.toString() ?? 'Auto',
+                  isM3U8:
+                      item['isM3U8'] == true || urlStr.contains('.m3u8'),
+                  isDub: audio == 'dub',
+                  type: endpoint.contains('animegg') ? 'AnimeGG' : 'AniNeko',
+                  headers: sourceHeaders,
+                );
+              })
+              .where((source) => source.url?.isNotEmpty == true)
+              .toList();
+
+      if (sources.isEmpty) continue;
+
+      final tracks =
+          (raw['subtitles'] as List<dynamic>? ??
+                  raw['tracks'] as List<dynamic>? ??
+                  payload['subtitles'] as List<dynamic>? ??
+                  const [])
+              .map((value) {
+                final item = Map<String, dynamic>.from(value as Map);
+                return Subtitle(
+                  url: (item['url'] ?? item['file'])?.toString(),
+                  lang:
+                      (item['lang'] ?? item['label'])?.toString() ??
+                      'English',
+                  isSub: true,
+                );
+              })
+              .where((track) => track.url?.isNotEmpty == true)
+              .toList();
+
+      return BaseSourcesModel(
+        sources: sources,
+        tracks: tracks,
+        headers: commonHeaders,
+        intro: Intro(start: 0, end: 0),
+        outro: Intro(start: 0, end: 0),
+      );
+    }
+    throw Exception('No playable JustAnime source found for episode $episode');
   }
 
   @override
   Future<BaseServerModel> getSupportedServers({dynamic metadata}) async {
     final subServers = [
-      ServerData(name: "justanime", id: "justanime", isDub: false),
+      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: false),
+      ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: false),
     ];
 
     final dubServers = [
-      ServerData(name: "justanime", id: "justanime", isDub: true),
+      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: true),
+      ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: true),
     ];
 
     return BaseServerModel(sub: subServers, dub: dubServers);

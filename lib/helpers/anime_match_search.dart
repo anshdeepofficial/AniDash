@@ -22,6 +22,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
   int? startAt,
   bool showSnackbar = false,
   bool directAutoMatch = false,
+  bool fromHentaiHub = false,
 }) async {
   beforeSearchCallback?.call();
 
@@ -43,6 +44,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
           animeCover: restoredAnime.poster ?? '',
           episodes: const [],
           currentEpisode: startAt ?? 1,
+          fromHentaiHub: fromHentaiHub || animeMedia.isAdult,
         );
       }
       return restoredAnime;
@@ -70,6 +72,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
               '',
           episodes: const [],
           currentEpisode: startAt ?? 1,
+          fromHentaiHub: fromHentaiHub || animeMedia.isAdult,
         );
       }
       return match;
@@ -78,8 +81,9 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
     // Show search dialog
     final animeProvider = ref.read(selectedAnimeProvider);
     final useExtensions = ref.read(experimentalProvider).useExtensions;
-    if (animeProvider == null && !useExtensions)
+    if (animeProvider == null && !useExtensions) {
       throw Exception('Anime provider is missing.');
+    }
     if (!context.mounted) return null;
 
     return await showDialog<BaseAnimeModel>(

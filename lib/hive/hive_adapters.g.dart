@@ -181,13 +181,14 @@ class AnimeWatchProgressEntryAdapter
       lastUpdated: fields[6] as DateTime?,
       currentEpisode: fields[7] == null ? 1 : (fields[7] as num).toInt(),
       status: fields[8] == null ? 'watching' : fields[8] as String,
+      isAdult: fields[9] == null ? false : fields[9] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, AnimeWatchProgressEntry obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.animeId)
       ..writeByte(1)
@@ -205,7 +206,9 @@ class AnimeWatchProgressEntryAdapter
       ..writeByte(7)
       ..write(obj.currentEpisode)
       ..writeByte(8)
-      ..write(obj.status);
+      ..write(obj.status)
+      ..writeByte(9)
+      ..write(obj.isAdult);
   }
 
   @override
@@ -432,13 +435,14 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       error: fields[17] as dynamic,
       subtitles: (fields[13] as List?)?.cast<dynamic>(),
       totalSegments: (fields[14] as num?)?.toInt(),
+      isAdult: fields[18] == null ? false : fields[18] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadItem obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -474,7 +478,9 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       ..writeByte(16)
       ..write(obj.eta)
       ..writeByte(17)
-      ..write(obj.error);
+      ..write(obj.error)
+      ..writeByte(18)
+      ..write(obj.isAdult);
   }
 
   @override

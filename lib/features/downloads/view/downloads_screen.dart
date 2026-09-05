@@ -12,18 +12,22 @@ import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/storage_provider.dart';
 
 class DownloadsScreen extends ConsumerWidget {
-  const DownloadsScreen({super.key});
+  final bool isAdult;
+
+  const DownloadsScreen({super.key, this.isAdult = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final downloads = ref.watch(downloadsProvider.select((d) => d.downloads));
+    final allDownloads = ref.watch(downloadsProvider.select((d) => d.downloads));
+    final downloads =
+        allDownloads.where((d) => isAdult ? d.isAdult : !d.isAdult).toList();
     final theme = Theme.of(context);
 
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Downloads'),
+          title: Text(isAdult ? '18+ Downloads' : 'Downloads'),
           bottom: TabBar(
             tabs: const [
               Tab(text: 'All'),

@@ -51,6 +51,7 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
     required int pos,
     required int dur,
     bool takeScreenshot = false,
+    bool isAdult = false,
   }) async {
     if (_repo == null || dur <= 0 || pos <= 0 || pos == _lastSavedPos) {
       return epThumb;
@@ -64,14 +65,18 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         if (thumb != null) currentThumb = thumb;
       }
 
-      final entry = _repo!.getProgress(mediaId) ??
+      var entry = _repo!.getProgress(mediaId) ??
           AnimeWatchProgressEntry(
             animeId: mediaId,
             animeTitle: animeName,
             animeFormat: animeFormat,
             animeCover: animeCover,
             totalEpisodes: totalEps,
+            isAdult: isAdult,
           );
+      if (isAdult && !entry.isAdult) {
+        entry = entry.copyWith(isAdult: true);
+      }
 
       final progress = EpisodeProgress(
         episodeNumber: epNum,

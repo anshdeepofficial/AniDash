@@ -169,6 +169,7 @@ final routerConfig = GoRouter(
             episode:
                 int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
             episodes: state.extra as List<EpisodeDataModel>,
+            fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
           ),
     ),
     AnimatedGoRoute(

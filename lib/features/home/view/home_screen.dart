@@ -396,11 +396,15 @@ final sortedWatchProgressProvider =
     Provider<AsyncValue<List<AnimeWatchProgressEntry>>>((ref) {
       return ref.watch(watchProgressStreamProvider).whenData((list) {
         if (list.isEmpty) return [];
-        return list.whereType<AnimeWatchProgressEntry>().toList()..sort(
-          (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-            a.lastUpdated ?? DateTime(0),
-          ),
-        );
+        return list
+            .whereType<AnimeWatchProgressEntry>()
+            .where((e) => !e.isAdult)
+            .toList()
+          ..sort(
+            (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+              a.lastUpdated ?? DateTime(0),
+            ),
+          );
       });
     });
 

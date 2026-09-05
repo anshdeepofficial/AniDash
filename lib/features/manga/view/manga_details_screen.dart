@@ -45,7 +45,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
 
       if (mounted) {
         setState(() {
-          _detailedManga = details ?? widget.manga;
+          _detailedManga = details;
           _isLoading = false;
         });
       }
