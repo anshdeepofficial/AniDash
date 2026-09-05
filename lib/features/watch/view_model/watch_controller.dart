@@ -17,6 +17,7 @@ import 'package:ani_dash/features/watch/view_model/watch_progress_notifier.dart'
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/next_episode_prompt_provider.dart';
 
 part 'watch_controller.g.dart';
 
@@ -38,6 +39,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _trackingTriggered = false;
   bool _hasAutoAdvanced = false;
   bool _fromHentaiHub = false;
+  bool _prefetchTriggered = false;
+  bool _nextPromptTriggered = false;
 
   @override
   void build() {
@@ -182,6 +185,26 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _checkAutoSkip(next.position);
       if (_dur > 30 && _pos >= _dur - 1) triggerAutoAdvance();
 
+      // Flow optimizations: 85% pre-fetch & 95% next episode prompt
+      if (_dur > 60) {
+        final progressRatio = _pos / _dur;
+
+        // 85% Trigger: Pre-fetch next episode stream in background
+        if (!_prefetchTriggered && progressRatio >= 0.85) {
+          _prefetchTriggered = true;
+          ref.read(episodeDataProvider.notifier).prefetchNextEpisode();
+        }
+
+        // 95% Trigger: Show floating Next Episode prompt
+        if (!_nextPromptTriggered && progressRatio >= 0.95) {
+          _nextPromptTriggered = true;
+          final settings = ref.read(playerSettingsProvider);
+          if (settings.showNextEpisodePrompt) {
+            ref.read(nextEpisodePromptProvider.notifier).show();
+          }
+        }
+      }
+
       final syncPercentage = ref.read(syncSettingsProvider).syncPercentage;
       if (!_trackingTriggered &&
           _dur > 0 &&
@@ -211,7 +234,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         _dur = 0;
         _trackingTriggered = false;
         _hasAutoAdvanced = false;
+        _prefetchTriggered = false;
+        _nextPromptTriggered = false;
         _isPlayerReady = false;
+        ref.read(nextEpisodePromptProvider.notifier).dismiss();
         ref.read(watchProgressProvider.notifier).resetLastSavedPosition();
 
         try {

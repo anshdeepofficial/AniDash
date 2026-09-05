@@ -274,7 +274,7 @@ Future<DownloadItem> _processM3U8(
 
   final batchSize = task.settings.parallelDownloads > 0
       ? task.settings.parallelDownloads
-      : 3;
+      : 6;
   int completed = 0;
   int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();

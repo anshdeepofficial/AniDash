@@ -11,7 +11,6 @@ import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/orientation_lock_provider.dart';
-import 'package:ani_dash/features/watch/view/widgets/player/sheets/cast_bottom_sheet.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -249,13 +248,6 @@ class TopControls extends ConsumerWidget {
                         },
                       );
                     },
-                  ),
-
-                  _TopIconButton(
-                    icon: Icons.cast_rounded,
-                    onTap: _wrap(() {
-                      CastBottomSheet.show(context);
-                    }),
                   ),
 
                   _TopIconButton(

@@ -60,7 +60,15 @@ class SecuritySettingsScreen extends ConsumerWidget {
                   }
                 },
               ),
-              if (security.appLockEnabled)
+              if (security.appLockEnabled) ...[
+                ToggleableSettingsItem(
+                  icon: Icon(Icons.fingerprint_rounded, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Biometric Unlock',
+                  description: 'Unlock AniDash using Fingerprint or Face Lock',
+                  value: security.appLockBiometrics,
+                  onChanged: (val) => notifier.toggleAppLockBiometrics(val),
+                ),
                 NormalSettingsItem(
                   icon: Icon(Icons.password_rounded, color: colorScheme.primary),
                   accent: colorScheme.primary,
@@ -83,6 +91,7 @@ class SecuritySettingsScreen extends ConsumerWidget {
                     }
                   },
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -118,7 +127,15 @@ class SecuritySettingsScreen extends ConsumerWidget {
                   }
                 },
               ),
-              if (security.hentaiLockEnabled)
+              if (security.hentaiLockEnabled) ...[
+                ToggleableSettingsItem(
+                  icon: Icon(Icons.fingerprint_rounded, color: Colors.redAccent),
+                  accent: Colors.redAccent,
+                  title: 'Biometric Unlock',
+                  description: 'Unlock Hentai Hub using Fingerprint or Face Lock',
+                  value: security.hentaiLockBiometrics,
+                  onChanged: (val) => notifier.toggleHentaiLockBiometrics(val),
+                ),
                 NormalSettingsItem(
                   icon: Icon(Icons.key_rounded, color: Colors.redAccent),
                   accent: Colors.redAccent,
@@ -141,6 +158,7 @@ class SecuritySettingsScreen extends ConsumerWidget {
                     }
                   },
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 10),

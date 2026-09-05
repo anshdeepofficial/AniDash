@@ -58,6 +58,13 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    ref.read(securityProvider.notifier).lockHentai();
+    super.dispose();
+  }
+
   Future<void> _showAdultContentWarning() async {
     const preferenceKey = 'adult_hub_warning_accepted';
     if (!mounted || (sharedPrefs.getBool(preferenceKey) ?? false)) return;
@@ -153,12 +160,6 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<List<Source>> _installedAdultSources() async {
@@ -543,6 +544,10 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
         body: PinLockDialog(
           title: 'Adult Hub Locked',
           subtitle: 'Enter your 4-digit PIN to access this section',
+          enableBiometrics: security.hentaiLockBiometrics,
+          onBiometricSuccess: () {
+            ref.read(securityProvider.notifier).unlockHentai();
+          },
           onVerify: (pin) {
             return ref.read(securityProvider.notifier).verifyHentaiPin(pin);
           },

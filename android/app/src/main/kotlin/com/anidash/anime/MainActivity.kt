@@ -1,27 +1,61 @@
-package com.anidash.anime
-
+import android.content.Context
 import android.content.pm.ActivityInfo
+import android.hardware.display.DisplayManager
+import android.view.Display
 import android.view.KeyEvent
 import android.view.OrientationEventListener
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private var landscapeListener: OrientationEventListener? = null
     private var volumeChannel: MethodChannel? = null
     private var interceptVolumeKeys = false
+    private var isScreenshotPrivacyEnabled = false
+    private var displayListener: DisplayManager.DisplayListener? = null
+
+    private fun updateSecureFlag() {
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+        val isCasting = displayManager?.displays?.any { it.displayId != Display.DEFAULT_DISPLAY } == true
+
+        runOnUiThread {
+            if (isScreenshotPrivacyEnabled && !isCasting) {
+                window.setFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                    android.view.WindowManager.LayoutParams.FLAG_SECURE
+                )
+            } else {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+        }
+    }
+
+    private var lastOrientationChangeTime: Long = 0L
 
     private fun enableLandscapeRotation() {
         landscapeListener?.disable()
         landscapeListener = object : OrientationEventListener(this) {
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
+                val now = System.currentTimeMillis()
+                if (now - lastOrientationChangeTime < 500) return
+
                 when (orientation) {
-                    in 45..135 -> requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                    in 225..315 -> requestedOrientation =
-                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    // Deliberate 55%+ tilt towards 90 deg (Reverse Landscape)
+                    in 65..115 -> {
+                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
+                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                            lastOrientationChangeTime = now
+                        }
+                    }
+                    // Deliberate 55%+ tilt towards 270 deg (Regular Landscape)
+                    in 245..295 -> {
+                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            lastOrientationChangeTime = now
+                        }
+                    }
                 }
             }
         }.also { if (it.canDetectOrientation()) it.enable() }
@@ -42,6 +76,11 @@ class MainActivity : FlutterActivity() {
                         enableLandscapeRotation()
                         result.success(null)
                     }
+                    "lockCurrent" -> {
+                        disableLandscapeRotation()
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                        result.success(null)
+                    }
                     "toggleLandscape" -> {
                         requestedOrientation =
                             if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
@@ -50,10 +89,12 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "landscapeLeft" -> {
+                        disableLandscapeRotation()
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         result.success(null)
                     }
                     "landscapeRight" -> {
+                        disableLandscapeRotation()
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
                         result.success(null)
                     }
@@ -83,19 +124,22 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+        if (displayListener == null && displayManager != null) {
+            displayListener = object : DisplayManager.DisplayListener {
+                override fun onDisplayAdded(displayId: Int) { updateSecureFlag() }
+                override fun onDisplayRemoved(displayId: Int) { updateSecureFlag() }
+                override fun onDisplayChanged(displayId: Int) { updateSecureFlag() }
+            }
+            displayManager.registerDisplayListener(displayListener, null)
+        }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/security")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setSecureFlag" -> {
-                        val enable = call.argument<Boolean>("enable") ?: false
-                        if (enable) {
-                            window.setFlags(
-                                android.view.WindowManager.LayoutParams.FLAG_SECURE,
-                                android.view.WindowManager.LayoutParams.FLAG_SECURE
-                            )
-                        } else {
-                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-                        }
+                        isScreenshotPrivacyEnabled = call.argument<Boolean>("enable") ?: false
+                        updateSecureFlag()
                         result.success(null)
                     }
                     else -> result.notImplemented()

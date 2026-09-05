@@ -27,6 +27,7 @@ import 'package:ani_dash/features/watch/view_model/player/player_ui_controller.d
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/next_episode_prompt_overlay.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -588,6 +589,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 bottom: uiState.isVisible ? 90 : 20,
                 child: const SubtitleOverlay(),
               ),
+
+              // Floating Next Episode Recommendation Prompt (at 95% progress)
+              const NextEpisodePromptOverlay(),
             ],
           ),
         ),

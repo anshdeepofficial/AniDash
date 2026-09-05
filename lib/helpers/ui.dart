@@ -163,6 +163,11 @@ class UIHelper {
   /// Lock to current landscape orientation
   static Future<void> lockCurrentLandscape() async {
     _lockMode = OrientationLockMode.lockedLandscape;
+    if (Platform.isAndroid) {
+      try {
+        await _orientationChannel.invokeMethod('lockCurrent');
+      } catch (_) {}
+    }
     await SystemChrome.setPreferredOrientations([
       _currentLandscape,
     ]);

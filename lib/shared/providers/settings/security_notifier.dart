@@ -167,6 +167,16 @@ class SecurityNotifier extends Notifier<SecurityState> {
     _save();
   }
 
+  void toggleAppLockBiometrics(bool val) {
+    state = state.copyWith(appLockBiometrics: val);
+    _save();
+  }
+
+  void toggleHentaiLockBiometrics(bool val) {
+    state = state.copyWith(hentaiLockBiometrics: val);
+    _save();
+  }
+
   void toggleRecentAppsPrivacy(bool val) {
     state = state.copyWith(recentAppsPrivacy: val);
     _save();

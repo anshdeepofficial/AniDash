@@ -9,6 +9,8 @@ class PlayerModel {
   final int autoHideDuration;
   final int lockAutoHideDuration;
   final bool showNextPrevButtons;
+  final bool prefetchNextEpisode;
+  final bool showNextEpisodePrompt;
   final double bufferSize;
   final Map<String, String> mpvSettings;
 
@@ -22,6 +24,8 @@ class PlayerModel {
     this.autoHideDuration = 5,
     this.lockAutoHideDuration = 3,
     this.showNextPrevButtons = true,
+    this.prefetchNextEpisode = true,
+    this.showNextEpisodePrompt = true,
     this.mpvSettings = const {},
   });
 
@@ -35,6 +39,8 @@ class PlayerModel {
     int? lockAutoHideDuration,
     double? bufferSize,
     bool? showNextPrevButtons,
+    bool? prefetchNextEpisode,
+    bool? showNextEpisodePrompt,
     Map<String, String>? mpvSettings,
   }) {
     return PlayerModel(
@@ -47,6 +53,9 @@ class PlayerModel {
       lockAutoHideDuration: lockAutoHideDuration ?? this.lockAutoHideDuration,
       bufferSize: bufferSize ?? this.bufferSize,
       showNextPrevButtons: showNextPrevButtons ?? this.showNextPrevButtons,
+      prefetchNextEpisode: prefetchNextEpisode ?? this.prefetchNextEpisode,
+      showNextEpisodePrompt:
+          showNextEpisodePrompt ?? this.showNextEpisodePrompt,
       mpvSettings: mpvSettings ?? this.mpvSettings,
     );
   }
@@ -62,6 +71,8 @@ class PlayerModel {
       'autoHideDuration': autoHideDuration,
       'lockAutoHideDuration': lockAutoHideDuration,
       'showNextPrevButtons': showNextPrevButtons,
+      'prefetchNextEpisode': prefetchNextEpisode,
+      'showNextEpisodePrompt': showNextEpisodePrompt,
       'mpvSettings': mpvSettings,
     };
   }
@@ -77,6 +88,8 @@ class PlayerModel {
       lockAutoHideDuration: map['lockAutoHideDuration'] ?? 3,
       bufferSize: map['bufferSize'] ?? 32,
       showNextPrevButtons: map['showNextPrevButtons'] ?? true,
+      prefetchNextEpisode: map['prefetchNextEpisode'] ?? true,
+      showNextEpisodePrompt: map['showNextEpisodePrompt'] ?? true,
       mpvSettings: Map<String, String>.from(map['mpvSettings'] ?? {}),
     );
   }

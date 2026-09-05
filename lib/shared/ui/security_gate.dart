@@ -15,6 +15,7 @@ class SecurityGate extends ConsumerStatefulWidget {
 class _SecurityGateState extends ConsumerState<SecurityGate>
     with WidgetsBindingObserver {
   bool _isBackgrounded = false;
+  DateTime? _pausedAt;
 
   @override
   void initState() {
@@ -31,15 +32,26 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final security = ref.read(securityProvider);
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      if (security.recentAppsPrivacy || security.appLockEnabled) {
+
+    // CRITICAL: Never lock or blur on 'inactive' state!
+    // 'inactive' occurs transiently when taking a screenshot, pulling the
+    // notification tray, or adjusting volume. Only 'paused' represents leaving the app.
+    if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
+      if (security.recentAppsPrivacy) {
         setState(() => _isBackgrounded = true);
-      }
-      if (security.appLockEnabled) {
-        ref.read(securityProvider.notifier).lockApp();
       }
     } else if (state == AppLifecycleState.resumed) {
       setState(() => _isBackgrounded = false);
+
+      // If app was genuinely backgrounded/minimized and app lock is enabled, re-lock
+      if (security.appLockEnabled && _pausedAt != null) {
+        final elapsed = DateTime.now().difference(_pausedAt!);
+        if (elapsed.inMilliseconds > 1500) {
+          ref.read(securityProvider.notifier).lockApp();
+        }
+      }
+      _pausedAt = null;
     }
   }
 
@@ -93,6 +105,10 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
               child: PinLockDialog(
                 title: 'AniDash Locked',
                 subtitle: 'Enter your 4-digit PIN to unlock',
+                enableBiometrics: security.appLockBiometrics,
+                onBiometricSuccess: () {
+                  ref.read(securityProvider.notifier).unlockApp();
+                },
                 onVerify: (pin) {
                   return ref.read(securityProvider.notifier).verifyAppPin(pin);
                 },

@@ -158,6 +158,45 @@ class EpisodeData extends _$EpisodeData {
     await loadEpisode(ep: target, play: true, startAt: startAt);
   }
 
+  int? _prefetchedEpNum;
+  BaseSourcesModel? _prefetchedSourceData;
+  bool _isPrefetching = false;
+
+  Future<void> prefetchNextEpisode() async {
+    final currentEp = state.selectedEpisode;
+    if (currentEp == null || _isPrefetching) return;
+    final nextEpNum = currentEp + 1;
+    if (!_isValidEp(nextEpNum)) return;
+    if (_prefetchedEpNum == nextEpNum && _prefetchedSourceData != null) return;
+
+    final settings = ref.read(playerSettingsProvider);
+    if (!settings.prefetchNextEpisode) return;
+
+    _isPrefetching = true;
+    try {
+      AppLogger.i('⚡ Background pre-fetching stream for Episode $nextEpNum');
+      final epModel = _epList.getEpisode(nextEpNum);
+      if (epModel == null) return;
+
+      final data = await _fetchSourceData(
+        epModel,
+        server: state.selectedServer,
+      ).timeout(const Duration(seconds: 15));
+
+      if (data != null && data.sources.isNotEmpty) {
+        _prefetchedEpNum = nextEpNum;
+        _prefetchedSourceData = data;
+        AppLogger.success(
+          '⚡ Successfully pre-fetched Episode $nextEpNum stream ready for instant play!',
+        );
+      }
+    } catch (e) {
+      AppLogger.w('Background prefetch failed: $e');
+    } finally {
+      _isPrefetching = false;
+    }
+  }
+
   Future<void> changeServer(ServerData server) async {
     AppLogger.infoPair('Changing Server', server.name ?? server.id);
     state = state.copyWith(selectedServer: server);
@@ -642,10 +681,20 @@ class EpisodeData extends _$EpisodeData {
     try {
       final epModel = _epList.getEpisode(epNum);
       if (epModel == null) throw StateError('Episode $epNum was not found');
-      final data = await _fetchSourceData(
-        epModel,
-        server: state.selectedServer,
-      ).timeout(const Duration(seconds: 20));
+
+      BaseSourcesModel? data;
+      if (epNum == _prefetchedEpNum && _prefetchedSourceData != null) {
+        AppLogger.success('⚡ Using pre-fetched stream data for Episode $epNum');
+        data = _prefetchedSourceData;
+        _prefetchedEpNum = null;
+        _prefetchedSourceData = null;
+      } else {
+        data = await _fetchSourceData(
+          epModel,
+          server: state.selectedServer,
+        ).timeout(const Duration(seconds: 20));
+      }
+
       if (data == null || data.sources.isEmpty) {
         throw StateError('No playable sources found');
       }

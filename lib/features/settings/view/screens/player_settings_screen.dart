@@ -94,6 +94,34 @@ class PlayerSettingsScreen extends ConsumerWidget {
               ],
             ),
             SettingsSection(
+              title: 'Playback & Flow',
+              titleColor: colorScheme.primary,
+              children: [
+                ToggleableSettingsItem(
+                  icon: Icon(Iconsax.flash_1, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Pre-load Next Episode at 85%',
+                  description:
+                      'Pre-fetches stream servers and URLs in memory for instant switching with zero lag',
+                  value: playerSettings.prefetchNextEpisode,
+                  onChanged: (value) => playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(prefetchNextEpisode: value),
+                  ),
+                ),
+                ToggleableSettingsItem(
+                  icon: Icon(Iconsax.play_add, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Next Episode Prompt at 95%',
+                  description:
+                      'Show floating Netflix-style next episode card during outro/credits',
+                  value: playerSettings.showNextEpisodePrompt,
+                  onChanged: (value) => playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(showNextEpisodePrompt: value),
+                  ),
+                ),
+              ],
+            ),
+            SettingsSection(
               title: 'Subtitle',
               titleColor: colorScheme.primary,
               children: [

@@ -92,6 +92,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     // Apply optimized fast-seeking and stream cache defaults
     final fastProperties = <String, String>{
       'cache': 'yes',
+      'cache-pause': 'no',
+      'cache-pause-wait': '1',
+      'demuxer-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
       'demuxer-max-bytes': '${(bufferSize.toInt() * 1024 * 1024).clamp(32 * 1024 * 1024, 128 * 1024 * 1024)}',
       'demuxer-readahead-secs': '25',
       'hr-seek': 'default',
