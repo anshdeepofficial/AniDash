@@ -58,9 +58,10 @@ class EpisodeListItem extends StatelessWidget {
                       isSelected
                           ? Icons.check_box_rounded
                           : Icons.check_box_outline_blank_rounded,
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.hintColor,
+                      color:
+                          isSelected
+                              ? theme.colorScheme.primary
+                              : theme.hintColor,
                     ),
                   ),
                 SizedBox(
@@ -88,7 +89,7 @@ class EpisodeListItem extends StatelessWidget {
                   Text(
                     'FILLER',
                     style: TextStyle(
-                      color: Colors.orange.shade700,
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w500,
                       fontSize: 12,
                     ),
@@ -99,24 +100,25 @@ class EpisodeListItem extends StatelessWidget {
                 ],
               ],
             ),
-            trailing: isSelectionMode
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (onDownload != null)
+            trailing:
+                isSelectionMode
+                    ? null
+                    : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (onDownload != null)
+                          IconButton(
+                            icon: const Icon(Icons.download_rounded),
+                            tooltip: 'Download',
+                            onPressed: onDownload,
+                          ),
                         IconButton(
-                          icon: const Icon(Icons.download_rounded),
-                          tooltip: 'Download',
-                          onPressed: onDownload,
+                          icon: const Icon(Icons.more_vert),
+                          tooltip: 'More options',
+                          onPressed: onMoreOptions,
                         ),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        tooltip: 'More options',
-                        onPressed: onMoreOptions,
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
             onTap: onTap,
             onLongPress: onLongPress,
           ),
@@ -128,9 +130,10 @@ class EpisodeListItem extends StatelessWidget {
                 backgroundColor: theme.colorScheme.primaryContainer.withValues(
                   alpha: 0.2,
                 ),
-                color: isWatched
-                    ? theme.colorScheme.tertiaryContainer
-                    : theme.colorScheme.primaryContainer,
+                color:
+                    isWatched
+                        ? theme.colorScheme.tertiaryContainer
+                        : theme.colorScheme.primaryContainer,
                 minHeight: isWatched ? 3 : 2,
               ),
             ),
@@ -153,15 +156,15 @@ class EpisodeListItem extends StatelessWidget {
           if (thumbnail != null)
             thumbnail.startsWith('http')
                 ? CachedNetworkImage(
-                    imageUrl: thumbnail,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, _, _) => _buildFallbackIcon(theme),
-                  )
+                  imageUrl: thumbnail,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, _, _) => _buildFallbackIcon(theme),
+                )
                 : Image.memory(
-                    base64Decode(thumbnail),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _buildFallbackIcon(theme),
-                  )
+                  base64Decode(thumbnail),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _buildFallbackIcon(theme),
+                )
           else if (fallbackUrl.isNotEmpty)
             CachedNetworkImage(
               imageUrl: fallbackUrl,

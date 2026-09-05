@@ -137,8 +137,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           continue;
         }
 
-        final episodesMap =
-            Map<int, EpisodeProgress>.from(local?.episodesProgress ?? {});
+        final episodesMap = Map<int, EpisodeProgress>.from(
+          local?.episodesProgress ?? {},
+        );
 
         for (int i = 1; i <= targetProgress; i++) {
           final existing = episodesMap[i];
@@ -147,7 +148,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               episodeNumber: i,
               episodeTitle: existing?.episodeTitle ?? 'Episode $i',
               episodeThumbnail: existing?.episodeThumbnail,
-              progressInSeconds: existing?.progressInSeconds ??
+              progressInSeconds:
+                  existing?.progressInSeconds ??
                   (i == targetProgress && entry.progress == 0 ? 0 : 1440),
               durationInSeconds: existing?.durationInSeconds ?? 1440,
               isCompleted: i < targetProgress,
@@ -156,12 +158,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           }
         }
 
-        final title = media.title.english ??
+        final title =
+            media.title.english ??
             media.title.romaji ??
             media.title.native ??
             '';
-        final cover =
-            media.coverImage.large ?? media.coverImage.medium ?? '';
+        final cover = media.coverImage.large ?? media.coverImage.medium ?? '';
 
         final updated = (local ??
                 AnimeWatchProgressEntry(
@@ -242,10 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final home = state.homePage;
                 if (home == null) return const SizedBox.shrink();
 
-                return _HomeSectionRenderer(
-                  section: section,
-                  home: home,
-                );
+                return _HomeSectionRenderer(section: section, home: home);
               },
             ),
           ],
@@ -266,8 +265,13 @@ class _HomeSectionRenderer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     switch (section.type) {
       case HomeSectionType.spotlight:
-        if (home.trendingAnime.data.isEmpty) return const SizedBox.shrink();
-        return SpotlightSection(spotlightAnime: home.trendingAnime.data);
+        final spotlight =
+            home.trendingAnime.data.isNotEmpty
+                ? home.trendingAnime.data
+                : home.popularAnime.data.take(25).toList();
+        return SpotlightSection(
+          spotlightAnime: spotlight.isEmpty ? null : spotlight,
+        );
 
       case HomeSectionType.continueWatching:
         return const Padding(
@@ -434,7 +438,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
                 cloudItem.progress > 0 ? cloudItem.progress : 1;
             merged[media.id] = AnimeWatchProgressEntry(
               animeId: media.id,
-              animeTitle: media.title.english ??
+              animeTitle:
+                  media.title.english ??
                   media.title.romaji ??
                   media.title.native ??
                   '',
@@ -461,9 +466,12 @@ class _ContinueWatchingSection extends ConsumerWidget {
           }
         }
 
-        final combinedList = merged.values.toList()
-          ..sort((a, b) => (b.lastUpdated ?? DateTime(0))
-              .compareTo(a.lastUpdated ?? DateTime(0)));
+        final combinedList =
+            merged.values.toList()..sort(
+              (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+                a.lastUpdated ?? DateTime(0),
+              ),
+            );
 
         if (combinedList.isEmpty) return const SizedBox.shrink();
         return ContinueSection(allProgress: combinedList.take(15).toList());
@@ -471,40 +479,45 @@ class _ContinueWatchingSection extends ConsumerWidget {
       loading: () {
         List<AnimeWatchProgressEntry> syncList = [];
         try {
-          syncList = ref.read(watchProgressRepositoryProvider).getAllProgress()
-            ..sort((a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(a.lastUpdated ?? DateTime(0)));
+          syncList =
+              ref.read(watchProgressRepositoryProvider).getAllProgress()..sort(
+                (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+                  a.lastUpdated ?? DateTime(0),
+                ),
+              );
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());
         }
 
         if (cloudWatching.isNotEmpty) {
-          final synthetic = cloudWatching.map((c) {
-            final media = c.media;
-            final ep = c.progress > 0 ? c.progress : 1;
-            return AnimeWatchProgressEntry(
-              animeId: media.id,
-              animeTitle: media.title.english ?? media.title.romaji ?? '',
-              animeFormat: media.format,
-              animeCover:
-                  media.coverImage.large ?? media.coverImage.medium ?? '',
-              totalEpisodes: media.episodes ?? 0,
-              episodesProgress: {
-                ep: EpisodeProgress(
-                  episodeNumber: ep,
-                  episodeTitle: 'Episode $ep',
-                  episodeThumbnail:
-                      media.coverImage.large ?? media.coverImage.medium,
-                  progressInSeconds: 0,
-                  durationInSeconds: 1440,
-                  isCompleted: false,
-                ),
-              },
-              currentEpisode: ep,
-              lastUpdated: DateTime.now(),
-              status: 'watching',
-            );
-          }).toList();
+          final synthetic =
+              cloudWatching.map((c) {
+                final media = c.media;
+                final ep = c.progress > 0 ? c.progress : 1;
+                return AnimeWatchProgressEntry(
+                  animeId: media.id,
+                  animeTitle: media.title.english ?? media.title.romaji ?? '',
+                  animeFormat: media.format,
+                  animeCover:
+                      media.coverImage.large ?? media.coverImage.medium ?? '',
+                  totalEpisodes: media.episodes ?? 0,
+                  episodesProgress: {
+                    ep: EpisodeProgress(
+                      episodeNumber: ep,
+                      episodeTitle: 'Episode $ep',
+                      episodeThumbnail:
+                          media.coverImage.large ?? media.coverImage.medium,
+                      progressInSeconds: 0,
+                      durationInSeconds: 1440,
+                      isCompleted: false,
+                    ),
+                  },
+                  currentEpisode: ep,
+                  lastUpdated: DateTime.now(),
+                  status: 'watching',
+                );
+              }).toList();
           return ContinueSection(allProgress: synthetic.take(15).toList());
         }
         return const SizedBox.shrink();
@@ -512,40 +525,45 @@ class _ContinueWatchingSection extends ConsumerWidget {
       error: (_, _) {
         List<AnimeWatchProgressEntry> syncList = [];
         try {
-          syncList = ref.read(watchProgressRepositoryProvider).getAllProgress()
-            ..sort((a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(a.lastUpdated ?? DateTime(0)));
+          syncList =
+              ref.read(watchProgressRepositoryProvider).getAllProgress()..sort(
+                (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+                  a.lastUpdated ?? DateTime(0),
+                ),
+              );
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());
         }
 
         if (cloudWatching.isNotEmpty) {
-          final synthetic = cloudWatching.map((c) {
-            final media = c.media;
-            final ep = c.progress > 0 ? c.progress : 1;
-            return AnimeWatchProgressEntry(
-              animeId: media.id,
-              animeTitle: media.title.english ?? media.title.romaji ?? '',
-              animeFormat: media.format,
-              animeCover:
-                  media.coverImage.large ?? media.coverImage.medium ?? '',
-              totalEpisodes: media.episodes ?? 0,
-              episodesProgress: {
-                ep: EpisodeProgress(
-                  episodeNumber: ep,
-                  episodeTitle: 'Episode $ep',
-                  episodeThumbnail:
-                      media.coverImage.large ?? media.coverImage.medium,
-                  progressInSeconds: 0,
-                  durationInSeconds: 1440,
-                  isCompleted: false,
-                ),
-              },
-              currentEpisode: ep,
-              lastUpdated: DateTime.now(),
-              status: 'watching',
-            );
-          }).toList();
+          final synthetic =
+              cloudWatching.map((c) {
+                final media = c.media;
+                final ep = c.progress > 0 ? c.progress : 1;
+                return AnimeWatchProgressEntry(
+                  animeId: media.id,
+                  animeTitle: media.title.english ?? media.title.romaji ?? '',
+                  animeFormat: media.format,
+                  animeCover:
+                      media.coverImage.large ?? media.coverImage.medium ?? '',
+                  totalEpisodes: media.episodes ?? 0,
+                  episodesProgress: {
+                    ep: EpisodeProgress(
+                      episodeNumber: ep,
+                      episodeTitle: 'Episode $ep',
+                      episodeThumbnail:
+                          media.coverImage.large ?? media.coverImage.medium,
+                      progressInSeconds: 0,
+                      durationInSeconds: 1440,
+                      isCompleted: false,
+                    ),
+                  },
+                  currentEpisode: ep,
+                  lastUpdated: DateTime.now(),
+                  status: 'watching',
+                );
+              }).toList();
           return ContinueSection(allProgress: synthetic.take(15).toList());
         }
         return const SizedBox.shrink();

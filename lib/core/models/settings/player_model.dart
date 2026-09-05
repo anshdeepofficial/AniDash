@@ -4,6 +4,7 @@ class PlayerModel {
   final String defaultQuality;
   final bool enableAniSkip;
   final bool enableAutoSkip;
+  final bool skipFillerEpisodes;
   final bool preferDub;
   final int seekDuration;
   final int autoHideDuration;
@@ -18,6 +19,7 @@ class PlayerModel {
     this.defaultQuality = 'Auto',
     this.enableAniSkip = true,
     this.enableAutoSkip = false,
+    this.skipFillerEpisodes = false,
     this.preferDub = true,
     this.bufferSize = 32,
     this.seekDuration = 10,
@@ -33,6 +35,7 @@ class PlayerModel {
     String? defaultQuality,
     bool? enableAniSkip,
     bool? enableAutoSkip,
+    bool? skipFillerEpisodes,
     bool? preferDub,
     int? seekDuration,
     int? autoHideDuration,
@@ -47,6 +50,7 @@ class PlayerModel {
       defaultQuality: defaultQuality ?? this.defaultQuality,
       enableAniSkip: enableAniSkip ?? this.enableAniSkip,
       enableAutoSkip: enableAutoSkip ?? this.enableAutoSkip,
+      skipFillerEpisodes: skipFillerEpisodes ?? this.skipFillerEpisodes,
       preferDub: preferDub ?? this.preferDub,
       seekDuration: seekDuration ?? this.seekDuration,
       autoHideDuration: autoHideDuration ?? this.autoHideDuration,
@@ -65,6 +69,7 @@ class PlayerModel {
       'defaultQuality': defaultQuality,
       'enableAniSkip': enableAniSkip,
       'enableAutoSkip': enableAutoSkip,
+      'skipFillerEpisodes': skipFillerEpisodes,
       'preferDub': preferDub,
       'seekDuration': seekDuration,
       'bufferSize': bufferSize,
@@ -82,6 +87,7 @@ class PlayerModel {
       defaultQuality: map['defaultQuality'] ?? 'Auto',
       enableAniSkip: map['enableAniSkip'] ?? true,
       enableAutoSkip: map['enableAutoSkip'] ?? false,
+      skipFillerEpisodes: map['skipFillerEpisodes'] ?? false,
       preferDub: map['preferDub'] ?? true,
       seekDuration: map['seekDuration'] ?? 10,
       autoHideDuration: map['autoHideDuration'] ?? 5,

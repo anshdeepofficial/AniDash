@@ -62,6 +62,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final safeInsets = MediaQuery.viewPaddingOf(context);
     // final settings = ref.watch(playerSettingsProvider);
 
     return Container(
@@ -76,9 +77,14 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       child: SafeArea(
         top: false,
         bottom: false,
+        left: false,
+        right: false,
         child: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.paddingOf(context).bottom.clamp(0.0, 8.0),
+          padding: EdgeInsets.fromLTRB(
+            safeInsets.left + 8,
+            0,
+            safeInsets.right + 8,
+            safeInsets.bottom.clamp(8.0, 24.0),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

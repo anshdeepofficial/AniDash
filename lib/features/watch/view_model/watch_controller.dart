@@ -153,8 +153,22 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     void triggerAutoAdvance() {
       if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
       _hasAutoAdvanced = true;
-      AppLogger.i('Auto-advancing to next episode instantly');
-      ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+      var target = (_epNum ?? 0) + 1;
+      if (ref.read(playerSettingsProvider).skipFillerEpisodes) {
+        while (target <= _totalEps) {
+          EpisodeDataModel? episode;
+          for (final item in episodes) {
+            if (item.number == target) {
+              episode = item;
+              break;
+            }
+          }
+          if (episode?.isFiller != true) break;
+          target++;
+        }
+      }
+      AppLogger.i('Auto-advancing to episode $target');
+      ref.read(episodeDataProvider.notifier).changeEpisode(target);
     }
 
     _completedSubscription?.cancel();

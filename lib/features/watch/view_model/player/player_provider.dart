@@ -299,17 +299,23 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   void seekRelative(int seconds) {
-    final p = _player.state.position + Duration(seconds: seconds);
+    final p =
+        (_pendingSeekTarget ?? _player.state.position) +
+        Duration(seconds: seconds);
     seek(p);
   }
 
   void forward(int seconds) {
-    final p = _player.state.position + Duration(seconds: seconds);
+    final p =
+        (_pendingSeekTarget ?? _player.state.position) +
+        Duration(seconds: seconds);
     seek(p);
   }
 
   void rewind(int seconds) {
-    final p = _player.state.position - Duration(seconds: seconds);
+    final p =
+        (_pendingSeekTarget ?? _player.state.position) -
+        Duration(seconds: seconds);
     seek(p < Duration.zero ? Duration.zero : p);
   }
 

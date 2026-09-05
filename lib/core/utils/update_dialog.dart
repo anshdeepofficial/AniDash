@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:install_plugin/install_plugin.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,10 +29,12 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
+  static const _installer = MethodChannel('anidash/updater');
   double _progress = 0.0;
   bool _downloading = false;
   String? _statusMessage;
   bool _error = false;
+  String? _downloadedApkPath;
 
   final String _linuxCmd =
       'bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/AniDash/main/install.sh)';
@@ -42,9 +43,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
     if (widget.apkDownloadUrl != null && widget.apkDownloadUrl!.isNotEmpty) {
       return widget.apkDownloadUrl!;
     }
-    final tag = widget.latestVersion.startsWith('v')
-        ? widget.latestVersion
-        : 'v${widget.latestVersion}';
+    final tag =
+        widget.latestVersion.startsWith('v')
+            ? widget.latestVersion
+            : 'v${widget.latestVersion}';
     return 'https://github.com/anshdeepofficial/Anidash/releases/download/$tag/app-release.apk';
   }
 
@@ -64,10 +66,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       }
     } else if (Platform.isWindows) {
       final url = _effectiveApkUrl;
-      await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
   }
 
@@ -108,15 +107,15 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 setState(() {
                   if (contentLength > 0) {
                     _progress = received / contentLength;
-                    final receivedMB =
-                        (received / (1024 * 1024)).toStringAsFixed(1);
-                    final totalMB =
-                        (contentLength / (1024 * 1024)).toStringAsFixed(1);
+                    final receivedMB = (received / (1024 * 1024))
+                        .toStringAsFixed(1);
+                    final totalMB = (contentLength / (1024 * 1024))
+                        .toStringAsFixed(1);
                     _statusMessage =
                         "Downloading... ${(_progress * 100).toInt()}% ($receivedMB MB / $totalMB MB)";
                   } else {
-                    final receivedMB =
-                        (received / (1024 * 1024)).toStringAsFixed(1);
+                    final receivedMB = (received / (1024 * 1024))
+                        .toStringAsFixed(1);
                     _statusMessage = "Downloading... $receivedMB MB";
                   }
                 });
@@ -134,8 +133,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
           )
           .asFuture();
 
-      if (mounted) setState(() => _statusMessage = "Installing...");
-      await InstallPlugin.install(savePath, appId: 'com.anidash.anime');
+      _downloadedApkPath = savePath;
+      await _launchInstaller(savePath);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -149,17 +148,41 @@ class _UpdateDialogState extends State<UpdateDialog> {
     }
   }
 
+  Future<void> _launchInstaller(String savePath) async {
+    final canInstall =
+        await _installer.invokeMethod<bool>('canInstallPackages') ?? false;
+    if (!canInstall) {
+      await _installer.invokeMethod<bool>('openInstallPermission');
+      if (!mounted) return;
+      setState(() {
+        _downloading = false;
+        _statusMessage =
+            'Allow installs from AniDash, return here, then tap Install Update.';
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _downloading = false;
+        _statusMessage = 'Android installer opened.';
+      });
+    }
+    await _installer.invokeMethod<bool>('installApk', {'path': savePath});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isLinux = Platform.isLinux;
 
-    final statusColor = widget.type == UpdateType.stable
-        ? colorScheme.primary
-        : widget.type == UpdateType.hotfix
-        ? colorScheme.error
-        : colorScheme.tertiary;
+    final statusColor =
+        widget.type == UpdateType.stable
+            ? colorScheme.primary
+            : widget.type == UpdateType.hotfix
+            ? colorScheme.error
+            : colorScheme.tertiary;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -180,11 +203,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton.icon(
-                    onPressed: () => launchUrl(
-                      Uri.parse(
-                        'https://github.com/anshdeepofficial/Anidash/releases',
-                      ),
-                    ),
+                    onPressed:
+                        () => launchUrl(
+                          Uri.parse(
+                            'https://github.com/anshdeepofficial/Anidash/releases',
+                          ),
+                        ),
                     icon: const Icon(Icons.code_rounded, size: 18),
                     label: const Text('GitHub'),
                     style: TextButton.styleFrom(
@@ -293,7 +317,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  if (_downloading || _error) ...[
+                  if (_statusMessage != null || _error) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -301,9 +325,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
                           child: Text(
                             _statusMessage ?? "",
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: _error
-                                  ? colorScheme.error
-                                  : colorScheme.onSurfaceVariant,
+                              color:
+                                  _error
+                                      ? colorScheme.error
+                                      : colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -315,17 +340,17 @@ class _UpdateDialogState extends State<UpdateDialog> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: _downloading ? _progress : 0,
-                      borderRadius: BorderRadius.circular(8),
-                      minHeight: 8,
-                    ),
+                    if (_downloading)
+                      LinearProgressIndicator(
+                        value: _progress,
+                        borderRadius: BorderRadius.circular(8),
+                        minHeight: 8,
+                      ),
                     const SizedBox(height: 24),
                   ],
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _downloading ? null : _handleUpdateAction,
                       icon: Icon(
                         isLinux
                             ? Icons.content_copy_rounded
@@ -334,8 +359,19 @@ class _UpdateDialogState extends State<UpdateDialog> {
                       label: Text(
                         isLinux
                             ? 'Copy Command'
-                            : (_downloading ? 'Downloading...' : 'Update Now'),
+                            : (_downloading
+                                ? 'Downloading...'
+                                : (_downloadedApkPath != null
+                                    ? 'Install Update'
+                                    : 'Update Now')),
                       ),
+                      onPressed:
+                          _downloading
+                              ? null
+                              : (_downloadedApkPath != null &&
+                                      Platform.isAndroid
+                                  ? () => _launchInstaller(_downloadedApkPath!)
+                                  : _handleUpdateAction),
                       style: FilledButton.styleFrom(
                         backgroundColor: statusColor,
                         padding: const EdgeInsets.symmetric(vertical: 16),

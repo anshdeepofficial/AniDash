@@ -47,7 +47,7 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
       // If app was genuinely backgrounded/minimized and app lock is enabled, re-lock
       if (security.appLockEnabled && _pausedAt != null) {
         final elapsed = DateTime.now().difference(_pausedAt!);
-        if (elapsed.inMilliseconds > 1500) {
+        if (elapsed.inSeconds >= security.appLockDelaySeconds) {
           ref.read(securityProvider.notifier).lockApp();
         }
       }
@@ -104,7 +104,9 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
               color: Theme.of(context).scaffoldBackgroundColor,
               child: PinLockDialog(
                 title: 'AniDash Locked',
-                subtitle: 'Enter your 4-digit PIN to unlock',
+                subtitle: _lockSubtitle(security.appLockType),
+                credentialLength: _credentialLength(security.appLockType),
+                allowLetters: security.appLockType == 'password',
                 enableBiometrics: security.appLockBiometrics,
                 onBiometricSuccess: () {
                   ref.read(securityProvider.notifier).unlockApp();
@@ -118,4 +120,13 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
       ],
     );
   }
+
+  int _credentialLength(String type) => type == 'pin6' ? 6 : 4;
+
+  String _lockSubtitle(String type) => switch (type) {
+    'pin6' => 'Enter your 6-digit PIN to unlock',
+    'password' => 'Enter your password to unlock',
+    'pattern' => 'Enter your 4-point pattern using numbers 1–9',
+    _ => 'Enter your 4-digit PIN to unlock',
+  };
 }

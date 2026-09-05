@@ -43,8 +43,9 @@ class EpisodeGridItem extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       elevation: 0,
-      color: Colors
-          .transparent, // We handle background manually if needed or just use column
+      color:
+          Colors
+              .transparent, // We handle background manually if needed or just use column
       child: InkWell(
         onLongPress: onLongPress,
         onTap: onTap,
@@ -61,7 +62,8 @@ class EpisodeGridItem extends StatelessWidget {
                     fallbackUrl: episode.thumbnail ?? fallbackCover,
                     episodeNumber: episodeNumber,
                     isWatched: isWatched,
-                    aspectRatio: 16 /
+                    aspectRatio:
+                        16 /
                         9, // Let parent constraint handle it but default typical video ratio
                   ),
                   if (isSelectionMode)
@@ -79,9 +81,10 @@ class EpisodeGridItem extends StatelessWidget {
                               ? Icons.check_box_rounded
                               : Icons.check_box_outline_blank_rounded,
                           size: 18,
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : Colors.white,
+                          color:
+                              isSelected
+                                  ? theme.colorScheme.primary
+                                  : Colors.white,
                         ),
                       ),
                     )
@@ -147,9 +150,10 @@ class EpisodeGridItem extends StatelessWidget {
                   Text(
                     'Episode $episodeNumber',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isWatched ? theme.hintColor : null),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isWatched ? theme.hintColor : null,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -157,19 +161,22 @@ class EpisodeGridItem extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                        color: isWatched
-                            ? theme.hintColor
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontSize: 11,
-                        height: 1.1),
+                      color:
+                          isWatched
+                              ? theme.hintColor
+                              : theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                      height: 1.1,
+                    ),
                   ),
                   if (episode.isFiller == true)
                     Text(
                       'FILLER',
                       style: TextStyle(
-                          color: Colors.orange.shade700,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold),
+                        color: theme.colorScheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                 ],
               ),

@@ -53,6 +53,11 @@ class NotificationService {
     );
 
     await _createNotificationChannels();
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
   }
 
   Future<void> _createNotificationChannels() async {
@@ -103,11 +108,19 @@ class NotificationService {
           enableVibration: true,
         );
 
+    const AndroidNotificationChannel updateChannel = AndroidNotificationChannel(
+      'AniDash_updates_channel',
+      'App Updates',
+      description: 'Notifications when a new AniDash version is available',
+      importance: Importance.high,
+    );
+
     const AndroidNotificationChannel playbackChannel =
         AndroidNotificationChannel(
           'AniDash_playback_channel',
           'Media Playback',
-          description: 'Controls for active media playback and lock screen controls',
+          description:
+              'Controls for active media playback and lock screen controls',
           importance: Importance.low,
           playSound: false,
           enableVibration: false,
@@ -118,6 +131,7 @@ class NotificationService {
     await androidImplementation?.createNotificationChannel(episodeChannel);
     await androidImplementation?.createNotificationChannel(downloadChannel);
     await androidImplementation?.createNotificationChannel(reminderChannel);
+    await androidImplementation?.createNotificationChannel(updateChannel);
     await androidImplementation?.createNotificationChannel(playbackChannel);
   }
 
@@ -281,6 +295,29 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.cancel(id);
   }
 
+  Future<void> showUpdateAvailableNotification(String version) async {
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'AniDash_updates_channel',
+        'App Updates',
+        channelDescription:
+            'Notifications when a new AniDash version is available',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: _iconName,
+        largeIcon: DrawableResourceAndroidBitmap(_largeIconName),
+        color: _brandColor,
+      ),
+    );
+    await flutterLocalNotificationsPlugin.show(
+      1901,
+      'AniDash $version is available',
+      'Open AniDash to download and install the update.',
+      details,
+      payload: 'update',
+    );
+  }
+
   Future<void> showPlaybackNotification({
     required String animeTitle,
     required String episodeTitle,
@@ -290,42 +327,43 @@ class NotificationService {
   }) async {
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'AniDash_playback_channel',
-      'Media Playback',
-      channelDescription: 'Controls for active media playback and lock screen controls',
-      importance: Importance.low,
-      priority: Priority.low,
-      ongoing: true,
-      autoCancel: false,
-      onlyAlertOnce: true,
-      showWhen: false,
-      color: const Color(0xFFE91E63),
-      icon: _iconName,
-      styleInformation: const MediaStyleInformation(
-        htmlFormatContent: false,
-        htmlFormatTitle: false,
-      ),
-      actions: <AndroidNotificationAction>[
-        const AndroidNotificationAction(
-          'prev',
-          'Previous',
-          cancelNotification: false,
-          showsUserInterface: false,
-        ),
-        AndroidNotificationAction(
-          'play_pause',
-          isPlaying ? 'Pause' : 'Play',
-          cancelNotification: false,
-          showsUserInterface: false,
-        ),
-        const AndroidNotificationAction(
-          'next',
-          'Next',
-          cancelNotification: false,
-          showsUserInterface: false,
-        ),
-      ],
-    );
+          'AniDash_playback_channel',
+          'Media Playback',
+          channelDescription:
+              'Controls for active media playback and lock screen controls',
+          importance: Importance.low,
+          priority: Priority.low,
+          ongoing: true,
+          autoCancel: false,
+          onlyAlertOnce: true,
+          showWhen: false,
+          color: const Color(0xFFE91E63),
+          icon: _iconName,
+          styleInformation: const MediaStyleInformation(
+            htmlFormatContent: false,
+            htmlFormatTitle: false,
+          ),
+          actions: <AndroidNotificationAction>[
+            const AndroidNotificationAction(
+              'prev',
+              'Previous',
+              cancelNotification: false,
+              showsUserInterface: false,
+            ),
+            AndroidNotificationAction(
+              'play_pause',
+              isPlaying ? 'Pause' : 'Play',
+              cancelNotification: false,
+              showsUserInterface: false,
+            ),
+            const AndroidNotificationAction(
+              'next',
+              'Next',
+              cancelNotification: false,
+              showsUserInterface: false,
+            ),
+          ],
+        );
 
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,

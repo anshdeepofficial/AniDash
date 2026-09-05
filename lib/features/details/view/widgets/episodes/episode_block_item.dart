@@ -40,17 +40,21 @@ class EpisodeBlockItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-              : isWatched
-              ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-              : theme.colorScheme.surfaceContainerHigh,
+          color:
+              isSelected
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
+                  : isWatched
+                  ? theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.5,
+                  )
+                  : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected
-              ? Border.all(color: theme.colorScheme.primary, width: 2)
-              : episode.isFiller == true
-              ? Border.all(color: Colors.orange.shade700, width: 2)
-              : null,
+          border:
+              isSelected
+                  ? Border.all(color: theme.colorScheme.primary, width: 2)
+                  : episode.isFiller == true
+                  ? Border.all(color: theme.colorScheme.primary, width: 2)
+                  : null,
         ),
         child: Stack(
           children: [
@@ -60,9 +64,8 @@ class EpisodeBlockItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: isWatched
-                      ? theme.hintColor
-                      : theme.colorScheme.onSurface,
+                  color:
+                      isWatched ? theme.hintColor : theme.colorScheme.onSurface,
                 ),
               ),
             ),
@@ -76,9 +79,8 @@ class EpisodeBlockItem extends StatelessWidget {
                       ? Icons.check_box_rounded
                       : Icons.check_box_outline_blank_rounded,
                   size: 16,
-                  color: isSelected
-                      ? theme.colorScheme.primary
-                      : theme.hintColor,
+                  color:
+                      isSelected ? theme.colorScheme.primary : theme.hintColor,
                 ),
               ),
 
@@ -106,9 +108,10 @@ class EpisodeBlockItem extends StatelessWidget {
                   value: watchProgress,
                   minHeight: 3,
                   backgroundColor: theme.colorScheme.surfaceDim,
-                  color: isWatched
-                      ? theme.colorScheme.secondary
-                      : theme.colorScheme.primary,
+                  color:
+                      isWatched
+                          ? theme.colorScheme.secondary
+                          : theme.colorScheme.primary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

@@ -142,11 +142,17 @@ class EpisodeData extends _$EpisodeData {
       clearError: true,
     );
 
-    // Fast-path: Reuse existing servers immediately to cut episode transition delay
+    // Server lists are useful for manual switching, but they must not hold the
+    // first frame hostage. Give the preferred provider a short opportunity to
+    // resolve them, then start source resolution while it finishes in background.
     if (state.servers.isNotEmpty && state.selectedServer != null) {
       _fetchServers(ep); // refresh in background
     } else {
-      await _fetchServers(ep);
+      try {
+        await _fetchServers(ep).timeout(const Duration(milliseconds: 2500));
+      } on TimeoutException {
+        AppLogger.d('Server discovery continuing in background');
+      }
     }
 
     if (play) await _playCurrent(startAt ?? Duration.zero);
@@ -694,7 +700,7 @@ class EpisodeData extends _$EpisodeData {
         data = await _fetchSourceData(
           epModel,
           server: state.selectedServer,
-        ).timeout(const Duration(seconds: 20));
+        ).timeout(const Duration(seconds: 15));
       }
 
       if (data == null || data.sources.isEmpty) {
@@ -1004,12 +1010,9 @@ class EpisodeData extends _$EpisodeData {
 
     if (_provider != null) {
       try {
-        final res = await _provider!.getSources(
-          _epList.animeId ?? '',
-          targetEpId,
-          server?.id,
-          category,
-        );
+        final res = await _provider!
+            .getSources(_epList.animeId ?? '', targetEpId, server?.id, category)
+            .timeout(const Duration(seconds: 8));
         if (res.sources.isNotEmpty) {
           return res;
         }
@@ -1025,12 +1028,12 @@ class EpisodeData extends _$EpisodeData {
           );
           final searchRes = await _provider!
               .getSearch(_epList.animeTitle!, null, 1)
-              .timeout(const Duration(seconds: 10));
+              .timeout(const Duration(seconds: 6));
           final best = searchRes.results.firstOrNull;
           if (best != null && best.id != null && best.id != _epList.animeId) {
             final res = await _provider!
                 .getSources(best.id!, targetEpId, server?.id, category)
-                .timeout(const Duration(seconds: 15));
+                .timeout(const Duration(seconds: 8));
             if (res.sources.isNotEmpty) {
               AppLogger.success(
                 'Resolved stream on ${_provider!.providerName}',
@@ -1065,37 +1068,60 @@ class EpisodeData extends _$EpisodeData {
       if (registry.has('justanime') && currentKey == 'justanime') 'justanime',
     ];
 
+    if (candidateKeys.isEmpty) return null;
+    final result = Completer<BaseSourcesModel?>();
+    var completed = 0;
+
     for (final altKey in candidateKeys) {
-      final altProvider = registry.get(altKey);
-      if (altProvider == null) continue;
-      try {
-        AppLogger.w('Trying fallback provider for stream: $altKey');
-        final altSearch = await altProvider
-            .getSearch(_epList.animeTitle ?? '', null, 1)
-            .timeout(const Duration(seconds: 12));
-        final altMatch = altSearch.results.firstOrNull;
-        if (altMatch != null && altMatch.id != null) {
-          final altEps = await altProvider
-              .getEpisodes(altMatch.id!)
-              .timeout(const Duration(seconds: 18));
+      () async {
+        try {
+          final altProvider = registry.get(altKey);
+          if (altProvider == null) return;
+          AppLogger.w('Trying fallback provider for stream: $altKey');
+          final altSearch = await altProvider.getSearch(
+            _epList.animeTitle ?? '',
+            null,
+            1,
+          );
+          final altMatch = altSearch.results.firstOrNull;
+          if (altMatch == null || altMatch.id == null) return;
+          final altEps = await altProvider.getEpisodes(altMatch.id!);
           final targetEp = altEps.episodes?.firstWhereOrNull(
             (e) => e.number == ep.number,
           );
-          final epToFetch = targetEp?.id ?? targetEpId;
-          final altSources = await altProvider
-              .getSources(altMatch.id!, epToFetch, null, category)
-              .timeout(const Duration(seconds: 25));
-          if (altSources.sources.isNotEmpty) {
+          final altSources = await altProvider.getSources(
+            altMatch.id!,
+            targetEp?.id ?? targetEpId,
+            null,
+            category,
+          );
+          if (altSources.sources.isNotEmpty && !result.isCompleted) {
             AppLogger.success('Fallback provider $altKey found sources!');
-            return altSources;
+            result.complete(altSources);
+          }
+        } catch (e) {
+          AppLogger.d('Fallback $altKey stream failed: $e');
+        } finally {
+          completed++;
+          if (completed == candidateKeys.length && !result.isCompleted) {
+            result.complete(null);
           }
         }
-      } catch (e) {
-        AppLogger.d('Fallback $altKey stream failed: $e');
-      }
+      }().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {
+          completed++;
+          if (completed == candidateKeys.length && !result.isCompleted) {
+            result.complete(null);
+          }
+        },
+      );
     }
 
-    return null;
+    return result.future.timeout(
+      const Duration(seconds: 12),
+      onTimeout: () => null,
+    );
   }
 
   Future<List<Map<String, dynamic>>> _getQualities(

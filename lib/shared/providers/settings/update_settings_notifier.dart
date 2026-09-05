@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/settings/update_settings_model.dart';
-import 'package:ani_dash/main.dart'; 
+import 'package:ani_dash/main.dart';
+import 'package:ani_dash/core/services/update_scheduler.dart';
 
 final updateSettingsProvider =
     NotifierProvider<UpdateSettingsNotifier, UpdateSettingsModel>(
@@ -19,8 +20,11 @@ class UpdateSettingsNotifier extends Notifier<UpdateSettingsModel> {
     return const UpdateSettingsModel();
   }
 
-  void updateSettings(UpdateSettingsModel Function(UpdateSettingsModel) updater) {
+  void updateSettings(
+    UpdateSettingsModel Function(UpdateSettingsModel) updater,
+  ) {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, state.toJson());
+    UpdateScheduler.apply(state);
   }
 }

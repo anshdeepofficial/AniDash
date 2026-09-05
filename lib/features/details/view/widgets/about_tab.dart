@@ -40,6 +40,33 @@ class DetailsContent extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           AdditionalInfoWidget(anime: anime),
+          if (anime.relations.any((relation) {
+            final type = relation.relationType.toUpperCase();
+            return type.contains('PREQUEL') || type.contains('SEQUEL');
+          })) ...[
+            const SizedBox(height: 24),
+            HorizontalMediaSection<UniversalMediaRelation>(
+              title: 'Watch Order',
+              items:
+                  anime.relations.where((relation) {
+                      final type = relation.relationType.toUpperCase();
+                      return type.contains('PREQUEL') ||
+                          type.contains('SEQUEL');
+                    }).toList()
+                    ..sort(
+                      (a, b) => (a.media.seasonYear ?? 9999).compareTo(
+                        b.media.seasonYear ?? 9999,
+                      ),
+                    ),
+              isLoading: isLoading,
+              itemBuilder:
+                  (context, relation) => MediaCard(
+                    media: relation.media,
+                    badgeText: _formatRelationType(relation.relationType),
+                    onTap: () => onMediaTap?.call(relation.media),
+                  ),
+            ),
+          ],
           if (anime.staff.isNotEmpty) ...[
             const SizedBox(height: 24),
             HorizontalMediaSection<UniversalStaff>(
@@ -105,9 +132,11 @@ class AnimeInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final mainStudio = anime.studios.firstWhere(
       (s) => s.isMain,
-      orElse: () => anime.studios.isNotEmpty
-          ? anime.studios.first
-          : UniversalStudio(name: 'Unknown', isMain: true),
+      orElse:
+          () =>
+              anime.studios.isNotEmpty
+                  ? anime.studios.first
+                  : UniversalStudio(name: 'Unknown', isMain: true),
     );
 
     final stats = [
@@ -148,9 +177,10 @@ class AnimeInfoCard extends StatelessWidget {
         ),
       _StatData(
         icon: Iconsax.building_3,
-        value: mainStudio.name.length > 20
-            ? '${mainStudio.name.substring(0, 18)}...'
-            : mainStudio.name,
+        value:
+            mainStudio.name.length > 20
+                ? '${mainStudio.name.substring(0, 18)}...'
+                : mainStudio.name,
         label: 'Studio',
         color: Colors.pinkAccent,
       ),
@@ -386,9 +416,10 @@ class _AnimeSynopsisState extends State<AnimeSynopsis>
             curve: Curves.easeInOut,
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: _isExpanded
-                  ? const BoxConstraints() // no height limit
-                  : BoxConstraints(maxHeight: widget.collapsedHeight),
+              constraints:
+                  _isExpanded
+                      ? const BoxConstraints() // no height limit
+                      : BoxConstraints(maxHeight: widget.collapsedHeight),
               child: Text(
                 parseHtmlToString(widget.description),
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -441,8 +472,8 @@ class AnimeRankings extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: rankings.length,
             separatorBuilder: (context, index) => const SizedBox(width: 8),
-            itemBuilder: (context, index) =>
-                RankingPill(ranking: rankings[index]),
+            itemBuilder:
+                (context, index) => RankingPill(ranking: rankings[index]),
           ),
         ),
       ],
@@ -464,14 +495,16 @@ class RankingPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isTop100
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color:
+            isTop100
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isTop100
-              ? colorScheme.primary.withValues(alpha: 0.5)
-              : colorScheme.outline.withValues(alpha: 0.1),
+          color:
+              isTop100
+                  ? colorScheme.primary.withValues(alpha: 0.5)
+                  : colorScheme.outline.withValues(alpha: 0.1),
         ),
       ),
       child: Row(
@@ -480,18 +513,20 @@ class RankingPill extends StatelessWidget {
           Icon(
             isTop100 ? Iconsax.cup : Iconsax.ranking_1,
             size: 16,
-            color: isTop100
-                ? colorScheme.onPrimaryContainer
-                : colorScheme.onSurfaceVariant,
+            color:
+                isTop100
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 8),
           Text(
             '#${ranking.rank} ${ranking.context} ${ranking.year ?? ''}'.trim(),
             style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: isTop100
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurface,
+              color:
+                  isTop100
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurface,
             ),
           ),
         ],
@@ -567,36 +602,40 @@ class AnimeTagsWidget extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: tags.map((tag) {
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              navigateToBrowse(context, filter: SearchFilter(tags: [tag]));
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
-                ),
+      children:
+          tags.map((tag) {
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  navigateToBrowse(context, filter: SearchFilter(tags: [tag]));
+                },
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Text(
+                    tag,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
-              child: Text(
-                tag,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -631,37 +670,38 @@ class AnimeInformationGrid extends StatelessWidget {
     return Wrap(
       spacing: 16,
       runSpacing: 16,
-      children: items.map((item) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final screenWidth = MediaQuery.of(context).size.width;
-            final itemWidth = (screenWidth - 32 - 16) / 2;
+      children:
+          items.map((item) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final itemWidth = (screenWidth - 32 - 16) / 2;
 
-            return SizedBox(
-              width: itemWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                return SizedBox(
+                  width: itemWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.label,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.value,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.value,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
-          },
-        );
-      }).toList(),
+          }).toList(),
     );
   }
 
@@ -715,9 +755,10 @@ class ExternalLinksWidget extends StatelessWidget {
               icon: Iconsax.video_play,
               label: 'Watch Trailer',
               color: const Color(0xFFFF0000), // YouTube Red
-              onTap: () => _launchUrl(
-                'https://www.youtube.com/watch?v=${anime.trailer!.id}',
-              ),
+              onTap:
+                  () => _launchUrl(
+                    'https://www.youtube.com/watch?v=${anime.trailer!.id}',
+                  ),
             ),
           ),
         if (anime.trailer != null && anime.siteUrl != null)

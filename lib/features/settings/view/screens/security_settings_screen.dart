@@ -10,6 +10,24 @@ import 'package:ani_dash/shared/ui/pin_lock_dialog.dart';
 class SecuritySettingsScreen extends ConsumerWidget {
   const SecuritySettingsScreen({super.key});
 
+  int _length(String type) => type == 'pin6' ? 6 : 4;
+  bool _letters(String type) => type == 'password';
+  String _typeLabel(String type) => switch (type) {
+    'pin6' => '6-digit PIN',
+    'password' => 'Alphanumeric password',
+    'pattern' => 'Pattern (4 points)',
+    _ => '4-digit PIN',
+  };
+
+  String _delayLabel(int seconds) => switch (seconds) {
+    10 => 'After 10 seconds',
+    20 => 'After 20 seconds',
+    30 => 'After 30 seconds',
+    300 => 'After 5 minutes',
+    600 => 'After 10 minutes',
+    _ => 'Immediately',
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final security = ref.watch(securityProvider);
@@ -47,6 +65,8 @@ class SecuritySettingsScreen extends ConsumerWidget {
                     final pin = await PinLockDialog.showSetup(
                       context: context,
                       title: 'Set App PIN',
+                      credentialLength: _length(security.appLockType),
+                      allowLetters: _letters(security.appLockType),
                     );
                     if (pin != null && pin.isNotEmpty) {
                       notifier.setAppLock(true, pin);
@@ -56,6 +76,8 @@ class SecuritySettingsScreen extends ConsumerWidget {
                       context: context,
                       title: 'Verify App PIN',
                       onVerify: (pin) => notifier.verifyAppPin(pin),
+                      credentialLength: _length(security.appLockType),
+                      allowLetters: _letters(security.appLockType),
                     );
                     if (verified) {
                       notifier.setAppLock(false);
@@ -64,6 +86,77 @@ class SecuritySettingsScreen extends ConsumerWidget {
                 },
               ),
               if (security.appLockEnabled) ...[
+                NormalSettingsItem(
+                  icon: Icon(
+                    Icons.security_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  accent: colorScheme.primary,
+                  title: 'Lock Method',
+                  description: _typeLabel(security.appLockType),
+                  onTap: () async {
+                    final type = await showDialog<String>(
+                      context: context,
+                      builder:
+                          (dialogContext) => SimpleDialog(
+                            title: const Text('Choose lock method'),
+                            children:
+                                ['pin4', 'pin6', 'password', 'pattern']
+                                    .map(
+                                      (type) => SimpleDialogOption(
+                                        onPressed:
+                                            () => Navigator.pop(
+                                              dialogContext,
+                                              type,
+                                            ),
+                                        child: Text(_typeLabel(type)),
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                    );
+                    if (type == null || !context.mounted) return;
+                    final credential = await PinLockDialog.showSetup(
+                      context: context,
+                      title: 'Set ${_typeLabel(type)}',
+                      credentialLength: _length(type),
+                      allowLetters: _letters(type),
+                    );
+                    if (credential != null && credential.isNotEmpty) {
+                      notifier.setAppLockType(type, credential);
+                    }
+                  },
+                ),
+                NormalSettingsItem(
+                  icon: Icon(Icons.timer_outlined, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Auto-lock',
+                  description: _delayLabel(security.appLockDelaySeconds),
+                  onTap: () async {
+                    const delays = [0, 10, 20, 30, 300, 600];
+                    final delay = await showDialog<int>(
+                      context: context,
+                      builder:
+                          (dialogContext) => SimpleDialog(
+                            title: const Text('Auto-lock after leaving app'),
+                            children:
+                                delays
+                                    .map(
+                                      (seconds) => SimpleDialogOption(
+                                        onPressed:
+                                            () => Navigator.pop(
+                                              dialogContext,
+                                              seconds,
+                                            ),
+                                        child: Text(_delayLabel(seconds)),
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                    );
+                    if (delay != null) notifier.setAppLockDelay(delay);
+                  },
+                ),
                 ToggleableSettingsItem(
                   icon: Icon(
                     Icons.fingerprint_rounded,
@@ -88,11 +181,15 @@ class SecuritySettingsScreen extends ConsumerWidget {
                       context: context,
                       title: 'Verify Current PIN',
                       onVerify: (pin) => notifier.verifyAppPin(pin),
+                      credentialLength: _length(security.appLockType),
+                      allowLetters: _letters(security.appLockType),
                     );
                     if (verified && context.mounted) {
                       final newPin = await PinLockDialog.showSetup(
                         context: context,
                         title: 'Set New App PIN',
+                        credentialLength: _length(security.appLockType),
+                        allowLetters: _letters(security.appLockType),
                       );
                       if (newPin != null && newPin.isNotEmpty) {
                         notifier.setAppLock(true, newPin);

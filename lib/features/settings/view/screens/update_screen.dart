@@ -26,7 +26,7 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
     });
 
     final packageInfo = await PackageInfo.fromPlatform();
-    final currentVersion = '${packageInfo.version}-${packageInfo.buildNumber}';
+    final currentVersion = packageInfo.version;
     final updateInfo = await _updateService.checkForUpdate();
 
     if (!mounted) return;
@@ -80,12 +80,11 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
                   final version = snapshot.data?.version ?? '...';
-                  final buildNumber = snapshot.data?.buildNumber ?? '';
                   return NormalSettingsItem(
                     icon: Icon(Iconsax.info_circle, color: colorScheme.primary),
                     accent: colorScheme.primary,
                     title: 'Current Version',
-                    description: 'v$version ($buildNumber)',
+                    description: 'v$version',
                     trailingWidgets: [
                       if (_isChecking)
                         const SizedBox(
@@ -145,12 +144,15 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   icon: Icon(Iconsax.clock, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'Auto-Check Start Hour',
-                  description: '${settings.startHour.toString().padLeft(2, '0')}:00',
+                  description:
+                      '${settings.startHour.toString().padLeft(2, '0')}:00',
                   onTap: () async {
                     final time = await showTimePicker(
                       context: context,
-                      initialTime:
-                          TimeOfDay(hour: settings.startHour, minute: 0),
+                      initialTime: TimeOfDay(
+                        hour: settings.startHour,
+                        minute: 0,
+                      ),
                     );
                     if (time != null) {
                       notifier.updateSettings(
@@ -163,12 +165,12 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   icon: Icon(Iconsax.clock, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'Auto-Check End Hour',
-                  description: '${settings.endHour.toString().padLeft(2, '0')}:00',
+                  description:
+                      '${settings.endHour.toString().padLeft(2, '0')}:00',
                   onTap: () async {
                     final time = await showTimePicker(
                       context: context,
-                      initialTime:
-                          TimeOfDay(hour: settings.endHour, minute: 0),
+                      initialTime: TimeOfDay(hour: settings.endHour, minute: 0),
                     );
                     if (time != null) {
                       notifier.updateSettings(

@@ -59,9 +59,12 @@ class EpisodeBannerItem extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected
-                    ? accentPink
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
+                color:
+                    isSelected
+                        ? accentPink
+                        : theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.25,
+                        ),
                 width: isSelected ? 2.0 : 1.0,
               ),
               color: theme.colorScheme.surfaceContainer,
@@ -71,32 +74,34 @@ class EpisodeBannerItem extends StatelessWidget {
               children: [
                 // Background thumbnail
                 Positioned.fill(
-                  child: thumbnail != null
-                      ? (thumbnail.startsWith('http')
-                          ? CachedNetworkImage(
-                              imageUrl: thumbnail,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, _, _) =>
-                                  _buildFallbackImage(theme),
-                            )
-                          : Image.memory(
-                              base64Decode(thumbnail),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
-                                  _buildFallbackImage(theme),
-                            ))
-                      : (fallbackUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: fallbackUrl,
-                              fit: BoxFit.cover,
-                              httpHeaders: {
-                                "Referer": fallbackUrl.split('#').last,
-                                "User-Agent":
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-                              },
-                              errorWidget: (_, _, _) => _buildFallbackImage(theme),
-                            )
-                          : _buildFallbackImage(theme)),
+                  child:
+                      thumbnail != null
+                          ? (thumbnail.startsWith('http')
+                              ? CachedNetworkImage(
+                                imageUrl: thumbnail,
+                                fit: BoxFit.cover,
+                                errorWidget:
+                                    (_, _, _) => _buildFallbackImage(theme),
+                              )
+                              : Image.memory(
+                                base64Decode(thumbnail),
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, _, _) => _buildFallbackImage(theme),
+                              ))
+                          : (fallbackUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                imageUrl: fallbackUrl,
+                                fit: BoxFit.cover,
+                                httpHeaders: {
+                                  "Referer": fallbackUrl.split('#').last,
+                                  "User-Agent":
+                                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+                                },
+                                errorWidget:
+                                    (_, _, _) => _buildFallbackImage(theme),
+                              )
+                              : _buildFallbackImage(theme)),
                 ),
 
                 // Dark Tint / Gradient Overlay
@@ -192,7 +197,7 @@ class EpisodeBannerItem extends StatelessWidget {
                                         vertical: 1.5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.orange.shade800,
+                                        color: theme.colorScheme.primary,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(

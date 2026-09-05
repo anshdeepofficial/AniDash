@@ -62,6 +62,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
   Timer? _tapSeekResetTimer;
+  Timer? _tapSeekCommitTimer;
   Duration? _tapSeekTarget;
   bool? _tapSeekForward;
 
@@ -100,6 +101,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     _focusNode.dispose();
     _volumeOverlayTimer?.cancel();
     _tapSeekResetTimer?.cancel();
+    _tapSeekCommitTimer?.cancel();
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
       UIHelper.removeVolumeKeyHandler();
@@ -275,7 +277,15 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     }
     _tapSeekTarget = target;
     _tapSeekForward = forward;
-    ref.read(playerStateProvider.notifier).seek(target);
+    // Coalesce rapid taps into one seek. Repeated decoder flushes were causing
+    // a stop-start 10 second jump instead of a continuous +20/+30 sequence.
+    _tapSeekCommitTimer?.cancel();
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 180), () {
+      final pending = _tapSeekTarget;
+      if (pending != null && mounted) {
+        ref.read(playerStateProvider.notifier).seek(pending);
+      }
+    });
 
     _tapSeekResetTimer?.cancel();
     _tapSeekResetTimer = Timer(const Duration(milliseconds: 900), () {

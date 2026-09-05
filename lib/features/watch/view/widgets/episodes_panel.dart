@@ -58,13 +58,14 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
           title: const Text("Episode Range Size"),
           content: Wrap(
             spacing: 8,
-            children: [10, 25, 50, 100].map((size) {
-              return ChoiceChip(
-                label: Text("$size"),
-                selected: temp == size,
-                onSelected: (_) => setState(() => temp = size),
-              );
-            }).toList(),
+            children:
+                [10, 25, 50, 100].map((size) {
+                  return ChoiceChip(
+                    label: Text("$size"),
+                    selected: temp == size,
+                    onSelected: (_) => setState(() => temp = size),
+                  );
+                }).toList(),
           ),
           actions: [
             TextButton(
@@ -115,13 +116,16 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
     final singleProgress =
         ref.watch(animeWatchProgressProvider(widget.mediaId)).value;
 
-    final animeProgress = singleProgress ??
+    final animeProgress =
+        singleProgress ??
         allProgress
-            .where((e) =>
-                e.animeId == widget.mediaId ||
-                (animeTitle != null &&
-                    e.animeTitle.trim().toLowerCase() ==
-                        animeTitle.trim().toLowerCase()))
+            .where(
+              (e) =>
+                  e.animeId == widget.mediaId ||
+                  (animeTitle != null &&
+                      e.animeTitle.trim().toLowerCase() ==
+                          animeTitle.trim().toLowerCase()),
+            )
             .firstOrNull ??
         ref.read(watchProgressRepositoryProvider).getProgress(widget.mediaId);
 
@@ -146,14 +150,15 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                     DropdownButton<int>(
                       value: _currentStart,
                       underline: const SizedBox.shrink(),
-                      items: ranges
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r.$1,
-                              child: Text("${r.$1}-${r.$2}"),
-                            ),
-                          )
-                          .toList(),
+                      items:
+                          ranges
+                              .map(
+                                (r) => DropdownMenuItem(
+                                  value: r.$1,
+                                  child: Text("${r.$1}-${r.$2}"),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (v) {
                         if (v == null) return;
                         setState(() {
@@ -164,8 +169,9 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                     ),
                   IconButton(
                     icon: const Icon(Iconsax.setting_2, size: 20),
-                    onPressed: () =>
-                        _showRangeSizeDialog(context, episodeListNotifier),
+                    onPressed:
+                        () =>
+                            _showRangeSizeDialog(context, episodeListNotifier),
                   ),
                 ],
               ),
@@ -183,9 +189,10 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                     final isCompleted = epProgress?.isCompleted ?? false;
                     final duration = epProgress?.durationInSeconds ?? 0;
                     final progressSec = epProgress?.progressInSeconds ?? 0;
-                    final watchProgress = (duration > 0)
-                        ? (progressSec / duration).clamp(0.0, 1.0)
-                        : (isCompleted ? 1.0 : 0.0);
+                    final watchProgress =
+                        (duration > 0)
+                            ? (progressSec / duration).clamp(0.0, 1.0)
+                            : (isCompleted ? 1.0 : 0.0);
 
                     final downloadState = ref.watch(downloadsProvider);
                     final download = downloadState.downloads.firstWhereOrNull(
@@ -246,19 +253,21 @@ class EpisodeTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     // Dim text if watched and not currently selected
-    final textColor = isSelected
-        ? theme.colorScheme.onPrimary
-        : isCompleted
+    final textColor =
+        isSelected
+            ? theme.colorScheme.onPrimary
+            : isCompleted
             ? theme.colorScheme.outline
             : theme.colorScheme.onSurfaceVariant;
 
-    final bgColor = isSelected
-        ? theme.colorScheme.primary
-        : isFiller
-            ? theme.colorScheme.errorContainer
+    final bgColor =
+        isSelected
+            ? theme.colorScheme.primary
+            : isFiller
+            ? theme.colorScheme.primaryContainer
             : isCompleted
-                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                : theme.colorScheme.surfaceContainerHighest;
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+            : theme.colorScheme.surfaceContainerHighest;
 
     return InkWell(
       onTap: onTap,
@@ -267,9 +276,10 @@ class EpisodeTile extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primaryContainer
-              : Colors.transparent,
+          color:
+              isSelected
+                  ? theme.colorScheme.primaryContainer
+                  : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -285,11 +295,13 @@ class EpisodeTile extends StatelessWidget {
                       height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : isCompleted
-                                ? theme.colorScheme.primaryContainer
-                                    .withValues(alpha: 0.6)
+                        color:
+                            isSelected
+                                ? theme.colorScheme.primary
+                                : isCompleted
+                                ? theme.colorScheme.primaryContainer.withValues(
+                                  alpha: 0.6,
+                                )
                                 : bgColor,
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -297,9 +309,10 @@ class EpisodeTile extends StatelessWidget {
                         episodeNumber,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? theme.colorScheme.onPrimary
-                              : isCompleted
+                          color:
+                              isSelected
+                                  ? theme.colorScheme.onPrimary
+                                  : isCompleted
                                   ? theme.colorScheme.primary
                                   : textColor,
                         ),
@@ -331,10 +344,12 @@ class EpisodeTile extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected
-                          ? theme.colorScheme.onSurface
-                          : isCompleted
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      color:
+                          isSelected
+                              ? theme.colorScheme.onSurface
+                              : isCompleted
                               ? theme.colorScheme.outline
                               : theme.colorScheme.onSurface,
                     ),
@@ -343,8 +358,10 @@ class EpisodeTile extends StatelessWidget {
                 if (isCompleted)
                   Container(
                     margin: const EdgeInsets.only(right: 6),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
@@ -359,7 +376,11 @@ class EpisodeTile extends StatelessWidget {
                     ),
                   ),
                 if (isSelected)
-                  Icon(Iconsax.play5, size: 18, color: theme.colorScheme.primary)
+                  Icon(
+                    Iconsax.play5,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  )
                 else if (download != null)
                   _buildDownloadIndicator(theme, download!)
                 else if (isCompleted)
@@ -378,9 +399,10 @@ class EpisodeTile extends StatelessWidget {
                   value: watchProgress,
                   minHeight: 2.5,
                   backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  color: isCompleted
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.secondary,
+                  color:
+                      isCompleted
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.secondary,
                 ),
               ),
             ],

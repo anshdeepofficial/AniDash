@@ -12,6 +12,8 @@ class PinLockDialog extends StatefulWidget {
   final void Function(String pin)? onCreated;
   final VoidCallback? onBiometricSuccess;
   final VoidCallback? onCancel;
+  final int credentialLength;
+  final bool allowLetters;
 
   const PinLockDialog({
     super.key,
@@ -23,6 +25,8 @@ class PinLockDialog extends StatefulWidget {
     this.onCreated,
     this.onBiometricSuccess,
     this.onCancel,
+    this.credentialLength = 4,
+    this.allowLetters = false,
   });
 
   static Future<bool> showUnlock({
@@ -31,6 +35,8 @@ class PinLockDialog extends StatefulWidget {
     required bool Function(String pin) onVerify,
     bool enableBiometrics = false,
     VoidCallback? onBiometricSuccess,
+    int credentialLength = 4,
+    bool allowLetters = false,
   }) async {
     final res = await showModalBottomSheet<bool>(
       context: context,
@@ -38,16 +44,19 @@ class PinLockDialog extends StatefulWidget {
       enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: PinLockDialog(
-          title: title,
-          onVerify: onVerify,
-          enableBiometrics: enableBiometrics,
-          onBiometricSuccess: onBiometricSuccess,
-          onCancel: () => Navigator.pop(context, false),
-        ),
-      ),
+      builder:
+          (_) => PopScope(
+            canPop: false,
+            child: PinLockDialog(
+              title: title,
+              onVerify: onVerify,
+              enableBiometrics: enableBiometrics,
+              onBiometricSuccess: onBiometricSuccess,
+              onCancel: () => Navigator.pop(context, false),
+              credentialLength: credentialLength,
+              allowLetters: allowLetters,
+            ),
+          ),
     );
     return res ?? false;
   }
@@ -55,22 +64,27 @@ class PinLockDialog extends StatefulWidget {
   static Future<String?> showSetup({
     required BuildContext context,
     required String title,
+    int credentialLength = 4,
+    bool allowLetters = false,
   }) async {
     String? createdPin;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => PinLockDialog(
-        title: title,
-        subtitle: 'Enter a 4-digit PIN to secure access',
-        isCreating: true,
-        onCreated: (pin) {
-          createdPin = pin;
-          Navigator.pop(context);
-        },
-        onCancel: () => Navigator.pop(context),
-      ),
+      builder:
+          (_) => PinLockDialog(
+            title: title,
+            subtitle: 'Enter a 4-digit PIN to secure access',
+            isCreating: true,
+            onCreated: (pin) {
+              createdPin = pin;
+              Navigator.pop(context);
+            },
+            onCancel: () => Navigator.pop(context),
+            credentialLength: credentialLength,
+            allowLetters: allowLetters,
+          ),
     );
     return createdPin;
   }
@@ -82,6 +96,7 @@ class PinLockDialog extends StatefulWidget {
 class _PinLockDialogState extends State<PinLockDialog>
     with SingleTickerProviderStateMixin {
   String _pin = '';
+  final TextEditingController _passwordController = TextEditingController();
   String? _firstPin;
   bool _hasError = false;
   late AnimationController _shakeController;
@@ -158,9 +173,10 @@ class _PinLockDialogState extends State<PinLockDialog>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _shakeAnimation = Tween<double>(begin: 0.0, end: 12.0)
-        .chain(CurveTween(curve: Curves.elasticIn))
-        .animate(_shakeController);
+    _shakeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 12.0,
+    ).chain(CurveTween(curve: Curves.elasticIn)).animate(_shakeController);
 
     // Keep portrait lock while PIN dialog is active
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -176,6 +192,7 @@ class _PinLockDialogState extends State<PinLockDialog>
 
   @override
   void dispose() {
+    _passwordController.dispose();
     _shakeController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -210,14 +227,14 @@ class _PinLockDialogState extends State<PinLockDialog>
   }
 
   void _onDigit(String d) {
-    if (_pin.length >= 4) return;
+    if (_pin.length >= widget.credentialLength) return;
     HapticFeedback.lightImpact();
     setState(() {
       _pin += d;
       _hasError = false;
     });
 
-    if (_pin.length == 4) {
+    if (_pin.length == widget.credentialLength) {
       _handleSubmit();
     }
   }
@@ -237,6 +254,7 @@ class _PinLockDialogState extends State<PinLockDialog>
         setState(() {
           _firstPin = _pin;
           _pin = '';
+          _passwordController.clear();
         });
       } else {
         if (_pin == _firstPin) {
@@ -248,6 +266,7 @@ class _PinLockDialogState extends State<PinLockDialog>
             _pin = '';
             _firstPin = null;
           });
+          _passwordController.clear();
         }
       }
     } else {
@@ -278,9 +297,12 @@ class _PinLockDialogState extends State<PinLockDialog>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final subtitleText = widget.isCreating
-        ? (_firstPin == null ? 'Enter a 4-digit PIN' : 'Confirm your 4-digit PIN')
-        : (_hasError ? 'Incorrect PIN. Try again.' : widget.subtitle);
+    final subtitleText =
+        widget.isCreating
+            ? (_firstPin == null
+                ? 'Enter your credential'
+                : 'Confirm your credential')
+            : (_hasError ? 'Incorrect PIN. Try again.' : widget.subtitle);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -319,9 +341,14 @@ class _PinLockDialogState extends State<PinLockDialog>
               onTap: _nextQuote,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.35,
+                  ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: colorScheme.primary.withValues(alpha: 0.2),
@@ -383,56 +410,83 @@ class _PinLockDialogState extends State<PinLockDialog>
             Text(
               subtitleText,
               style: TextStyle(
-                color: _hasError ? Colors.redAccent : colorScheme.onSurfaceVariant,
+                color:
+                    _hasError ? Colors.redAccent : colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: _hasError ? FontWeight.bold : FontWeight.normal,
               ),
             ),
             const SizedBox(height: 20),
 
-            // Pin Dots
-            AnimatedBuilder(
-              animation: _shakeAnimation,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(
-                    _shakeController.isAnimating
-                        ? (_shakeAnimation.value * (1 - _shakeController.value))
-                        : 0,
-                    0,
-                  ),
-                  child: child,
-                );
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (index) {
-                  final filled = index < _pin.length;
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: filled
-                          ? (_hasError ? Colors.redAccent : colorScheme.primary)
-                          : colorScheme.surfaceContainerHighest,
-                      border: Border.all(
-                        color: _hasError
-                            ? Colors.redAccent
-                            : colorScheme.outlineVariant,
-                        width: 1.5,
-                      ),
+            // PIN/pattern dots or an alphanumeric password field.
+            if (widget.allowLetters)
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onChanged: (value) => _pin = value,
+                onSubmitted: (_) {
+                  if (_pin.length >= 4) _handleSubmit();
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
+              )
+            else
+              AnimatedBuilder(
+                animation: _shakeAnimation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(
+                      _shakeController.isAnimating
+                          ? (_shakeAnimation.value *
+                              (1 - _shakeController.value))
+                          : 0,
+                      0,
                     ),
+                    child: child,
                   );
-                }),
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.credentialLength, (index) {
+                    final filled = index < _pin.length;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            filled
+                                ? (_hasError
+                                    ? Colors.redAccent
+                                    : colorScheme.primary)
+                                : colorScheme.surfaceContainerHighest,
+                        border: Border.all(
+                          color:
+                              _hasError
+                                  ? Colors.redAccent
+                                  : colorScheme.outlineVariant,
+                          width: 1.5,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
               ),
-            ),
 
             const Spacer(),
 
-            // Ergonomically Placed Keypad
-            _buildKeypad(colorScheme),
+            if (widget.allowLetters)
+              FilledButton(
+                onPressed: _pin.length >= 4 ? _handleSubmit : null,
+                child: Text(widget.isCreating ? 'Continue' : 'Unlock'),
+              )
+            else
+              _buildKeypad(colorScheme),
             const SizedBox(height: 16),
           ],
         ),
@@ -525,4 +579,3 @@ class _PinLockDialogState extends State<PinLockDialog>
     );
   }
 }
-

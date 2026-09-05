@@ -209,6 +209,19 @@ class SettingsSheetContent extends ConsumerWidget {
                   );
                 },
               ),
+              SwitchListTile(
+                secondary: const Icon(Icons.skip_next_rounded),
+                title: const Text('Skip Filler Episodes'),
+                subtitle: const Text(
+                  'Jump to the next canon episode without marking fillers watched',
+                ),
+                value: playerSettings.skipFillerEpisodes,
+                onChanged: (val) {
+                  playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(skipFillerEpisodes: val),
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Iconsax.speedometer),
                 title: const Text("Playback Speed"),

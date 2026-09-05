@@ -21,7 +21,9 @@ class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
   @override
   Widget build(BuildContext context) {
     final trendingAnimes =
-        widget.spotlightAnime ?? List<UniversalMedia?>.filled(9, null);
+        (widget.spotlightAnime != null && widget.spotlightAnime!.isNotEmpty)
+            ? widget.spotlightAnime!
+            : List<UniversalMedia?>.filled(25, null);
     final cardMode = ref.watch(
       uiSettingsProvider.select((ui) => ui.spotlightCardStyle),
     );
@@ -98,7 +100,7 @@ class _SpotlightHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'Trending ${spotlightAnime?.length ?? 0}',
+              'Trending ${spotlightAnime?.length ?? 25}',
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onTertiaryContainer,
                 fontWeight: FontWeight.bold,

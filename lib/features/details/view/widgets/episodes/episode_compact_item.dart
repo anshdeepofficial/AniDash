@@ -54,9 +54,10 @@ class EpisodeCompactItem extends StatelessWidget {
                         ? Icons.check_box_rounded
                         : Icons.check_box_outline_blank_rounded,
                     size: 20,
-                    color: isSelected
-                        ? theme.colorScheme.primary
-                        : theme.hintColor,
+                    color:
+                        isSelected
+                            ? theme.colorScheme.primary
+                            : theme.hintColor,
                   ),
                 ),
               SizedBox(
@@ -67,9 +68,10 @@ class EpisodeCompactItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: isWatched
-                          ? theme.hintColor
-                          : theme.colorScheme.primary,
+                      color:
+                          isWatched
+                              ? theme.hintColor
+                              : theme.colorScheme.primary,
                     ),
                   ),
                 ),
@@ -82,43 +84,45 @@ class EpisodeCompactItem extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: isWatched ? theme.hintColor : null),
           ),
-          subtitle: (download != null || episode.isFiller == true)
-              ? Row(
-                  children: [
-                    if (episode.isFiller == true)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Text(
-                          'FILLER',
-                          style: TextStyle(
-                            color: Colors.orange.shade700,
-                            fontSize: 10,
+          subtitle:
+              (download != null || episode.isFiller == true)
+                  ? Row(
+                    children: [
+                      if (episode.isFiller == true)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Text(
+                            'FILLER',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontSize: 10,
+                            ),
                           ),
                         ),
-                      ),
-                    if (download != null)
-                      _buildDownloadStatus(theme, download!),
-                  ],
-                )
-              : null,
-          trailing: isSelectionMode
-              ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onDownload != null)
+                      if (download != null)
+                        _buildDownloadStatus(theme, download!),
+                    ],
+                  )
+                  : null,
+          trailing:
+              isSelectionMode
+                  ? null
+                  : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onDownload != null)
+                        IconButton(
+                          icon: const Icon(Icons.download_rounded, size: 20),
+                          tooltip: 'Download',
+                          onPressed: onDownload,
+                        ),
                       IconButton(
-                        icon: const Icon(Icons.download_rounded, size: 20),
-                        tooltip: 'Download',
-                        onPressed: onDownload,
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        tooltip: 'More options',
+                        onPressed: onMoreOptions,
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.more_vert, size: 20),
-                      tooltip: 'More options',
-                      onPressed: onMoreOptions,
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
           onTap: onTap,
           onLongPress: onLongPress,
         ),

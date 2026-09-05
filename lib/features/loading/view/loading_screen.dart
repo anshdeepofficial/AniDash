@@ -9,6 +9,8 @@ import 'package:ani_dash/features/loading/view_model/initialization_notifier.dar
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/update_provider.dart';
 import 'package:ani_dash/core/utils/updater.dart';
+import 'package:ani_dash/core/services/update_scheduler.dart';
+import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
 
 const List<String> _kAnimeQuotes = [
   '"Believe in yourself!" - Gurren Lagann',
@@ -48,6 +50,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen> {
     // Post-frame callback ensures context is available for checks
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(initializationProvider.notifier).initialize();
+      UpdateScheduler.apply(ref.read(updateSettingsProvider));
 
       if (!kDebugMode && ref.read(automaticUpdatesProvider)) {
         final useTest = ref.read(experimentalProvider).useTestReleases;

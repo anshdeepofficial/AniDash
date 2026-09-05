@@ -8,6 +8,8 @@ class SecurityState {
   final bool appLockEnabled;
   final String? appLockPinHash;
   final bool appLockBiometrics;
+  final String appLockType;
+  final int appLockDelaySeconds;
   final bool hentaiLockEnabled;
   final String? hentaiLockPinHash;
   final bool hentaiLockBiometrics;
@@ -20,6 +22,8 @@ class SecurityState {
     this.appLockEnabled = false,
     this.appLockPinHash,
     this.appLockBiometrics = true,
+    this.appLockType = 'pin4',
+    this.appLockDelaySeconds = 0,
     this.hentaiLockEnabled = false,
     this.hentaiLockPinHash,
     this.hentaiLockBiometrics = true,
@@ -33,6 +37,8 @@ class SecurityState {
     bool? appLockEnabled,
     String? appLockPinHash,
     bool? appLockBiometrics,
+    String? appLockType,
+    int? appLockDelaySeconds,
     bool? hentaiLockEnabled,
     String? hentaiLockPinHash,
     bool? hentaiLockBiometrics,
@@ -45,6 +51,8 @@ class SecurityState {
       appLockEnabled: appLockEnabled ?? this.appLockEnabled,
       appLockPinHash: appLockPinHash ?? this.appLockPinHash,
       appLockBiometrics: appLockBiometrics ?? this.appLockBiometrics,
+      appLockType: appLockType ?? this.appLockType,
+      appLockDelaySeconds: appLockDelaySeconds ?? this.appLockDelaySeconds,
       hentaiLockEnabled: hentaiLockEnabled ?? this.hentaiLockEnabled,
       hentaiLockPinHash: hentaiLockPinHash ?? this.hentaiLockPinHash,
       hentaiLockBiometrics: hentaiLockBiometrics ?? this.hentaiLockBiometrics,
@@ -60,6 +68,8 @@ class SecurityState {
       'appLockEnabled': appLockEnabled,
       'appLockPinHash': appLockPinHash,
       'appLockBiometrics': appLockBiometrics,
+      'appLockType': appLockType,
+      'appLockDelaySeconds': appLockDelaySeconds,
       'hentaiLockEnabled': hentaiLockEnabled,
       'hentaiLockPinHash': hentaiLockPinHash,
       'hentaiLockBiometrics': hentaiLockBiometrics,
@@ -75,6 +85,8 @@ class SecurityState {
       appLockEnabled: appLock,
       appLockPinHash: map['appLockPinHash'],
       appLockBiometrics: map['appLockBiometrics'] ?? true,
+      appLockType: map['appLockType'] ?? 'pin4',
+      appLockDelaySeconds: map['appLockDelaySeconds'] ?? 0,
       hentaiLockEnabled: hentaiLock,
       hentaiLockPinHash: map['hentaiLockPinHash'],
       hentaiLockBiometrics: map['hentaiLockBiometrics'] ?? true,
@@ -90,8 +102,9 @@ class SecurityState {
       SecurityState.fromMap(json.decode(source));
 }
 
-final securityProvider =
-    NotifierProvider<SecurityNotifier, SecurityState>(SecurityNotifier.new);
+final securityProvider = NotifierProvider<SecurityNotifier, SecurityState>(
+  SecurityNotifier.new,
+);
 
 class SecurityNotifier extends Notifier<SecurityState> {
   static const _prefsKey = 'ani_security_settings';
@@ -100,7 +113,8 @@ class SecurityNotifier extends Notifier<SecurityState> {
   @override
   SecurityState build() {
     final raw = sharedPrefs.getString(_prefsKey);
-    final initial = raw != null ? SecurityState.fromJson(raw) : const SecurityState();
+    final initial =
+        raw != null ? SecurityState.fromJson(raw) : const SecurityState();
     _applySecureFlag(initial.screenshotPrivacy);
     return initial;
   }
@@ -169,6 +183,25 @@ class SecurityNotifier extends Notifier<SecurityState> {
 
   void toggleAppLockBiometrics(bool val) {
     state = state.copyWith(appLockBiometrics: val);
+    _save();
+  }
+
+  void setAppLockType(String type, String credential) {
+    state = state.copyWith(
+      appLockType: type,
+      appLockPinHash: hashPin(credential),
+      isAppUnlocked: true,
+    );
+    _save();
+  }
+
+  void setPreferredAppLockType(String type) {
+    state = state.copyWith(appLockType: type);
+    _save();
+  }
+
+  void setAppLockDelay(int seconds) {
+    state = state.copyWith(appLockDelaySeconds: seconds);
     _save();
   }
 

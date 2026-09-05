@@ -1,7 +1,11 @@
 package com.anidash.anime
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.hardware.display.DisplayManager
 import android.view.Display
 import android.view.KeyEvent
@@ -9,6 +13,8 @@ import android.view.OrientationEventListener
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import androidx.core.content.FileProvider
 
 class MainActivity : FlutterFragmentActivity() {
     private var landscapeListener: OrientationEventListener? = null
@@ -149,6 +155,43 @@ class MainActivity : FlutterFragmentActivity() {
                         isScreenshotPrivacyEnabled = call.argument<Boolean>("enable") ?: false
                         updateSecureFlag()
                         result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anidash/updater")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "canInstallPackages" -> result.success(
+                        Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                            packageManager.canRequestPackageInstalls()
+                    )
+                    "openInstallPermission" -> {
+                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = Uri.parse("package:$packageName")
+                        })
+                        result.success(true)
+                    }
+                    "installApk" -> {
+                        val path = call.argument<String>("path")
+                        val apk = path?.let(::File)
+                        if (apk == null || !apk.exists() || apk.length() == 0L) {
+                            result.error("INVALID_APK", "Downloaded APK is missing or empty", null)
+                        } else {
+                            val uri = FileProvider.getUriForFile(
+                                this,
+                                "$packageName.installFileProvider.install",
+                                apk
+                            )
+                            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            })
+                            // Do not wait for PackageInstaller's activity result: some Android
+                            // versions never return it when an update replaces this process.
+                            result.success(true)
+                        }
                     }
                     else -> result.notImplemented()
                 }

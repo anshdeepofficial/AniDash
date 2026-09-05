@@ -72,21 +72,23 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
       defaultQuality: fields[0] == null ? 'Auto' : fields[0] as String,
       enableAniSkip: fields[1] == null ? true : fields[1] as bool,
       enableAutoSkip: fields[2] == null ? false : fields[2] as bool,
+      skipFillerEpisodes: fields[9] == null ? false : fields[9] as bool,
       preferDub: fields[3] == null ? true : fields[3] as bool,
       bufferSize: fields[8] == null ? 32 : (fields[8] as num).toDouble(),
       seekDuration: fields[4] == null ? 10 : (fields[4] as num).toInt(),
       autoHideDuration: fields[5] == null ? 4 : (fields[5] as num).toInt(),
       showNextPrevButtons: fields[6] == null ? true : fields[6] as bool,
-      mpvSettings: fields[7] == null
-          ? const {}
-          : (fields[7] as Map).cast<String, String>(),
+      mpvSettings:
+          fields[7] == null
+              ? const {}
+              : (fields[7] as Map).cast<String, String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, PlayerModel obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.defaultQuality)
       ..writeByte(1)
@@ -104,7 +106,9 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
       ..writeByte(7)
       ..write(obj.mpvSettings)
       ..writeByte(8)
-      ..write(obj.bufferSize);
+      ..write(obj.bufferSize)
+      ..writeByte(9)
+      ..write(obj.skipFillerEpisodes);
   }
 
   @override
@@ -175,9 +179,10 @@ class AnimeWatchProgressEntryAdapter
       animeFormat: fields[2] as String?,
       animeCover: fields[3] as String,
       totalEpisodes: (fields[4] as num).toInt(),
-      episodesProgress: fields[5] == null
-          ? const {}
-          : (fields[5] as Map).cast<int, EpisodeProgress>(),
+      episodesProgress:
+          fields[5] == null
+              ? const {}
+              : (fields[5] as Map).cast<int, EpisodeProgress>(),
       lastUpdated: fields[6] as DateTime?,
       currentEpisode: fields[7] == null ? 1 : (fields[7] as num).toInt(),
       status: fields[8] == null ? 'watching' : fields[8] as String,
@@ -288,9 +293,8 @@ class SubtitleAppearanceModelAdapter
     return SubtitleAppearanceModel(
       fontSize: fields[0] == null ? 16.0 : (fields[0] as num).toDouble(),
       textColor: fields[1] == null ? 0xFFFFFFFF : (fields[1] as num).toInt(),
-      backgroundOpacity: fields[2] == null
-          ? 0.5
-          : (fields[2] as num).toDouble(),
+      backgroundOpacity:
+          fields[2] == null ? 0.5 : (fields[2] as num).toDouble(),
       hasShadow: fields[3] == null ? true : fields[3] as bool,
       shadowOpacity: fields[4] == null ? 0.5 : (fields[4] as num).toDouble(),
       shadowBlur: fields[5] == null ? 2.0 : (fields[5] as num).toDouble(),
@@ -299,12 +303,10 @@ class SubtitleAppearanceModelAdapter
       boldText: fields[8] == null ? true : fields[8] as bool,
       forceUppercase: fields[9] == null ? false : fields[9] as bool,
       bottomMargin: fields[10] == null ? 20.0 : (fields[10] as num).toDouble(),
-      backgroundColor: fields[11] == null
-          ? 0xFF000000
-          : (fields[11] as num).toInt(),
-      outlineColor: fields[12] == null
-          ? 0xFF000000
-          : (fields[12] as num).toInt(),
+      backgroundColor:
+          fields[11] == null ? 0xFF000000 : (fields[11] as num).toInt(),
+      outlineColor:
+          fields[12] == null ? 0xFF000000 : (fields[12] as num).toInt(),
       outlineWidth: fields[13] == null ? 0.0 : (fields[13] as num).toDouble(),
     );
   }
@@ -423,12 +425,13 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       state: fields[6] as DownloadStatus,
       progress: (fields[7] as num).toInt(),
       filePath: fields[10] as String,
-      headers: fields[11] == null
-          ? const {
-              'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            }
-          : (fields[11] as Map).cast<dynamic, dynamic>(),
+      headers:
+          fields[11] == null
+              ? const {
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              }
+              : (fields[11] as Map).cast<dynamic, dynamic>(),
       speed: fields[15] == null ? 0 : (fields[15] as num).toInt(),
       eta: fields[16] as Duration?,
       contentType: fields[12] as String?,
@@ -560,9 +563,8 @@ class DownloadSettingsModelAdapter extends TypeAdapter<DownloadSettingsModel> {
     return DownloadSettingsModel(
       customDownloadPath: fields[0] as String?,
       useCustomPath: fields[1] == null ? false : fields[1] as bool,
-      folderStructure: fields[2] == null
-          ? 'Anime/Episode'
-          : fields[2] as String,
+      folderStructure:
+          fields[2] == null ? 'Anime/Episode' : fields[2] as String,
       parallelDownloads: fields[3] == null ? 5 : (fields[3] as num).toInt(),
       speedLimitKBps: fields[4] == null ? 0 : (fields[4] as num).toInt(),
       wifiOnly: fields[5] == null ? false : fields[5] as bool,
@@ -831,13 +833,15 @@ class UiSettingsAdapter extends TypeAdapter<UiSettings> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return UiSettings(
-      cardStyle: fields[0] == null
-          ? AnimeCardMode.defaults
-          : fields[0] as AnimeCardMode,
+      cardStyle:
+          fields[0] == null
+              ? AnimeCardMode.defaults
+              : fields[0] as AnimeCardMode,
       immersiveMode: fields[2] == null ? false : fields[2] as bool,
-      spotlightCardStyle: fields[1] == null
-          ? SpotlightCardMode.defaults
-          : fields[1] as SpotlightCardMode,
+      spotlightCardStyle:
+          fields[1] == null
+              ? SpotlightCardMode.defaults
+              : fields[1] as SpotlightCardMode,
       episodeViewMode: fields[3] == null ? 'list' : fields[3] as String,
       scale: fields[4] == null ? 1.0 : (fields[4] as num).toDouble(),
     );
