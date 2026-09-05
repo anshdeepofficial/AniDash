@@ -127,9 +127,22 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _isPlayerReady = false;
     _epNum = initialEpisode;
 
+    Duration startAt = Duration.zero;
+    final saved = ref
+        .read(watchProgressRepositoryProvider)
+        .getEpisodeProgress(mediaId, initialEpisode);
+    final savedSeconds = saved?.progressInSeconds ?? 0;
+    final savedDuration = saved?.durationInSeconds ?? 0;
+    if (savedSeconds > 0 &&
+        !((saved?.isCompleted ?? false) ||
+            (savedDuration > 0 && savedSeconds >= savedDuration - 10))) {
+      startAt = Duration(seconds: savedSeconds);
+      AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
+    }
+
     await ref
         .read(episodeDataProvider.notifier)
-        .loadEpisode(ep: initialEpisode);
+        .loadEpisode(ep: initialEpisode, startAt: startAt);
   }
 
   void _attachPlaybackListeners(
@@ -175,19 +188,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       if (!_isPlayerReady) {
         if (_dur == 0 || next.position.inSeconds == 0) return;
         _isPlayerReady = true;
-
-        try {
-          final repo = ref.read(watchProgressRepositoryProvider);
-          final progress = repo.getEpisodeProgress(mediaId, _epNum ?? 1);
-          if (progress != null && (progress.progressInSeconds ?? 0) > 0) {
-            final targetSeconds = progress.progressInSeconds!;
-            if (targetSeconds < _dur - 10) {
-              ref
-                  .read(playerStateProvider.notifier)
-                  .seek(Duration(seconds: targetSeconds));
-            }
-          }
-        } catch (_) {}
       }
 
       if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);

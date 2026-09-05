@@ -1,3 +1,5 @@
+package com.anidash.anime
+
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.hardware.display.DisplayManager
