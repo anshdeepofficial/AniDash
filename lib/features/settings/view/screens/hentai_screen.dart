@@ -61,8 +61,12 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    ref.read(securityProvider.notifier).lockHentai();
     super.dispose();
+  }
+
+  void _exitHub() {
+    ref.read(securityProvider.notifier).lockHentai();
+    context.pop();
   }
 
   Future<void> _showAdultContentWarning() async {
@@ -232,12 +236,7 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
       ref.read(sourceProvider.notifier).setActiveSource(source);
     }
     if (!context.mounted) return;
-    navigateToDetail(
-      context,
-      anime,
-      'hentai-${anime.id}',
-      fromHentaiHub: true,
-    );
+    navigateToDetail(context, anime, 'hentai-${anime.id}', fromHentaiHub: true);
   }
 
   Future<void> _openLogin(
@@ -356,7 +355,10 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
             final activeSource = ref.watch(sourceProvider).activeAnimeSource;
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,9 +384,8 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                         const SizedBox(width: 10),
                         Text(
                           'Hentai Hub Accounts & Settings',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -405,7 +406,9 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                       ),
                       value: isIncognito,
                       onChanged: (val) {
-                        ref.read(global18PlusIncognitoProvider.notifier).toggle();
+                        ref
+                            .read(global18PlusIncognitoProvider.notifier)
+                            .toggle();
                       },
                     ),
                     const Divider(height: 20),
@@ -489,7 +492,9 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                           children: [
                             Text(
                               'Active 18+ Source',
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              style: Theme.of(
+                                context,
+                              ).textTheme.labelLarge?.copyWith(
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
@@ -559,248 +564,267 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
     final colorScheme = theme.colorScheme;
     ref.watch(sourceProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        leading: IconButton.filledTonal(
-          onPressed: () => context.pop(),
-          icon: const Icon(Iconsax.arrow_left_2),
-        ),
-        title:
-            _showSearch
-                ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Search 18+ anime & manga...',
-                    border: InputBorder.none,
-                  ),
-                  textInputAction: TextInputAction.search,
-                  onSubmitted:
-                      (query) =>
-                          _showManga
-                              ? _loadAdultManga(query)
-                              : _loadMatureAnime(query),
-                )
-                : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Hentai Hub', style: TextStyle(fontSize: 18)),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade700,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        '18+',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _exitHub();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          titleSpacing: 0,
+          leading: IconButton.filledTonal(
+            onPressed: _exitHub,
+            icon: const Icon(Iconsax.arrow_left_2),
+          ),
+          title:
+              _showSearch
+                  ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Search 18+ anime & manga...',
+                      border: InputBorder.none,
                     ),
-                  ],
-                ),
-        actions: [
-          IconButton(
-            tooltip: '18+ Downloads',
-            icon: const Icon(Iconsax.document_download),
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DownloadsScreen(isAdult: true),
-                  ),
-                ),
-          ),
-          IconButton(
-            tooltip: '18+ Sources & Extensions',
-            icon: const Icon(Icons.extension_rounded),
-            onPressed:
-                () => context.push('/settings/extensions?adultOnly=true'),
-          ),
-          IconButton(
-            tooltip: _showSearch ? 'Close search' : 'Search',
-            icon: Icon(_showSearch ? Icons.close : Iconsax.search_normal_1),
-            onPressed: () {
-              setState(() => _showSearch = !_showSearch);
-              if (!_showSearch) {
-                _searchController.clear();
-                _searchAnime.clear();
-                _loadMatureAnime();
-              }
-            },
-          ),
-          IconButton(
-            tooltip: 'Hub Accounts & Settings',
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => _showAccountBottomSheet(context),
-          ),
-          const SizedBox(width: 4),
-        ],
-        forceMaterialTransparency: true,
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          if (_showManga) {
-            await _loadAdultManga(_searchController.text);
-          } else {
-            await _loadMatureAnime(_searchController.text);
-          }
-        },
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                    value: false,
-                    icon: Icon(Icons.movie_outlined),
-                    label: Text('Anime'),
-                  ),
-                  ButtonSegment(
-                    value: true,
-                    icon: Icon(Icons.menu_book_rounded),
-                    label: Text('Manga'),
-                  ),
-                ],
-                selected: {_showManga},
-                onSelectionChanged: (value) {
-                  final manga = value.first;
-                  setState(() => _showManga = manga);
-                  if (manga && _adultManga.isEmpty) _loadAdultManga();
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            if (_showManga)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: _buildMangaCatalog(context, colorScheme),
-              )
-            else if (_showSearch && _searchController.text.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: _buildSearchGrid(context, colorScheme),
-              )
-            else if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(48.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else ...[
-              // Spotlight carousel banner
-              if (_trendingAnime.isNotEmpty)
-                SpotlightSection(
-                  spotlightAnime: _trendingAnime.take(10).toList(),
-                ),
-
-              // Dedicated Hentai Hub Continue Watching section
-              const _HentaiContinueWatchingSection(),
-
-              // Horizontal Category Sections
-              if (_trendingAnime.isNotEmpty)
-                HomeSectionWidget(
-                  title: 'Trending 18+',
-                  mediaList: _trendingAnime,
-                  fromHentaiHub: true,
-                  onTitleTap:
-                      () => _navigateToCategory('Trending 18+', _trendingAnime),
-                ),
-
-              if (_topRatedAnime.isNotEmpty)
-                HomeSectionWidget(
-                  title: 'Top Rated 18+',
-                  mediaList: _topRatedAnime,
-                  fromHentaiHub: true,
-                  onTitleTap:
-                      () => _navigateToCategory('Top Rated 18+', _topRatedAnime),
-                ),
-
-              if (_recentAnime.isNotEmpty)
-                HomeSectionWidget(
-                  title: 'Recent Releases',
-                  mediaList: _recentAnime,
-                  fromHentaiHub: true,
-                  onTitleTap:
-                      () => _navigateToCategory('Recent Releases', _recentAnime),
-                ),
-
-              // Explore All Catalog with Filter Chips
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                child: Text(
-                  'Explore All 18+ Anime',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                    textInputAction: TextInputAction.search,
+                    onSubmitted:
+                        (query) =>
+                            _showManga
+                                ? _loadAdultManga(query)
+                                : _loadMatureAnime(query),
+                  )
+                  : Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      ChoiceChip(
-                        label: const Text('Popularity'),
-                        selected: _exploreSortIndex == 0,
-                        onSelected: (val) {
-                          if (val) setState(() => _exploreSortIndex = 0);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Top Rated'),
-                        selected: _exploreSortIndex == 1,
-                        onSelected: (val) {
-                          if (val) setState(() => _exploreSortIndex = 1);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Recent'),
-                        selected: _exploreSortIndex == 2,
-                        onSelected: (val) {
-                          if (val) setState(() => _exploreSortIndex = 2);
-                        },
+                      const Text('Hentai Hub', style: TextStyle(fontSize: 18)),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade700,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '18+',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
+          actions: [
+            IconButton(
+              tooltip: '18+ Downloads',
+              icon: const Icon(Iconsax.document_download),
+              onPressed:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DownloadsScreen(isAdult: true),
+                    ),
+                  ),
+            ),
+            IconButton(
+              tooltip: '18+ Sources & Extensions',
+              icon: const Icon(Icons.extension_rounded),
+              onPressed:
+                  () => context.push('/settings/extensions?adultOnly=true'),
+            ),
+            IconButton(
+              tooltip: _showSearch ? 'Close search' : 'Search',
+              icon: Icon(_showSearch ? Icons.close : Iconsax.search_normal_1),
+              onPressed: () {
+                setState(() => _showSearch = !_showSearch);
+                if (!_showSearch) {
+                  _searchController.clear();
+                  _searchAnime.clear();
+                  _loadMatureAnime();
+                }
+              },
+            ),
+            IconButton(
+              tooltip: 'Hub Accounts & Settings',
+              icon: const Icon(Icons.account_circle_outlined),
+              onPressed: () => _showAccountBottomSheet(context),
+            ),
+            const SizedBox(width: 4),
+          ],
+          forceMaterialTransparency: true,
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            if (_showManga) {
+              await _loadAdultManga(_searchController.text);
+            } else {
+              await _loadMatureAnime(_searchController.text);
+            }
+          },
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: _buildPreinstalledSourcesCard(context, colorScheme),
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      icon: Icon(Icons.movie_outlined),
+                      label: Text('Anime'),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      icon: Icon(Icons.menu_book_rounded),
+                      label: Text('Manga'),
+                    ),
+                  ],
+                  selected: {_showManga},
+                  onSelectionChanged: (value) {
+                    final manga = value.first;
+                    setState(() => _showManga = manga);
+                    if (manga && _adultManga.isEmpty) _loadAdultManga();
+                  },
+                ),
               ),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: _buildAnimeGrid(
-                  context,
-                  colorScheme,
-                  _exploreSortIndex == 1
-                      ? _topRatedAnime
-                      : _exploreSortIndex == 2
-                      ? _recentAnime
-                      : _trendingAnime,
+
+              if (_showManga)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: _buildMangaCatalog(context, colorScheme),
+                )
+              else if (_showSearch && _searchController.text.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: _buildSearchGrid(context, colorScheme),
+                )
+              else if (_isLoading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(48.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else ...[
+                // Spotlight carousel banner
+                if (_trendingAnime.isNotEmpty)
+                  SpotlightSection(
+                    spotlightAnime: _trendingAnime.take(10).toList(),
+                  ),
+
+                // Dedicated Hentai Hub Continue Watching section
+                const _HentaiContinueWatchingSection(),
+
+                // Horizontal Category Sections
+                if (_trendingAnime.isNotEmpty)
+                  HomeSectionWidget(
+                    title: 'Trending 18+',
+                    mediaList: _trendingAnime,
+                    fromHentaiHub: true,
+                    onTitleTap:
+                        () =>
+                            _navigateToCategory('Trending 18+', _trendingAnime),
+                  ),
+
+                if (_topRatedAnime.isNotEmpty)
+                  HomeSectionWidget(
+                    title: 'Top Rated 18+',
+                    mediaList: _topRatedAnime,
+                    fromHentaiHub: true,
+                    onTitleTap:
+                        () => _navigateToCategory(
+                          'Top Rated 18+',
+                          _topRatedAnime,
+                        ),
+                  ),
+
+                if (_recentAnime.isNotEmpty)
+                  HomeSectionWidget(
+                    title: 'Recent Releases',
+                    mediaList: _recentAnime,
+                    fromHentaiHub: true,
+                    onTitleTap:
+                        () => _navigateToCategory(
+                          'Recent Releases',
+                          _recentAnime,
+                        ),
+                  ),
+
+                // Explore All Catalog with Filter Chips
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    'Explore All 18+ Anime',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 80),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 2,
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Popularity'),
+                          selected: _exploreSortIndex == 0,
+                          onSelected: (val) {
+                            if (val) setState(() => _exploreSortIndex = 0);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Top Rated'),
+                          selected: _exploreSortIndex == 1,
+                          onSelected: (val) {
+                            if (val) setState(() => _exploreSortIndex = 1);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Recent'),
+                          selected: _exploreSortIndex == 2,
+                          onSelected: (val) {
+                            if (val) setState(() => _exploreSortIndex = 2);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: _buildPreinstalledSourcesCard(context, colorScheme),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: _buildAnimeGrid(
+                    context,
+                    colorScheme,
+                    _exploreSortIndex == 1
+                        ? _topRatedAnime
+                        : _exploreSortIndex == 2
+                        ? _recentAnime
+                        : _trendingAnime,
+                  ),
+                ),
+                const SizedBox(height: 80),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -826,7 +850,11 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.bolt_rounded, size: 20, color: Colors.amber.shade400),
+                Icon(
+                  Icons.bolt_rounded,
+                  size: 20,
+                  color: Colors.amber.shade400,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Fast Streaming & Login',
@@ -933,7 +961,11 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
           padding: const EdgeInsets.all(48),
           child: Column(
             children: [
-              Icon(Icons.search_off_rounded, size: 48, color: colorScheme.outline),
+              Icon(
+                Icons.search_off_rounded,
+                size: 48,
+                color: colorScheme.outline,
+              ),
               const SizedBox(height: 8),
               const Text('No 18+ content matched your search.'),
             ],
@@ -1247,9 +1279,7 @@ class _CategoryViewScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final anime = animeList[index];
                     final coverUrl =
-                        anime.coverImage.large ??
-                        anime.coverImage.medium ??
-                        '';
+                        anime.coverImage.large ?? anime.coverImage.medium ?? '';
                     return InkWell(
                       borderRadius: BorderRadius.circular(10),
                       onTap: () => onOpen(anime),
@@ -1285,9 +1315,7 @@ class _CategoryViewScreen extends StatelessWidget {
                               left: 6,
                               right: 6,
                               child: Text(
-                                anime.title.english ??
-                                    anime.title.romaji ??
-                                    '',
+                                anime.title.english ?? anime.title.romaji ?? '',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(

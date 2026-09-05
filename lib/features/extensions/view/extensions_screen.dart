@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Extension;
@@ -17,9 +19,36 @@ class ExtensionScreen extends StatefulWidget {
 }
 
 class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
+  ExtensionType? _previousManagerType;
+
   @override
   void initState() {
     super.initState();
+    if (widget.adultOnly && Platform.isAndroid) {
+      final controller = Get.find<ExtensionManager>();
+      _previousManagerType = ExtensionType.fromManager(
+        controller.currentManager,
+      );
+      controller.setCurrentManager(ExtensionType.aniyomi);
+      manager = controller.currentManager;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRepositories());
+  }
+
+  @override
+  void dispose() {
+    if (_previousManagerType != null) {
+      Get.find<ExtensionManager>().setCurrentManager(_previousManagerType!);
+    }
+    super.dispose();
+  }
+
+  Future<void> _refreshRepositories() async {
+    final manager = Get.find<ExtensionManager>().currentManager;
+    await Future.wait([
+      manager.fetchAvailableAnimeExtensions(_getSavedAnimeRepos(manager)),
+      manager.fetchAvailableMangaExtensions(_getSavedMangaRepos(manager)),
+    ]);
   }
 
   @override
@@ -44,11 +73,17 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
     );
   };
 
-  List<String> _getSavedAnimeRepos() {
+  List<String> _getSavedAnimeRepos(dynamic manager) {
+    if (ExtensionType.fromManager(manager) == ExtensionType.mangayomi) {
+      return const [
+        'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+        'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
+      ];
+    }
     final saved = sharedPrefs.getStringList('saved_anime_repos');
     final repos = <String>{
-      "https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json",
       "https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json",
+      "https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json",
     };
     if (saved != null && saved.isNotEmpty) {
       repos.addAll(saved);
@@ -56,7 +91,12 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
     return repos.toList();
   }
 
-  List<String> _getSavedMangaRepos() {
+  List<String> _getSavedMangaRepos(dynamic manager) {
+    if (ExtensionType.fromManager(manager) == ExtensionType.mangayomi) {
+      return const [
+        'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
+      ];
+    }
     final saved = sharedPrefs.getStringList('saved_manga_repos');
     final repos = <String>{
       'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
@@ -111,11 +151,7 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
         },
       ),
       IconButton(
-        onPressed: () async {
-          final repos = _getSavedAnimeRepos();
-          await Get.find<ExtensionManager>().currentManager
-              .fetchAvailableAnimeExtensions(repos);
-        },
+        onPressed: _refreshRepositories,
         icon: const Icon(Iconsax.refresh),
         tooltip: 'Refresh',
       ),
@@ -124,6 +160,9 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
         tooltip: 'Filter Extension Type',
         onSelected: (type) {
           Get.find<ExtensionManager>().setCurrentManager(type);
+          manager = Get.find<ExtensionManager>().currentManager;
+          setState(() {});
+          _refreshRepositories();
         },
         itemBuilder: (context) {
           return ExtensionType.values.map((type) {
@@ -381,10 +420,18 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                               final messenger = ScaffoldMessenger.of(context);
                               try {
                                 final isManga = selectedType == ItemType.manga;
+                                final isAniyomiRepository =
+                                    url.contains('index.min.json') ||
+                                    url.contains('aniyomi');
+                                final targetManager =
+                                    isAniyomiRepository
+                                        ? ExtensionType.aniyomi.getManager()
+                                        : Get.find<ExtensionManager>()
+                                            .currentManager;
                                 final currentRepos =
                                     isManga
-                                        ? _getSavedMangaRepos()
-                                        : _getSavedAnimeRepos();
+                                        ? _getSavedMangaRepos(targetManager)
+                                        : _getSavedAnimeRepos(targetManager);
                                 final updated = {...currentRepos, url}.toList();
                                 await sharedPrefs.setStringList(
                                   isManga
@@ -392,13 +439,8 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                       : 'saved_anime_repos',
                                   updated,
                                 );
-                                final isAniyomiRepository =
-                                    url.contains('index.min.json') ||
-                                    url.contains('aniyomi');
                                 if (isAniyomiRepository) {
-                                  final manager =
-                                      ExtensionType.aniyomi.getManager();
-                                  await manager.onRepoSaved(
+                                  await targetManager.onRepoSaved(
                                     updated,
                                     selectedType,
                                   );
@@ -495,7 +537,8 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
     if (source == null) return const SizedBox.shrink();
     final normalizedName = (source.name ?? '').toLowerCase();
     final normalizedId = (source.id ?? '').toLowerCase();
-    final is18 = source.isNsfw == true ||
+    final is18 =
+        source.isNsfw == true ||
         normalizedName.contains('hentai') ||
         normalizedName.contains('hanime') ||
         normalizedName.contains('18+') ||

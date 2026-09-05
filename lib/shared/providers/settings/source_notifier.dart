@@ -103,9 +103,10 @@ class SourceNotifier extends _$SourceNotifier {
       // Also collect from other extension manager so extensions are never lost
       try {
         final currentType = ExtensionType.fromManager(manager);
-        final other = currentType == ExtensionType.aniyomi
-            ? ExtensionType.mangayomi.getManager()
-            : ExtensionType.aniyomi.getManager();
+        final other =
+            currentType == ExtensionType.aniyomi
+                ? ExtensionType.mangayomi.getManager()
+                : ExtensionType.aniyomi.getManager();
         await addExtensions(other);
       } catch (_) {}
 
@@ -263,16 +264,34 @@ class SourceNotifier extends _$SourceNotifier {
   Future<void> fetchSources(ItemType mediaType) async {
     final manager = Get.find<ExtensionManager>().currentManager;
     if (mediaType == ItemType.anime) {
-      final savedList = sharedPrefs.getStringList('saved_anime_repos');
-      final repos = (savedList != null && savedList.isNotEmpty)
-          ? savedList
-          : (state.activeAnimeRepo.isNotEmpty
-              ? [state.activeAnimeRepo]
-              : ["https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json"]);
+      final isMangayomi =
+          ExtensionType.fromManager(manager) == ExtensionType.mangayomi;
+      final savedList = sharedPrefs.getStringList('saved_anime_repos') ?? [];
+      final repos =
+          isMangayomi
+              ? const [
+                'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+                'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
+              ]
+              : <String>{
+                'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
+                'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
+                ...savedList,
+              }.toList();
       await manager.fetchAvailableAnimeExtensions(repos);
     } else if (mediaType == ItemType.manga) {
-      if (state.activeMangaRepo.isEmpty) return;
-      await manager.fetchAvailableMangaExtensions([state.activeMangaRepo]);
+      final isMangayomi =
+          ExtensionType.fromManager(manager) == ExtensionType.mangayomi;
+      final repos =
+          isMangayomi
+              ? const [
+                'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
+              ]
+              : <String>{
+                'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
+                ...?sharedPrefs.getStringList('saved_manga_repos'),
+              }.toList();
+      await manager.fetchAvailableMangaExtensions(repos);
     } else {
       if (state.activeNovelRepo.isEmpty) return;
       await manager.fetchAvailableNovelExtensions([state.activeNovelRepo]);
@@ -296,14 +315,20 @@ class SourceNotifier extends _$SourceNotifier {
           return Pages(list: []);
         }
       }
-      AppLogger.d('Search: Using source "${state.activeAnimeSource!.name}" (id: ${state.activeAnimeSource!.id}, itemType: ${state.activeAnimeSource!.itemType}) for query "$query"');
+      AppLogger.d(
+        'Search: Using source "${state.activeAnimeSource!.name}" (id: ${state.activeAnimeSource!.id}, itemType: ${state.activeAnimeSource!.itemType}) for query "$query"',
+      );
       final result = await state.activeAnimeSource!.methods
           .search(query, page, filters)
           .timeout(const Duration(seconds: 10));
       AppLogger.d('Search: Got ${result.list.length} results');
       return result;
     } catch (err, st) {
-      AppLogger.e('Search failed for query "$query" with source "${state.activeAnimeSource?.name}" (id: ${state.activeAnimeSource?.id})', err, st);
+      AppLogger.e(
+        'Search failed for query "$query" with source "${state.activeAnimeSource?.name}" (id: ${state.activeAnimeSource?.id})',
+        err,
+        st,
+      );
       return Pages(list: []);
     }
   }
@@ -366,4 +391,3 @@ class SourceNotifier extends _$SourceNotifier {
     // }
   }
 }
-
