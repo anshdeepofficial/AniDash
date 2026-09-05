@@ -3,11 +3,11 @@ name: ani_dash
 description: >
   🚀 AniDash is a blazing-fast, modern, and user-friendly anime streaming app built with Flutter.
   Stream your favorite anime, keep track of your watch progress, and explore trending shows —
-  all in one place. Built with ❤️ by Darkx-dev.
+  all in one place. Built with ❤️ by anshdeepofficial.
 
 publish_to: "none"
 
-version: 1.8.12+26
+version: 1.8.13+27
 
 environment:
   sdk: ">=3.7.0 <4.0.0"

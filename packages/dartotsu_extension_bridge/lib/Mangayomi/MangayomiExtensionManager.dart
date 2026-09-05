@@ -49,48 +49,50 @@ class MangayomiExtensionManager extends GetxController {
         debugPrint("Failed to fetch sources from $repo: ${req.statusCode}");
         continue;
       }
-      final sourceList = (jsonDecode(req.body) as List)
-          .map((e) {
-            if (e['id'] is String &&
-                e['name'] != null &&
-                e['site'] != null &&
-                e['lang'] != null &&
-                e['version'] != null &&
-                e['url'] != null &&
-                e['iconUrl'] != null) {
-              final src = MSource.fromJson(e)
-                ..sourceId = e['id'].toString()
-                ..apiUrl = ''
-                ..appMinVerReq = ''
-                ..dateFormat = ''
-                ..dateFormatLocale = ''
-                ..hasCloudflare = false
-                ..headers = ''
-                ..isActive = true
-                ..isAdded = false
-                ..isFullData = false
-                ..isNsfw = false
-                ..isPinned = false
-                ..lastUsed = false
-                ..sourceCode = ''
-                ..typeSource = ''
-                ..versionLast = '0.0.1'
-                ..isObsolete = false
-                ..isLocal = false
-                ..lang = _convertLang(e)
-                ..baseUrl = e['site']
-                ..sourceCodeUrl = e['url']
-                ..sourceCodeLanguage = SourceCodeLanguage.lnreader
-                ..itemType = ItemType.novel;
-              return src;
-            } else {
-              return MSource.fromJson(e)
-                ..repo = repo
-                ..sourceId = e['id'].toString();
-            }
-          })
-          .where((source) => source.itemType == itemType)
-          .toList();
+      final sourceList =
+          (jsonDecode(req.body) as List)
+              .map((e) {
+                if (e['id'] is String &&
+                    e['name'] != null &&
+                    e['site'] != null &&
+                    e['lang'] != null &&
+                    e['version'] != null &&
+                    e['url'] != null &&
+                    e['iconUrl'] != null) {
+                  final src =
+                      MSource.fromJson(e)
+                        ..sourceId = e['id'].toString()
+                        ..apiUrl = ''
+                        ..appMinVerReq = ''
+                        ..dateFormat = ''
+                        ..dateFormatLocale = ''
+                        ..hasCloudflare = false
+                        ..headers = ''
+                        ..isActive = true
+                        ..isAdded = false
+                        ..isFullData = false
+                        ..isNsfw = false
+                        ..isPinned = false
+                        ..lastUsed = false
+                        ..sourceCode = ''
+                        ..typeSource = ''
+                        ..versionLast = '0.0.1'
+                        ..isObsolete = false
+                        ..isLocal = false
+                        ..lang = _convertLang(e)
+                        ..baseUrl = e['site']
+                        ..sourceCodeUrl = e['url']
+                        ..sourceCodeLanguage = SourceCodeLanguage.lnreader
+                        ..itemType = ItemType.novel;
+                  return src;
+                } else {
+                  return MSource.fromJson(e)
+                    ..repo = repo
+                    ..sourceId = e['id'].toString();
+                }
+              })
+              .where((source) => source.itemType == itemType)
+              .toList();
 
       sources.addAll(sourceList);
     }
@@ -171,13 +173,14 @@ class MangayomiExtensionManager extends GetxController {
     try {
       var mSource = await getAvailable(source.itemType!, source.id);
       final req = await http.get(Uri.parse(mSource.sourceCodeUrl!));
-      final headers = getExtensionService(
-        mSource..sourceCode = req.body,
-      ).getHeaders();
+      final headers =
+          getExtensionService(mSource..sourceCode = req.body).getHeaders();
 
-      var s = mSource
-        ..sourceCode = req.body
-        ..headers = jsonEncode(headers);
+      var s =
+          mSource
+            ..id = null
+            ..sourceCode = req.body
+            ..headers = jsonEncode(headers);
 
       isar.writeTxnSync(() => isar.mSources.putSync(s));
     } catch (e) {
@@ -189,9 +192,7 @@ class MangayomiExtensionManager extends GetxController {
   Future<void> uninstallSource(Source source) async {
     try {
       var mSource = await getInstalled(source.itemType!, source.id);
-      isar.writeTxnSync(
-        () => isar.mSources.deleteSync(mSource.id!),
-      );
+      isar.writeTxnSync(() => isar.mSources.deleteSync(mSource.id!));
     } catch (e) {
       debugPrint("Error uninstalling source: $e");
       return Future.error(e);
@@ -202,14 +203,14 @@ class MangayomiExtensionManager extends GetxController {
     try {
       var mSource = await getAvailable(source.itemType!, source.id);
       final req = await http.get(Uri.parse(mSource.sourceCodeUrl!));
-      final headers = getExtensionService(
-        mSource..sourceCode = req.body,
-      ).getHeaders();
+      final headers =
+          getExtensionService(mSource..sourceCode = req.body).getHeaders();
 
-      var s = mSource
-        ..sourceCode = req.body
-        ..version = source.version
-        ..headers = jsonEncode(headers);
+      var s =
+          mSource
+            ..sourceCode = req.body
+            ..version = source.version
+            ..headers = jsonEncode(headers);
 
       isar.writeTxnSync(() => isar.mSources.putSync(s));
     } catch (e) {

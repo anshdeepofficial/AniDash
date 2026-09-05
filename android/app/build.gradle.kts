@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.shonenx.anime"
+    namespace = "com.anidash.anime"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -26,7 +26,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shonenx.anime"
+        applicationId = "com.anidash.anime"
         minSdk = 23
         targetSdk = 36
         versionCode = flutter.versionCode

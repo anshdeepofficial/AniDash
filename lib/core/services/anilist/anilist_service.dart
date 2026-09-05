@@ -62,21 +62,22 @@ class AnilistService implements AnimeRepository, TrackerService {
 
       final document = gql(query);
 
-      final result = isMutation
-          ? await _client!.mutate(
-              MutationOptions(
-                document: document,
-                variables: variables ?? const {},
-                fetchPolicy: FetchPolicy.networkOnly,
-              ),
-            )
-          : await _client!.query(
-              QueryOptions(
-                document: document,
-                variables: variables ?? const {},
-                fetchPolicy: FetchPolicy.cacheFirst,
-              ),
-            );
+      final result =
+          isMutation
+              ? await _client!.mutate(
+                MutationOptions(
+                  document: document,
+                  variables: variables ?? const {},
+                  fetchPolicy: FetchPolicy.networkOnly,
+                ),
+              )
+              : await _client!.query(
+                QueryOptions(
+                  document: document,
+                  variables: variables ?? const {},
+                  fetchPolicy: FetchPolicy.cacheFirst,
+                ),
+              );
 
       if (result.hasException) {
         throw TrackerException('GraphQL operation failed', result.exception);
@@ -93,8 +94,9 @@ class AnilistService implements AnimeRepository, TrackerService {
   List<UniversalMedia> _parseMediaList(List<dynamic>? media) =>
       media
           ?.map(
-            (json) =>
-                UniversalMediaMapper.fromAnilist(Map<String, dynamic>.from(json)),
+            (json) => UniversalMediaMapper.fromAnilist(
+              Map<String, dynamic>.from(json),
+            ),
           )
           .toList() ??
       [];
@@ -384,7 +386,7 @@ class AnilistService implements AnimeRepository, TrackerService {
     SearchFilter? filter,
   }) async {
     try {
-      final adultParam = _getAdultParam();
+      final adultParam = filter?.isAdult ?? _getAdultParam();
       final useAdult = adultParam != null;
 
       final hasSearch = title.trim().isNotEmpty;

@@ -1,4 +1,4 @@
-package com.shonenx.shonenx
+package com.anidash.anime
 
 import android.content.pm.ActivityInfo
 import android.view.KeyEvent
@@ -18,16 +18,10 @@ class MainActivity : FlutterActivity() {
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
                 when (orientation) {
-                    in 45..135 -> {
-                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                        }
-                    }
-                    in 225..315 -> {
-                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        }
-                    }
+                    in 45..135 -> requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                    in 225..315 -> requestedOrientation =
+                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 }
             }
         }.also { if (it.canDetectOrientation()) it.enable() }
@@ -49,11 +43,10 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "toggleLandscape" -> {
-                        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        } else {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                        }
+                        requestedOrientation =
+                            if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
+                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
                         result.success(null)
                     }
                     "landscapeLeft" -> {
@@ -69,43 +62,39 @@ class MainActivity : FlutterActivity() {
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         result.success(null)
                     }
-                    else -> {
-                        result.notImplemented()
-                    }
-                }
-            }
-
-        volumeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/volume").apply {
-            setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "enableIntercept" -> {
-                        interceptVolumeKeys = true
-                        result.success(null)
-                    }
-                    "disableIntercept" -> {
-                        interceptVolumeKeys = false
-                        result.success(null)
-                    }
                     else -> result.notImplemented()
                 }
             }
-        }
+
+        volumeChannel =
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/volume").apply {
+                setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "enableIntercept" -> {
+                            interceptVolumeKeys = true
+                            result.success(null)
+                        }
+                        "disableIntercept" -> {
+                            interceptVolumeKeys = false
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                }
+            }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (interceptVolumeKeys) {
-            val action = event.action
-            val keyCode = event.keyCode
-            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                if (action == KeyEvent.ACTION_DOWN) {
+        if (interceptVolumeKeys && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
                     volumeChannel?.invokeMethod("volumeUp", null)
+                    return true
                 }
-                return true
-            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-                if (action == KeyEvent.ACTION_DOWN) {
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     volumeChannel?.invokeMethod("volumeDown", null)
+                    return true
                 }
-                return true
             }
         }
         return super.dispatchKeyEvent(event)
@@ -116,3 +105,4 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 }
+

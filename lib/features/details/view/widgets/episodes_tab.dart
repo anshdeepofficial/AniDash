@@ -45,6 +45,7 @@ class EpisodesTab extends ConsumerStatefulWidget {
   final UniversalTitle mediaTitle;
   final String mediaFormat;
   final String mediaCover;
+  final bool fromHentaiHub;
 
   const EpisodesTab({
     super.key,
@@ -52,6 +53,7 @@ class EpisodesTab extends ConsumerStatefulWidget {
     required this.mediaTitle,
     required this.mediaFormat,
     required this.mediaCover,
+    this.fromHentaiHub = false,
   });
 
   @override
@@ -270,12 +272,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final state = ref.watch(detailsPageProvider(widget.mediaId));
     final experimentalSettings = ref.watch(experimentalProvider);
     final uiSettings = ref.watch(uiSettingsProvider);
-    final viewMode = experimentalSettings.useEpisodeBannerStyle
-        ? EpisodeViewMode.banner
-        : EpisodeViewMode.values.firstWhere(
-            (e) => e.name == uiSettings.episodeViewMode,
-            orElse: () => EpisodeViewMode.list,
-          );
+    final viewMode =
+        experimentalSettings.useEpisodeBannerStyle
+            ? EpisodeViewMode.banner
+            : EpisodeViewMode.values.firstWhere(
+              (e) => e.name == uiSettings.episodeViewMode,
+              orElse: () => EpisodeViewMode.list,
+            );
 
     final episodeListState = ref.watch(episodeListProvider);
 
@@ -606,7 +609,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                       onSelected: (mode) {
                                         if (mode == EpisodeViewMode.banner) {
                                           ref
-                                              .read(experimentalProvider.notifier)
+                                              .read(
+                                                experimentalProvider.notifier,
+                                              )
                                               .updateSettings(
                                                 (s) => s.copyWith(
                                                   useEpisodeBannerStyle: true,
@@ -614,7 +619,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                               );
                                         } else {
                                           ref
-                                              .read(experimentalProvider.notifier)
+                                              .read(
+                                                experimentalProvider.notifier,
+                                              )
                                               .updateSettings(
                                                 (s) => s.copyWith(
                                                   useEpisodeBannerStyle: false,
@@ -752,12 +759,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     String? animeIdForSource,
   ) {
     final experimentalSettings = ref.watch(experimentalProvider);
-    final viewMode = experimentalSettings.useEpisodeBannerStyle
-        ? EpisodeViewMode.banner
-        : EpisodeViewMode.values.firstWhere(
-            (e) => e.name == ref.watch(uiSettingsProvider).episodeViewMode,
-            orElse: () => EpisodeViewMode.list,
-          );
+    final viewMode =
+        experimentalSettings.useEpisodeBannerStyle
+            ? EpisodeViewMode.banner
+            : EpisodeViewMode.values.firstWhere(
+              (e) => e.name == ref.watch(uiSettingsProvider).episodeViewMode,
+              orElse: () => EpisodeViewMode.list,
+            );
 
     Widget buildItem(BuildContext context, int index) {
       final ep = visibleEpisodes[index];
@@ -1110,15 +1118,34 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     );
   }
 
+  bool _isSource18Plus(dynamic s) {
+    if (s == null) return false;
+    if (s is Source) {
+      if (s.isNsfw == true) return true;
+      final name = (s.name ?? '').toLowerCase();
+      return name.contains('hanime') || name.contains('hentai');
+    }
+    final str = s.toString().toLowerCase();
+    return str.contains('hanime') || str.contains('hentai');
+  }
+
   Widget _buildExtensionSourceList(
     WidgetRef ref,
     ScrollController scrollController,
     DetailsPageNotifier notifier,
     String query,
   ) {
+    final detailsMedia =
+        ref.watch(detailsPageProvider(widget.mediaId)).details.value;
+    final isMature = widget.fromHentaiHub && detailsMedia?.isMature == true;
+
     final sourceState = ref.watch(sourceProvider);
     final sources =
         sourceState.installedAnimeExtensions.where((s) {
+            final is18 = _isSource18Plus(s);
+            if (isMature && !is18) return false;
+            if (!isMature && is18) return false;
+
             if (query.isEmpty) return true;
             return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
           }).toList()
@@ -1132,7 +1159,17 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final activeId = sourceState.activeAnimeSource?.id;
 
     if (sources.isEmpty) {
-      return const Center(child: Text('No extensions found.'));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            isMature
+                ? 'No 18+ extensions found.\nPlease install Hanime.tv or HentaiHaven from Extensions.'
+                : 'No extensions found.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return ListView.builder(
@@ -1181,6 +1218,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                   : null,
 
           onTap: () {
+            ref.read(selectedProviderKeyProvider.notifier).clear();
             ref.read(sourceProvider.notifier).setActiveSource(source);
             Navigator.pop(context);
             notifier.refresh();
@@ -1196,10 +1234,27 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     DetailsPageNotifier notifier,
     String query,
   ) {
+    final detailsMedia =
+        ref.watch(detailsPageProvider(widget.mediaId)).details.value;
+    final isMature = widget.fromHentaiHub && detailsMedia?.isMature == true;
+
+    if (isMature) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            'Built-in sources only support regular anime.\nFor 18+ content, switch to the Extensions tab.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
     final registry = ref.read(animeSourceRegistryProvider);
     final selectedAnimeSource = ref.watch(selectedAnimeProvider);
     final sources =
         registry.keys.where((s) {
+          if (_isSource18Plus(s)) return false;
           if (query.isEmpty) return true;
           return s.toLowerCase().contains(query.toLowerCase());
         }).toList();

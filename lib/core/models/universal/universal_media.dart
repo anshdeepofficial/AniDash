@@ -228,12 +228,17 @@ class UniversalTitle {
 }
 
 class UniversalCoverImage {
+  final String? extraLarge;
   final String? large;
   final String? medium;
 
-  const UniversalCoverImage({this.large, this.medium});
+  const UniversalCoverImage({this.extraLarge, this.large, this.medium});
 
-  Map<String, dynamic> toJson() => {'large': large, 'medium': medium};
+  Map<String, dynamic> toJson() => {
+    'extraLarge': extraLarge,
+    'large': large,
+    'medium': medium,
+  };
 }
 
 class UniversalNextAiringEpisode {

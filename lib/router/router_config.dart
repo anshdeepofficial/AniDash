@@ -48,21 +48,27 @@ class AnimatedGoRoute extends GoRoute {
     super.routes = const <RouteBase>[],
     super.redirect,
   }) : super(
-         pageBuilder: (context, state) => CustomTransitionPage(
-           key: state.pageKey,
-           child: contentBuilder(context, state),
-           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-             return SlideTransition(
-               position: animation.drive(
-                 Tween<Offset>(
-                   begin: const Offset(0, 1),
-                   end: Offset.zero,
-                 ).chain(CurveTween(curve: Curves.easeOutCubic)),
-               ),
-               child: child,
-             );
-           },
-         ),
+         pageBuilder:
+             (context, state) => CustomTransitionPage(
+               key: state.pageKey,
+               child: contentBuilder(context, state),
+               transitionsBuilder: (
+                 context,
+                 animation,
+                 secondaryAnimation,
+                 child,
+               ) {
+                 return SlideTransition(
+                   position: animation.drive(
+                     Tween<Offset>(
+                       begin: const Offset(0, 1),
+                       end: Offset.zero,
+                     ).chain(CurveTween(curve: Curves.easeOutCubic)),
+                   ),
+                   child: child,
+                 );
+               },
+             ),
        );
 }
 
@@ -87,22 +93,25 @@ final routerConfig = GoRouter(
       builder: (context, state, navigationShell) {
         return navigationShell;
       },
-      branches: navItems.map((item) {
-        return StatefulShellBranch(
-          routes: [
-            AnimatedGoRoute(
-              path: item.path,
-              contentBuilder: (context, state) => item.path == '/browse'
-                  ? BrowseScreen(
-                      key: ValueKey(state.uri.toString()),
-                      keyword: state.uri.queryParameters['keyword'],
-                      initialFilter: state.extra as SearchFilter?,
-                    )
-                  : item.screen,
-            ),
-          ],
-        );
-      }).toList(),
+      branches:
+          navItems.map((item) {
+            return StatefulShellBranch(
+              routes: [
+                AnimatedGoRoute(
+                  path: item.path,
+                  contentBuilder:
+                      (context, state) =>
+                          item.path == '/browse'
+                              ? BrowseScreen(
+                                key: ValueKey(state.uri.toString()),
+                                keyword: state.uri.queryParameters['keyword'],
+                                initialFilter: state.extra as SearchFilter?,
+                              )
+                              : item.screen,
+                ),
+              ],
+            );
+          }).toList(),
     ),
     AnimatedGoRoute(
       path: '/extensions',
@@ -118,43 +127,49 @@ final routerConfig = GoRouter(
     ),
     AnimatedGoRoute(
       path: '/details',
-      contentBuilder: (context, state) => AnimeDetailsScreen(
-        anime: state.extra as UniversalMedia,
-        tag: state.uri.queryParameters['tag'] ?? '',
-        forceFetch: state.uri.queryParameters['forceFetch'] == 'true',
-      ),
+      contentBuilder:
+          (context, state) => AnimeDetailsScreen(
+            anime: state.extra as UniversalMedia,
+            tag: state.uri.queryParameters['tag'] ?? '',
+            forceFetch: state.uri.queryParameters['forceFetch'] == 'true',
+            fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
+          ),
     ),
     AnimatedGoRoute(
       path: '/details/:id',
       contentBuilder: (context, state) {
-        final anime = state.extra is UniversalMedia
-            ? state.extra as UniversalMedia
-            : UniversalMedia(
-                id: state.pathParameters['id']!,
-                title: const UniversalTitle(
-                  english: 'Anime',
-                  romaji: 'Anime',
-                ),
-                coverImage: const UniversalCoverImage(),
-              );
+        final anime =
+            state.extra is UniversalMedia
+                ? state.extra as UniversalMedia
+                : UniversalMedia(
+                  id: state.pathParameters['id']!,
+                  title: const UniversalTitle(
+                    english: 'Anime',
+                    romaji: 'Anime',
+                  ),
+                  coverImage: const UniversalCoverImage(),
+                );
         return AnimeDetailsScreen(
           anime: anime,
           tag: state.uri.queryParameters['tag'] ?? '',
           forceFetch: true,
+          fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
         );
       },
     ),
     AnimatedGoRoute(
       path: '/watch/:id',
-      contentBuilder: (context, state) => WatchScreen(
-        mediaId: state.pathParameters['id']!,
-        animeId: state.uri.queryParameters['animeId'],
-        animeName: state.uri.queryParameters['animeName']!,
-        animeFormat: state.uri.queryParameters['animeFormat'],
-        animeCover: state.uri.queryParameters['animeCover']!,
-        episode: int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
-        episodes: state.extra as List<EpisodeDataModel>,
-      ),
+      contentBuilder:
+          (context, state) => WatchScreen(
+            mediaId: state.pathParameters['id']!,
+            animeId: state.uri.queryParameters['animeId'],
+            animeName: state.uri.queryParameters['animeName']!,
+            animeFormat: state.uri.queryParameters['animeFormat'],
+            animeCover: state.uri.queryParameters['animeCover']!,
+            episode:
+                int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
+            episodes: state.extra as List<EpisodeDataModel>,
+          ),
     ),
     AnimatedGoRoute(
       path: '/settings',
@@ -234,8 +249,9 @@ final routerConfig = GoRouter(
           routes: [
             AnimatedGoRoute(
               path: 'extension-preference',
-              contentBuilder: (_, state) =>
-                  ExtensionPreferenceScreen(source: state.extra as Source),
+              contentBuilder:
+                  (_, state) =>
+                      ExtensionPreferenceScreen(source: state.extra as Source),
             ),
           ],
         ),

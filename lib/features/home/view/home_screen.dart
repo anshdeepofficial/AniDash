@@ -217,6 +217,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: HeaderSection(isDesktop: false),
                   );
 
+                // bottom spacer so the nav bar doesn't choke the content
+                if (index == sections.length + 1)
+                  return const SizedBox(height: 80);
+
+                final section = sections[index - 1];
+
+                // Continue Watching section runs independently from remote homePage API
+                if (section.type == HomeSectionType.continueWatching) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: _ContinueWatchingSection(),
+                  );
+                }
+
                 if (state.isLoading)
                   return const SizedBox(
                     height: 200,
@@ -228,12 +242,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final home = state.homePage;
                 if (home == null) return const SizedBox.shrink();
 
-                // bottom spacer so the nav bar doesn't choke the content
-                if (index == sections.length + 1)
-                  return const SizedBox(height: 80);
-
                 return _HomeSectionRenderer(
-                  section: sections[index - 1],
+                  section: section,
                   home: home,
                 );
               },
@@ -455,6 +465,15 @@ class _ContinueWatchingSection extends ConsumerWidget {
         return ContinueSection(allProgress: combinedList.take(15).toList());
       },
       loading: () {
+        List<AnimeWatchProgressEntry> syncList = [];
+        try {
+          syncList = ref.read(watchProgressRepositoryProvider).getAllProgress()
+            ..sort((a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(a.lastUpdated ?? DateTime(0)));
+        } catch (_) {}
+        if (syncList.isNotEmpty) {
+          return ContinueSection(allProgress: syncList.take(15).toList());
+        }
+
         if (cloudWatching.isNotEmpty) {
           final synthetic = cloudWatching.map((c) {
             final media = c.media;
@@ -487,6 +506,15 @@ class _ContinueWatchingSection extends ConsumerWidget {
         return const SizedBox.shrink();
       },
       error: (_, _) {
+        List<AnimeWatchProgressEntry> syncList = [];
+        try {
+          syncList = ref.read(watchProgressRepositoryProvider).getAllProgress()
+            ..sort((a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(a.lastUpdated ?? DateTime(0)));
+        } catch (_) {}
+        if (syncList.isNotEmpty) {
+          return ContinueSection(allProgress: syncList.take(15).toList());
+        }
+
         if (cloudWatching.isNotEmpty) {
           final synthetic = cloudWatching.map((c) {
             final media = c.media;

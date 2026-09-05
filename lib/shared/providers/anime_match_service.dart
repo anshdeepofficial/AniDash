@@ -27,11 +27,11 @@ class AnimeMatchService {
   /// Iterates through English, Romaji, and Native titles.
   /// Returns the best match as a [BaseAnimeModel] or null if no match is found.
   Future<BaseAnimeModel?> findBestMatch(UniversalTitle title) async {
-    final titles = [
-      title.english,
-      title.romaji,
-      title.native,
-    ].where((t) => t != null && t.trim().isNotEmpty).cast<String>().toList();
+    final titles =
+        [title.english, title.romaji, title.native]
+            .where((t) => t != null && t.trim().isNotEmpty)
+            .cast<String>()
+            .toList();
 
     if (titles.isEmpty) {
       AppLogger.w("No valid title available for searching episodes.");
@@ -69,8 +69,12 @@ class AnimeMatchService {
   /// Searches for anime using the configured source (Mangayomi or Legacy).
   Future<List<BaseAnimeModel>> search(String query) async {
     final useExtensions = _ref.read(experimentalProvider).useExtensions;
+    final nativeKey = _ref.read(selectedProviderKeyProvider);
+    final isNative =
+        nativeKey != null &&
+        _ref.read(animeSourceRegistryProvider).has(nativeKey);
 
-    if (useExtensions) {
+    if (useExtensions && !isNative) {
       final res = await _ref.read(sourceProvider.notifier).search(query);
 
       return res.list
@@ -81,12 +85,42 @@ class AnimeMatchService {
       final provider = _ref.read(selectedAnimeProvider);
       if (provider == null) return [];
 
-      final res = await provider.getSearch(query, null, 1);
-
-      return res.results
-          .where((r) => r.id != null && r.name != null)
-          .map((r) => BaseAnimeModel(id: r.id, name: r.name, poster: r.poster))
-          .toList();
+      final registry = _ref.read(animeSourceRegistryProvider);
+      final currentKey = _ref.read(selectedProviderKeyProvider);
+      final keys = [
+        if (currentKey != null) currentKey,
+        ...registry.keys.where((key) => key != currentKey),
+      ];
+      for (final key in keys) {
+        final candidate = registry.get(key);
+        if (candidate == null) continue;
+        try {
+          final res = await candidate
+              .getSearch(query, null, 1)
+              .timeout(const Duration(seconds: 8));
+          final results =
+              res.results
+                  .where((item) => item.id != null && item.name != null)
+                  .map(
+                    (item) => BaseAnimeModel(
+                      id: item.id,
+                      name: item.name,
+                      poster: item.poster,
+                    ),
+                  )
+                  .toList();
+          if (results.isNotEmpty) {
+            if (key != currentKey) {
+              _ref.read(selectedProviderKeyProvider.notifier).select(key);
+              AppLogger.w('Source $currentKey unavailable; using $key');
+            }
+            return results;
+          }
+        } catch (error) {
+          AppLogger.d('Search failed on $key: $error');
+        }
+      }
+      return [];
     }
   }
 
@@ -134,6 +168,7 @@ class AnimeMatchService {
           );
           // Switch to extensions
           _ref.read(experimentalProvider.notifier).toggleExtensions(true);
+          _ref.read(selectedProviderKeyProvider.notifier).clear();
 
           final sourceNotifier = _ref.read(sourceProvider.notifier);
           final source = _ref

@@ -5,8 +5,12 @@ class UniversalMediaMapper {
     return UniversalMedia(
       id: node['id'].toString(),
       idMal: node['idMal']?.toString(),
-      title: UniversalTitleMapper.fromAnilist(Map<String, dynamic>.from(node['title'] ?? {})),
-      coverImage: UniversalCoverImageMapper.fromAnilist(Map<String, dynamic>.from(node['coverImage'] ?? {})),
+      title: UniversalTitleMapper.fromAnilist(
+        Map<String, dynamic>.from(node['title'] ?? {}),
+      ),
+      coverImage: UniversalCoverImageMapper.fromAnilist(
+        Map<String, dynamic>.from(node['coverImage'] ?? {}),
+      ),
       bannerImage: node['bannerImage'],
       format: node['format'],
       status: node['status'],
@@ -18,16 +22,18 @@ class UniversalMediaMapper {
       isAdult: node['isAdult'] ?? false,
       season: node['season'],
       seasonYear: node['seasonYear'],
-      startDate: node['startDate'] != null
-          ? UniversalFuzzyDateMapper.fromJson(
-              Map<String, dynamic>.from(node['startDate']),
-            )
-          : null,
-      endDate: node['endDate'] != null
-          ? UniversalFuzzyDateMapper.fromJson(
-              Map<String, dynamic>.from(node['endDate']),
-            )
-          : null,
+      startDate:
+          node['startDate'] != null
+              ? UniversalFuzzyDateMapper.fromJson(
+                Map<String, dynamic>.from(node['startDate']),
+              )
+              : null,
+      endDate:
+          node['endDate'] != null
+              ? UniversalFuzzyDateMapper.fromJson(
+                Map<String, dynamic>.from(node['endDate']),
+              )
+              : null,
       genres:
           (node['genres'] as List?)?.map((e) => e.toString()).toList() ?? [],
       synonyms:
@@ -39,11 +45,12 @@ class UniversalMediaMapper {
               .where((e) => e.isNotEmpty)
               .toList() ??
           [],
-      nextAiringEpisode: node['nextAiringEpisode'] != null
-          ? UniversalNextAiringEpisodeMapper.fromJson(
-              Map<String, dynamic>.from(node['nextAiringEpisode']),
-            )
-          : null,
+      nextAiringEpisode:
+          node['nextAiringEpisode'] != null
+              ? UniversalNextAiringEpisodeMapper.fromJson(
+                Map<String, dynamic>.from(node['nextAiringEpisode']),
+              )
+              : null,
       rankings:
           (node['rankings'] as List?)
               ?.map(
@@ -65,7 +72,9 @@ class UniversalMediaMapper {
       staff:
           (node['staff']?['edges'] as List?)
               ?.map(
-                (e) => UniversalStaffMapper.fromAnilist(Map<String, dynamic>.from(e)),
+                (e) => UniversalStaffMapper.fromAnilist(
+                  Map<String, dynamic>.from(e),
+                ),
               )
               .toList() ??
           [],
@@ -84,8 +93,8 @@ class UniversalMediaMapper {
                 final recNode = e['mediaRecommendation'];
                 return recNode != null
                     ? UniversalMediaMapper.fromAnilist(
-                        Map<String, dynamic>.from(recNode),
-                      )
+                      Map<String, dynamic>.from(recNode),
+                    )
                     : null;
               })
               .whereType<UniversalMedia>()
@@ -94,16 +103,18 @@ class UniversalMediaMapper {
       studios:
           (node['studios']?['nodes'] as List?)
               ?.map(
-                (e) =>
-                    UniversalStudioMapper.fromAnilist(Map<String, dynamic>.from(e)),
+                (e) => UniversalStudioMapper.fromAnilist(
+                  Map<String, dynamic>.from(e),
+                ),
               )
               .toList() ??
           [],
-      trailer: node['trailer'] != null
-          ? UniversalTrailerMapper.fromAnilist(
-              Map<String, dynamic>.from(node['trailer']),
-            )
-          : null,
+      trailer:
+          node['trailer'] != null
+              ? UniversalTrailerMapper.fromAnilist(
+                Map<String, dynamic>.from(node['trailer']),
+              )
+              : null,
       siteUrl: node['siteUrl'],
     );
   }
@@ -130,12 +141,14 @@ class UniversalMediaMapper {
       averageScore: (node['mean'] as num?)?.toDouble(),
       popularity: node['popularity'],
       isAdult: node['nsfw'] == 'white' ? false : true,
-      startDate: node['start_date'] != null
-          ? UniversalFuzzyDateMapper.fromMal(node['start_date'])
-          : null,
-      endDate: node['end_date'] != null
-          ? UniversalFuzzyDateMapper.fromMal(node['end_date'])
-          : null,
+      startDate:
+          node['start_date'] != null
+              ? UniversalFuzzyDateMapper.fromMal(node['start_date'])
+              : null,
+      endDate:
+          node['end_date'] != null
+              ? UniversalFuzzyDateMapper.fromMal(node['end_date'])
+              : null,
       genres:
           (node['genres'] as List?)?.map((e) => e['name'] as String).toList() ??
           [],
@@ -164,27 +177,30 @@ class UniversalMediaMapper {
       isAdult: json['isAdult'] ?? false,
       season: json['season'],
       seasonYear: json['seasonYear'],
-      startDate: json['startDate'] != null
-          ? UniversalFuzzyDateMapper.fromJson(
-              Map<String, dynamic>.from(json['startDate']),
-            )
-          : null,
-      endDate: json['endDate'] != null
-          ? UniversalFuzzyDateMapper.fromJson(
-              Map<String, dynamic>.from(json['endDate']),
-            )
-          : null,
+      startDate:
+          json['startDate'] != null
+              ? UniversalFuzzyDateMapper.fromJson(
+                Map<String, dynamic>.from(json['startDate']),
+              )
+              : null,
+      endDate:
+          json['endDate'] != null
+              ? UniversalFuzzyDateMapper.fromJson(
+                Map<String, dynamic>.from(json['endDate']),
+              )
+              : null,
       genres:
           (json['genres'] as List?)?.map((e) => e.toString()).toList() ?? [],
       synonyms:
           (json['synonyms'] as List?)?.map((e) => e.toString()).toList() ?? [],
       source: json['source'],
       tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      nextAiringEpisode: json['nextAiringEpisode'] != null
-          ? UniversalNextAiringEpisodeMapper.fromJson(
-              Map<String, dynamic>.from(json['nextAiringEpisode']),
-            )
-          : null,
+      nextAiringEpisode:
+          json['nextAiringEpisode'] != null
+              ? UniversalNextAiringEpisodeMapper.fromJson(
+                Map<String, dynamic>.from(json['nextAiringEpisode']),
+              )
+              : null,
       rankings:
           (json['rankings'] as List?)
               ?.map(
@@ -197,15 +213,17 @@ class UniversalMediaMapper {
       characters:
           (json['characters'] as List?)
               ?.map(
-                (e) =>
-                    UniversalCharacterMapper.fromJson(Map<String, dynamic>.from(e)),
+                (e) => UniversalCharacterMapper.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
               )
               .toList() ??
           [],
       staff:
           (json['staff'] as List?)
               ?.map(
-                (e) => UniversalStaffMapper.fromJson(Map<String, dynamic>.from(e)),
+                (e) =>
+                    UniversalStaffMapper.fromJson(Map<String, dynamic>.from(e)),
               )
               .toList() ??
           [],
@@ -221,22 +239,26 @@ class UniversalMediaMapper {
       recommendations:
           (json['recommendations'] as List?)
               ?.map(
-                (e) => UniversalMediaMapper.fromJson(Map<String, dynamic>.from(e)),
+                (e) =>
+                    UniversalMediaMapper.fromJson(Map<String, dynamic>.from(e)),
               )
               .toList() ??
           [],
       studios:
           (json['studios'] as List?)
               ?.map(
-                (e) => UniversalStudioMapper.fromJson(Map<String, dynamic>.from(e)),
+                (e) => UniversalStudioMapper.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
               )
               .toList() ??
           [],
-      trailer: json['trailer'] != null
-          ? UniversalTrailerMapper.fromJson(
-              Map<String, dynamic>.from(json['trailer']),
-            )
-          : null,
+      trailer:
+          json['trailer'] != null
+              ? UniversalTrailerMapper.fromJson(
+                Map<String, dynamic>.from(json['trailer']),
+              )
+              : null,
       siteUrl: json['siteUrl'],
     );
   }
@@ -263,13 +285,18 @@ class UniversalTitleMapper {
 class UniversalCoverImageMapper {
   static UniversalCoverImage fromAnilist(Map<String, dynamic> json) {
     return UniversalCoverImage(
+      extraLarge: json['extraLarge'],
       large: json['large'],
       medium: json['medium'],
     );
   }
 
   static UniversalCoverImage fromJson(Map<String, dynamic> json) {
-    return UniversalCoverImage(large: json['large'], medium: json['medium']);
+    return UniversalCoverImage(
+      extraLarge: json['extraLarge'],
+      large: json['large'],
+      medium: json['medium'],
+    );
   }
 }
 
@@ -333,12 +360,14 @@ class UniversalStaffMapper {
     final staffNode = edge['node'] ?? {};
     return UniversalStaff(
       id: staffNode['id'],
-      name: staffNode['name'] != null
-          ? UniversalStaffNameMapper.fromAnilist(staffNode['name'])
-          : null,
-      image: staffNode['image'] != null
-          ? UniversalStaffImageMapper.fromAnilist(staffNode['image'])
-          : null,
+      name:
+          staffNode['name'] != null
+              ? UniversalStaffNameMapper.fromAnilist(staffNode['name'])
+              : null,
+      image:
+          staffNode['image'] != null
+              ? UniversalStaffImageMapper.fromAnilist(staffNode['image'])
+              : null,
       role: edge['role'],
     );
   }
@@ -346,14 +375,18 @@ class UniversalStaffMapper {
   static UniversalStaff fromJson(Map<String, dynamic> json) {
     return UniversalStaff(
       id: json['id'],
-      name: json['name'] != null
-          ? UniversalStaffNameMapper.fromJson(Map<String, dynamic>.from(json['name']))
-          : null,
-      image: json['image'] != null
-          ? UniversalStaffImageMapper.fromJson(
-              Map<String, dynamic>.from(json['image']),
-            )
-          : null,
+      name:
+          json['name'] != null
+              ? UniversalStaffNameMapper.fromJson(
+                Map<String, dynamic>.from(json['name']),
+              )
+              : null,
+      image:
+          json['image'] != null
+              ? UniversalStaffImageMapper.fromJson(
+                Map<String, dynamic>.from(json['image']),
+              )
+              : null,
       role: json['role'],
     );
   }

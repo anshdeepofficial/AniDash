@@ -14,12 +14,14 @@ class AnimeDetailsScreen extends ConsumerStatefulWidget {
   final UniversalMedia anime;
   final String tag;
   final bool forceFetch;
+  final bool fromHentaiHub;
 
   const AnimeDetailsScreen({
     super.key,
     required this.anime,
     required this.tag,
     this.forceFetch = false,
+    this.fromHentaiHub = false,
   });
 
   @override
@@ -51,8 +53,12 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            AnimeDetailsScreen(anime: media, tag: 'tag-${media.id}'),
+        builder:
+            (_) => AnimeDetailsScreen(
+              anime: media,
+              tag: 'tag-${media.id}',
+              fromHentaiHub: widget.fromHentaiHub,
+            ),
       ),
     );
   }
@@ -77,9 +83,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
           return [DetailsHeader(anime: displayedAnime, tag: widget.tag)];
         },
         body: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(
-            context,
-          ).copyWith(scrollbars: false),
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
           child: TabBarView(
             controller: _tabController,
             children: [
@@ -102,6 +106,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                       displayedAnime.coverImage.large ??
                       displayedAnime.coverImage.medium ??
                       '',
+                  fromHentaiHub: widget.fromHentaiHub,
                 ),
               ),
               _KeepAliveWrapper(
@@ -138,9 +143,8 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
           ),
         ),
       ),
-      floatingActionButton: !useExtensions
-          ? _WatchFab(anime: displayedAnime)
-          : null,
+      floatingActionButton:
+          !useExtensions ? _WatchFab(anime: displayedAnime) : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
@@ -168,34 +172,36 @@ class _WatchFabState extends ConsumerState<_WatchFab> {
 
     return FloatingActionButton.extended(
       heroTag: 'watch_btn',
-      onPressed: _isWatchLoading
-          ? null
-          : () async {
-              setState(() => _isWatchLoading = true);
-              await providerAnimeMatchSearch(
-                context: context,
-                ref: ref,
-                animeMedia: widget.anime,
-              );
-              if (mounted) {
-                setState(() => _isWatchLoading = false);
-              }
-            },
+      onPressed:
+          _isWatchLoading
+              ? null
+              : () async {
+                setState(() => _isWatchLoading = true);
+                await providerAnimeMatchSearch(
+                  context: context,
+                  ref: ref,
+                  animeMedia: widget.anime,
+                );
+                if (mounted) {
+                  setState(() => _isWatchLoading = false);
+                }
+              },
       backgroundColor: colorScheme.primary,
       foregroundColor: colorScheme.onPrimary,
       elevation: 6,
-      icon: _isWatchLoading
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  colorScheme.onPrimary,
+      icon:
+          _isWatchLoading
+              ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    colorScheme.onPrimary,
+                  ),
                 ),
-              ),
-            )
-          : const Icon(Iconsax.play_circle, size: 24),
+              )
+              : const Icon(Iconsax.play_circle, size: 24),
       label: Text(
         _isWatchLoading
             ? 'Loading...'

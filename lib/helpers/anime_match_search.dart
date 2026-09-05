@@ -1,4 +1,4 @@
-﻿import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/anime/anime_model.dep.dart';
@@ -10,6 +10,7 @@ import 'package:ani_dash/shared/providers/anime_match_service.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/ui/anime/anime_search_dialog.dart';
+import 'package:ani_dash/shared/ui/anime/anime_search_notifier.dart';
 
 Future<BaseAnimeModel?> providerAnimeMatchSearch({
   Function? beforeSearchCallback,
@@ -20,6 +21,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
   bool withAnimeMatch = true,
   int? startAt,
   bool showSnackbar = false,
+  bool directAutoMatch = false,
 }) async {
   beforeSearchCallback?.call();
 
@@ -46,21 +48,50 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
       return restoredAnime;
     }
 
+    if (directAutoMatch && withAnimeMatch) {
+      final match = await ref
+          .read(animeMatchServiceProvider)
+          .findBestMatch(animeMedia.title);
+      if (match == null) {
+        throw StateError('No matching title was found on the active source.');
+      }
+      ref.read(animeSearchProvider.notifier).saveSelection(animeMedia, match);
+      if (context.mounted) {
+        navigateToWatch(
+          context: context,
+          mediaId: animeMedia.id.toString(),
+          animeId: match.id!,
+          animeName: match.name ?? animeMedia.title.userPreferred,
+          animeFormat: animeMedia.format ?? '',
+          animeCover:
+              match.poster ??
+              animeMedia.coverImage.large ??
+              animeMedia.coverImage.medium ??
+              '',
+          episodes: const [],
+          currentEpisode: startAt ?? 1,
+        );
+      }
+      return match;
+    }
+
     // Show search dialog
     final animeProvider = ref.read(selectedAnimeProvider);
     final useExtensions = ref.read(experimentalProvider).useExtensions;
-    if (animeProvider == null && !useExtensions) throw Exception('Anime provider is missing.');
+    if (animeProvider == null && !useExtensions)
+      throw Exception('Anime provider is missing.');
     if (!context.mounted) return null;
 
     return await showDialog<BaseAnimeModel>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => AnimeSearchDialog(
-        animeProvider: animeProvider,
-        media: animeMedia,
-        autoMatch: withAnimeMatch,
-        startAt: startAt,
-      ),
+      builder:
+          (_) => AnimeSearchDialog(
+            animeProvider: animeProvider,
+            media: animeMedia,
+            autoMatch: withAnimeMatch,
+            startAt: startAt,
+          ),
     );
   } catch (e, s) {
     AppLogger.e('Search failed', e, s);
@@ -77,4 +108,3 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
     afterSearchCallback?.call();
   }
 }
-

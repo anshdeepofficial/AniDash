@@ -131,7 +131,8 @@ class AboutScreen extends StatelessWidget {
                   icon: Iconsax.code,
                   title: 'Developer',
                   content: 'anshdeepofficial',
-                  subtitle: 'Passionate Flutter Developer (github.com/anshdeepofficial)',
+                  subtitle:
+                      'Passionate Flutter Developer (github.com/anshdeepofficial)',
                 ),
 
                 const SizedBox(height: 16),
@@ -227,9 +228,10 @@ class AboutScreen extends StatelessWidget {
                         context,
                         icon: Iconsax.user,
                         label: 'Developer',
-                        onTap: () => _launchUrl(
-                          'https://github.com/anshdeepofficial',
-                        ),
+                        onTap:
+                            () => _launchUrl(
+                              'https://github.com/anshdeepofficial',
+                            ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -238,9 +240,10 @@ class AboutScreen extends StatelessWidget {
                         context,
                         icon: Iconsax.code_1,
                         label: 'Source Code',
-                        onTap: () => _launchUrl(
-                          'https://github.com/anshdeepofficial/Anidash',
-                        ),
+                        onTap:
+                            () => _launchUrl(
+                              'https://github.com/anshdeepofficial/Anidash',
+                            ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -249,9 +252,10 @@ class AboutScreen extends StatelessWidget {
                         context,
                         icon: Iconsax.message,
                         label: 'Report Issue',
-                        onTap: () => _launchUrl(
-                          'https://github.com/anshdeepofficial/Anidash/issues',
-                        ),
+                        onTap:
+                            () => _launchUrl(
+                              'https://github.com/anshdeepofficial/Anidash/issues',
+                            ),
                       ),
                     ),
                   ],
@@ -284,16 +288,24 @@ class AboutScreen extends StatelessWidget {
                         color: const Color(0xFFFFDD00).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
-                          onTap: () => _launchUrl(
-                            'https://buymeacoffee.com/anshdeepofficial',
-                          ),
+                          onTap:
+                              () => _launchUrl(
+                                'https://buymeacoffee.com/anshdeepofficial',
+                              ),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 8,
+                            ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Iconsax.coffee, color: Color(0xFFFFDD00), size: 22),
+                                const Icon(
+                                  Iconsax.coffee,
+                                  color: Color(0xFFFFDD00),
+                                  size: 22,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Buy Me a Coffee',
@@ -314,16 +326,24 @@ class AboutScreen extends StatelessWidget {
                         color: const Color(0xFFEA4AAA).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
-                          onTap: () => _launchUrl(
-                            'https://github.com/sponsors/anshdeepofficial',
-                          ),
+                          onTap:
+                              () => _launchUrl(
+                                'https://github.com/sponsors/anshdeepofficial',
+                              ),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 8,
+                            ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Iconsax.heart, color: Color(0xFFEA4AAA), size: 22),
+                                const Icon(
+                                  Iconsax.heart,
+                                  color: Color(0xFFEA4AAA),
+                                  size: 22,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'GitHub Sponsor',
@@ -391,7 +411,7 @@ class AboutScreen extends StatelessWidget {
                 // Footer
                 Center(
                   child: Text(
-                    'Made with ❤️ by Anshdeep\n© 2026 AniDash',
+                    'Made with ❤️ by anshdeepofficial\n© 2026 AniDash',
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.6),

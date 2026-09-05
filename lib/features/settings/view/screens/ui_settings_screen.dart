@@ -116,29 +116,31 @@ class UiSettingsScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StyleSelector(
-        isSpotlight: isSpotlight,
-        initialStyle: ref.read(
-          uiSettingsProvider.select(
-            (s) => isSpotlight ? s.spotlightCardStyle.name : s.cardStyle.name,
+      builder:
+          (context) => StyleSelector(
+            isSpotlight: isSpotlight,
+            initialStyle: ref.read(
+              uiSettingsProvider.select(
+                (s) =>
+                    isSpotlight ? s.spotlightCardStyle.name : s.cardStyle.name,
+              ),
+            ),
+            onChanged: (newStyle) {
+              ref
+                  .read(uiSettingsProvider.notifier)
+                  .updateSettings(
+                    (s) =>
+                        isSpotlight
+                            ? s.copyWith(
+                              spotlightCardStyle: SpotlightCardMode.values
+                                  .byName(newStyle),
+                            )
+                            : s.copyWith(
+                              cardStyle: AnimeCardMode.values.byName(newStyle),
+                            ),
+                  );
+            },
           ),
-        ),
-        onChanged: (newStyle) {
-          ref
-              .read(uiSettingsProvider.notifier)
-              .updateSettings(
-                (s) => isSpotlight
-                    ? s.copyWith(
-                        spotlightCardStyle: SpotlightCardMode.values.byName(
-                          newStyle,
-                        ),
-                      )
-                    : s.copyWith(
-                        cardStyle: AnimeCardMode.values.byName(newStyle),
-                      ),
-              );
-        },
-      ),
     );
   }
 }
@@ -168,9 +170,10 @@ class StyleSelectorState extends State<StyleSelector> {
   @override
   void initState() {
     super.initState();
-    _modes = widget.isSpotlight
-        ? SpotlightCardMode.values.map((e) => e.name).toList()
-        : AnimeCardMode.values.map((e) => e.name).toList();
+    _modes =
+        widget.isSpotlight
+            ? SpotlightCardMode.values.map((e) => e.name).toList()
+            : AnimeCardMode.values.map((e) => e.name).toList();
 
     _currentIndex = _modes.indexOf(widget.initialStyle);
     if (_currentIndex == -1) _currentIndex = 0;
@@ -271,9 +274,10 @@ class StyleSelectorState extends State<StyleSelector> {
                     IconButton(
                       onPressed: () => _navigate(-1),
                       icon: const Icon(Iconsax.arrow_left_2),
-                      color: _currentIndex > 0
-                          ? colorScheme.primary
-                          : colorScheme.surfaceContainerHighest,
+                      color:
+                          _currentIndex > 0
+                              ? colorScheme.primary
+                              : colorScheme.surfaceContainerHighest,
                     ),
                   Expanded(
                     child: PageView.builder(
@@ -313,9 +317,10 @@ class StyleSelectorState extends State<StyleSelector> {
                     IconButton(
                       onPressed: () => _navigate(1),
                       icon: const Icon(Iconsax.arrow_right_3),
-                      color: _currentIndex < _modes.length - 1
-                          ? colorScheme.primary
-                          : colorScheme.surfaceContainerHighest,
+                      color:
+                          _currentIndex < _modes.length - 1
+                              ? colorScheme.primary
+                              : colorScheme.surfaceContainerHighest,
                     ),
                 ],
               ),
@@ -331,9 +336,10 @@ class StyleSelectorState extends State<StyleSelector> {
                   height: 8,
                   width: isSelected ? 24 : 8,
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.surfaceContainerHighest,
+                    color:
+                        isSelected
+                            ? colorScheme.primary
+                            : colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -352,9 +358,9 @@ class StyleSelectorState extends State<StyleSelector> {
       id: '1',
       coverImage: UniversalCoverImage(
         large:
-            'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675065.jpg',
+            'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-YCDoj1EkAxFn.jpg',
         medium:
-            'https://cdn.noitatnemucod.net/thumbnail/300x400/100/bcd84731a3eda4f4a306250769675065.jpg',
+            'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-YCDoj1EkAxFn.jpg',
       ),
       title: UniversalTitle(
         english: "One Piece",
@@ -370,19 +376,22 @@ class StyleSelectorState extends State<StyleSelector> {
     );
 
     return IgnorePointer(
-      child: widget.isSpotlight
-          ? AnimeSpotlightCard(
-              anime: anime,
-              heroTag: 'prev_$styleName',
-              mode: SpotlightCardMode.values.firstWhere(
-                (e) => e.name == styleName,
+      child:
+          widget.isSpotlight
+              ? AnimeSpotlightCard(
+                anime: anime,
+                heroTag: 'prev_$styleName',
+                mode: SpotlightCardMode.values.firstWhere(
+                  (e) => e.name == styleName,
+                ),
+              )
+              : AnimeCard(
+                anime: anime,
+                tag: 'prev_$styleName',
+                mode: AnimeCardMode.values.firstWhere(
+                  (e) => e.name == styleName,
+                ),
               ),
-            )
-          : AnimeCard(
-              anime: anime,
-              tag: 'prev_$styleName',
-              mode: AnimeCardMode.values.firstWhere((e) => e.name == styleName),
-            ),
     );
   }
 }

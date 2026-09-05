@@ -57,22 +57,26 @@ class ContinueSection extends ConsumerWidget {
             itemBuilder: (context, index) {
               final entry = validEntries[index];
               final currentEp = entry.episodesProgress[entry.currentEpisode];
-              
+
               // If current episode is completed (or watched > 85%), show next episode
-              final isCurrentCompleted = currentEp?.isCompleted == true ||
+              final isCurrentCompleted =
+                  currentEp?.isCompleted == true ||
                   ((currentEp?.durationInSeconds ?? 0) > 0 &&
                       ((currentEp?.progressInSeconds ?? 0) /
                               currentEp!.durationInSeconds!) >=
                           0.85);
 
-              final baseEp = entry.currentEpisode > 0 ? entry.currentEpisode : 1;
-              final nextEpisodeNum = isCurrentCompleted &&
-                      (entry.totalEpisodes == 0 ||
-                          baseEp < entry.totalEpisodes)
-                  ? baseEp + 1
-                  : baseEp;
+              final baseEp =
+                  entry.currentEpisode > 0 ? entry.currentEpisode : 1;
+              final nextEpisodeNum =
+                  isCurrentCompleted &&
+                          (entry.totalEpisodes == 0 ||
+                              baseEp < entry.totalEpisodes)
+                      ? baseEp + 1
+                      : baseEp;
 
-              final displayEp = entry.episodesProgress[nextEpisodeNum] ?? currentEp;
+              final displayEp =
+                  entry.episodesProgress[nextEpisodeNum] ?? currentEp;
 
               double progressValue = 0.0;
               if (!isCurrentCompleted && currentEp != null) {
@@ -81,7 +85,8 @@ class ContinueSection extends ConsumerWidget {
                 if (d > 0) progressValue = (p / d).clamp(0.0, 1.0);
               }
 
-              final thumb = displayEp?.episodeThumbnail ?? currentEp?.episodeThumbnail;
+              final thumb =
+                  displayEp?.episodeThumbnail ?? currentEp?.episodeThumbnail;
               Widget imageWidget;
 
               if (thumb != null && thumb.startsWith('http')) {
@@ -147,6 +152,7 @@ class ContinueSection extends ConsumerWidget {
                             ),
                             startAt: nextEpisodeNum,
                             withAnimeMatch: true,
+                            directAutoMatch: true,
                           );
                           if (context.mounted) {
                             setState(() => isLoading = false);
@@ -164,25 +170,27 @@ class ContinueSection extends ConsumerWidget {
                                     Positioned.fill(child: imageWidget),
                                     Positioned.fill(
                                       child: Center(
-                                        child: isLoading
-                                            ? const CircularProgressIndicator()
-                                            : Container(
-                                                padding: const EdgeInsets.all(
-                                                  8,
+                                        child:
+                                            isLoading
+                                                ? const CircularProgressIndicator()
+                                                : Container(
+                                                  padding: const EdgeInsets.all(
+                                                    8,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: colorScheme
+                                                        .primaryContainer
+                                                        .withValues(alpha: 0.5),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Icon(
+                                                    Iconsax.play5,
+                                                    color:
+                                                        colorScheme
+                                                            .onPrimaryContainer,
+                                                    size: 20,
+                                                  ),
                                                 ),
-                                                decoration: BoxDecoration(
-                                                  color: colorScheme
-                                                      .primaryContainer
-                                                      .withValues(alpha: 0.5),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  Iconsax.play5,
-                                                  color: colorScheme
-                                                      .onPrimaryContainer,
-                                                  size: 20,
-                                                ),
-                                              ),
                                       ),
                                     ),
                                     Positioned(
@@ -240,8 +248,14 @@ class ContinueSection extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               isCurrentCompleted
-                                  ? (entry.episodesProgress[nextEpisodeNum]?.episodeTitle.isNotEmpty == true
-                                      ? entry.episodesProgress[nextEpisodeNum]!.episodeTitle
+                                  ? (entry
+                                              .episodesProgress[nextEpisodeNum]
+                                              ?.episodeTitle
+                                              .isNotEmpty ==
+                                          true
+                                      ? entry
+                                          .episodesProgress[nextEpisodeNum]!
+                                          .episodeTitle
                                       : 'Episode $nextEpisodeNum')
                                   : (currentEp?.episodeTitle.isNotEmpty == true
                                       ? currentEp!.episodeTitle

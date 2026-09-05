@@ -77,12 +77,21 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
 
   String _getHighResImageUrl(String? url) {
     if (url == null || url.isEmpty) return '';
-    if (url.contains('anilist.co')) {
-      return url
-          .replaceAll('/medium/', '/extraLarge/')
-          .replaceAll('/large/', '/extraLarge/');
-    }
     return url;
+  }
+
+  String _posterUrl() {
+    final candidates = [
+      widget.anime.coverImage.extraLarge,
+      widget.anime.coverImage.large,
+      widget.anime.coverImage.medium,
+    ];
+    return _getHighResImageUrl(
+      candidates.firstWhere(
+        (url) => url != null && url.isNotEmpty,
+        orElse: () => '',
+      ),
+    );
   }
 
   void _openFullscreenPoster(
@@ -94,60 +103,106 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.95),
       builder: (ctx) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.close_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-            title: Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.download_rounded,
-                  color: Colors.white,
-                  size: 28,
+        var retrying = false;
+        var retryKey = 0;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
                 ),
-                tooltip: 'Save to Gallery',
-                onPressed: () async {
-                  await _saveImageToGallery(context, imageUrl, title);
-                },
+                title: Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.download_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    tooltip: 'Save to Gallery',
+                    onPressed: () async {
+                      await _saveImageToGallery(context, imageUrl, title);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: Center(
-            child: InteractiveViewer(
-              minScale: 0.8,
-              maxScale: 4.0,
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
-                placeholder: (_, _) =>
-                    const Center(child: CircularProgressIndicator()),
-                errorWidget: (_, _, _) => const Center(
-                  child: Icon(
-                    Icons.broken_image_rounded,
-                    color: Colors.white54,
-                    size: 64,
+              body: Center(
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4.0,
+                  child: CachedNetworkImage(
+                    key: ValueKey(retryKey),
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    placeholder:
+                        (_, _) =>
+                            const Center(child: CircularProgressIndicator()),
+                    errorWidget:
+                        (_, _, _) => Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.broken_image_rounded,
+                                color: Colors.white54,
+                                size: 64,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Poster could not be loaded',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              TextButton.icon(
+                                onPressed:
+                                    retrying
+                                        ? null
+                                        : () async {
+                                          setDialogState(() => retrying = true);
+                                          await CachedNetworkImage.evictFromCache(
+                                            imageUrl,
+                                          );
+                                          if (ctx.mounted) {
+                                            setDialogState(() {
+                                              retrying = false;
+                                              retryKey++;
+                                            });
+                                          }
+                                        },
+                                icon:
+                                    retrying
+                                        ? const SizedBox.square(
+                                          dimension: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : const Icon(Icons.refresh_rounded),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -232,7 +287,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
     );
 
     return SliverAppBar(
-      expandedHeight: 420,
+      expandedHeight: 280,
       pinned: false,
       floating: true,
       elevation: 0,
@@ -270,10 +325,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                 children: [
                   GestureDetector(
                     onTap: () {
-                      final posterUrl = _getHighResImageUrl(
-                        widget.anime.coverImage.large ??
-                            widget.anime.coverImage.medium,
-                      );
+                      final posterUrl = _posterUrl();
                       if (posterUrl.isNotEmpty) {
                         _openFullscreenPoster(
                           context,
@@ -292,27 +344,11 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                           alignment: Alignment.bottomRight,
                           children: [
                             CachedNetworkImage(
-                              imageUrl:
-                                  widget.anime.coverImage.large ??
-                                  widget.anime.coverImage.medium ??
-                                  '',
+                              imageUrl: _posterUrl(),
                               width: 105,
                               height: 160,
                               fit: BoxFit.cover,
                               filterQuality: FilterQuality.high,
-                            ),
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              margin: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Icon(
-                                Icons.fullscreen_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
                             ),
                           ],
                         ),
@@ -376,37 +412,41 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                                 onTap: () {
                                   showDialog(
                                     context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Row(
-                                        children: [
-                                          Icon(
-                                            Icons.explicit_rounded,
-                                            color: Colors.pinkAccent,
+                                    builder:
+                                        (ctx) => AlertDialog(
+                                          title: const Row(
+                                            children: [
+                                              Icon(
+                                                Icons.explicit_rounded,
+                                                color: Colors.pinkAccent,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('18+ Content Notice'),
+                                            ],
                                           ),
-                                          SizedBox(width: 8),
-                                          Text('18+ Content Notice'),
-                                        ],
-                                      ),
-                                      content: const Text(
-                                        'This anime contains mature / 18+ content. You can manage 18+ extensions (Hanime, HentaiHaven) and enable Global Incognito under:\n\nSettings > Experimental Features > Hentai Hub',
-                                        style: TextStyle(fontSize: 14),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(ctx),
-                                          child: const Text('Close'),
+                                          content: const Text(
+                                            'This anime contains mature / 18+ content. You can manage 18+ extensions (Hanime, HentaiHaven) and enable Global Incognito under:\n\nSettings > Experimental Features > Hentai Hub',
+                                            style: TextStyle(fontSize: 14),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed:
+                                                  () => Navigator.pop(ctx),
+                                              child: const Text('Close'),
+                                            ),
+                                            FilledButton(
+                                              onPressed: () {
+                                                Navigator.pop(ctx);
+                                                context.push(
+                                                  '/settings/experimental/hentai',
+                                                );
+                                              },
+                                              child: const Text(
+                                                'Open Hentai Hub',
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        FilledButton(
-                                          onPressed: () {
-                                            Navigator.pop(ctx);
-                                            context.push(
-                                              '/settings/experimental/hentai',
-                                            );
-                                          },
-                                          child: const Text('Open Hentai Hub'),
-                                        ),
-                                      ],
-                                    ),
                                   );
                                 },
                                 child: const Padding(
@@ -787,11 +827,14 @@ class _IncognitoToggleBadge extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
-            backgroundColor: nowActive ? Colors.deepPurple.shade900 : Colors.grey.shade900,
+            backgroundColor:
+                nowActive ? Colors.deepPurple.shade900 : Colors.grey.shade900,
             content: Row(
               children: [
                 Icon(
-                  nowActive ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  nowActive
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
                   color: nowActive ? Colors.purpleAccent : Colors.white70,
                   size: 20,
                 ),
@@ -801,7 +844,10 @@ class _IncognitoToggleBadge extends ConsumerWidget {
                     nowActive
                         ? '🕶️ Incognito Mode ON: No watch history or progress will be saved.'
                         : 'Incognito Mode OFF: Watch progress will be saved.',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -814,29 +860,33 @@ class _IncognitoToggleBadge extends ConsumerWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: isIncognito
-              ? Colors.purple.shade900.withValues(alpha: 0.9)
-              : Colors.black.withValues(alpha: 0.6),
+          color:
+              isIncognito
+                  ? Colors.purple.shade900.withValues(alpha: 0.9)
+                  : Colors.black.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isIncognito ? Colors.purpleAccent : Colors.white30,
             width: 1.0,
           ),
-          boxShadow: isIncognito
-              ? [
-                  BoxShadow(
-                    color: Colors.purpleAccent.withValues(alpha: 0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
+          boxShadow:
+              isIncognito
+                  ? [
+                    BoxShadow(
+                      color: Colors.purpleAccent.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                  : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isIncognito ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              isIncognito
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
               color: isIncognito ? Colors.purpleAccent : Colors.white70,
               size: 14,
             ),
@@ -856,4 +906,3 @@ class _IncognitoToggleBadge extends ConsumerWidget {
     );
   }
 }
-

@@ -20,15 +20,19 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
       const Text('Extensions', style: TextStyle(fontWeight: FontWeight.bold));
 
   @override
-  ExtensionScreenBuilder get extensionScreenBuilder =>
-      (itemType, isInstalled, searchQuery, selectedLanguage) {
-        return ExtensionListWidget(
-          itemType: itemType,
-          isInstalled: isInstalled,
-          searchQuery: searchQuery,
-          selectedLanguage: selectedLanguage,
-        );
-      };
+  ExtensionScreenBuilder get extensionScreenBuilder => (
+    itemType,
+    isInstalled,
+    searchQuery,
+    selectedLanguage,
+  ) {
+    return ExtensionListWidget(
+      itemType: itemType,
+      isInstalled: isInstalled,
+      searchQuery: searchQuery,
+      selectedLanguage: selectedLanguage,
+    );
+  };
 
   List<String> _getSavedAnimeRepos() {
     final saved = sharedPrefs.getStringList('saved_anime_repos');
@@ -180,19 +184,22 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
     final presets = [
       (
         name: 'Kohi-den (Standard Anime)',
-        url: 'https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json',
+        url:
+            'https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json',
         type: ItemType.anime,
         is18Plus: false,
       ),
       (
         name: 'Yuzono (18+ & Anime Sources)',
-        url: 'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
+        url:
+            'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
         type: ItemType.anime,
         is18Plus: true,
       ),
       (
         name: 'Secozzi Aniyomi Extensions',
-        url: 'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
+        url:
+            'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
         type: ItemType.anime,
         is18Plus: false,
       ),
@@ -221,14 +228,15 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Extension Type',
                         ),
-                        items: ItemType.values
-                            .map(
-                              (type) => DropdownMenuItem(
-                                value: type,
-                                child: Text(type.name.toUpperCase()),
-                              ),
-                            )
-                            .toList(),
+                        items:
+                            const [ItemType.anime, ItemType.manga]
+                                .map(
+                                  (type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(type.name.toUpperCase()),
+                                  ),
+                                )
+                                .toList(),
                         onChanged: (val) {
                           if (val != null) setState(() => selectedType = val);
                         },
@@ -256,14 +264,16 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: preset.is18Plus
-                                  ? Colors.redAccent.withValues(alpha: 0.6)
-                                  : colorScheme.outlineVariant,
+                              color:
+                                  preset.is18Plus
+                                      ? Colors.redAccent.withValues(alpha: 0.6)
+                                      : colorScheme.outlineVariant,
                             ),
                             borderRadius: BorderRadius.circular(8),
-                            color: preset.is18Plus
-                                ? Colors.redAccent.withValues(alpha: 0.05)
-                                : null,
+                            color:
+                                preset.is18Plus
+                                    ? Colors.redAccent.withValues(alpha: 0.05)
+                                    : null,
                           ),
                           child: ListTile(
                             dense: true,
@@ -339,9 +349,33 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                     if (url.isNotEmpty) {
                       final currentRepos = _getSavedAnimeRepos();
                       final updated = {...currentRepos, url}.toList();
-                      await sharedPrefs.setStringList('saved_anime_repos', updated);
-                      onRepoSaved(updated, selectedType);
-                      if (context.mounted) Navigator.pop(context);
+                      await sharedPrefs.setStringList(
+                        'saved_anime_repos',
+                        updated,
+                      );
+                      final isAniyomiRepository =
+                          url.contains('index.min.json') ||
+                          url.contains('aniyomi');
+                      if (isAniyomiRepository) {
+                        await ExtensionType.aniyomi.getManager().onRepoSaved(
+                          updated,
+                          selectedType,
+                        );
+                      } else {
+                        await onRepoSaved(updated, selectedType);
+                      }
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isAniyomiRepository
+                                  ? 'Repository added. Open the source-engine menu and choose Aniyomi to view it.'
+                                  : 'Repository added. Sources are available in the Available tab.',
+                            ),
+                          ),
+                        );
+                      }
                     }
                   },
                   child: const Text('Add'),
@@ -398,12 +432,18 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
     return ExtensionListItem(
       source: source,
       isInstalled: widget.isInstalled,
-      onInstall: () =>
-          (source.extensionType?.getManager() ?? manager).installSource(source),
-      onUninstall: () =>
-          (source.extensionType?.getManager() ?? manager).uninstallSource(source),
-      onUpdate: () =>
-          (source.extensionType?.getManager() ?? manager).updateSource(source),
+      onInstall:
+          () => (source.extensionType?.getManager() ?? manager).installSource(
+            source,
+          ),
+      onUninstall:
+          () => (source.extensionType?.getManager() ?? manager).uninstallSource(
+            source,
+          ),
+      onUpdate:
+          () => (source.extensionType?.getManager() ?? manager).updateSource(
+            source,
+          ),
       onTap: () {
         // Open details or settings if installed
         if (widget.isInstalled) {
@@ -412,7 +452,7 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
             extra: source,
           );
         } else {
-          manager.installSource(source);
+          (source.extensionType?.getManager() ?? manager).installSource(source);
         }
       },
     );
@@ -445,11 +485,15 @@ class ExtensionListItem extends StatelessWidget {
     Color repoColor = Theme.of(context).colorScheme.primaryContainer;
     Color repoTextColor = Theme.of(context).colorScheme.onPrimaryContainer;
 
-    if (source.isNsfw == true || icon.contains('yuzono') || name.contains('yuzono')) {
+    if (source.isNsfw == true ||
+        icon.contains('yuzono') ||
+        name.contains('yuzono')) {
       repoName = 'Yuzono (18+)';
       repoColor = Colors.red.shade900.withValues(alpha: 0.3);
       repoTextColor = Colors.redAccent;
-    } else if (icon.contains('kohi-den') || icon.contains('kohiden') || name.contains('kohi')) {
+    } else if (icon.contains('kohi-den') ||
+        icon.contains('kohiden') ||
+        name.contains('kohi')) {
       repoName = 'Kohi-den';
       repoColor = Colors.blue.shade900.withValues(alpha: 0.3);
       repoTextColor = Colors.lightBlueAccent;
@@ -467,27 +511,31 @@ class ExtensionListItem extends StatelessWidget {
         onTap: onTap,
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: source.iconUrl != null && source.iconUrl!.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: source.iconUrl!,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                  errorWidget: (context, url, error) => Container(
+          child:
+              source.iconUrl != null && source.iconUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                    imageUrl: source.iconUrl!,
                     width: 40,
                     height: 40,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
+                    fit: BoxFit.cover,
+                    errorWidget:
+                        (context, url, error) => Container(
+                          width: 40,
+                          height: 40,
+                          color:
+                              Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.extension, size: 20),
+                        ),
+                  )
+                  : Container(
+                    width: 40,
+                    height: 40,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: const Icon(Icons.extension, size: 20),
                   ),
-                )
-              : Container(
-                  width: 40,
-                  height: 40,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: const Icon(Icons.extension, size: 20),
-                ),
         ),
         title: Row(
           children: [
@@ -500,7 +548,10 @@ class ExtensionListItem extends StatelessWidget {
             if (source.isNsfw == true) ...[
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.red.shade900.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(4),
@@ -562,10 +613,11 @@ class ExtensionListItem extends StatelessWidget {
             if (isInstalled)
               IconButton(
                 icon: const Icon(Iconsax.setting_2),
-                onPressed: () => context.push(
-                  '/settings/extensions/extension-preference',
-                  extra: source,
-                ),
+                onPressed:
+                    () => context.push(
+                      '/settings/extensions/extension-preference',
+                      extra: source,
+                    ),
               ),
           ],
         ),

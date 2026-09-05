@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/features/browse/model/search_filter.dart';
-import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
+import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
+import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
+import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 
 class HentaiScreen extends ConsumerStatefulWidget {
   const HentaiScreen({super.key});
@@ -27,12 +31,12 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
 
   Future<void> _loadMatureAnime() async {
     try {
-      final repo = ref.read(animeRepositoryProvider);
+      final repo = ref.read(anilistServiceProvider);
       final list = await repo.searchAnime(
         '',
         page: 1,
         perPage: 30,
-        filter: const SearchFilter(genres: ['Hentai']),
+        filter: const SearchFilter(isAdult: true, sort: 'POPULARITY_DESC'),
       );
       if (mounted) {
         setState(() {
@@ -47,13 +51,137 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
     }
   }
 
+  void _openAdultAnime(BuildContext context, UniversalMedia anime) {
+    final source =
+        ref.read(sourceProvider).installedAnimeExtensions.where((item) {
+          final name = (item.name ?? '').toLowerCase();
+          return item.isNsfw == true ||
+              name.contains('hanime') ||
+              name.contains('hentai');
+        }).firstOrNull;
+    if (source == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Install an 18+ source from Manage before playing.',
+          ),
+          action: SnackBarAction(
+            label: 'Manage',
+            onPressed: () => context.push('/settings/extensions'),
+          ),
+        ),
+      );
+      return;
+    }
+    ref.read(experimentalProvider.notifier).toggleExtensions(true);
+    ref.read(selectedProviderKeyProvider.notifier).clear();
+    ref.read(sourceProvider.notifier).setActiveSource(source);
+    context.push('/details?hentaiHub=true', extra: anime);
+  }
+
+  Future<void> _openLogin(
+    BuildContext context,
+    String sourceName,
+    String loginUrl,
+  ) async {
+    try {
+      await launchUrl(
+        Uri.parse(loginUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open $sourceName login page'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openPreferences(BuildContext context, String sourceName) {
+    final normalized = sourceName.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    final source =
+        ref
+            .read(sourceProvider)
+            .installedAnimeExtensions
+            .where(
+              (item) =>
+                  (item.name ?? '').toLowerCase().replaceAll(
+                    RegExp(r'[^a-z0-9]'),
+                    '',
+                  ) ==
+                  normalized,
+            )
+            .firstOrNull;
+    if (source == null) {
+      context.push('/settings/extensions');
+      return;
+    }
+    context.push('/settings/extensions/extension-preference', extra: source);
+  }
+
+  void _openSourceOptions(
+    BuildContext context,
+    String sourceName,
+    String loginUrl,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.login_rounded),
+                  title: Text('Login to $sourceName Account'),
+                  subtitle: const Text(
+                    'Open official website to log into your account',
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openLogin(context, sourceName, loginUrl);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.extension_rounded),
+                  title: const Text('Extension Preferences'),
+                  subtitle: const Text('Configure sources and credentials'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openPreferences(context, sourceName);
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isGlobalIncognito = ref.watch(global18PlusIncognitoProvider);
-    final globalIncognitoNotifier =
-        ref.read(global18PlusIncognitoProvider.notifier);
+    final globalIncognitoNotifier = ref.read(
+      global18PlusIncognitoProvider.notifier,
+    );
+    final adultSourceCount =
+        ref.watch(sourceProvider).installedAnimeExtensions.where((source) {
+          final name = (source.name ?? '').toLowerCase();
+          return source.isNsfw == true ||
+              name.contains('hanime') ||
+              name.contains('hentai');
+        }).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -82,85 +210,40 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip:
+                isGlobalIncognito
+                    ? '18+ Incognito Active'
+                    : '18+ Incognito Inactive',
+            icon: Icon(
+              isGlobalIncognito
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
+              color: isGlobalIncognito ? Colors.purpleAccent : null,
+            ),
+            onPressed: () {
+              globalIncognitoNotifier.toggle();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    !isGlobalIncognito
+                        ? '18+ Incognito enabled: History and progress will not be saved'
+                        : '18+ Incognito disabled',
+                  ),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         forceMaterialTransparency: true,
       ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // Global Incognito Toggle Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.purple.shade900.withValues(alpha: 0.6),
-                  colorScheme.surfaceContainer,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isGlobalIncognito
-                    ? Colors.purpleAccent
-                    : colorScheme.outlineVariant.withValues(alpha: 0.3),
-                width: isGlobalIncognito ? 1.5 : 1.0,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isGlobalIncognito
-                        ? Colors.purpleAccent.withValues(alpha: 0.2)
-                        : colorScheme.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isGlobalIncognito
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded,
-                    color: isGlobalIncognito
-                        ? Colors.purpleAccent
-                        : colorScheme.onSurfaceVariant,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Global 18+ Incognito',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Never save watch progress or history for any 18+ anime.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: isGlobalIncognito,
-                  activeColor: Colors.purpleAccent,
-                  onChanged: (val) => globalIncognitoNotifier.set(val),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // 18+ Extensions Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -180,43 +263,153 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Pre-installed sources recommendation cards
           Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.pink.shade700,
-                    child: const Text('H', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: const Text('Hanime.tv'),
-                  subtitle: const Text('Yuzono 18+ Repository • HD Streaming'),
-                  trailing: const Chip(
-                    label: Text('Available', style: TextStyle(fontSize: 11)),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onTap: () => context.push('/settings/extensions'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.purple.shade700,
-                    child: const Text('HH', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: const Text('HentaiHaven'),
-                  subtitle: const Text('Yuzono 18+ Repository • Uncensored & Dub'),
-                  trailing: const Chip(
-                    label: Text('Available', style: TextStyle(fontSize: 11)),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  onTap: () => context.push('/settings/extensions'),
-                ),
-              ],
+            child: ListTile(
+              leading: const Icon(Icons.verified_user_rounded),
+              title: const Text('Private 18+ sources'),
+              subtitle: Text(
+                adultSourceCount == 0
+                    ? 'Open Manage to install sources from the 18+ repository.'
+                    : '$adultSourceCount adult sources ready',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push('/settings/extensions'),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Pre-installed sources recommendation cards
+          if (adultSourceCount == -1)
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.pink.shade700,
+                      child: const Text(
+                        'H',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: const Text('Hanime.tv'),
+                    subtitle: const Text(
+                      'Yuzono 18+ Repository • HD Streaming',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade900.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.greenAccent.shade400,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Text(
+                            'Pre-installed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: const Icon(Icons.login_rounded, size: 20),
+                          tooltip: 'Account / Login',
+                          onPressed:
+                              () => _openLogin(
+                                context,
+                                'Hanime.tv',
+                                'https://hanime.tv/login',
+                              ),
+                        ),
+                      ],
+                    ),
+                    onTap:
+                        () => _openSourceOptions(
+                          context,
+                          'Hanime.tv',
+                          'https://hanime.tv/login',
+                        ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.purple.shade700,
+                      child: const Text(
+                        'HH',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: const Text('HentaiHaven'),
+                    subtitle: const Text(
+                      'Yuzono 18+ Repository • Uncensored & Dub',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade900.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.greenAccent.shade400,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Text(
+                            'Pre-installed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: const Icon(Icons.login_rounded, size: 20),
+                          tooltip: 'Account / Login',
+                          onPressed:
+                              () => _openLogin(
+                                context,
+                                'HentaiHaven',
+                                'https://hentaihaven.xxx/login',
+                              ),
+                        ),
+                      ],
+                    ),
+                    onTap:
+                        () => _openSourceOptions(
+                          context,
+                          'HentaiHaven',
+                          'https://hentaihaven.xxx/login',
+                        ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 20),
 
           // 18+ Catalog
@@ -241,7 +434,11 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                 padding: const EdgeInsets.all(32.0),
                 child: Column(
                   children: [
-                    Icon(Icons.movie_outlined, size: 48, color: colorScheme.outline),
+                    Icon(
+                      Icons.movie_outlined,
+                      size: 48,
+                      color: colorScheme.outline,
+                    ),
                     const SizedBox(height: 8),
                     const Text('No mature anime found right now.'),
                   ],
@@ -265,7 +462,7 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                     anime.coverImage.large ?? anime.coverImage.medium ?? '';
                 return InkWell(
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () => context.push('/details/', extra: anime),
+                  onTap: () => _openAdultAnime(context, anime),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Stack(
@@ -274,10 +471,11 @@ class _HentaiScreenState extends ConsumerState<HentaiScreen> {
                         CachedNetworkImage(
                           imageUrl: coverUrl,
                           fit: BoxFit.cover,
-                          errorWidget: (_, _, _) => Container(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: const Icon(Icons.movie),
-                          ),
+                          errorWidget:
+                              (_, _, _) => Container(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: const Icon(Icons.movie),
+                              ),
                         ),
                         Container(
                           decoration: BoxDecoration(

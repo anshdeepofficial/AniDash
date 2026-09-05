@@ -135,7 +135,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           .asFuture();
 
       if (mounted) setState(() => _statusMessage = "Installing...");
-      await InstallPlugin.install(savePath, appId: 'com.darkx.AniDash');
+      await InstallPlugin.install(savePath, appId: 'com.anidash.anime');
     } catch (e) {
       if (mounted) {
         setState(() {

@@ -116,6 +116,12 @@ class EpisodeData extends _$EpisodeData {
   SourceNotifier get _srcNotifier => ref.read(sourceProvider.notifier);
   PlayerStateNotifier get _player => ref.read(playerStateProvider.notifier);
 
+  bool get _isNativeProvider {
+    final key = ref.read(selectedProviderKeyProvider);
+    if (key == null || key.isEmpty) return false;
+    return ref.read(animeSourceRegistryProvider).has(key);
+  }
+
   @override
   EpisodeDataState build() => const EpisodeDataState();
 
@@ -269,7 +275,7 @@ class EpisodeData extends _$EpisodeData {
       Navigator.pop(context);
 
       ServerData? selected;
-      if (_exp.useExtensions) {
+      if (!_isNativeProvider && _exp.useExtensions) {
         selected = ServerData(name: 'Extension', id: 'ext', isDub: false);
       } else {
         if (servers.isEmpty) {
@@ -560,12 +566,10 @@ class EpisodeData extends _$EpisodeData {
   bool _isValidEp(int ep) => _epList.episodes.any((i) => i.number == ep);
 
   Future<List<ServerData>> _getRawServers(EpisodeDataModel ep) async {
-    if (_exp.useExtensions) {
-      return (await _srcNotifier.getServers(
-        _epList.animeId!,
-        (ep.id ?? ep.number)!.toString(),
-        ep.number.toString(),
-      )).cast<ServerData>();
+    if (!_isNativeProvider && _exp.useExtensions) {
+      // Extensions extract their streams directly from the episode URL and
+      // do not use native-provider server identifiers.
+      return [ServerData(name: 'Extension', id: 'ext', isDub: false)];
     }
 
     return (await _provider?.getSupportedServers(
@@ -756,24 +760,26 @@ class EpisodeData extends _$EpisodeData {
 
       // In background, extract sub-qualities for M3U8 without delaying playback start
       if (primarySrc.isM3U8) {
-        _getQualities(primarySrc, state.headers).then((extracted) {
-          if (extracted.isNotEmpty) {
-            final merged = [
-              {'quality': 'Auto', 'url': primarySrc.url},
-              ...extracted,
-            ];
-            final seenUrls = <String>{};
-            merged.retainWhere((m) {
-              final u = m['url'] as String?;
-              if (u == null || seenUrls.contains(u)) return false;
-              seenUrls.add(u);
-              return true;
+        _getQualities(primarySrc, state.headers)
+            .then((extracted) {
+              if (extracted.isNotEmpty) {
+                final merged = [
+                  {'quality': 'Auto', 'url': primarySrc.url},
+                  ...extracted,
+                ];
+                final seenUrls = <String>{};
+                merged.retainWhere((m) {
+                  final u = m['url'] as String?;
+                  if (u == null || seenUrls.contains(u)) return false;
+                  seenUrls.add(u);
+                  return true;
+                });
+                state = state.copyWith(qualityOptions: merged);
+              }
+            })
+            .catchError((e) {
+              AppLogger.d('Background quality extraction completed: $e');
             });
-            state = state.copyWith(qualityOptions: merged);
-          }
-        }).catchError((e) {
-          AppLogger.d('Background quality extraction completed: $e');
-        });
       }
     } finally {
       state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
@@ -789,7 +795,10 @@ class EpisodeData extends _$EpisodeData {
     );
     final epTargetUrl =
         (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
-    if (_exp.useExtensions && epTargetUrl != null && epTargetUrl.isNotEmpty) {
+    if (!_isNativeProvider &&
+        _exp.useExtensions &&
+        epTargetUrl != null &&
+        epTargetUrl.isNotEmpty) {
       try {
         final res = await _srcNotifier.getSources(
           DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
@@ -882,12 +891,58 @@ class EpisodeData extends _$EpisodeData {
     }
 
     final category = server?.isDub == true ? 'dub' : 'sub';
-    return _provider?.getSources(
-      _epList.animeId ?? '',
-      ep.id ?? '',
-      server?.id,
-      category,
-    );
+    try {
+      final res = await _provider?.getSources(
+        _epList.animeId ?? '',
+        ep.id ?? '',
+        server?.id,
+        category,
+      );
+      if (res != null && res.sources.isNotEmpty) {
+        return res;
+      }
+    } catch (e) {
+      AppLogger.e('Native provider source fetch failed', e);
+    }
+
+    // Fallback: If current native provider has no sources, try other native sources
+    final registry = ref.read(animeSourceRegistryProvider);
+    final currentKey = ref.read(selectedProviderKeyProvider);
+    for (final altKey in registry.keys.where((k) => k != currentKey)) {
+      final altProvider = registry.get(altKey);
+      if (altProvider == null) continue;
+      try {
+        AppLogger.w('Trying fallback provider for stream: $altKey');
+        final altSearch = await altProvider.getSearch(
+          _epList.animeTitle ?? '',
+          null,
+          1,
+        );
+        final altMatch = altSearch.results.firstOrNull;
+        if (altMatch != null && altMatch.id != null) {
+          final altEps = await altProvider.getEpisodes(altMatch.id!);
+          final targetEp = altEps.episodes?.firstWhereOrNull(
+            (e) => e.number == ep.number,
+          );
+          if (targetEp != null && targetEp.id != null) {
+            final altSources = await altProvider.getSources(
+              altMatch.id!,
+              targetEp.id!,
+              null,
+              category,
+            );
+            if (altSources.sources.isNotEmpty) {
+              AppLogger.success('Fallback provider $altKey found sources!');
+              return altSources;
+            }
+          }
+        }
+      } catch (e) {
+        AppLogger.d('Fallback $altKey stream failed: $e');
+      }
+    }
+
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> _getQualities(

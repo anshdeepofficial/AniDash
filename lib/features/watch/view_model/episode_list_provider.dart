@@ -150,14 +150,16 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     DMedia? media,
   }) async {
     try {
-      var eps = _exp.useExtensions
+      final registry = ref.read(animeSourceRegistryProvider);
+      final currentKey = ref.read(selectedProviderKeyProvider);
+      final isNative = currentKey != null && registry.has(currentKey);
+
+      var eps = (!isNative && _exp.useExtensions)
           ? await _fetchExtensionEpisodes(media)
           : await _fetchLegacyEpisodes(animeId);
 
       // Multi-Source Fallback: If 0 episodes returned, check other sources
-      if (eps.isEmpty && !_exp.useExtensions) {
-        final registry = ref.read(animeSourceRegistryProvider);
-        final currentKey = ref.read(selectedProviderKeyProvider);
+      if (eps.isEmpty) {
         final otherKeys = registry.keys.where((k) => k != currentKey).toList();
 
         for (final altKey in otherKeys) {

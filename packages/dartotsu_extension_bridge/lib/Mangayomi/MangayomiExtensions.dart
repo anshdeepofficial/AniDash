@@ -32,25 +32,46 @@ class MangayomiExtensions extends Extension {
   Future<void> _autoInstallDefaults() async {
     try {
       final installedNames =
-          getInstalledRx(
-            ItemType.anime,
-          ).value.map((e) => e.name?.toLowerCase() ?? '').toSet();
+          getInstalledRx(ItemType.anime).value
+              .map(
+                (e) => (e.name ?? '').toLowerCase().replaceAll(
+                  RegExp(r'[^a-z0-9]'),
+                  '',
+                ),
+              )
+              .toSet();
       final available = getAvailableRx(ItemType.anime).value;
       const targetNames = ['justanime', 'hianime', 'anikoto'];
 
       for (final target in targetNames) {
-        if (!installedNames.contains(target)) {
+        if (!installedNames.any(
+          (name) => name == target || name.startsWith(target),
+        )) {
           final match =
               available.firstWhereOrNull(
                 (s) =>
-                    s.name?.toLowerCase() == target &&
+                    (s.name
+                            ?.toLowerCase()
+                            .replaceAll(RegExp(r'[^a-z0-9]'), '')
+                            .startsWith(target) ==
+                        true) &&
                     (target != 'hianime' ||
                         s.version == '0.4.11' ||
                         (s.version != null &&
                             s.version!.compareTo('0.4') >= 0)),
               ) ??
               available.firstWhereOrNull(
-                (s) => s.name?.toLowerCase() == target,
+                (s) =>
+                    s.name?.toLowerCase().replaceAll(
+                          RegExp(r'[^a-z0-9]'),
+                          '',
+                        ) ==
+                        target ||
+                    (s.name
+                            ?.toLowerCase()
+                            .replaceAll(RegExp(r'[^a-z0-9]'), '')
+                            .startsWith(target) ==
+                        true),
               );
 
           if (match != null) {
@@ -193,6 +214,17 @@ class MangayomiExtensions extends Extension {
     }
 
     await _manager.installSource(source);
+
+    switch (source.itemType!) {
+      case ItemType.anime:
+        await getInstalledAnimeExtensions();
+        break;
+      case ItemType.manga:
+        await getInstalledMangaExtensions();
+        break;
+      case ItemType.novel:
+        break;
+    }
 
     final rx = getAvailableRx(source.itemType!);
     rx.value = rx.value.where((s) => s.id != source.id).toList();

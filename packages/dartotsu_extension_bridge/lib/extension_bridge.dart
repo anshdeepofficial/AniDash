@@ -29,16 +29,14 @@ class DartotsuExtensionBridge {
     } else {
       isar = isarInstance;
     }
-    final settings = await isar.bridgeSettings
-        .filter()
-        .idEqualTo(26)
-        .findFirst();
+    final settings =
+        await isar.bridgeSettings.filter().idEqualTo(26).findFirst();
     if (settings == null) {
       isar.writeTxnSync(
         () => isar.bridgeSettings.putSync(BridgeSettings()..id = 26),
       );
     }
-    
+
     // Ensure default extension repos are present
     final currentSettings = isar.bridgeSettings.getSync(26)!;
     bool needsUpdate = false;
@@ -48,12 +46,34 @@ class DartotsuExtensionBridge {
     ];
     for (final repo in defaultAnimeRepos) {
       if (!currentSettings.mangayomiAnimeExtensions.contains(repo)) {
-        currentSettings.mangayomiAnimeExtensions = [...currentSettings.mangayomiAnimeExtensions, repo];
+        currentSettings.mangayomiAnimeExtensions = [
+          ...currentSettings.mangayomiAnimeExtensions,
+          repo,
+        ];
         needsUpdate = true;
       }
     }
-    if (!currentSettings.mangayomiMangaExtensions.contains('https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json')) {
-      currentSettings.mangayomiMangaExtensions = [...currentSettings.mangayomiMangaExtensions, 'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json'];
+    const defaultAniyomiRepos = [
+      'https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json',
+      'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
+      'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
+    ];
+    for (final repo in defaultAniyomiRepos) {
+      if (!currentSettings.aniyomiAnimeExtensions.contains(repo)) {
+        currentSettings.aniyomiAnimeExtensions = [
+          ...currentSettings.aniyomiAnimeExtensions,
+          repo,
+        ];
+        needsUpdate = true;
+      }
+    }
+    if (!currentSettings.mangayomiMangaExtensions.contains(
+      'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
+    )) {
+      currentSettings.mangayomiMangaExtensions = [
+        ...currentSettings.mangayomiMangaExtensions,
+        'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
+      ];
       needsUpdate = true;
     }
     if (needsUpdate) {
@@ -88,4 +108,3 @@ Future<Directory> getDatabaseDirectory(String dirName) async {
     return Directory(dbDir);
   }
 }
-
