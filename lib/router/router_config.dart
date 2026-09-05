@@ -25,7 +25,6 @@ import 'package:ani_dash/features/settings/view/screens/account_settings_screen.
 import 'package:ani_dash/features/settings/view/screens/anime_sources_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/download_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/experimental_screen.dart';
-import 'package:ani_dash/features/settings/view/screens/hentai_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/player_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/advanced_player_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/profile_settings_screen.dart';
@@ -133,7 +132,6 @@ final routerConfig = GoRouter(
             anime: state.extra as UniversalMedia,
             tag: state.uri.queryParameters['tag'] ?? '',
             forceFetch: state.uri.queryParameters['forceFetch'] == 'true',
-            fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
           ),
     ),
     AnimatedGoRoute(
@@ -154,7 +152,6 @@ final routerConfig = GoRouter(
           anime: anime,
           tag: state.uri.queryParameters['tag'] ?? '',
           forceFetch: true,
-          fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
         );
       },
     ),
@@ -170,7 +167,6 @@ final routerConfig = GoRouter(
             episode:
                 int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
             episodes: state.extra as List<EpisodeDataModel>,
-            fromHentaiHub: state.uri.queryParameters['hentaiHub'] == 'true',
           ),
     ),
     AnimatedGoRoute(
@@ -247,10 +243,7 @@ final routerConfig = GoRouter(
         ),
         AnimatedGoRoute(
           path: 'extensions',
-          contentBuilder:
-              (_, state) => ExtensionScreen(
-                adultOnly: state.uri.queryParameters['adultOnly'] == 'true',
-              ),
+          contentBuilder: (_, _) => const ExtensionScreen(),
           routes: [
             AnimatedGoRoute(
               path: 'extension-preference',
@@ -263,10 +256,6 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'experimental',
           contentBuilder: (_, _) => ExperimentalScreen(),
-        ),
-        AnimatedGoRoute(
-          path: 'experimental/hentai',
-          contentBuilder: (_, _) => const HentaiScreen(),
         ),
         AnimatedGoRoute(
           path: 'permissions',

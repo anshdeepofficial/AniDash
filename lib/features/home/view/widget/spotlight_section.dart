@@ -18,9 +18,6 @@ class SpotlightSection extends ConsumerStatefulWidget {
 }
 
 class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
-  int _currentIndex = 0;
-  final CarouselSliderController _controller = CarouselSliderController();
-
   @override
   Widget build(BuildContext context) {
     final trendingAnimes =
@@ -35,7 +32,6 @@ class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
       children: [
         _SpotlightHeader(spotlightAnime: widget.spotlightAnime),
         CarouselSlider.builder(
-          carouselController: _controller,
           options: CarouselOptions(
             height: carouselHeight,
             autoPlay: true,
@@ -43,15 +39,9 @@ class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
             enableInfiniteScroll: true,
             enlargeCenterPage: true,
             enlargeStrategy: CenterPageEnlargeStrategy.height,
-            viewportFraction: MediaQuery.of(context).size.width > 900
-                ? 0.8
-                : 0.9,
+            viewportFraction:
+                MediaQuery.of(context).size.width > 900 ? 0.8 : 0.9,
             pageSnapping: true,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
           ),
           itemCount: trendingAnimes.length,
           itemBuilder: (context, index, realIndex) {
@@ -59,25 +49,22 @@ class _SpotlightSectionState extends ConsumerState<SpotlightSection> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 5),
               child: AnimeSpotlightCard(
-                onTap: (media) => anime?.id != null
-                    ? navigateToDetail(
-                        context,
-                        media,
-                        anime?.id.toString() ?? '',
-                        forceFetch: true,
-                      )
-                    : null,
+                onTap:
+                    (media) =>
+                        anime?.id != null
+                            ? navigateToDetail(
+                              context,
+                              media,
+                              anime?.id.toString() ?? '',
+                              forceFetch: true,
+                            )
+                            : null,
                 anime: anime,
                 mode: cardMode,
                 heroTag: 'spotlight_${anime?.id ?? 'loading_$index'}',
               ),
             );
           },
-        ),
-        const SizedBox(height: 8),
-        _DotIndicator(
-          length: trendingAnimes.length,
-          currentIndex: _currentIndex,
         ),
         const SizedBox(height: 10),
       ],
@@ -119,37 +106,6 @@ class _SpotlightHeader extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DotIndicator extends StatelessWidget {
-  final int length;
-  final int currentIndex;
-
-  const _DotIndicator({required this.length, required this.currentIndex});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        length,
-        (index) => AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: currentIndex == index ? 16 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: currentIndex == index
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant,
-            borderRadius: BorderRadius.circular(8),
-          ),
         ),
       ),
     );

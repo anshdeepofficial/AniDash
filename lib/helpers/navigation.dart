@@ -12,12 +12,7 @@ void navigateToDetail(
   bool forceFetch = false,
   bool fromHentaiHub = false,
 }) {
-  final hentaiParam =
-      fromHentaiHub || media.isAdult || media.isMature ? '&hentaiHub=true' : '';
-  context.push(
-    '/details?tag=$tag&forceFetch=$forceFetch$hentaiParam',
-    extra: media,
-  );
+  context.push('/details?tag=$tag&forceFetch=$forceFetch', extra: media);
 }
 
 void navigateToBrowse(
@@ -31,6 +26,7 @@ void navigateToBrowse(
   );
   context.go(uri.toString(), extra: filter);
 }
+
 void navigateToWatch({
   required BuildContext context,
   required String mediaId,
@@ -50,10 +46,6 @@ void navigateToWatch({
     'episode': currentEpisode.toString(),
   };
 
-  if (fromHentaiHub) {
-    queryParams['hentaiHub'] = 'true';
-  }
-
   if (animeId != null) {
     queryParams['animeId'] = animeId;
   }
@@ -62,10 +54,7 @@ void navigateToWatch({
     queryParams['startAt'] = startAt.toString();
   }
 
-  final uri = Uri(
-    path: '/watch/$mediaId',
-    queryParameters: queryParams,
-  );
+  final uri = Uri(path: '/watch/$mediaId', queryParameters: queryParams);
 
   AppLogger.d('Navigating to watch screen: $uri');
 

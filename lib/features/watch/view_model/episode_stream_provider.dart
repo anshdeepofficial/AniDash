@@ -801,9 +801,26 @@ class EpisodeData extends _$EpisodeData {
 
       // Pick best match for preferred quality
       final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
-      int qIdx = allQualities.indexWhere(
-        (q) => (q['quality'] as String).contains(prefQuality),
-      );
+      int qIdx;
+      if (prefQuality.toLowerCase() == 'auto' && !primarySrc.isM3U8) {
+        // Direct files cannot adapt bitrate like HLS. Start Auto at a
+        // network-safe resolution and leave higher qualities user-selectable.
+        qIdx = allQualities.indexWhere(
+          (q) => RegExp(r'(^|\D)480(\D|$)').hasMatch(q['quality'] as String),
+        );
+        if (qIdx == -1) {
+          qIdx = allQualities.indexWhere(
+            (q) => RegExp(r'(^|\D)360(\D|$)').hasMatch(q['quality'] as String),
+          );
+        }
+        if (qIdx == -1 && allQualities.isNotEmpty) {
+          qIdx = allQualities.length - 1;
+        }
+      } else {
+        qIdx = allQualities.indexWhere(
+          (q) => (q['quality'] as String).contains(prefQuality),
+        );
+      }
       if (qIdx == -1) qIdx = 0;
 
       AppLogger.d(

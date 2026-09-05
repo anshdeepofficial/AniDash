@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Extension;
@@ -10,37 +8,17 @@ import 'package:go_router/go_router.dart';
 import 'package:ani_dash/main.dart';
 
 class ExtensionScreen extends StatefulWidget {
-  final bool adultOnly;
-
-  const ExtensionScreen({super.key, this.adultOnly = false});
+  const ExtensionScreen({super.key});
 
   @override
   State<ExtensionScreen> createState() => _ExtensionScreenState();
 }
 
 class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
-  ExtensionType? _previousManagerType;
-
   @override
   void initState() {
     super.initState();
-    if (widget.adultOnly && Platform.isAndroid) {
-      final controller = Get.find<ExtensionManager>();
-      _previousManagerType = ExtensionType.fromManager(
-        controller.currentManager,
-      );
-      controller.setCurrentManager(ExtensionType.aniyomi);
-      manager = controller.currentManager;
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRepositories());
-  }
-
-  @override
-  void dispose() {
-    if (_previousManagerType != null) {
-      Get.find<ExtensionManager>().setCurrentManager(_previousManagerType!);
-    }
-    super.dispose();
   }
 
   Future<void> _refreshRepositories() async {
@@ -52,10 +30,8 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
   }
 
   @override
-  Text get title => Text(
-    widget.adultOnly ? '18+ Hub Sources' : 'Extensions',
-    style: const TextStyle(fontWeight: FontWeight.bold),
-  );
+  Text get title =>
+      const Text('Extensions', style: TextStyle(fontWeight: FontWeight.bold));
 
   @override
   ExtensionScreenBuilder get extensionScreenBuilder => (
@@ -69,7 +45,6 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
       isInstalled: isInstalled,
       searchQuery: searchQuery,
       selectedLanguage: selectedLanguage,
-      adultOnly: widget.adultOnly,
     );
   };
 
@@ -503,15 +478,12 @@ class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
   final String searchQuery;
   @override
   final String selectedLanguage;
-  final bool adultOnly;
-
   const ExtensionListWidget({
     super.key,
     required this.itemType,
     required this.isInstalled,
     required this.searchQuery,
     required this.selectedLanguage,
-    this.adultOnly = false,
   });
 
   @override
@@ -535,23 +507,6 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
     }
 
     if (source == null) return const SizedBox.shrink();
-    final normalizedName = (source.name ?? '').toLowerCase();
-    final normalizedId = (source.id ?? '').toLowerCase();
-    final is18 =
-        source.isNsfw == true ||
-        normalizedName.contains('hentai') ||
-        normalizedName.contains('hanime') ||
-        normalizedName.contains('18+') ||
-        normalizedName.contains('adult') ||
-        normalizedId.contains('hanime') ||
-        normalizedId.contains('hentai');
-
-    if (widget.adultOnly && !is18) {
-      return const SizedBox.shrink();
-    }
-    if (!widget.adultOnly && is18) {
-      return const SizedBox.shrink();
-    }
 
     return ExtensionListItem(
       source: source,

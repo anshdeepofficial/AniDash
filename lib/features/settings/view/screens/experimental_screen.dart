@@ -51,19 +51,6 @@ class ExperimentalScreen extends ConsumerWidget {
                 );
               },
             ),
-            const SizedBox(height: 8),
-            NormalSettingsItem(
-              accent: Colors.pinkAccent,
-              icon: const Icon(
-                Icons.explicit_rounded,
-                color: Colors.pinkAccent,
-              ),
-              title: 'Hentai Hub (18+)',
-              description:
-                  'Access 18+ content, extensions, and global incognito toggle',
-              trailingWidgets: const [Icon(Icons.chevron_right_rounded)],
-              onTap: () => context.push('/settings/experimental/hentai'),
-            ),
           ],
         ),
       ),

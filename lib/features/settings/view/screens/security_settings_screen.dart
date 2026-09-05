@@ -34,7 +34,10 @@ class SecuritySettingsScreen extends ConsumerWidget {
             onTap: () {},
             children: [
               ToggleableSettingsItem(
-                icon: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
+                icon: Icon(
+                  Icons.lock_outline_rounded,
+                  color: colorScheme.primary,
+                ),
                 accent: colorScheme.primary,
                 title: 'Lock AniDash App',
                 description: 'Require PIN to open the AniDash application',
@@ -62,7 +65,10 @@ class SecuritySettingsScreen extends ConsumerWidget {
               ),
               if (security.appLockEnabled) ...[
                 ToggleableSettingsItem(
-                  icon: Icon(Icons.fingerprint_rounded, color: colorScheme.primary),
+                  icon: Icon(
+                    Icons.fingerprint_rounded,
+                    color: colorScheme.primary,
+                  ),
                   accent: colorScheme.primary,
                   title: 'Biometric Unlock',
                   description: 'Unlock AniDash using Fingerprint or Face Lock',
@@ -70,7 +76,10 @@ class SecuritySettingsScreen extends ConsumerWidget {
                   onChanged: (val) => notifier.toggleAppLockBiometrics(val),
                 ),
                 NormalSettingsItem(
-                  icon: Icon(Icons.password_rounded, color: colorScheme.primary),
+                  icon: Icon(
+                    Icons.password_rounded,
+                    color: colorScheme.primary,
+                  ),
                   accent: colorScheme.primary,
                   title: 'Change App PIN',
                   description: 'Update your 4-digit AniDash PIN',
@@ -96,73 +105,6 @@ class SecuritySettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           SettingsSection(
-            title: '18+ Hub Lock',
-            titleColor: colorScheme.primary,
-            onTap: () {},
-            children: [
-              ToggleableSettingsItem(
-                icon: Icon(Icons.lock_person_rounded, color: Colors.redAccent),
-                accent: Colors.redAccent,
-                title: 'Lock Hentai Hub',
-                description: 'Require separate PIN before opening Hentai Hub',
-                value: security.hentaiLockEnabled,
-                onChanged: (val) async {
-                  if (val) {
-                    final pin = await PinLockDialog.showSetup(
-                      context: context,
-                      title: 'Set Hentai Hub PIN',
-                    );
-                    if (pin != null && pin.isNotEmpty) {
-                      notifier.setHentaiLock(true, pin);
-                    }
-                  } else {
-                    final verified = await PinLockDialog.showUnlock(
-                      context: context,
-                      title: 'Verify Hentai Hub PIN',
-                      onVerify: (pin) => notifier.verifyHentaiPin(pin),
-                    );
-                    if (verified) {
-                      notifier.setHentaiLock(false);
-                    }
-                  }
-                },
-              ),
-              if (security.hentaiLockEnabled) ...[
-                ToggleableSettingsItem(
-                  icon: Icon(Icons.fingerprint_rounded, color: Colors.redAccent),
-                  accent: Colors.redAccent,
-                  title: 'Biometric Unlock',
-                  description: 'Unlock Hentai Hub using Fingerprint or Face Lock',
-                  value: security.hentaiLockBiometrics,
-                  onChanged: (val) => notifier.toggleHentaiLockBiometrics(val),
-                ),
-                NormalSettingsItem(
-                  icon: Icon(Icons.key_rounded, color: Colors.redAccent),
-                  accent: Colors.redAccent,
-                  title: 'Change Hentai Hub PIN',
-                  description: 'Update your separate 4-digit Hentai Hub PIN',
-                  onTap: () async {
-                    final verified = await PinLockDialog.showUnlock(
-                      context: context,
-                      title: 'Verify Current Hentai PIN',
-                      onVerify: (pin) => notifier.verifyHentaiPin(pin),
-                    );
-                    if (verified && context.mounted) {
-                      final newPin = await PinLockDialog.showSetup(
-                        context: context,
-                        title: 'Set New Hentai Hub PIN',
-                      );
-                      if (newPin != null && newPin.isNotEmpty) {
-                        notifier.setHentaiLock(true, newPin);
-                      }
-                    }
-                  },
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          SettingsSection(
             title: 'Privacy Protection',
             titleColor: colorScheme.primary,
             onTap: () {},
@@ -171,15 +113,20 @@ class SecuritySettingsScreen extends ConsumerWidget {
                 icon: Icon(Icons.blur_on_rounded, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'Recent Apps Privacy Blur',
-                description: 'Blurs app content in Android app switcher preview thumbnail',
+                description:
+                    'Blurs app content in Android app switcher preview thumbnail',
                 value: security.recentAppsPrivacy,
                 onChanged: notifier.toggleRecentAppsPrivacy,
               ),
               ToggleableSettingsItem(
-                icon: Icon(Icons.no_photography_outlined, color: colorScheme.primary),
+                icon: Icon(
+                  Icons.no_photography_outlined,
+                  color: colorScheme.primary,
+                ),
                 accent: colorScheme.primary,
                 title: 'Screenshot Privacy',
-                description: 'Block screenshots & device screen capture. (Wi-Fi TV casting remains fully functional)',
+                description:
+                    'Block screenshots & device screen capture. (Wi-Fi TV casting remains fully functional)',
                 value: security.screenshotPrivacy,
                 onChanged: notifier.toggleScreenshotPrivacy,
               ),

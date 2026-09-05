@@ -23,7 +23,9 @@ class ContinueSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final validEntries =
-        allProgress.where((e) => isAdult ? e.isAdult : !e.isAdult).toList();
+        isAdult
+            ? allProgress.where((e) => e.isAdult).toList()
+            : List<AnimeWatchProgressEntry>.from(allProgress);
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 

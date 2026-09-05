@@ -407,58 +407,6 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                                   ),
                                 ),
                               ),
-                              InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder:
-                                        (ctx) => AlertDialog(
-                                          title: const Row(
-                                            children: [
-                                              Icon(
-                                                Icons.explicit_rounded,
-                                                color: Colors.pinkAccent,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('18+ Content Notice'),
-                                            ],
-                                          ),
-                                          content: const Text(
-                                            'This anime contains mature / 18+ content. You can manage 18+ extensions (Hanime, HentaiHaven) and enable Global Incognito under:\n\nSettings > Experimental Features > Hentai Hub',
-                                            style: TextStyle(fontSize: 14),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed:
-                                                  () => Navigator.pop(ctx),
-                                              child: const Text('Close'),
-                                            ),
-                                            FilledButton(
-                                              onPressed: () {
-                                                Navigator.pop(ctx);
-                                                context.push(
-                                                  '/settings/experimental/hentai',
-                                                );
-                                              },
-                                              child: const Text(
-                                                'Open Hentai Hub',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                  );
-                                },
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4.0),
-                                  child: Icon(
-                                    Icons.help_outline_rounded,
-                                    color: Colors.white70,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                              _IncognitoToggleBadge(mediaId: widget.anime.id),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -809,6 +757,8 @@ class WatchButton extends StatelessWidget {
   }
 }
 
+// Kept for backward-compatible detail layouts that may still reference it.
+// ignore: unused_element
 class _IncognitoToggleBadge extends ConsumerWidget {
   final String mediaId;
 

@@ -453,6 +453,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     );
     final isBusy =
         state.isBuffering ||
+        state.isSeeking ||
         episodesLoading ||
         episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
         episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
