@@ -152,7 +152,12 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
               state.details.value?.isMature == true;
           final match = await ref
               .read(animeMatchServiceProvider)
-              .findBestMatch(mediaTitle, isAdult: isAdultMedia);
+              .findBestMatch(
+                mediaTitle,
+                isAdult: isAdultMedia,
+                mediaId: animeId,
+                malId: state.details.value?.idMal,
+              );
 
           if (!ref.mounted) return;
 
@@ -195,6 +200,11 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
           );
 
       if (!ref.mounted) return;
+      final currentListState = ref.read(episodeListProvider);
+      if (currentListState.animeId != null &&
+          currentListState.animeId != state.animeIdForSource) {
+        state = state.copyWith(animeIdForSource: currentListState.animeId);
+      }
       _updateRanges();
     } catch (err, stack) {
       AppLogger.e(err, stack);

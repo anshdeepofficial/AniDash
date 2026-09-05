@@ -22,6 +22,7 @@ import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
+import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -421,13 +422,19 @@ class _ContinueWatchingSection extends ConsumerWidget {
     final sortedAsync = ref.watch(sortedWatchProgressProvider);
     final watchlist = ref.watch(watchlistProvider);
     final watchingStatus = auth.isMalAuthenticated ? 'watching' : 'CURRENT';
-    final cloudWatching = watchlist.listFor(watchingStatus);
+    final dismissedIds = ref.watch(continueWatchingDismissedProvider);
+    final cloudWatching = watchlist
+        .listFor(watchingStatus)
+        .where((c) => !dismissedIds.contains(c.media.id))
+        .toList();
 
     return sortedAsync.when(
       data: (sorted) {
         final Map<String, AnimeWatchProgressEntry> merged = {};
         for (final entry in sorted) {
-          merged[entry.animeId] = entry;
+          if (!dismissedIds.contains(entry.animeId)) {
+            merged[entry.animeId] = entry;
+          }
         }
 
         // Merge cloud watching items
@@ -480,11 +487,16 @@ class _ContinueWatchingSection extends ConsumerWidget {
         List<AnimeWatchProgressEntry> syncList = [];
         try {
           syncList =
-              ref.read(watchProgressRepositoryProvider).getAllProgress()..sort(
-                (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-                  a.lastUpdated ?? DateTime(0),
-                ),
-              );
+              ref
+                  .read(watchProgressRepositoryProvider)
+                  .getAllProgress()
+                  .where((e) => !dismissedIds.contains(e.animeId))
+                  .toList()
+                ..sort(
+                  (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+                    a.lastUpdated ?? DateTime(0),
+                  ),
+                );
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());
@@ -526,11 +538,16 @@ class _ContinueWatchingSection extends ConsumerWidget {
         List<AnimeWatchProgressEntry> syncList = [];
         try {
           syncList =
-              ref.read(watchProgressRepositoryProvider).getAllProgress()..sort(
-                (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-                  a.lastUpdated ?? DateTime(0),
-                ),
-              );
+              ref
+                  .read(watchProgressRepositoryProvider)
+                  .getAllProgress()
+                  .where((e) => !dismissedIds.contains(e.animeId))
+                  .toList()
+                ..sort(
+                  (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+                    a.lastUpdated ?? DateTime(0),
+                  ),
+                );
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());

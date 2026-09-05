@@ -50,6 +50,11 @@ double _calculateHybridScore(
     return 0.0;
   }
 
+  // Exact normalized match
+  if (nQuery == nTarget) {
+    return 1.2;
+  }
+
   // Jaccard Similarity (token overlap)
   final intersection = qTokens.intersection(tTokens).length;
   final union = qTokens.union(tTokens).length;
@@ -70,11 +75,34 @@ double _calculateHybridScore(
     seasonBonus = 0.15;
   }
 
+  // Subtitle / Movie Distinctive Token Mismatch Penalty
+  // e.g. "One Piece Film: Red" vs "One Piece: Stampede"
+  const stopWords = {
+    'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
+    'movie', 'film', 'special', 'ova', 'ona', 'tv', 'season', 'series', 'part', 'x'
+  };
+  final qMeaningful = qTokens.difference(stopWords);
+  final tMeaningful = tTokens.difference(stopWords);
+
+  double subtitlePenalty = 0.0;
+  if (qMeaningful.isNotEmpty && tMeaningful.isNotEmpty) {
+    final missingInTarget = qMeaningful.difference(tMeaningful);
+    final extraInTarget = tMeaningful.difference(qMeaningful);
+    if (missingInTarget.isNotEmpty && extraInTarget.isNotEmpty) {
+      subtitlePenalty = 0.35 *
+          (missingInTarget.length + extraInTarget.length) /
+          (qMeaningful.length + tMeaningful.length);
+    }
+  }
+
   // Weighted combination of scores.
-  return (jaccardScore * 0.7) +
+  final rawScore = (jaccardScore * 0.7) +
       (levenshteinScore * 0.3) +
       substringBonus +
-      seasonBonus;
+      seasonBonus -
+      subtitlePenalty;
+
+  return max(0.0, rawScore);
 }
 
 /// Normalizes the string: lowercase, roman numerals to arabic, standardizes seasons, removes special characters.

@@ -42,7 +42,7 @@ final class AnimeSearchNotifierProvider
 }
 
 String _$animeSearchNotifierHash() =>
-    r'abec0420f97798877f5e5a2c399c8f489117cc06';
+    r'df65c7ab1ca3c0d08a29475de4d2a1a6db1bc9e9';
 
 abstract class _$AnimeSearchNotifier extends $Notifier<AnimeSearchState> {
   AnimeSearchState build();

@@ -108,7 +108,7 @@ class EpisodeDataState {
   }
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 class EpisodeData extends _$EpisodeData {
   EpisodeListState get _epList => ref.read(episodeListProvider);
   ExperimentalFeaturesModel get _exp => ref.read(experimentalProvider);

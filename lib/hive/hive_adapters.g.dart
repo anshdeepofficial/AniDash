@@ -24,13 +24,14 @@ class ThemeModelAdapter extends TypeAdapter<ThemeModel> {
       swapColors: fields[4] == null ? false : fields[4] as bool,
       useMaterial3: fields[5] == null ? true : fields[5] as bool,
       useDynamicColors: fields[6] == null ? false : fields[6] as bool,
+      logoMode: fields[8] == null ? 'dynamic' : fields[8] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, ThemeModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.themeMode)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class ThemeModelAdapter extends TypeAdapter<ThemeModel> {
       ..writeByte(5)
       ..write(obj.useMaterial3)
       ..writeByte(6)
-      ..write(obj.useDynamicColors);
+      ..write(obj.useDynamicColors)
+      ..writeByte(8)
+      ..write(obj.logoMode);
   }
 
   @override
@@ -76,8 +79,12 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
       preferDub: fields[3] == null ? true : fields[3] as bool,
       bufferSize: fields[8] == null ? 32 : (fields[8] as num).toDouble(),
       seekDuration: fields[4] == null ? 10 : (fields[4] as num).toInt(),
-      autoHideDuration: fields[5] == null ? 4 : (fields[5] as num).toInt(),
+      autoHideDuration: fields[5] == null ? 5 : (fields[5] as num).toInt(),
+      lockAutoHideDuration:
+          fields[10] == null ? 3 : (fields[10] as num).toInt(),
       showNextPrevButtons: fields[6] == null ? true : fields[6] as bool,
+      prefetchNextEpisode: fields[11] == null ? true : fields[11] as bool,
+      showNextEpisodePrompt: fields[12] == null ? true : fields[12] as bool,
       mpvSettings:
           fields[7] == null
               ? const {}
@@ -88,7 +95,7 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
   @override
   void write(BinaryWriter writer, PlayerModel obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.defaultQuality)
       ..writeByte(1)
@@ -108,7 +115,13 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
       ..writeByte(8)
       ..write(obj.bufferSize)
       ..writeByte(9)
-      ..write(obj.skipFillerEpisodes);
+      ..write(obj.skipFillerEpisodes)
+      ..writeByte(10)
+      ..write(obj.lockAutoHideDuration)
+      ..writeByte(11)
+      ..write(obj.prefetchNextEpisode)
+      ..writeByte(12)
+      ..write(obj.showNextEpisodePrompt);
   }
 
   @override
@@ -371,15 +384,16 @@ class ExperimentalFeaturesModelAdapter
       episodeTitleSync: fields[0] == null ? true : fields[0] as bool,
       useExtensions: fields[5] == null ? true : fields[5] as bool,
       useTestReleases: fields[2] == null ? false : fields[2] as bool,
-      newUI: fields[3] == null ? false : fields[3] as bool,
+      newUI: fields[3] == null ? true : fields[3] as bool,
       debugMode: fields[4] == null ? false : fields[4] as bool,
+      useEpisodeBannerStyle: fields[6] == null ? false : fields[6] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, ExperimentalFeaturesModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.episodeTitleSync)
       ..writeByte(2)
@@ -389,7 +403,9 @@ class ExperimentalFeaturesModelAdapter
       ..writeByte(4)
       ..write(obj.debugMode)
       ..writeByte(5)
-      ..write(obj.useExtensions);
+      ..write(obj.useExtensions)
+      ..writeByte(6)
+      ..write(obj.useEpisodeBannerStyle);
   }
 
   @override
@@ -438,14 +454,15 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       error: fields[17] as dynamic,
       subtitles: (fields[13] as List?)?.cast<dynamic>(),
       totalSegments: (fields[14] as num?)?.toInt(),
-      isAdult: fields[18] == null ? false : fields[18] as bool,
+      downloadedBytes: (fields[18] as num?)?.toInt(),
+      isAdult: fields[19] == null ? false : fields[19] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadItem obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -483,6 +500,8 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       ..writeByte(17)
       ..write(obj.error)
       ..writeByte(18)
+      ..write(obj.downloadedBytes)
+      ..writeByte(19)
       ..write(obj.isAdult);
   }
 
@@ -568,13 +587,17 @@ class DownloadSettingsModelAdapter extends TypeAdapter<DownloadSettingsModel> {
       parallelDownloads: fields[3] == null ? 5 : (fields[3] as num).toInt(),
       speedLimitKBps: fields[4] == null ? 0 : (fields[4] as num).toInt(),
       wifiOnly: fields[5] == null ? false : fields[5] as bool,
+      rememberDownloadPreferences:
+          fields[6] == null ? false : fields[6] as bool,
+      preferredLanguage: fields[7] == null ? 'dub' : fields[7] as String,
+      preferredQuality: fields[8] == null ? '1080p' : fields[8] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadSettingsModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.customDownloadPath)
       ..writeByte(1)
@@ -586,7 +609,13 @@ class DownloadSettingsModelAdapter extends TypeAdapter<DownloadSettingsModel> {
       ..writeByte(4)
       ..write(obj.speedLimitKBps)
       ..writeByte(5)
-      ..write(obj.wifiOnly);
+      ..write(obj.wifiOnly)
+      ..writeByte(6)
+      ..write(obj.rememberDownloadPreferences)
+      ..writeByte(7)
+      ..write(obj.preferredLanguage)
+      ..writeByte(8)
+      ..write(obj.preferredQuality);
   }
 
   @override

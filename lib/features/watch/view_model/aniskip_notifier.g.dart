@@ -41,7 +41,7 @@ final class AniSkipNotifierProvider
   }
 }
 
-String _$aniSkipNotifierHash() => r'e10d5eb36e05987c6c969d951314774c2635e427';
+String _$aniSkipNotifierHash() => r'99109ea79ee911750dd604c2ea83b94edf6a151f';
 
 abstract class _$AniSkipNotifier extends $Notifier<List<AniSkipResultItem>> {
   List<AniSkipResultItem> build();

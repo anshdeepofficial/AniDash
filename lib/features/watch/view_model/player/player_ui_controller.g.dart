@@ -42,7 +42,7 @@ final class PlayerUIControllerProvider
 }
 
 String _$playerUIControllerHash() =>
-    r'6c6bc5daddcf5c429e93b3b9b2e088621035e647';
+    r'c809fc483d7562babf0e675c0f1f12393641a61a';
 
 abstract class _$PlayerUIController extends $Notifier<PlayerUIState> {
   PlayerUIState build();

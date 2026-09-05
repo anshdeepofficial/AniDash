@@ -53,7 +53,12 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
     if (directAutoMatch && withAnimeMatch) {
       final match = await ref
           .read(animeMatchServiceProvider)
-          .findBestMatch(animeMedia.title);
+          .findBestMatch(
+            animeMedia.title,
+            isAdult: fromHentaiHub || animeMedia.isAdult,
+            mediaId: animeMedia.id.toString(),
+            malId: animeMedia.idMal,
+          );
       if (match == null) {
         throw StateError('No matching title was found on the active source.');
       }

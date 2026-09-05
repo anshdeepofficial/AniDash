@@ -108,6 +108,18 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       await markAdultAnimeId(entry.animeId);
     }
     try {
+      final dismissed =
+          (sharedPrefs.getStringList('dismissed_continue_watching_ids') ?? [])
+              .toSet();
+      if (dismissed.contains(entry.animeId)) {
+        dismissed.remove(entry.animeId);
+        await sharedPrefs.setStringList(
+          'dismissed_continue_watching_ids',
+          dismissed.toList(),
+        );
+      }
+    } catch (_) {}
+    try {
       final isarEntry = IsarAnimeWatchProgress(
         id: fastHash(entry.animeId),
         animeId: entry.animeId,
@@ -311,6 +323,12 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     await isar.writeTxn(() async {
       await isar.isarAnimeWatchProgress.delete(fastHash(animeId));
     });
+    try {
+      if (Hive.isBoxOpen('anime_watch_progress')) {
+        final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
+        await box.delete(animeId);
+      }
+    } catch (_) {}
     AppLogger.d('Deleted progress for anime: $animeId');
   }
 
@@ -350,6 +368,12 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         animeIds.map(fastHash).toList(),
       );
     });
+    try {
+      if (Hive.isBoxOpen('anime_watch_progress')) {
+        final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
+        await box.deleteAll(animeIds);
+      }
+    } catch (_) {}
     AppLogger.d('Deleted progress for ${animeIds.length} animes');
   }
 

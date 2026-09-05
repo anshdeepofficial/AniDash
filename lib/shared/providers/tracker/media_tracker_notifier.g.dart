@@ -58,7 +58,7 @@ final class MediaTrackerProvider
   }
 }
 
-String _$mediaTrackerHash() => r'ca88bb9dbc57ef85c9eb7cde01db79cb8da0d67d';
+String _$mediaTrackerHash() => r'6ccf2d074adb6102f19e476ed0c6202f67bf20c3';
 
 final class MediaTrackerFamily extends $Family
     with

@@ -28,16 +28,47 @@ class UpdateDialog extends StatefulWidget {
   State<UpdateDialog> createState() => _UpdateDialogState();
 }
 
-class _UpdateDialogState extends State<UpdateDialog> {
+class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver {
   static const _installer = MethodChannel('anidash/updater');
   double _progress = 0.0;
   bool _downloading = false;
   String? _statusMessage;
   bool _error = false;
   String? _downloadedApkPath;
+  bool _awaitingInstallPermission = false;
 
   final String _linuxCmd =
       'bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/AniDash/main/install.sh)';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingInstallPermission) {
+      _awaitingInstallPermission = false;
+      if (_downloadedApkPath != null && Platform.isAndroid) {
+        _checkAndInstallAfterPermission();
+      }
+    }
+  }
+
+  Future<void> _checkAndInstallAfterPermission() async {
+    final canInstall =
+        await _installer.invokeMethod<bool>('canInstallPackages') ?? false;
+    if (canInstall && _downloadedApkPath != null) {
+      _launchInstaller(_downloadedApkPath!);
+    }
+  }
 
   String get _effectiveApkUrl {
     if (widget.apkDownloadUrl != null && widget.apkDownloadUrl!.isNotEmpty) {
@@ -47,7 +78,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         widget.latestVersion.startsWith('v')
             ? widget.latestVersion
             : 'v${widget.latestVersion}';
-    return 'https://github.com/anshdeepofficial/Anidash/releases/download/$tag/app-release.apk';
+    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/AniDash-$tag-Universal.apk';
   }
 
   Future<void> _handleUpdateAction() async {
@@ -80,12 +111,19 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
     final client = http.Client();
     try {
-      final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/app-update.apk';
+      Directory? dir;
+      if (Platform.isAndroid) {
+        try {
+          dir = await getExternalStorageDirectory();
+        } catch (_) {}
+      }
+      dir ??= await getTemporaryDirectory();
+      final savePath = '${dir.path}/app-update.apk';
       final file = File(savePath);
       if (await file.exists()) await file.delete();
 
       final request = http.Request('GET', Uri.parse(downloadUrl));
+      request.headers['User-Agent'] = 'AniDash';
       final response = await client.send(request);
 
       if (response.statusCode >= 400) {
@@ -97,41 +135,30 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
       final sink = file.openWrite();
 
-      await response.stream
-          .listen(
-            (chunk) {
-              sink.add(chunk);
-              received += chunk.length;
+      try {
+        await response.stream.forEach((chunk) {
+          sink.add(chunk);
+          received += chunk.length;
 
-              if (mounted) {
-                setState(() {
-                  if (contentLength > 0) {
-                    _progress = received / contentLength;
-                    final receivedMB = (received / (1024 * 1024))
-                        .toStringAsFixed(1);
-                    final totalMB = (contentLength / (1024 * 1024))
-                        .toStringAsFixed(1);
-                    _statusMessage =
-                        "Downloading... ${(_progress * 100).toInt()}% ($receivedMB MB / $totalMB MB)";
-                  } else {
-                    final receivedMB = (received / (1024 * 1024))
-                        .toStringAsFixed(1);
-                    _statusMessage = "Downloading... $receivedMB MB";
-                  }
-                });
+          if (mounted) {
+            setState(() {
+              if (contentLength > 0) {
+                _progress = received / contentLength;
+                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
+                final totalMB = (contentLength / (1024 * 1024)).toStringAsFixed(1);
+                _statusMessage =
+                    "Downloading... ${(_progress * 100).toInt()}% ($receivedMB MB / $totalMB MB)";
+              } else {
+                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
+                _statusMessage = "Downloading... $receivedMB MB";
               }
-            },
-            onDone: () async {
-              await sink.flush();
-              await sink.close();
-            },
-            onError: (e) async {
-              await sink.close();
-              throw e;
-            },
-            cancelOnError: true,
-          )
-          .asFuture();
+            });
+          }
+        });
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
 
       _downloadedApkPath = savePath;
       await _launchInstaller(savePath);
@@ -153,6 +180,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       final canInstall =
           await _installer.invokeMethod<bool>('canInstallPackages') ?? false;
       if (!canInstall) {
+        _awaitingInstallPermission = true;
         await _installer.invokeMethod<bool>('openInstallPermission');
         if (!mounted) return;
         setState(() {
@@ -166,10 +194,15 @@ class _UpdateDialogState extends State<UpdateDialog> {
       if (mounted) {
         setState(() {
           _downloading = false;
-          _statusMessage = 'Android installer opened.';
+          _statusMessage = 'Opening Android installer...';
         });
       }
-      await _installer.invokeMethod<bool>('installApk', {'path': savePath});
+      final success = await _installer.invokeMethod<bool>('installApk', {'path': savePath});
+      if (success != true && mounted) {
+        setState(() {
+          _statusMessage = 'Could not open installer. Tap Install Update again.';
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {

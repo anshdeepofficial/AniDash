@@ -41,7 +41,7 @@ final class WatchSyncNotifierProvider
   }
 }
 
-String _$watchSyncNotifierHash() => r'd4bca5826746f55693c7c2c4877073a76f11d9e5';
+String _$watchSyncNotifierHash() => r'8eb9bad6d93ed157c7255f487e9be06b8134e7f8';
 
 abstract class _$WatchSyncNotifier extends $Notifier<void> {
   void build();

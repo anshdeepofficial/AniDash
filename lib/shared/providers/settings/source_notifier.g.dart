@@ -41,7 +41,7 @@ final class SourceNotifierProvider
   }
 }
 
-String _$sourceNotifierHash() => r'8c5287ab31f9bbdddd8a84dd8c3f015453a80142';
+String _$sourceNotifierHash() => r'fe9d96a4c9998bf9239d5af751712b5c7acae2b0';
 
 abstract class _$SourceNotifier extends $Notifier<SourceState> {
   SourceState build();

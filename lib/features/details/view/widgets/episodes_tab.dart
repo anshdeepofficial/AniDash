@@ -283,13 +283,19 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final episodeListState = ref.watch(episodeListProvider);
 
-    final isMatchingAnime = episodeListState.animeId == state.animeIdForSource;
+    final isMatchingAnime = episodeListState.animeId == state.animeIdForSource ||
+        (episodeListState.episodes.isNotEmpty &&
+            (episodeListState.animeId != null &&
+                (episodeListState.animeTitle == state.bestMatchName ||
+                    episodeListState.animeId == state.animeIdForSource)));
     final hasSourceMatch = state.animeIdForSource != null;
 
     if (!isMatchingAnime &&
         hasSourceMatch &&
         !state.isSearchingMatch &&
-        !episodeListState.isLoading) {
+        !episodeListState.isLoading &&
+        episodeListState.error == null &&
+        episodeListState.episodes.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final titleForSearch =
@@ -314,10 +320,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     }
 
     final episodes =
-        isMatchingAnime ? episodeListState.episodes : <EpisodeDataModel>[];
+        (isMatchingAnime || episodeListState.episodes.isNotEmpty)
+            ? episodeListState.episodes
+            : <EpisodeDataModel>[];
     final loading =
-        episodeListState.isLoading || (!isMatchingAnime && hasSourceMatch);
-    final error = isMatchingAnime ? episodeListState.error : null;
+        episodeListState.isLoading ||
+        state.isSearchingMatch ||
+        (!isMatchingAnime && hasSourceMatch && episodes.isEmpty && episodeListState.error == null);
+    final error = state.error ?? episodeListState.error;
 
     final exposedName = state.bestMatchName;
     final theme = Theme.of(context);

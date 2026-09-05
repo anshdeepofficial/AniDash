@@ -8,7 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
-import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
@@ -22,12 +22,14 @@ class ContinueSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final dismissedIds = ref.watch(continueWatchingDismissedProvider);
     final scopedEntries =
         isAdult
             ? allProgress.where((e) => e.isAdult).toList()
             : List<AnimeWatchProgressEntry>.from(allProgress);
     final validEntries =
         scopedEntries.where((entry) {
+          if (dismissedIds.contains(entry.animeId)) return false;
           if (entry.status.toLowerCase() == 'completed') return false;
           if (entry.totalEpisodes > 0) {
             if (entry.currentEpisode > entry.totalEpisodes) return false;
@@ -372,10 +374,13 @@ class ContinueSection extends ConsumerWidget {
                   title: const Text('Remove from Continue Watching'),
                   subtitle: const Text('Clears your watch progress'),
                   onTap: () {
-                    ref
-                        .read(watchProgressRepositoryProvider)
-                        .deleteProgress(entry.animeId);
                     Navigator.pop(sheetContext);
+                    showContinueWatchingUndoSnackBar(
+                      context: context,
+                      ref: ref,
+                      animeId: entry.animeId,
+                      animeTitle: entry.animeTitle,
+                    );
                   },
                 ),
                 ListTile(

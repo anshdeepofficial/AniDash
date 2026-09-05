@@ -42,7 +42,7 @@ final class WatchProgressNotifierProvider
 }
 
 String _$watchProgressNotifierHash() =>
-    r'7fde8786af776053f6a011a77b353510569864e7';
+    r'5238745441e9bc32682b370a9b26d4ff7e53a34d';
 
 abstract class _$WatchProgressNotifier extends $Notifier<void> {
   void build();

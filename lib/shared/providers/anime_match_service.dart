@@ -30,6 +30,8 @@ class AnimeMatchService {
   Future<BaseAnimeModel?> findBestMatch(
     UniversalTitle title, {
     bool isAdult = false,
+    String? mediaId,
+    String? malId,
   }) async {
     final titles =
         [title.english, title.romaji, title.native]
@@ -51,6 +53,30 @@ class AnimeMatchService {
 
         if (results.isEmpty) continue;
 
+        // 1. Direct AniList / MAL ID Match (e.g. JustAnime where ID == AniList ID)
+        if (mediaId != null && mediaId.isNotEmpty) {
+          final idMatch = results.firstWhereOrNull(
+            (r) => r.id == mediaId || r.anilistId?.toString() == mediaId,
+          );
+          if (idMatch != null) {
+            AppLogger.d(
+              'Direct AniList ID match found: ${idMatch.name} (id: $mediaId)',
+            );
+            return idMatch;
+          }
+        }
+        if (malId != null && malId.isNotEmpty) {
+          final malMatch = results.firstWhereOrNull(
+            (r) => r.id == malId || (r.id != null && r.id!.contains(malId)),
+          );
+          if (malMatch != null) {
+            AppLogger.d(
+              'Direct MAL ID match found: ${malMatch.name} (malId: $malId)',
+            );
+            return malMatch;
+          }
+        }
+
         final matches = getBestMatches<BaseAnimeModel>(
           results: results,
           title: title,
@@ -70,8 +96,6 @@ class AnimeMatchService {
             bestSimilarity = topMatch.similarity;
             bestCandidate = topMatch.result;
           }
-        } else if (bestCandidate == null && results.isNotEmpty) {
-          bestCandidate = results.first;
         }
       } catch (e) {
         AppLogger.e('Error searching for title: $title', e);
@@ -79,7 +103,7 @@ class AnimeMatchService {
       }
     }
 
-    if (bestCandidate != null) {
+    if (bestCandidate != null && bestSimilarity >= 0.55) {
       AppLogger.d(
         'Using closest match: ${bestCandidate.name} (similarity: ${bestSimilarity.toStringAsFixed(2)})',
       );

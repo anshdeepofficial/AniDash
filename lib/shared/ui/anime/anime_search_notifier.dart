@@ -44,7 +44,13 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
     performSearch(title);
 
     if (autoMatch) {
-      final match = await ref.read(animeMatchServiceProvider).findBestMatch(media.title);
+      final match = await ref
+          .read(animeMatchServiceProvider)
+          .findBestMatch(
+            media.title,
+            mediaId: media.id.toString(),
+            malId: media.idMal,
+          );
       if (match != null) {
         onMatch(match);
       }
