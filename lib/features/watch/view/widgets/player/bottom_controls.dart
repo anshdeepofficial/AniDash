@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +64,8 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final safeInsets = MediaQuery.viewPaddingOf(context);
+    final maxSide = math.max(safeInsets.left, safeInsets.right);
+    final sidePadding = (maxSide > 0 ? maxSide : 16.0) + 8.0;
     // final settings = ref.watch(playerSettingsProvider);
 
     return Container(
@@ -81,9 +84,9 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
         right: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            safeInsets.left + 8,
+            sidePadding,
             0,
-            safeInsets.right + 8,
+            sidePadding,
             safeInsets.bottom.clamp(8.0, 24.0),
           ),
           child: Column(

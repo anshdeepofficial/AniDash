@@ -149,26 +149,36 @@ class _UpdateDialogState extends State<UpdateDialog> {
   }
 
   Future<void> _launchInstaller(String savePath) async {
-    final canInstall =
-        await _installer.invokeMethod<bool>('canInstallPackages') ?? false;
-    if (!canInstall) {
-      await _installer.invokeMethod<bool>('openInstallPermission');
-      if (!mounted) return;
-      setState(() {
-        _downloading = false;
-        _statusMessage =
-            'Allow installs from AniDash, return here, then tap Install Update.';
-      });
-      return;
-    }
+    try {
+      final canInstall =
+          await _installer.invokeMethod<bool>('canInstallPackages') ?? false;
+      if (!canInstall) {
+        await _installer.invokeMethod<bool>('openInstallPermission');
+        if (!mounted) return;
+        setState(() {
+          _downloading = false;
+          _statusMessage =
+              'Allow installs from AniDash, return here, then tap Install Update.';
+        });
+        return;
+      }
 
-    if (mounted) {
-      setState(() {
-        _downloading = false;
-        _statusMessage = 'Android installer opened.';
-      });
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _statusMessage = 'Android installer opened.';
+        });
+      }
+      await _installer.invokeMethod<bool>('installApk', {'path': savePath});
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = true;
+          _downloading = false;
+          _statusMessage = 'Installer error: $e';
+        });
+      }
     }
-    await _installer.invokeMethod<bool>('installApk', {'path': savePath});
   }
 
   @override
