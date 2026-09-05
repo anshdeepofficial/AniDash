@@ -138,7 +138,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     List<EpisodeDataModel> episodes,
   ) {
     void triggerAutoAdvance() {
-      if (_isDisposed || _hasAutoAdvanced) return;
+      if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
       _hasAutoAdvanced = true;
       AppLogger.i('Auto-advancing to next episode instantly');
       ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
@@ -151,8 +151,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .player
         .stream
         .completed
+        .distinct()
         .listen((completed) {
-          if (completed && !_hasAutoAdvanced && !_isDisposed) {
+          if (!completed) {
+            _hasAutoAdvanced = false;
+            return;
+          }
+          if (_isPlayerReady &&
+              _dur > 120 &&
+              _pos >= _dur - 2 &&
+              !_hasAutoAdvanced &&
+              !_isDisposed) {
             triggerAutoAdvance();
           }
         });
@@ -233,7 +242,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         _pos = 0;
         _dur = 0;
         _trackingTriggered = false;
-        _hasAutoAdvanced = false;
         _prefetchTriggered = false;
         _nextPromptTriggered = false;
         _isPlayerReady = false;
