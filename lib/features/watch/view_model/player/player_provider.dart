@@ -92,10 +92,13 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     // Apply optimized fast-seeking and stream cache defaults
     final fastProperties = <String, String>{
       'cache': 'yes',
+      'cache-on-disk': 'yes',
       'cache-pause': 'no',
       'cache-pause-wait': '1',
-      'demuxer-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
-      'demuxer-max-bytes': '${(bufferSize.toInt() * 1024 * 1024).clamp(32 * 1024 * 1024, 128 * 1024 * 1024)}',
+      'demuxer-lavf-o':
+          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
+      'demuxer-max-bytes':
+          '${(bufferSize.toInt() * 1024 * 1024).clamp(32 * 1024 * 1024, 128 * 1024 * 1024)}',
       'demuxer-readahead-secs': '25',
       'hr-seek': 'default',
       'hr-seek-framedrop': 'yes',
@@ -207,14 +210,17 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     if (startAt == null || startAt == Duration.zero) return;
 
     try {
-      await _player.stream.playing
-          .firstWhere((p) => p == true)
-          .timeout(const Duration(seconds: 10));
-
-      if ((_player.state.position - startAt).inSeconds.abs() > 5) {
+      if (_player.state.duration == Duration.zero) {
+        await _player.stream.duration
+            .firstWhere((duration) => duration > Duration.zero)
+            .timeout(const Duration(seconds: 10));
+      }
+      if ((_player.state.position - startAt).inSeconds.abs() > 3) {
         await _player.seek(startAt);
       }
-    } catch (_) {}
+    } catch (_) {
+      await _player.seek(startAt);
+    }
   }
 
   Future<void> togglePlay() async {

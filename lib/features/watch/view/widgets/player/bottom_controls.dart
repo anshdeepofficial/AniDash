@@ -9,6 +9,7 @@ import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/helpers/show_subtitle_sidebar.dart';
+import 'package:ani_dash/main.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class BottomControls extends ConsumerStatefulWidget {
@@ -40,9 +41,16 @@ class BottomControls extends ConsumerStatefulWidget {
 }
 
 class _BottomControlsState extends ConsumerState<BottomControls> {
+  static const _remainingTimePreference = 'player_show_remaining_time';
   double? _draggedValue;
   double _dragPositionX = 0.0;
   bool _showRemainingTime = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showRemainingTime = sharedPrefs.getBool(_remainingTimePreference) ?? false;
+  }
 
   // VoidCallback _wrap(VoidCallback? cb) {
   //   return () {
@@ -412,6 +420,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       behavior: HitTestBehavior.opaque,
       onTap: () {
         setState(() => _showRemainingTime = !_showRemainingTime);
+        sharedPrefs.setBool(_remainingTimePreference, _showRemainingTime);
         widget.onInteraction();
       },
       child: Padding(

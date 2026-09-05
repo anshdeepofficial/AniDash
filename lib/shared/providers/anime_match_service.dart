@@ -138,12 +138,12 @@ class AnimeMatchService {
         _ref.read(animeSourceRegistryProvider).has(nativeKey);
 
     final activeSource = _ref.read(sourceProvider).activeAnimeSource;
-    final isSourceAdult = activeSource != null && (
-        activeSource.isNsfw == true ||
-        (activeSource.name ?? '').toLowerCase().contains('hanime') ||
-        (activeSource.name ?? '').toLowerCase().contains('hentai') ||
-        (activeSource.name ?? '').toLowerCase().contains('adult')
-    );
+    final isSourceAdult =
+        activeSource != null &&
+        (activeSource.isNsfw == true ||
+            (activeSource.name ?? '').toLowerCase().contains('hanime') ||
+            (activeSource.name ?? '').toLowerCase().contains('hentai') ||
+            (activeSource.name ?? '').toLowerCase().contains('adult'));
 
     if (useExtensions && !isNative && !isSourceAdult && activeSource != null) {
       final res = await _ref.read(sourceProvider.notifier).search(query);
@@ -158,10 +158,7 @@ class AnimeMatchService {
 
       final registry = _ref.read(animeSourceRegistryProvider);
       final currentKey = _ref.read(selectedProviderKeyProvider);
-      final keys = [
-        if (currentKey != null) currentKey,
-        ...registry.keys.where((key) => key != currentKey),
-      ];
+      final keys = [if (currentKey != null) currentKey];
       for (final key in keys) {
         final candidate = registry.get(key);
         if (candidate == null) continue;
@@ -181,10 +178,6 @@ class AnimeMatchService {
                   )
                   .toList();
           if (results.isNotEmpty) {
-            if (key != currentKey) {
-              _ref.read(selectedProviderKeyProvider.notifier).select(key);
-              AppLogger.w('Source $currentKey unavailable; using $key');
-            }
             return results;
           }
         } catch (error) {
@@ -219,7 +212,15 @@ class AnimeMatchService {
         if (selection.sourceType == 'legacy') {
           final targetSourceKey = selection.sourceId ?? 'justanime';
           final registry = _ref.read(animeSourceRegistryProvider);
-          final provider = registry.get(targetSourceKey) ?? registry.get('justanime');
+          final selectedKey = _ref.read(selectedProviderKeyProvider);
+          if (selectedKey != null && targetSourceKey != selectedKey) {
+            AppLogger.d(
+              'Ignoring saved $targetSourceKey match; user selected $selectedKey',
+            );
+            return null;
+          }
+          final provider =
+              registry.get(targetSourceKey) ?? registry.get('justanime');
           final matchedId = selection.matchedAnimeId;
           if (provider != null && matchedId != null && matchedId.isNotEmpty) {
             try {
@@ -227,10 +228,9 @@ class AnimeMatchService {
                   .getEpisodes(matchedId)
                   .timeout(const Duration(seconds: 12));
               if (episodes.episodes?.isNotEmpty == true) {
-                _ref
-                    .read(selectedProviderKeyProvider.notifier)
-                    .select(provider.providerName);
-                AppLogger.d('Auto-Restore: Success with ${provider.providerName}');
+                AppLogger.d(
+                  'Auto-Restore: Success with ${provider.providerName}',
+                );
                 return BaseAnimeModel(
                   id: matchedId,
                   name: selection.matchedAnimeTitle,
@@ -243,8 +243,6 @@ class AnimeMatchService {
           } else {
             AppLogger.w('Auto-Restore: Legacy provider not found');
           }
-          // Fallback to justanime if saved source is stale
-          _ref.read(selectedProviderKeyProvider.notifier).select('justanime');
         } else if (['mangayomi', 'aniyomi'].contains(selection.sourceType)) {
           AppLogger.d(
             'Auto-Restore: Restoring extension source ${selection.sourceId}',

@@ -287,7 +287,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
     );
 
     return SliverAppBar(
-      expandedHeight: 280,
+      expandedHeight: 340,
       pinned: false,
       floating: true,
       elevation: 0,
@@ -312,12 +312,12 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                     Colors.black.withValues(alpha: 0.3),
                     colorScheme.surfaceContainerLowest,
                   ],
-                  stops: const [0.0, 1.0],
+                  stops: const [0.25, 1.0],
                 ),
               ),
             ),
             Positioned(
-              bottom: 20,
+              bottom: 24,
               left: 20,
               right: 20,
               child: Row(

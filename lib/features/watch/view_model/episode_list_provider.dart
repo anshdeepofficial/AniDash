@@ -160,9 +160,10 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       final currentKey = ref.read(selectedProviderKeyProvider);
       final isNative = currentKey != null && registry.has(currentKey);
 
-      var eps = (!isNative && _exp.useExtensions)
-          ? await _fetchExtensionEpisodes(media)
-          : await _fetchLegacyEpisodes(animeId);
+      var eps =
+          (!isNative && _exp.useExtensions)
+              ? await _fetchExtensionEpisodes(media)
+              : await _fetchLegacyEpisodes(animeId);
 
       // Multi-Source Fallback: If 0 episodes returned, search active and fallback sources by title
       if (eps.isEmpty &&
@@ -197,7 +198,6 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                 AppLogger.success(
                   'Source $altKey found ${altEps.length} episodes!',
                 );
-                ref.read(selectedProviderKeyProvider.notifier).select(altKey);
                 state = state.copyWith(animeId: matchId);
                 return altEps;
               }
