@@ -297,18 +297,15 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       final end = (skip.interval!.endTime * 1000).clamp(0, total);
       if (end <= start) return const SizedBox.shrink();
 
-      final isOp = skip.skipType == SkipType.op ||
+      final isOp =
+          skip.skipType == SkipType.op ||
           (skip.skipType == SkipType.mixed && start < total * 0.5);
-      final isEd = skip.skipType == SkipType.ed ||
+      final isEd =
+          skip.skipType == SkipType.ed ||
           (skip.skipType == SkipType.mixed && start >= total * 0.5) ||
           (!isOp && start >= total * 0.6);
 
-      // Vibrant Amber for Opening/Intro, Vivid Cyan for Ending/Outro, Orange for other
-      final highlightColor = isOp
-          ? const Color(0xFFFFB300)
-          : (isEd
-              ? const Color(0xFF00E5FF)
-              : const Color(0xFFFF7043));
+      final highlightColor = Color.lerp(scheme.primary, Colors.black, 0.45)!;
 
       final startRatio = start / total;
       final endRatio = end / total;
@@ -328,30 +325,24 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: highlightColor.withValues(alpha: 0.95),
+                color: highlightColor.withValues(alpha: 0.68),
                 borderRadius: BorderRadius.circular(2),
-                boxShadow: [
-                  BoxShadow(
-                    color: highlightColor.withValues(alpha: 0.7),
-                    blurRadius: 4,
-                    spreadRadius: 1,
-                  ),
-                ],
               ),
-              child: width >= 34
-                  ? Center(
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.2,
-                          height: 1.0,
+              child:
+                  width >= 34
+                      ? Center(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.2,
+                            height: 1.0,
+                          ),
                         ),
-                      ),
-                    )
-                  : null,
+                      )
+                      : null,
             ),
             // Floating badge above the bar for narrow segments (e.g. short Outro)
             if (width < 34)
@@ -363,7 +354,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: highlightColor,
+                    color: highlightColor.withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(3),
                     boxShadow: const [
                       BoxShadow(
@@ -376,7 +367,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                   child: Text(
                     label,
                     style: const TextStyle(
-                      color: Colors.black,
+                      color: Colors.white70,
                       fontSize: 7,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.2,
@@ -443,13 +434,12 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                 ),
               ),
               TextSpan(
-                text: _showRemainingTime
-                    ? '-${formatDuration(remaining)}'
-                    : formatDuration(dur),
+                text:
+                    _showRemainingTime
+                        ? '-${formatDuration(remaining)}'
+                        : formatDuration(dur),
                 style: TextStyle(
-                  color: _showRemainingTime
-                      ? Colors.amberAccent
-                      : Colors.white60,
+                  color: Colors.white60,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -488,11 +478,12 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
 
     if (currentSkip.interval == null) return const SizedBox.shrink();
 
-    final isOp = currentSkip.skipType == SkipType.op ||
+    final isOp =
+        currentSkip.skipType == SkipType.op ||
         (currentSkip.skipType == SkipType.mixed &&
             currentSkip.interval!.startTime < 700);
     final skipLabel = isOp ? 'INTRO' : 'OUTRO';
-    final skipColor = isOp ? const Color(0xFFFFB300) : const Color(0xFF00E5FF);
+    final skipColor = Color.lerp(scheme.primary, Colors.black, 0.45)!;
 
     return _FlatActionBtn(
       text: 'Skip $skipLabel',
@@ -504,7 +495,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
         widget.onInteraction();
       },
       color: skipColor,
-      textColor: Colors.black,
+      textColor: Colors.white,
     );
   }
 }

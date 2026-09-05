@@ -34,6 +34,8 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private var lastOrientationChangeTime: Long = 0L
+    private var pendingLandscape: Int? = null
+    private var pendingLandscapeSince: Long = 0L
 
     private fun enableLandscapeRotation() {
         landscapeListener?.disable()
@@ -41,23 +43,27 @@ class MainActivity : FlutterFragmentActivity() {
             override fun onOrientationChanged(orientation: Int) {
                 if (orientation == ORIENTATION_UNKNOWN) return
                 val now = System.currentTimeMillis()
-                if (now - lastOrientationChangeTime < 500) return
+                val candidate = when (orientation) {
+                    in 78..102 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                    in 258..282 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    else -> null
+                }
 
-                when (orientation) {
-                    // Deliberate 55%+ tilt towards 90 deg (Reverse Landscape)
-                    in 65..115 -> {
-                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                            lastOrientationChangeTime = now
-                        }
-                    }
-                    // Deliberate 55%+ tilt towards 270 deg (Regular Landscape)
-                    in 245..295 -> {
-                        if (requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
-                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            lastOrientationChangeTime = now
-                        }
-                    }
+                if (candidate == null) {
+                    pendingLandscape = null
+                    return
+                }
+                if (pendingLandscape != candidate) {
+                    pendingLandscape = candidate
+                    pendingLandscapeSince = now
+                    return
+                }
+                if (requestedOrientation != candidate &&
+                    now - pendingLandscapeSince >= 900 &&
+                    now - lastOrientationChangeTime >= 1200) {
+                    requestedOrientation = candidate
+                    lastOrientationChangeTime = now
+                    pendingLandscape = null
                 }
             }
         }.also { if (it.canDetectOrientation()) it.enable() }
@@ -74,7 +80,7 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "sensorLandscape" -> {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         enableLandscapeRotation()
                         result.success(null)
                     }

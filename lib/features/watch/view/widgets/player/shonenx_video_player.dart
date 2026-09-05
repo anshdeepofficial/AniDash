@@ -61,6 +61,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
+  Timer? _tapSeekResetTimer;
+  Duration? _tapSeekTarget;
+  bool? _tapSeekForward;
 
   bool _isDraggingSeek = false;
   Duration _dragStartPos = Duration.zero;
@@ -96,6 +99,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   void dispose() {
     _focusNode.dispose();
     _volumeOverlayTimer?.cancel();
+    _tapSeekResetTimer?.cancel();
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
       UIHelper.removeVolumeKeyHandler();
@@ -258,11 +262,26 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   void _onDoubleTap(bool forward) {
     if (ref.read(playerUIControllerProvider).isLocked) return;
 
-    final notifier = ref.read(playerStateProvider.notifier);
     final settings = ref.read(playerSettingsProvider);
     final jump = settings.seekDuration;
+    final player = ref.read(playerStateProvider);
+    final sameSequence = _tapSeekTarget != null && _tapSeekForward == forward;
+    final base = sameSequence ? _tapSeekTarget! : player.position;
+    final delta = Duration(seconds: forward ? jump : -jump);
+    var target = base + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (player.duration > Duration.zero && target > player.duration) {
+      target = player.duration;
+    }
+    _tapSeekTarget = target;
+    _tapSeekForward = forward;
+    ref.read(playerStateProvider.notifier).seek(target);
 
-    forward ? notifier.forward(jump) : notifier.rewind(jump);
+    _tapSeekResetTimer?.cancel();
+    _tapSeekResetTimer = Timer(const Duration(milliseconds: 900), () {
+      _tapSeekTarget = null;
+      _tapSeekForward = null;
+    });
 
     ref
         .read(playerUIControllerProvider.notifier)

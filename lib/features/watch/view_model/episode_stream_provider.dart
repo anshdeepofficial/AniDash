@@ -847,7 +847,7 @@ class EpisodeData extends _$EpisodeData {
 
       // In background, extract sub-qualities for M3U8 without delaying playback start
       if (primarySrc.isM3U8) {
-        _getQualities(primarySrc, state.headers)
+        _getQualities(primarySrc, streamHeaders)
             .then((extracted) {
               if (extracted.isNotEmpty) {
                 final merged = [
@@ -1009,14 +1009,13 @@ class EpisodeData extends _$EpisodeData {
               .timeout(const Duration(seconds: 10));
           final best = searchRes.results.firstOrNull;
           if (best != null && best.id != null && best.id != _epList.animeId) {
-            final res = await _provider!.getSources(
-              best.id!,
-              targetEpId,
-              server?.id,
-              category,
-            ).timeout(const Duration(seconds: 15));
+            final res = await _provider!
+                .getSources(best.id!, targetEpId, server?.id, category)
+                .timeout(const Duration(seconds: 15));
             if (res.sources.isNotEmpty) {
-              AppLogger.success('Resolved stream on ${_provider!.providerName}');
+              AppLogger.success(
+                'Resolved stream on ${_provider!.providerName}',
+              );
               return res;
             }
           }
