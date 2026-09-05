@@ -8,16 +8,40 @@ import 'package:go_router/go_router.dart';
 import 'package:ani_dash/main.dart';
 
 class ExtensionScreen extends StatefulWidget {
-  const ExtensionScreen({super.key});
+  final bool adultOnly;
+
+  const ExtensionScreen({super.key, this.adultOnly = false});
 
   @override
   State<ExtensionScreen> createState() => _ExtensionScreenState();
 }
 
 class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
+  ExtensionType? _previousManager;
+
   @override
-  Text get title =>
-      const Text('Extensions', style: TextStyle(fontWeight: FontWeight.bold));
+  void initState() {
+    super.initState();
+    if (widget.adultOnly) {
+      final controller = Get.find<ExtensionManager>();
+      _previousManager = ExtensionType.fromManager(controller.currentManager);
+      controller.setCurrentManager(ExtensionType.aniyomi);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_previousManager != null) {
+      Get.find<ExtensionManager>().setCurrentManager(_previousManager!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Text get title => Text(
+    widget.adultOnly ? '18+ Hub Sources' : 'Extensions',
+    style: const TextStyle(fontWeight: FontWeight.bold),
+  );
 
   @override
   ExtensionScreenBuilder get extensionScreenBuilder => (
@@ -31,6 +55,7 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
       isInstalled: isInstalled,
       searchQuery: searchQuery,
       selectedLanguage: selectedLanguage,
+      adultOnly: widget.adultOnly,
     );
   };
 
@@ -43,6 +68,15 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
     if (saved != null && saved.isNotEmpty) {
       repos.addAll(saved);
     }
+    return repos.toList();
+  }
+
+  List<String> _getSavedMangaRepos() {
+    final saved = sharedPrefs.getStringList('saved_manga_repos');
+    final repos = <String>{
+      'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
+    };
+    if (saved != null && saved.isNotEmpty) repos.addAll(saved);
     return repos.toList();
   }
 
@@ -203,12 +237,20 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
         type: ItemType.anime,
         is18Plus: false,
       ),
+      (
+        name: 'Keiyoushi Manga Sources',
+        url:
+            'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
+        type: ItemType.manga,
+        is18Plus: true,
+      ),
     ];
 
     showDialog(
       context: context,
       builder: (context) {
         ItemType selectedType = ItemType.anime;
+        bool isAdding = false;
         return StatefulBuilder(
           builder: (context, setState) {
             final theme = Theme.of(context);
@@ -340,45 +382,81 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: isAdding ? null : () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () async {
-                    final url = controller.text.trim();
-                    if (url.isNotEmpty) {
-                      final currentRepos = _getSavedAnimeRepos();
-                      final updated = {...currentRepos, url}.toList();
-                      await sharedPrefs.setStringList(
-                        'saved_anime_repos',
-                        updated,
-                      );
-                      final isAniyomiRepository =
-                          url.contains('index.min.json') ||
-                          url.contains('aniyomi');
-                      if (isAniyomiRepository) {
-                        await ExtensionType.aniyomi.getManager().onRepoSaved(
-                          updated,
-                          selectedType,
-                        );
-                      } else {
-                        await onRepoSaved(updated, selectedType);
-                      }
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isAniyomiRepository
-                                  ? 'Repository added. Open the source-engine menu and choose Aniyomi to view it.'
-                                  : 'Repository added. Sources are available in the Available tab.',
-                            ),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Add'),
+                  onPressed:
+                      isAdding
+                          ? null
+                          : () async {
+                            final url = controller.text.trim();
+                            if (url.isNotEmpty) {
+                              setState(() => isAdding = true);
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                final isManga = selectedType == ItemType.manga;
+                                final currentRepos =
+                                    isManga
+                                        ? _getSavedMangaRepos()
+                                        : _getSavedAnimeRepos();
+                                final updated = {...currentRepos, url}.toList();
+                                await sharedPrefs.setStringList(
+                                  isManga
+                                      ? 'saved_manga_repos'
+                                      : 'saved_anime_repos',
+                                  updated,
+                                );
+                                final isAniyomiRepository =
+                                    url.contains('index.min.json') ||
+                                    url.contains('aniyomi');
+                                if (isAniyomiRepository) {
+                                  final manager =
+                                      ExtensionType.aniyomi.getManager();
+                                  await manager.onRepoSaved(
+                                    updated,
+                                    selectedType,
+                                  );
+                                  if (context.mounted) Navigator.pop(context);
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${isManga ? 'Manga' : 'Anime'} repository added successfully.',
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  await onRepoSaved(updated, selectedType);
+                                  if (context.mounted) Navigator.pop(context);
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Repository added successfully.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (error) {
+                                if (context.mounted) {
+                                  setState(() => isAdding = false);
+                                }
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Could not add repository: $error',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                  child:
+                      isAdding
+                          ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('Add'),
                 ),
               ],
             );
@@ -398,6 +476,7 @@ class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
   final String searchQuery;
   @override
   final String selectedLanguage;
+  final bool adultOnly;
 
   const ExtensionListWidget({
     super.key,
@@ -405,6 +484,7 @@ class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
     required this.isInstalled,
     required this.searchQuery,
     required this.selectedLanguage,
+    this.adultOnly = false,
   });
 
   @override
@@ -428,14 +508,36 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
     }
 
     if (source == null) return const SizedBox.shrink();
+    final normalizedName = (source.name ?? '').toLowerCase();
+    if (widget.adultOnly &&
+        source.isNsfw != true &&
+        !normalizedName.contains('hentai') &&
+        !normalizedName.contains('hanime') &&
+        !normalizedName.contains('adult')) {
+      return const SizedBox.shrink();
+    }
 
     return ExtensionListItem(
       source: source,
       isInstalled: widget.isInstalled,
-      onInstall:
-          () => (source.extensionType?.getManager() ?? manager).installSource(
+      onInstall: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Opening Android installer…')),
+        );
+        try {
+          await (source.extensionType?.getManager() ?? manager).installSource(
             source,
-          ),
+          );
+          messenger.showSnackBar(
+            SnackBar(content: Text('${source.name ?? 'Extension'} installed.')),
+          );
+        } catch (error) {
+          messenger.showSnackBar(
+            SnackBar(content: Text('Installation failed: $error')),
+          );
+        }
+      },
       onUninstall:
           () => (source.extensionType?.getManager() ?? manager).uninstallSource(
             source,
@@ -462,7 +564,7 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
 class ExtensionListItem extends StatelessWidget {
   final Source source;
   final bool isInstalled;
-  final VoidCallback onInstall;
+  final Future<void> Function() onInstall;
   final VoidCallback onUninstall;
   final VoidCallback onUpdate;
   final VoidCallback onTap;

@@ -646,7 +646,23 @@ class EpisodeData extends _$EpisodeData {
         subtitles: [Subtitle(lang: 'None'), ...data.tracks],
         headers: data.headers?.cast<String, String>(),
       );
-      await _loadSourceStream(0, startAt: startAt);
+      try {
+        await _loadSourceStream(0, startAt: startAt);
+      } catch (primaryError) {
+        AppLogger.w('Primary stream stalled; trying another provider');
+        final category = state.selectedServer?.isDub == true ? 'dub' : 'sub';
+        final fallback = await _fetchFallbackNativeSourceData(
+          epModel,
+          category,
+        );
+        if (fallback == null || fallback.sources.isEmpty) rethrow;
+        state = state.copyWith(
+          sources: fallback.sources,
+          subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
+          headers: fallback.headers?.cast<String, String>(),
+        );
+        await _loadSourceStream(0, startAt: startAt);
+      }
     } catch (e, stack) {
       AppLogger.e('Episode playback failed', e, stack);
       state = state.copyWith(
@@ -743,6 +759,18 @@ class EpisodeData extends _$EpisodeData {
             headers: streamHeaders,
           )
           .timeout(const Duration(seconds: 15));
+
+      // media_kit's open call can complete before the remote stream has
+      // delivered any media. Detect dead/expired URLs instead of showing an
+      // endless spinner, while allowing slow connections enough startup time.
+      await Future.any([
+        _player.videoController.player.stream.position.firstWhere(
+          (position) => position > Duration.zero,
+        ),
+        _player.videoController.player.stream.duration.firstWhere(
+          (duration) => duration > Duration.zero,
+        ),
+      ]).timeout(const Duration(seconds: 35));
 
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
       if (!isDub) {
@@ -905,7 +933,15 @@ class EpisodeData extends _$EpisodeData {
       AppLogger.e('Native provider source fetch failed', e);
     }
 
-    // Fallback: If current native provider has no sources, try other native sources
+    return _fetchFallbackNativeSourceData(ep, category);
+  }
+
+  Future<BaseSourcesModel?> _fetchFallbackNativeSourceData(
+    EpisodeDataModel ep,
+    String category,
+  ) async {
+    // If the selected provider is stale or its stream token has expired, find
+    // the same title/episode on another registered provider.
     final registry = ref.read(animeSourceRegistryProvider);
     final currentKey = ref.read(selectedProviderKeyProvider);
     for (final altKey in registry.keys.where((k) => k != currentKey)) {
@@ -913,24 +949,21 @@ class EpisodeData extends _$EpisodeData {
       if (altProvider == null) continue;
       try {
         AppLogger.w('Trying fallback provider for stream: $altKey');
-        final altSearch = await altProvider.getSearch(
-          _epList.animeTitle ?? '',
-          null,
-          1,
-        );
+        final altSearch = await altProvider
+            .getSearch(_epList.animeTitle ?? '', null, 1)
+            .timeout(const Duration(seconds: 12));
         final altMatch = altSearch.results.firstOrNull;
         if (altMatch != null && altMatch.id != null) {
-          final altEps = await altProvider.getEpisodes(altMatch.id!);
+          final altEps = await altProvider
+              .getEpisodes(altMatch.id!)
+              .timeout(const Duration(seconds: 18));
           final targetEp = altEps.episodes?.firstWhereOrNull(
             (e) => e.number == ep.number,
           );
           if (targetEp != null && targetEp.id != null) {
-            final altSources = await altProvider.getSources(
-              altMatch.id!,
-              targetEp.id!,
-              null,
-              category,
-            );
+            final altSources = await altProvider
+                .getSources(altMatch.id!, targetEp.id!, null, category)
+                .timeout(const Duration(seconds: 30));
             if (altSources.sources.isNotEmpty) {
               AppLogger.success('Fallback provider $altKey found sources!');
               return altSources;

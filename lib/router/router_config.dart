@@ -245,7 +245,10 @@ final routerConfig = GoRouter(
         ),
         AnimatedGoRoute(
           path: 'extensions',
-          contentBuilder: (_, _) => const ExtensionScreen(),
+          contentBuilder:
+              (_, state) => ExtensionScreen(
+                adultOnly: state.uri.queryParameters['adultOnly'] == 'true',
+              ),
           routes: [
             AnimatedGoRoute(
               path: 'extension-preference',

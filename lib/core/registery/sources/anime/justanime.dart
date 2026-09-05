@@ -99,10 +99,15 @@ class JustAnimeProvider extends AnimeProvider {
     } catch (e) {
       bodyDecoded = {};
     }
-    
-    if (bodyDecoded['data'] == null || (bodyDecoded['data'] is List && bodyDecoded['data'].isEmpty)) {
+
+    if (bodyDecoded['data'] == null ||
+        (bodyDecoded['data'] is List && bodyDecoded['data'].isEmpty)) {
       try {
-        final searchRes = await getSearch(animeId.replaceAll('-', ' '), null, 1);
+        final searchRes = await getSearch(
+          animeId.replaceAll('-', ' '),
+          null,
+          1,
+        );
         if (searchRes.results.isNotEmpty) {
           actualId = searchRes.results.first.id ?? actualId;
           url = "$apiUrl?m=release&id=$actualId&sort=episode_asc";
@@ -129,8 +134,8 @@ class JustAnimeProvider extends AnimeProvider {
         headers: headers,
         cacheConfig:
             (i == (totalPages - 1) || (i == 0 && i == (totalPages - 1)))
-            ? CacheConfig.short
-            : CacheConfig.year,
+                ? CacheConfig.short
+                : CacheConfig.year,
       );
       final nextBody = json.decode(nextRes.body);
       if (nextBody['data'] != null) {
@@ -147,9 +152,8 @@ class JustAnimeProvider extends AnimeProvider {
       final String combinedId = "$animeId+$episodeSession";
 
       final num? epNumFromApi = item['episode'];
-      final int calculatedEpNum = (epNumFromApi != null)
-          ? epNumFromApi.toInt()
-          : (i + 1);
+      final int calculatedEpNum =
+          (epNumFromApi != null) ? epNumFromApi.toInt() : (i + 1);
 
       String? title = item['title'];
       if (title != null && title.trim().isEmpty) {
@@ -175,9 +179,10 @@ class JustAnimeProvider extends AnimeProvider {
     for (int i = 0; i < episodes.length; i++) {
       episodes[i] = episodes[i].copyWith(
         number: i + 1,
-        title: episodes[i].title!.startsWith('Episode ')
-            ? 'Episode ${i + 1}'
-            : episodes[i].title,
+        title:
+            episodes[i].title!.startsWith('Episode ')
+                ? 'Episode ${i + 1}'
+                : episodes[i].title,
       );
     }
 
@@ -202,7 +207,9 @@ class JustAnimeProvider extends AnimeProvider {
     final data = await UniversalHttpClient.instance.get(
       Uri.parse(episodeUrl),
       headers: headers,
-      cacheConfig: CacheConfig.veryLong,
+      // Playback pages contain short-lived Kwik tokens. Caching them causes an
+      // endless spinner when a user resumes an episode later.
+      cacheConfig: CacheConfig.none,
     );
     final document = html.parse(data.body);
 
@@ -226,11 +233,9 @@ class JustAnimeProvider extends AnimeProvider {
 
       extractTasks.add(() async {
         try {
-          final extracted = await Kwik().extract(
-            link,
-            server: 'Kwik',
-            quality: quality,
-          );
+          final extracted = await Kwik()
+              .extract(link, server: 'Kwik', quality: quality)
+              .timeout(const Duration(seconds: 20));
 
           if (extracted.isNotEmpty) {
             sources.addAll(extracted.cast<Source>());

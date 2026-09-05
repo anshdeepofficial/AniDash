@@ -153,12 +153,23 @@ class AnimeMatchService {
               .read(selectedProviderKeyProvider.notifier)
               .select(selection.sourceId!);
           final provider = _ref.read(selectedAnimeProvider);
-          if (provider != null) {
-            AppLogger.d('Auto-Restore: Success');
-            return BaseAnimeModel(
-              id: selection.matchedAnimeId,
-              name: selection.matchedAnimeTitle,
-            );
+          final matchedId = selection.matchedAnimeId;
+          if (provider != null && matchedId != null && matchedId.isNotEmpty) {
+            try {
+              final episodes = await provider
+                  .getEpisodes(matchedId)
+                  .timeout(const Duration(seconds: 12));
+              if (episodes.episodes?.isNotEmpty == true) {
+                AppLogger.d('Auto-Restore: Success');
+                return BaseAnimeModel(
+                  id: matchedId,
+                  name: selection.matchedAnimeTitle,
+                );
+              }
+              AppLogger.w('Auto-Restore: Saved match has no episodes');
+            } catch (error) {
+              AppLogger.w('Auto-Restore: Saved match is stale: $error');
+            }
           } else {
             AppLogger.w('Auto-Restore: Legacy provider not found');
           }

@@ -64,14 +64,14 @@ class AniyomiExtensions extends Extension {
     final sources = await _loadExtensions(method, repos: repos);
     final installedIds = getInstalledRx(type).value.map((e) => e.id).toSet();
 
-    final unmodifiedList = sources.map((e) {
-      var map = e.toJson();
-      map['extensionType'] = 1;
-      return Source.fromJson(map);
-    }).toList();
-    final list = unmodifiedList
-        .where((s) => !installedIds.contains(s.id))
-        .toList();
+    final unmodifiedList =
+        sources.map((e) {
+          var map = e.toJson();
+          map['extensionType'] = 1;
+          return Source.fromJson(map);
+        }).toList();
+    final list =
+        unmodifiedList.where((s) => !installedIds.contains(s.id)).toList();
     getAvailableRx(type).value = list;
     getAvailableUnmodified(type).value = unmodifiedList;
     checkForUpdates(type);
@@ -127,7 +127,11 @@ class AniyomiExtensions extends Extension {
     }
 
     try {
-      final packageName = source.apkUrl!.split('/').last.replaceAll('.apk', '');
+      final apkName = source.apkUrl!.split('/').last;
+      final packageName =
+          source.id?.trim().isNotEmpty == true
+              ? source.id!
+              : apkName.replaceAll('.apk', '');
 
       final response = await http.get(Uri.parse(source.apkUrl!));
 
@@ -136,7 +140,7 @@ class AniyomiExtensions extends Extension {
       }
 
       final tempDir = await getTemporaryDirectory();
-      final apkFileName = '$packageName.apk';
+      final apkFileName = apkName.endsWith('.apk') ? apkName : '$apkName.apk';
       final apkFile = File(path.join(tempDir.path, apkFileName));
 
       await apkFile.writeAsBytes(response.bodyBytes);
@@ -286,19 +290,22 @@ class AniyomiExtensions extends Extension {
   void _removeFromInstalledList(Source source) {
     switch (source.itemType) {
       case ItemType.anime:
-        installedAnimeExtensions.value = installedAnimeExtensions.value
-            .where((e) => e.name != source.name)
-            .toList();
+        installedAnimeExtensions.value =
+            installedAnimeExtensions.value
+                .where((e) => e.name != source.name)
+                .toList();
         break;
       case ItemType.manga:
-        installedMangaExtensions.value = installedMangaExtensions.value
-            .where((e) => e.name != source.name)
-            .toList();
+        installedMangaExtensions.value =
+            installedMangaExtensions.value
+                .where((e) => e.name != source.name)
+                .toList();
         break;
       case ItemType.novel:
-        installedNovelExtensions.value = installedNovelExtensions.value
-            .where((e) => e.name != source.name)
-            .toList();
+        installedNovelExtensions.value =
+            installedNovelExtensions.value
+                .where((e) => e.name != source.name)
+                .toList();
         break;
       case null:
         break;
@@ -321,19 +328,20 @@ class AniyomiExtensions extends Extension {
       for (var s in getAvailableUnmodified(type).value) s.id: s,
     };
 
-    final updated = getInstalledRx(type).value.map((installed) {
-      final avail = availableMap[installed.id ?? ''];
-      if (avail != null &&
-          installed.version != null &&
-          avail.version != null &&
-          compareVersions(installed.version!, avail.version!) < 0) {
-        return installed
-          ..hasUpdate = true
-          ..apkUrl = avail.apkUrl
-          ..versionLast = avail.version;
-      }
-      return installed;
-    }).toList();
+    final updated =
+        getInstalledRx(type).value.map((installed) {
+          final avail = availableMap[installed.id ?? ''];
+          if (avail != null &&
+              installed.version != null &&
+              avail.version != null &&
+              compareVersions(installed.version!, avail.version!) < 0) {
+            return installed
+              ..hasUpdate = true
+              ..apkUrl = avail.apkUrl
+              ..versionLast = avail.version;
+          }
+          return installed;
+        }).toList();
 
     getInstalledRx(type).value = updated;
   }

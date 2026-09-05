@@ -67,6 +67,18 @@ class DartotsuExtensionBridge {
         needsUpdate = true;
       }
     }
+    const defaultAniyomiMangaRepos = [
+      'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
+    ];
+    for (final repo in defaultAniyomiMangaRepos) {
+      if (!currentSettings.aniyomiMangaExtensions.contains(repo)) {
+        currentSettings.aniyomiMangaExtensions = [
+          ...currentSettings.aniyomiMangaExtensions,
+          repo,
+        ];
+        needsUpdate = true;
+      }
+    }
     if (!currentSettings.mangayomiMangaExtensions.contains(
       'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
     )) {
