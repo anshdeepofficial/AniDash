@@ -44,285 +44,237 @@ class EpisodeBannerItem extends StatelessWidget {
     final episodeNumber = episode.number ?? index + 1;
     final thumbnail = episodeProgress?.episodeThumbnail;
     final fallbackUrl = episode.thumbnail ?? fallbackCover;
+    const accentPink = Color(0xFFE91E63);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           onLongPress: onLongPress,
           child: Container(
+            height: 74,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ? accentPink
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
                 width: isSelected ? 2.0 : 1.0,
               ),
               color: theme.colorScheme.surfaceContainer,
             ),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Stack(
               children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Thumbnail image
-                      if (thumbnail != null)
-                        thumbnail.startsWith('http')
-                            ? CachedNetworkImage(
-                                imageUrl: thumbnail,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, _, _) =>
-                                    _buildFallbackImage(theme),
-                              )
-                            : Image.memory(
-                                base64Decode(thumbnail),
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) =>
-                                    _buildFallbackImage(theme),
-                              )
-                      else if (fallbackUrl.isNotEmpty)
-                        CachedNetworkImage(
-                          imageUrl: fallbackUrl,
-                          fit: BoxFit.cover,
-                          httpHeaders: {
-                            "Referer": fallbackUrl.split('#').last,
-                            "User-Agent":
-                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-                          },
-                          errorWidget: (_, _, _) => _buildFallbackImage(theme),
-                        )
-                      else
-                        _buildFallbackImage(theme),
+                // Background thumbnail
+                Positioned.fill(
+                  child: thumbnail != null
+                      ? (thumbnail.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: thumbnail,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, _, _) =>
+                                  _buildFallbackImage(theme),
+                            )
+                          : Image.memory(
+                              base64Decode(thumbnail),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  _buildFallbackImage(theme),
+                            ))
+                      : (fallbackUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: fallbackUrl,
+                              fit: BoxFit.cover,
+                              httpHeaders: {
+                                "Referer": fallbackUrl.split('#').last,
+                                "User-Agent":
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+                              },
+                              errorWidget: (_, _, _) => _buildFallbackImage(theme),
+                            )
+                          : _buildFallbackImage(theme)),
+                ),
 
-                      // Gradient overlay for contrast
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.4),
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.85),
-                            ],
-                            stops: const [0.0, 0.4, 1.0],
-                          ),
-                        ),
+                // Dark Tint / Gradient Overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.88),
+                          Colors.black.withValues(alpha: 0.75),
+                          Colors.black.withValues(alpha: 0.82),
+                        ],
                       ),
+                    ),
+                  ),
+                ),
 
-                      // Center Play Button
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withValues(alpha: 0.55),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              width: 1.5,
+                // Content Row
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Selection checkbox if in selection mode
+                        if (isSelectionMode)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Icon(
+                              isSelected
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              color: isSelected ? accentPink : Colors.white70,
+                              size: 22,
                             ),
+                          ),
+
+                        // Pink Circular Play Button
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: accentPink,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black45,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: const Icon(
                             Icons.play_arrow_rounded,
                             color: Colors.white,
-                            size: 28,
+                            size: 24,
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
 
-                      // Top-left badges: Selection / EP badge
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: Row(
-                          children: [
-                            if (isSelectionMode)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6.0),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black87,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Icon(
-                                    isSelected
-                                        ? Icons.check_box_rounded
-                                        : Icons.check_box_outline_blank_rounded,
-                                    color: isSelected
-                                        ? theme.colorScheme.primary
-                                        : Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isWatched
-                                    ? Colors.black.withValues(alpha: 0.7)
-                                    : theme.colorScheme.primary.withValues(alpha: 0.9),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                        // Episode Number & Title
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  if (isWatched) ...[
-                                    const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.greenAccent,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 4),
-                                  ],
                                   Text(
-                                    'EP $episodeNumber',
+                                    'EPISODE $episodeNumber',
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: accentPink,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
+                                      letterSpacing: 0.6,
                                     ),
                                   ),
+                                  if (isWatched) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.greenAccent,
+                                      size: 13,
+                                    ),
+                                  ],
+                                  if (episode.isFiller == true) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.shade800,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'FILLER',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Top-right controls / badges
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Row(
-                          children: [
-                            if (episode.isFiller == true)
-                              Container(
-                                margin: const EdgeInsets.only(right: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade800,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'FILLER',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              const SizedBox(height: 3),
+                              Text(
+                                episode.title ?? 'Episode $episodeNumber',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            if (!isSelectionMode) ...[
-                              if (onDownload != null)
-                                Container(
-                                  margin: const EdgeInsets.only(right: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.download_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
-                                    tooltip: 'Download',
-                                    onPressed: onDownload,
-                                  ),
-                                ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.more_vert,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                  tooltip: 'More options',
-                                  onPressed: onMoreOptions,
-                                ),
-                              ),
+                              if (download != null) ...[
+                                const SizedBox(height: 2),
+                                _buildDownloadBadge(theme, download!),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
 
-                      // Bottom title & download status overlay
-                      Positioned(
-                        bottom: 8,
-                        left: 12,
-                        right: 12,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              episode.title ?? 'Episode $episodeNumber',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black87,
-                                    blurRadius: 4,
-                                  ),
-                                ],
+                        // Trailing actions: Download & More
+                        if (!isSelectionMode) ...[
+                          if (onDownload != null)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.download_rounded,
+                                color: Colors.white70,
+                                size: 20,
                               ),
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 36,
+                              ),
+                              padding: EdgeInsets.zero,
+                              tooltip: 'Download',
+                              onPressed: onDownload,
                             ),
-                            if (download != null) ...[
-                              const SizedBox(height: 4),
-                              _buildDownloadBadge(theme, download!),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
+                          IconButton(
+                            icon: const Icon(
+                              Icons.more_vert_rounded,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            padding: EdgeInsets.zero,
+                            tooltip: 'More options',
+                            onPressed: onMoreOptions,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
 
-                // Watch Progress Indicator
+                // Bottom watch progress indicator line
                 if (watchProgress > 0)
-                  LinearProgressIndicator(
-                    value: watchProgress,
-                    backgroundColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.2),
-                    color: isWatched
-                        ? theme.colorScheme.tertiary
-                        : theme.colorScheme.primary,
-                    minHeight: 3,
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: LinearProgressIndicator(
+                      value: watchProgress,
+                      backgroundColor: Colors.white.withValues(alpha: 0.15),
+                      color: isWatched ? Colors.greenAccent : accentPink,
+                      minHeight: 2.5,
+                    ),
                   ),
               ],
             ),
@@ -338,8 +290,8 @@ class EpisodeBannerItem extends StatelessWidget {
       child: Center(
         child: Icon(
           Icons.movie_filter_rounded,
-          size: 48,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          size: 32,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
         ),
       ),
     );
@@ -378,27 +330,20 @@ class EpisodeBannerItem extends StatelessWidget {
         icon = Icons.hourglass_empty;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 3),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 10,
+            color: color,
+            fontWeight: FontWeight.bold,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

@@ -150,9 +150,52 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     DMedia? media,
   }) async {
     try {
-      return _exp.useExtensions
+      var eps = _exp.useExtensions
           ? await _fetchExtensionEpisodes(media)
           : await _fetchLegacyEpisodes(animeId);
+
+      // Multi-Source Fallback: If 0 episodes returned, check other sources
+      if (eps.isEmpty && !_exp.useExtensions) {
+        final registry = ref.read(animeSourceRegistryProvider);
+        final currentKey = ref.read(selectedProviderKeyProvider);
+        final otherKeys = registry.keys.where((k) => k != currentKey).toList();
+
+        for (final altKey in otherKeys) {
+          AppLogger.w(
+            'Active source returned 0 episodes. Trying fallback source: $altKey',
+          );
+          final altProvider = registry.get(altKey);
+          if (altProvider == null) continue;
+
+          try {
+            final searchResults = await altProvider.getSearch(
+              state.animeTitle ?? '',
+              null,
+              1,
+            );
+            final altMatch = searchResults.results.firstOrNull;
+            final matchId = altMatch?.id;
+            if (matchId != null && matchId.isNotEmpty) {
+              final altResult = await altProvider.getEpisodes(matchId);
+              final altEps = altResult.episodes ?? [];
+              if (altEps.isNotEmpty) {
+                AppLogger.success(
+                  'Fallback source $altKey found ${altEps.length} episodes!',
+                );
+                ref.read(selectedProviderKeyProvider.notifier).select(altKey);
+                showAppSnackBar(
+                  'Auto-Switched Source',
+                  'Switched to $altKey (${altEps.length} episodes found)',
+                  type: ContentType.help,
+                );
+                return altEps;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      return eps;
     } catch (e, st) {
       AppLogger.e('Episode fetch pipeline failed', e, st);
       showAppSnackBar(

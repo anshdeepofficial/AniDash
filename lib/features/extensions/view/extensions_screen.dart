@@ -111,11 +111,6 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
           }).toList();
         },
       ),
-      IconButton(
-        onPressed: () => context.push('/settings/extensions/playground'),
-        icon: const Icon(Iconsax.code),
-        tooltip: 'Playground',
-      ),
     ];
   }
 
@@ -403,9 +398,12 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
     return ExtensionListItem(
       source: source,
       isInstalled: widget.isInstalled,
-      onInstall: () => source.extensionType?.getManager().installSource(source),
-      onUninstall: () => source.extensionType?.getManager().uninstallSource(source),
-      onUpdate: () => source.extensionType?.getManager().updateSource(source),
+      onInstall: () =>
+          (source.extensionType?.getManager() ?? manager).installSource(source),
+      onUninstall: () =>
+          (source.extensionType?.getManager() ?? manager).uninstallSource(source),
+      onUpdate: () =>
+          (source.extensionType?.getManager() ?? manager).updateSource(source),
       onTap: () {
         // Open details or settings if installed
         if (widget.isInstalled) {

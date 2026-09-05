@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/universal/universal_news.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
 
 import 'package:ani_dash/main.dart';
 import 'package:ani_dash/core/models/anime/page_model.dart';
@@ -108,10 +109,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final auth = ref.read(authProvider);
       if (!auth.isAniListAuthenticated && !auth.isMalAuthenticated) return;
 
+      final statusQuery = auth.isMalAuthenticated ? 'watching' : 'CURRENT';
+
+      // Also trigger watchlistProvider to fetch watching list in background
+      ref.read(watchlistProvider.notifier).fetchListForStatus(statusQuery);
+
       final repo = ref.read(animeRepositoryProvider);
       final response = await repo.getUserAnimeList(
         type: 'ANIME',
-        status: 'CURRENT',
+        status: statusQuery,
         page: 1,
         perPage: 50,
       );
@@ -123,13 +129,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       for (final entry in response.data) {
         final media = entry.media;
         final mediaId = media.id;
-        final targetProgress = entry.progress;
-
-        if (targetProgress <= 0) continue;
+        final targetProgress = entry.progress > 0 ? entry.progress : 1;
 
         final local = progressRepo.getProgress(mediaId);
 
-        if (local != null && local.currentEpisode >= targetProgress) {
+        if (local != null && local.currentEpisode > targetProgress) {
           continue;
         }
 
@@ -143,9 +147,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               episodeNumber: i,
               episodeTitle: existing?.episodeTitle ?? 'Episode $i',
               episodeThumbnail: existing?.episodeThumbnail,
-              progressInSeconds: existing?.progressInSeconds ?? 1440,
+              progressInSeconds: existing?.progressInSeconds ??
+                  (i == targetProgress && entry.progress == 0 ? 0 : 1440),
               durationInSeconds: existing?.durationInSeconds ?? 1440,
-              isCompleted: true,
+              isCompleted: i < targetProgress,
               watchedAt: existing?.watchedAt ?? DateTime.now(),
             );
           }
@@ -181,7 +186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         await progressRepo.saveProgress(updated);
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.e('Error syncing account watch progress: $e');
+    }
   }
 
   @override
@@ -392,15 +399,125 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(sortedWatchProgressProvider)
-        .when(
-          data: (sorted) {
-            if (sorted.isEmpty) return const SizedBox.shrink();
-            return ContinueSection(allProgress: sorted.take(15).toList());
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
-        );
+    final auth = ref.watch(authProvider);
+    final sortedAsync = ref.watch(sortedWatchProgressProvider);
+    final watchlist = ref.watch(watchlistProvider);
+    final watchingStatus = auth.isMalAuthenticated ? 'watching' : 'CURRENT';
+    final cloudWatching = watchlist.listFor(watchingStatus);
+
+    return sortedAsync.when(
+      data: (sorted) {
+        final Map<String, AnimeWatchProgressEntry> merged = {};
+        for (final entry in sorted) {
+          merged[entry.animeId] = entry;
+        }
+
+        // Merge cloud watching items
+        for (final cloudItem in cloudWatching) {
+          final media = cloudItem.media;
+          if (!merged.containsKey(media.id)) {
+            final targetProgress =
+                cloudItem.progress > 0 ? cloudItem.progress : 1;
+            merged[media.id] = AnimeWatchProgressEntry(
+              animeId: media.id,
+              animeTitle: media.title.english ??
+                  media.title.romaji ??
+                  media.title.native ??
+                  '',
+              animeFormat: media.format,
+              animeCover:
+                  media.coverImage.large ?? media.coverImage.medium ?? '',
+              totalEpisodes: media.episodes ?? 0,
+              episodesProgress: {
+                targetProgress: EpisodeProgress(
+                  episodeNumber: targetProgress,
+                  episodeTitle: 'Episode $targetProgress',
+                  episodeThumbnail:
+                      media.coverImage.large ?? media.coverImage.medium,
+                  progressInSeconds: 0,
+                  durationInSeconds: 1440,
+                  isCompleted: false,
+                  watchedAt: DateTime.now(),
+                ),
+              },
+              lastUpdated: DateTime.now(),
+              currentEpisode: targetProgress,
+              status: 'watching',
+            );
+          }
+        }
+
+        final combinedList = merged.values.toList()
+          ..sort((a, b) => (b.lastUpdated ?? DateTime(0))
+              .compareTo(a.lastUpdated ?? DateTime(0)));
+
+        if (combinedList.isEmpty) return const SizedBox.shrink();
+        return ContinueSection(allProgress: combinedList.take(15).toList());
+      },
+      loading: () {
+        if (cloudWatching.isNotEmpty) {
+          final synthetic = cloudWatching.map((c) {
+            final media = c.media;
+            final ep = c.progress > 0 ? c.progress : 1;
+            return AnimeWatchProgressEntry(
+              animeId: media.id,
+              animeTitle: media.title.english ?? media.title.romaji ?? '',
+              animeFormat: media.format,
+              animeCover:
+                  media.coverImage.large ?? media.coverImage.medium ?? '',
+              totalEpisodes: media.episodes ?? 0,
+              episodesProgress: {
+                ep: EpisodeProgress(
+                  episodeNumber: ep,
+                  episodeTitle: 'Episode $ep',
+                  episodeThumbnail:
+                      media.coverImage.large ?? media.coverImage.medium,
+                  progressInSeconds: 0,
+                  durationInSeconds: 1440,
+                  isCompleted: false,
+                ),
+              },
+              currentEpisode: ep,
+              lastUpdated: DateTime.now(),
+              status: 'watching',
+            );
+          }).toList();
+          return ContinueSection(allProgress: synthetic.take(15).toList());
+        }
+        return const SizedBox.shrink();
+      },
+      error: (_, _) {
+        if (cloudWatching.isNotEmpty) {
+          final synthetic = cloudWatching.map((c) {
+            final media = c.media;
+            final ep = c.progress > 0 ? c.progress : 1;
+            return AnimeWatchProgressEntry(
+              animeId: media.id,
+              animeTitle: media.title.english ?? media.title.romaji ?? '',
+              animeFormat: media.format,
+              animeCover:
+                  media.coverImage.large ?? media.coverImage.medium ?? '',
+              totalEpisodes: media.episodes ?? 0,
+              episodesProgress: {
+                ep: EpisodeProgress(
+                  episodeNumber: ep,
+                  episodeTitle: 'Episode $ep',
+                  episodeThumbnail:
+                      media.coverImage.large ?? media.coverImage.medium,
+                  progressInSeconds: 0,
+                  durationInSeconds: 1440,
+                  isCompleted: false,
+                ),
+              },
+              currentEpisode: ep,
+              lastUpdated: DateTime.now(),
+              status: 'watching',
+            );
+          }).toList();
+          return ContinueSection(allProgress: synthetic.take(15).toList());
+        }
+        return const SizedBox.shrink();
+      },
+    );
   }
 }

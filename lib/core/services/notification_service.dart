@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
@@ -11,6 +12,10 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  final StreamController<String> playbackActionController =
+      StreamController<String>.broadcast();
+  Stream<String> get onPlaybackAction => playbackActionController.stream;
 
   static const String _iconName = '@drawable/ic_notification';
   static const String _largeIconName = '@mipmap/ic_launcher';
@@ -40,6 +45,9 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.actionId != null) {
+          _instance.playbackActionController.add(response.actionId!);
+        }
         AppLogger.infoPair('Notification tapped', response.payload);
       },
     );
@@ -95,10 +103,22 @@ class NotificationService {
           enableVibration: true,
         );
 
+    const AndroidNotificationChannel playbackChannel =
+        AndroidNotificationChannel(
+          'AniDash_playback_channel',
+          'Media Playback',
+          description: 'Controls for active media playback and lock screen controls',
+          importance: Importance.low,
+          playSound: false,
+          enableVibration: false,
+          showBadge: false,
+        );
+
     await androidImplementation?.createNotificationChannel(newsChannel);
     await androidImplementation?.createNotificationChannel(episodeChannel);
     await androidImplementation?.createNotificationChannel(downloadChannel);
     await androidImplementation?.createNotificationChannel(reminderChannel);
+    await androidImplementation?.createNotificationChannel(playbackChannel);
   }
 
   Future<void> showNewsNotification({
@@ -259,5 +279,67 @@ class NotificationService {
 
   Future<void> cancelNotification(int id) async {
     await flutterLocalNotificationsPlugin.cancel(id);
+  }
+
+  Future<void> showPlaybackNotification({
+    required String animeTitle,
+    required String episodeTitle,
+    required int episodeNumber,
+    required bool isPlaying,
+    String? posterUrl,
+  }) async {
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'AniDash_playback_channel',
+      'Media Playback',
+      channelDescription: 'Controls for active media playback and lock screen controls',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      onlyAlertOnce: true,
+      showWhen: false,
+      color: const Color(0xFFE91E63),
+      icon: _iconName,
+      styleInformation: const MediaStyleInformation(
+        htmlFormatContent: false,
+        htmlFormatTitle: false,
+      ),
+      actions: <AndroidNotificationAction>[
+        const AndroidNotificationAction(
+          'prev',
+          'Previous',
+          cancelNotification: false,
+          showsUserInterface: false,
+        ),
+        AndroidNotificationAction(
+          'play_pause',
+          isPlaying ? 'Pause' : 'Play',
+          cancelNotification: false,
+          showsUserInterface: false,
+        ),
+        const AndroidNotificationAction(
+          'next',
+          'Next',
+          cancelNotification: false,
+          showsUserInterface: false,
+        ),
+      ],
+    );
+
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+    );
+
+    await flutterLocalNotificationsPlugin.show(
+      9999,
+      '$animeTitle - EP $episodeNumber',
+      episodeTitle,
+      platformChannelSpecifics,
+    );
+  }
+
+  Future<void> hidePlaybackNotification() async {
+    await flutterLocalNotificationsPlugin.cancel(9999);
   }
 }

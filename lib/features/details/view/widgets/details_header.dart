@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:iconsax/iconsax.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:ani_dash/core/models/tracker/tracker_type.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/services/auth_provider_enum.dart';
@@ -72,10 +75,161 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
     }
   }
 
+  String _getHighResImageUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    if (url.contains('anilist.co')) {
+      return url
+          .replaceAll('/medium/', '/extraLarge/')
+          .replaceAll('/large/', '/extraLarge/');
+    }
+    return url;
+  }
+
+  void _openFullscreenPoster(
+    BuildContext context,
+    String imageUrl,
+    String title,
+  ) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.95),
+      builder: (ctx) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(
+                Icons.close_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.download_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                tooltip: 'Save to Gallery',
+                onPressed: () async {
+                  await _saveImageToGallery(context, imageUrl, title);
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+                placeholder: (_, _) =>
+                    const Center(child: CircularProgressIndicator()),
+                errorWidget: (_, _, _) => const Center(
+                  child: Icon(
+                    Icons.broken_image_rounded,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _saveImageToGallery(
+    BuildContext context,
+    String imageUrl,
+    String animeTitle,
+  ) async {
+    try {
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Failed to download image (HTTP ${response.statusCode})',
+        );
+      }
+
+      Directory? targetDir;
+      if (Platform.isAndroid) {
+        final picturesDir = Directory('/storage/emulated/0/Pictures/AniDash');
+        if (await picturesDir.exists()) {
+          targetDir = picturesDir;
+        } else {
+          try {
+            targetDir = await picturesDir.create(recursive: true);
+          } catch (_) {
+            targetDir = await getExternalStorageDirectory();
+          }
+        }
+      } else {
+        targetDir = await getApplicationDocumentsDirectory();
+      }
+
+      final sanitizedTitle =
+          animeTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
+      final fileName =
+          '${sanitizedTitle}_poster_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File('${targetDir!.path}/$fileName');
+      await file.writeAsBytes(response.bodyBytes);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.greenAccent,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('Poster saved to Pictures/AniDash/$fileName'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.grey.shade900,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save poster: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final highResBanner = _getHighResImageUrl(
+      widget.anime.bannerImage != null && widget.anime.bannerImage!.isNotEmpty
+          ? widget.anime.bannerImage!
+          : widget.anime.coverImage.large ?? widget.anime.coverImage.medium,
+    );
 
     return SliverAppBar(
       expandedHeight: 420,
@@ -88,14 +242,9 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl:
-                  widget.anime.bannerImage != null &&
-                          widget.anime.bannerImage!.isNotEmpty
-                      ? widget.anime.bannerImage!
-                      : widget.anime.coverImage.large ??
-                          widget.anime.coverImage.medium ??
-                          '',
+              imageUrl: highResBanner,
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
               placeholder:
                   (_, _) => Container(color: colorScheme.surfaceContainer),
             ),
@@ -119,18 +268,54 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Hero(
-                    tag: widget.tag,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            widget.anime.coverImage.large ??
-                            widget.anime.coverImage.medium ??
-                            '',
-                        width: 105,
-                        height: 160,
-                        fit: BoxFit.cover,
+                  GestureDetector(
+                    onTap: () {
+                      final posterUrl = _getHighResImageUrl(
+                        widget.anime.coverImage.large ??
+                            widget.anime.coverImage.medium,
+                      );
+                      if (posterUrl.isNotEmpty) {
+                        _openFullscreenPoster(
+                          context,
+                          posterUrl,
+                          widget.anime.title.english ??
+                              widget.anime.title.romaji ??
+                              'Poster',
+                        );
+                      }
+                    },
+                    child: Hero(
+                      tag: widget.tag,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl:
+                                  widget.anime.coverImage.large ??
+                                  widget.anime.coverImage.medium ??
+                                  '',
+                              width: 105,
+                              height: 160,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.high,
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              margin: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Icon(
+                                Icons.fullscreen_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -183,6 +368,53 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Row(
+                                        children: [
+                                          Icon(
+                                            Icons.explicit_rounded,
+                                            color: Colors.pinkAccent,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('18+ Content Notice'),
+                                        ],
+                                      ),
+                                      content: const Text(
+                                        'This anime contains mature / 18+ content. You can manage 18+ extensions (Hanime, HentaiHaven) and enable Global Incognito under:\n\nSettings > Experimental Features > Hentai Hub',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('Close'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () {
+                                            Navigator.pop(ctx);
+                                            context.push(
+                                              '/settings/experimental/hentai',
+                                            );
+                                          },
+                                          child: const Text('Open Hentai Hub'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4.0),
+                                  child: Icon(
+                                    Icons.help_outline_rounded,
+                                    color: Colors.white70,
+                                    size: 18,
                                   ),
                                 ),
                               ),

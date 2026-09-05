@@ -17,9 +17,7 @@ class ContinueSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final validEntries = allProgress
-        .where((e) => e.episodesProgress.isNotEmpty)
-        .toList();
+    final validEntries = allProgress.toList();
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 
@@ -67,11 +65,12 @@ class ContinueSection extends ConsumerWidget {
                               currentEp!.durationInSeconds!) >=
                           0.85);
 
+              final baseEp = entry.currentEpisode > 0 ? entry.currentEpisode : 1;
               final nextEpisodeNum = isCurrentCompleted &&
                       (entry.totalEpisodes == 0 ||
-                          entry.currentEpisode < entry.totalEpisodes)
-                  ? entry.currentEpisode + 1
-                  : entry.currentEpisode;
+                          baseEp < entry.totalEpisodes)
+                  ? baseEp + 1
+                  : baseEp;
 
               final displayEp = entry.episodesProgress[nextEpisodeNum] ?? currentEp;
 

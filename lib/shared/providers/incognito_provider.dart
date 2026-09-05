@@ -7,7 +7,17 @@ class IncognitoService {
 
   static Set<String> get activeSessions => _activeSessions;
 
-  static bool isIncognito(String animeId) {
+  static const String _global18PlusKey = 'global_18_plus_incognito';
+
+  static bool get isGlobal18PlusIncognito =>
+      sharedPrefs.getBool(_global18PlusKey) ?? false;
+
+  static set isGlobal18PlusIncognito(bool value) {
+    sharedPrefs.setBool(_global18PlusKey, value);
+  }
+
+  static bool isIncognito(String animeId, {bool isMature = false}) {
+    if (isMature && isGlobal18PlusIncognito) return true;
     if (_activeSessions.contains(animeId)) return true;
     return sharedPrefs.getBool('$_incognitoPrefix$animeId') ?? false;
   }
@@ -28,6 +38,26 @@ class IncognitoService {
     return next;
   }
 }
+
+class Global18PlusNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return IncognitoService.isGlobal18PlusIncognito;
+  }
+
+  void toggle() {
+    state = !state;
+    IncognitoService.isGlobal18PlusIncognito = state;
+  }
+
+  void set(bool value) {
+    state = value;
+    IncognitoService.isGlobal18PlusIncognito = value;
+  }
+}
+
+final global18PlusIncognitoProvider =
+    NotifierProvider<Global18PlusNotifier, bool>(() => Global18PlusNotifier());
 
 class IncognitoNotifier extends Notifier<Set<String>> {
   @override

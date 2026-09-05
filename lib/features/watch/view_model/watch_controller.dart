@@ -7,6 +7,7 @@ import 'package:screenshot/screenshot.dart';
 
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
@@ -21,6 +22,7 @@ part 'watch_controller.g.dart';
 @riverpod
 class WatchController extends _$WatchController with WidgetsBindingObserver {
   StreamSubscription<bool>? _completedSubscription;
+  StreamSubscription<String>? _playbackActionSubscription;
   int? _lastAniSkipEpisode;
   bool _isDisposed = false;
   bool _isPlayerReady = false;
@@ -39,9 +41,27 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   void build() {
     WidgetsBinding.instance.addObserver(this);
 
+    _playbackActionSubscription =
+        NotificationService().onPlaybackAction.listen((action) {
+      if (_isDisposed) return;
+      if (action == 'play_pause') {
+        ref
+            .read(playerStateProvider.notifier)
+            .videoController
+            .player
+            .playOrPause();
+      } else if (action == 'prev') {
+        ref.read(episodeDataProvider.notifier).changeEpisode(null, by: -1);
+      } else if (action == 'next') {
+        ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+      }
+    });
+
     ref.onDispose(() {
       _isDisposed = true;
       _completedSubscription?.cancel();
+      _playbackActionSubscription?.cancel();
+      NotificationService().hidePlaybackNotification();
       WidgetsBinding.instance.removeObserver(this);
       _triggerSave();
     });
@@ -165,6 +185,16 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         }
       }
 
+      if (prev == null || prev.isPlaying != next.isPlaying) {
+        NotificationService().showPlaybackNotification(
+          animeTitle: animeName,
+          episodeTitle: _epTitle ?? 'Episode ${_epNum ?? 1}',
+          episodeNumber: _epNum ?? 1,
+          isPlaying: next.isPlaying,
+          posterUrl: _animeCover,
+        );
+      }
+
       _handlePeriodicSave();
     });
 
@@ -190,6 +220,14 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           _epTitle = epInfo.title;
           _epThumb = epInfo.thumbnail;
         } catch (_) {}
+
+        NotificationService().showPlaybackNotification(
+          animeTitle: animeName,
+          episodeTitle: _epTitle ?? 'Episode $next',
+          episodeNumber: next,
+          isPlaying: ref.read(playerStateProvider).isPlaying,
+          posterUrl: _animeCover,
+        );
       }
     });
   }

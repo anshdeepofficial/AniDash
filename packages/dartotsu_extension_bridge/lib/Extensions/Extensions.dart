@@ -7,7 +7,7 @@ abstract class Extension extends GetxController {
 
   bool get supportsAnime => true;
   bool get supportsManga => true;
-  bool get supportsNovel => true;
+  bool get supportsNovel => false;
 
   final Rx<List<Source>> installedAnimeExtensions = Rx([]);
   final Rx<List<Source>> installedMangaExtensions = Rx([]);

@@ -25,6 +25,7 @@ import 'package:ani_dash/features/settings/view/screens/account_settings_screen.
 import 'package:ani_dash/features/settings/view/screens/anime_sources_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/download_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/experimental_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/hentai_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/player_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/advanced_player_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/profile_settings_screen.dart';
@@ -241,6 +242,10 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'experimental',
           contentBuilder: (_, _) => ExperimentalScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'experimental/hentai',
+          contentBuilder: (_, _) => const HentaiScreen(),
         ),
         AnimatedGoRoute(
           path: 'permissions',

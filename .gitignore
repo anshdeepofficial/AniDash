@@ -81,3 +81,4 @@ dist
 .debug_cache
 repomix-output.xml
 *.iml~
+*.apk
