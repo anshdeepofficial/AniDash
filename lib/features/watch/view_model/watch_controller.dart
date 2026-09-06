@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:screenshot/screenshot.dart';
 
+import 'package:ani_dash/core/models/aniskip/aniskip_result.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
@@ -360,7 +361,19 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       final start = Duration(seconds: skip.interval!.startTime.toInt());
       final end = Duration(seconds: skip.interval!.endTime.toInt() + 1);
 
-      if (position >= start && position < end) {
+      final validType =
+          skip.skipType == SkipType.op ||
+          skip.skipType == SkipType.ed ||
+          skip.skipType == SkipType.mixed;
+      final length = end - start;
+      final validTiming =
+          start >= Duration.zero &&
+          end > start &&
+          end <= Duration(seconds: _dur + 3) &&
+          length <= const Duration(minutes: 5) &&
+          length.inSeconds <= (_dur * 0.25);
+
+      if (validType && validTiming && position >= start && position < end) {
         ref.read(playerStateProvider.notifier).seek(end);
         return;
       }

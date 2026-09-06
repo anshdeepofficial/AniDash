@@ -58,6 +58,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isChangingVolume = false;
   bool _isChangingBrightness = false;
   bool _isDragLeft = false;
+  bool _allowVolumeBoostForGesture = false;
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
@@ -115,13 +116,13 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
   void _handleHardwareVolumeKey(bool isUp) {
     if (!mounted) return;
-    if (ref.read(playerUIControllerProvider).isLocked) return;
 
     final controller = ref.read(playerUIControllerProvider.notifier);
     final state = ref.read(playerUIControllerProvider);
 
     const step = 0.05; // 5% per press
-    double newV = (state.volume + (isUp ? step : -step)).clamp(0.0, 2.0);
+    final maxVolume = isUp && state.volume < 1.0 ? 1.0 : 2.0;
+    double newV = (state.volume + (isUp ? step : -step)).clamp(0.0, maxVolume);
 
     setState(() {
       _isChangingVolume = true;
@@ -158,12 +159,16 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     if (ref.read(playerUIControllerProvider).isLocked) return;
     final w = MediaQuery.of(context).size.width;
     _isDragLeft = details.globalPosition.dx < w / 2;
+    // A swipe that begins below 100% stops at normal maximum. Starting a new
+    // upward swipe at 100% explicitly unlocks VLC-style amplified volume.
+    _allowVolumeBoostForGesture =
+        _isDragLeft && ref.read(playerUIControllerProvider).volume >= 0.99;
 
     setState(() {
       if (_isDragLeft) {
-        _isChangingBrightness = true;
-      } else {
         _isChangingVolume = true;
+      } else {
+        _isChangingBrightness = true;
       }
     });
 
@@ -181,10 +186,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final state = ref.read(playerUIControllerProvider);
 
     if (_isDragLeft) {
-      double newB = (state.brightness + delta).clamp(0.0, 1.0);
-      controller.setBrightness(newB);
-    } else {
-      double newV = (state.volume + delta).clamp(0.0, 2.0);
+      final maxVolume = _allowVolumeBoostForGesture ? 2.0 : 1.0;
+      double newV = (state.volume + delta).clamp(0.0, maxVolume);
 
       // Update system/player volume
       controller.setVolume(newV);
@@ -204,6 +207,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
             .player
             .setVolume(100.0);
       }
+    } else {
+      double newB = (state.brightness + delta).clamp(0.0, 1.0);
+      controller.setBrightness(newB);
     }
   }
 
@@ -638,7 +644,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (_isChangingBrightness)
                 Positioned.fill(
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: Alignment.centerRight,
                     child: VolumeBrightnessOverlay(
                       isVolume: false,
                       value: uiState.brightness,
@@ -648,7 +654,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (_isChangingVolume)
                 Positioned.fill(
                   child: Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.centerLeft,
                     child: VolumeBrightnessOverlay(
                       isVolume: true,
                       value: uiState.volume,

@@ -45,7 +45,7 @@ class EpisodeGridItem extends StatelessWidget {
       elevation: 0,
       color:
           episode.isFiller == true
-              ? theme.colorScheme.primary.withValues(alpha: 0.10)
+              ? theme.colorScheme.primary.withValues(alpha: 0.18)
               : Colors.transparent,
       child: InkWell(
         onLongPress: onLongPress,

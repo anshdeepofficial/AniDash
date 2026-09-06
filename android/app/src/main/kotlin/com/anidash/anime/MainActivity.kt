@@ -16,6 +16,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import androidx.core.content.FileProvider
+import android.content.ComponentName
 
 class MainActivity : FlutterFragmentActivity() {
     private var landscapeListener: OrientationEventListener? = null
@@ -120,6 +121,28 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     else -> result.notImplemented()
                 }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "anidash/launcher_icon")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "setMode") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val selected = when (call.argument<String>("mode")) {
+                    "white" -> "LauncherDark"
+                    "black" -> "LauncherLight"
+                    else -> "LauncherDynamic"
+                }
+                listOf("LauncherDynamic", "LauncherLight", "LauncherDark").forEach { alias ->
+                    packageManager.setComponentEnabledSetting(
+                        ComponentName(this, "$packageName.$alias"),
+                        if (alias == selected) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
+                }
+                result.success(null)
             }
 
         volumeChannel =

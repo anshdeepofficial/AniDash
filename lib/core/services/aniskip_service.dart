@@ -12,9 +12,10 @@ class AniSkipService {
     int episodeLength,
   ) async {
     try {
-      // Query with episodeLength=0 so AniSkip returns all available intro AND outro segments
+      // Always include the real episode length. Results requested with zero can
+      // be aligned to a different cut and may span most of the episode.
       final uri = Uri.parse(
-        '$_baseUrl/skip-times/$malId/$episodeNumber?types[]=op&types[]=ed&types[]=mixed-op&types[]=mixed-ed&types[]=recap&episodeLength=0',
+        '$_baseUrl/skip-times/$malId/$episodeNumber?types[]=op&types[]=ed&types[]=mixed-op&types[]=mixed-ed&types[]=recap&episodeLength=$episodeLength',
       );
 
       final response = await UniversalHttpClient.instance.get(
@@ -28,14 +29,15 @@ class AniSkipService {
         final data = jsonDecode(response.body);
         final result = AniSkipResponse.fromJson(data);
         if (result.found && result.results.isNotEmpty) {
-          return result.results;
+          return _validIntervals(result.results, episodeLength);
         }
       }
 
-      // Fallback with specific episodeLength if length=0 returned nothing
+      // Older AniSkip entries may only respond without an episode length. Keep
+      // that as a fallback, but strictly validate the returned timestamps.
       if (episodeLength > 0) {
         final fallbackUri = Uri.parse(
-          '$_baseUrl/skip-times/$malId/$episodeNumber?types[]=op&types[]=ed&types[]=mixed-op&types[]=mixed-ed&types[]=recap&episodeLength=$episodeLength',
+          '$_baseUrl/skip-times/$malId/$episodeNumber?types[]=op&types[]=ed&types[]=mixed-op&types[]=mixed-ed&types[]=recap&episodeLength=0',
         );
         final fallbackRes = await UniversalHttpClient.instance.get(
           fallbackUri,
@@ -44,13 +46,47 @@ class AniSkipService {
         if (fallbackRes.statusCode == 200) {
           final data = jsonDecode(fallbackRes.body);
           final result = AniSkipResponse.fromJson(data);
-          if (result.found) return result.results;
+          if (result.found) {
+            return _validIntervals(result.results, episodeLength);
+          }
         }
       }
     } catch (e) {
       AppLogger.e('Failed to fetch AniSkip data: $e');
     }
     return [];
+  }
+
+  List<AniSkipResultItem> _validIntervals(
+    List<AniSkipResultItem> results,
+    int episodeLength,
+  ) {
+    if (episodeLength <= 0) return const [];
+    return results
+        .where((item) {
+          final interval = item.interval;
+          if (interval == null) return false;
+          final start = interval.startTime;
+          final end = interval.endTime;
+          final length = end - start;
+          if (start < 0 || end <= start || end > episodeLength + 3) {
+            return false;
+          }
+          if (length > 300 || length > episodeLength * 0.25) return false;
+
+          switch (item.skipType) {
+            case SkipType.op:
+              return start < episodeLength * 0.45;
+            case SkipType.ed:
+              return start > episodeLength * 0.50;
+            case SkipType.mixed:
+              return start < episodeLength * 0.45 ||
+                  start > episodeLength * 0.50;
+            default:
+              return false;
+          }
+        })
+        .toList(growable: false);
   }
 }
 

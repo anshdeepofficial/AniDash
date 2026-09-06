@@ -49,7 +49,7 @@ class EpisodeListItem extends StatelessWidget {
           ListTile(
             tileColor:
                 episode.isFiller == true
-                    ? theme.colorScheme.primary.withValues(alpha: 0.10)
+                    ? theme.colorScheme.primary.withValues(alpha: 0.18)
                     : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
             leading: Row(

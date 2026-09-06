@@ -114,6 +114,7 @@ class ControlsOverlay extends ConsumerWidget {
               onLockPressed: onLockPressed,
               onEpisodePressed: onEpisodesPressed,
               onForwardPressed: () => notifier.forward(85),
+              onSettingsPressed: onSettingsPressed,
               onSourcePressed: onSourcePressed,
               onSubtitlePressed: onSubtitlePressed,
               onServerPressed: onServerPressed,

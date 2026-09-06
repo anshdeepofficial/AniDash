@@ -19,6 +19,7 @@ class BottomControls extends ConsumerStatefulWidget {
   final VoidCallback onSubtitlePressed;
   final VoidCallback onServerPressed;
   final VoidCallback onForwardPressed;
+  final VoidCallback onSettingsPressed;
   final VoidCallback? onEpisodePressed;
   final VoidCallback? onFullScreenPressed;
   final bool isLocal;
@@ -31,6 +32,7 @@ class BottomControls extends ConsumerStatefulWidget {
     required this.onSubtitlePressed,
     required this.onServerPressed,
     required this.onForwardPressed,
+    required this.onSettingsPressed,
     required this.onFullScreenPressed,
     this.onEpisodePressed,
     this.isLocal = false,
@@ -161,6 +163,10 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                             _ToolbarIcon(
                               icon: Icons.fullscreen_rounded,
                               onTap: widget.onFullScreenPressed,
+                            ),
+                            _ToolbarIcon(
+                              icon: Icons.settings_rounded,
+                              onTap: widget.onSettingsPressed,
                             ),
                           ],
                         ),

@@ -74,10 +74,10 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
               Icon(
                 widget.isVolume
                     ? (percent == 0
-                          ? Iconsax.volume_slash
-                          : (percent < 50
-                                ? Iconsax.volume_low
-                                : Iconsax.volume_high))
+                        ? Iconsax.volume_slash
+                        : (percent < 50
+                            ? Iconsax.volume_low
+                            : Iconsax.volume_high))
                     : (percent < 50 ? Iconsax.sun_1 : Iconsax.sun_1),
                 color: isBoosted ? Colors.redAccent : Colors.white,
                 size: 32,
@@ -91,16 +91,15 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
-                      Container(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
+                      Container(color: Colors.white.withValues(alpha: 0.2)),
                       LayoutBuilder(
                         builder: (context, constraints) {
                           if (!widget.isVolume) {
                             return Align(
                               alignment: Alignment.bottomCenter,
                               child: Container(
-                                height: constraints.maxHeight *
+                                height:
+                                    constraints.maxHeight *
                                     displayValue.clamp(0.0, 1.0),
                                 width: double.infinity,
                                 color: Theme.of(context).colorScheme.primary,
@@ -108,36 +107,15 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
                             );
                           }
 
-                          final double normalHeight = constraints.maxHeight *
-                              displayValue.clamp(0.0, 1.0);
-                          final double boostHeight = isBoosted
-                              ? constraints.maxHeight *
-                                  (displayValue - 1.0).clamp(0.0, 1.0)
-                              : 0.0;
-
-                          return Stack(
+                          return Align(
                             alignment: Alignment.bottomCenter,
-                            children: [
-                              Align(
-                                alignment: Alignment.bottomCenter,
-                                child: Container(
-                                  height: normalHeight,
-                                  width: double.infinity,
-                                  color: isBoosted
-                                      ? Colors.redAccent.withValues(alpha: 0.35)
-                                      : Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              if (isBoosted)
-                                Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: Container(
-                                    height: boostHeight,
-                                    width: double.infinity,
-                                    color: Colors.redAccent,
-                                  ),
-                                ),
-                            ],
+                            child: Container(
+                              height:
+                                  constraints.maxHeight *
+                                  (displayValue / maxLimit).clamp(0.0, 1.0),
+                              width: double.infinity,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           );
                         },
                       ),

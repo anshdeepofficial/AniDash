@@ -105,9 +105,13 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     final bufferSize = ref.read(
       playerSettingsProvider.select((s) => s.bufferSize),
     );
+    final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
+      64 * 1024 * 1024,
+      128 * 1024 * 1024,
+    );
     _player = Player(
       configuration: PlayerConfiguration(
-        bufferSize: bufferSize.toInt() * 1024 * 1024,
+        bufferSize: effectiveBufferBytes,
         logLevel: MPVLogLevel.warn,
         vo: vo,
       ),
@@ -117,12 +121,21 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     final fastProperties = <String, String>{
       'cache': 'yes',
       'cache-pause': 'yes',
-      'cache-pause-wait': '1',
+      // Keep enough media queued before resuming after an underrun. A
+      // one-second target made weak connections alternate between playing and
+      // buffering every few seconds.
+      'cache-pause-wait': '8',
+      // With cache enabled this is the real time-based forward-buffer limit;
+      // demuxer-readahead-secs alone is mostly ignored by mpv.
+      'cache-secs': '30',
+      'demuxer-thread': 'yes',
       'demuxer-lavf-o':
-          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
-      'demuxer-max-bytes':
-          '${(bufferSize.toInt() * 1024 * 1024).clamp(32 * 1024 * 1024, 128 * 1024 * 1024)}',
-      'demuxer-readahead-secs': '10',
+          'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,'
+          'reconnect_on_http_error=%7%4xx,5xx,reconnect_delay_max=5,'
+          'reconnect_delay_total_max=15',
+      'demuxer-max-bytes': '$effectiveBufferBytes',
+      // Continuously retain about twenty seconds ahead of the playhead.
+      'demuxer-readahead-secs': '20',
       'hr-seek': 'default',
       'hr-seek-framedrop': 'yes',
       'force-seekable': 'yes',

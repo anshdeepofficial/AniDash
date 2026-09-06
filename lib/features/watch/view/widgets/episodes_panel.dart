@@ -279,7 +279,13 @@ class EpisodeTile extends StatelessWidget {
           color:
               isSelected
                   ? theme.colorScheme.primaryContainer
+                  : isFiller
+                  ? theme.colorScheme.primary.withValues(alpha: 0.18)
                   : Colors.transparent,
+          border:
+              isFiller
+                  ? Border.all(color: theme.colorScheme.primary, width: 1.4)
+                  : null,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
