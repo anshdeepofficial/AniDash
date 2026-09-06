@@ -44,8 +44,9 @@ class EpisodeGridItem extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       color:
-          Colors
-              .transparent, // We handle background manually if needed or just use column
+          episode.isFiller == true
+              ? theme.colorScheme.primary.withValues(alpha: 0.10)
+              : Colors.transparent,
       child: InkWell(
         onLongPress: onLongPress,
         onTap: onTap,

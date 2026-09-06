@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -153,26 +152,16 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                 isAccent: true,
                                 scheme: scheme,
                               ),
-                            _ToolbarIcon(
-                              icon: Icons.lock_outline_rounded,
-                              onTap: widget.onLockPressed,
-                            ),
                             if (!widget.isLocal)
                               _ToolbarIcon(
                                 icon: Icons.subtitles_rounded,
                                 onTap: widget.onSubtitlePressed,
                                 onHold: () => showSubtitleSettings(context),
                               ),
-                            if (!widget.isLocal)
-                              _ToolbarIcon(
-                                icon: Icons.view_list_rounded,
-                                onTap: widget.onEpisodePressed,
-                              ),
-                            if (!(Platform.isAndroid || Platform.isIOS))
-                              _ToolbarIcon(
-                                icon: Icons.fullscreen_rounded,
-                                onTap: widget.onFullScreenPressed,
-                              ),
+                            _ToolbarIcon(
+                              icon: Icons.fullscreen_rounded,
+                              onTap: widget.onFullScreenPressed,
+                            ),
                           ],
                         ),
                       ),

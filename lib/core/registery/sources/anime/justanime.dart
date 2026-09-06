@@ -46,9 +46,9 @@ class JustAnimeProvider extends AnimeProvider {
   Future<SearchPage> getSearch(String keyword, String? type, int page) async {
     Future<SearchPage> doSearch(String q) async {
       try {
-        final url = Uri.parse('$apiUrl/search').replace(
-          queryParameters: {'query': q, 'page': '$page'},
-        );
+        final url = Uri.parse(
+          '$apiUrl/search',
+        ).replace(queryParameters: {'query': q, 'page': '$page'});
         final res = await UniversalHttpClient.instance
             .get(url, headers: headers)
             .timeout(const Duration(seconds: 20));
@@ -79,12 +79,13 @@ class JustAnimeProvider extends AnimeProvider {
     }
 
     // 1. Cleaned query: remove colons, dashes, special punctuation that break JustAnime API
-    final cleaned = keyword
-        .replaceAll('-', ' ')
-        .replaceAll(':', ' ')
-        .replaceAll(RegExp(r'[^\w\s]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final cleaned =
+        keyword
+            .replaceAll('-', ' ')
+            .replaceAll(':', ' ')
+            .replaceAll(RegExp(r'[^\w\s]'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
 
     var searchPage = await doSearch(cleaned);
     if (searchPage.results.isNotEmpty) return searchPage;
@@ -97,10 +98,11 @@ class JustAnimeProvider extends AnimeProvider {
     }
 
     // 3. Try removing common movie prefixes/suffixes: "the movie", "movie", "film"
-    final stripped = lower
-        .replaceAll(RegExp(r'\b(the\s+movie|movie|film)\b'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final stripped =
+        lower
+            .replaceAll(RegExp(r'\b(the\s+movie|movie|film)\b'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
     if (stripped.isNotEmpty && stripped != lower && stripped != cleaned) {
       searchPage = await doSearch(stripped);
       if (searchPage.results.isNotEmpty) return searchPage;
@@ -180,13 +182,7 @@ class JustAnimeProvider extends AnimeProvider {
 
     // For movies, if episodes list was empty, synthesize Episode 1
     if (episodes.isEmpty) {
-      episodes.add(
-        EpisodeDataModel(
-          id: '1',
-          number: 1,
-          title: 'Full Movie',
-        ),
-      );
+      episodes.add(EpisodeDataModel(id: '1', number: 1, title: 'Full Movie'));
     }
 
     return BaseEpisodeModel(episodes: episodes, totalEpisodes: episodes.length);
@@ -201,7 +197,8 @@ class JustAnimeProvider extends AnimeProvider {
   ) async {
     final rawEp = episodeId.split('+').last.replaceAll(RegExp(r'[^0-9]'), '');
     final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId) ?? 1;
-    final audio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
+    final requestedAudio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
+    final audioOrder = requestedAudio == 'dub' ? ['dub', 'sub'] : ['sub'];
 
     Future<Map<String, dynamic>?> request(String path) async {
       try {
@@ -221,25 +218,32 @@ class JustAnimeProvider extends AnimeProvider {
 
     // Default to AniNeko (HLS .m3u8 with subtitles, fast start) and fallback to AnimeGG (direct MP4)
     final preferAnimeGG = serverName?.toLowerCase().contains('animegg') == true;
+    final hlsEndpoints = [
+      for (final audio in audioOrder)
+        '/watch/$animeId/episode/$episode/anineko/$audio',
+    ];
     final endpoints =
         preferAnimeGG
-            ? [
-              '/watch/$animeId/episode/$episode/animegg',
-              '/watch/$animeId/episode/$episode/anineko/$audio',
-            ]
-            : [
-              '/watch/$animeId/episode/$episode/anineko/$audio',
-              '/watch/$animeId/episode/$episode/animegg',
-            ];
+            ? ['/watch/$animeId/episode/$episode/animegg', ...hlsEndpoints]
+            : [...hlsEndpoints, '/watch/$animeId/episode/$episode/animegg'];
 
     for (final endpoint in endpoints) {
       final payload = await request(endpoint);
       if (payload == null) continue;
+      final endpointAudio = endpoint.contains('/anineko/dub') ? 'dub' : 'sub';
+      final animeGGRaw =
+          endpoint.contains('animegg')
+              ? (payload[requestedAudio] ?? payload['sub'])
+              : null;
       final raw =
           endpoint.contains('animegg')
-              ? payload[audio] as Map<String, dynamic>?
+              ? animeGGRaw as Map<String, dynamic>?
               : payload;
       if (raw == null) continue;
+      final actualAudio =
+          endpoint.contains('animegg')
+              ? (identical(animeGGRaw, payload['dub']) ? 'dub' : 'sub')
+              : endpointAudio;
 
       final commonHeaders = Map<String, String>.from(
         (raw['headers'] as Map?)?.map(
@@ -266,9 +270,8 @@ class JustAnimeProvider extends AnimeProvider {
                 return Source(
                   url: urlStr,
                   quality: item['quality']?.toString() ?? 'Auto',
-                  isM3U8:
-                      item['isM3U8'] == true || urlStr.contains('.m3u8'),
-                  isDub: audio == 'dub',
+                  isM3U8: item['isM3U8'] == true || urlStr.contains('.m3u8'),
+                  isDub: actualAudio == 'dub',
                   type: endpoint.contains('animegg') ? 'AnimeGG' : 'AniNeko',
                   headers: sourceHeaders,
                 );
@@ -288,8 +291,7 @@ class JustAnimeProvider extends AnimeProvider {
                 return Subtitle(
                   url: (item['url'] ?? item['file'])?.toString(),
                   lang:
-                      (item['lang'] ?? item['label'])?.toString() ??
-                      'English',
+                      (item['lang'] ?? item['label'])?.toString() ?? 'English',
                   isSub: true,
                 );
               })

@@ -65,7 +65,8 @@ class TopControls extends ConsumerWidget {
     );
 
     final animeId = ref.watch(episodeListProvider.select((s) => s.animeId));
-    final isIncognito = animeId != null && ref.watch(incognitoProvider(animeId));
+    final isIncognito =
+        animeId != null && ref.watch(incognitoProvider(animeId));
 
     return Container(
       decoration: const BoxDecoration(
@@ -224,7 +225,8 @@ class TopControls extends ConsumerWidget {
                       final lockMode = ref.watch(orientationLockProvider);
                       IconData lockIcon = Icons.screen_rotation_rounded;
                       Color iconColor = Colors.white;
-                      String tooltipText = 'Auto-Rotate Landscape (Tap to lock)';
+                      String tooltipText =
+                          'Auto-Rotate Landscape (Tap to lock)';
 
                       if (lockMode == OrientationLockMode.lockedLandscape) {
                         lockIcon = Icons.screen_lock_landscape_rounded;
@@ -251,8 +253,8 @@ class TopControls extends ConsumerWidget {
                   ),
 
                   _TopIconButton(
-                    icon: Icons.settings_rounded,
-                    onTap: _wrap(onSettingsPressed),
+                    icon: Icons.view_list_rounded,
+                    onTap: _wrap(onEpisodesPressed),
                   ),
                 ],
               ),
@@ -270,58 +272,69 @@ class TopControls extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E1E1E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(Icons.screen_rotation_rounded, color: scheme.primary, size: 22),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Landscape Screen Rotation',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+      builder:
+          (ctx) => Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.screen_rotation_rounded,
+                          color: scheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Landscape Screen Rotation',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRotationOption(
+                    context: ctx,
+                    ref: ref,
+                    mode: OrientationLockMode.unlocked,
+                    title: 'Auto-Rotate Landscape (Sensor)',
+                    subtitle:
+                        'Screen freely flips between both landscape sides following sensor',
+                    icon: Icons.screen_rotation_rounded,
+                    isSelected: currentMode == OrientationLockMode.unlocked,
+                  ),
+                  _buildRotationOption(
+                    context: ctx,
+                    ref: ref,
+                    mode: OrientationLockMode.lockedLandscape,
+                    title: 'Lock Landscape',
+                    subtitle:
+                        'Screen remains strictly locked in current landscape direction',
+                    icon: Icons.stay_current_landscape_rounded,
+                    isSelected:
+                        currentMode == OrientationLockMode.lockedLandscape,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _buildRotationOption(
-                context: ctx,
-                ref: ref,
-                mode: OrientationLockMode.unlocked,
-                title: 'Auto-Rotate Landscape (Sensor)',
-                subtitle: 'Screen freely flips between both landscape sides following sensor',
-                icon: Icons.screen_rotation_rounded,
-                isSelected: currentMode == OrientationLockMode.unlocked,
-              ),
-              _buildRotationOption(
-                context: ctx,
-                ref: ref,
-                mode: OrientationLockMode.lockedLandscape,
-                title: 'Lock Landscape',
-                subtitle: 'Screen remains strictly locked in current landscape direction',
-                icon: Icons.stay_current_landscape_rounded,
-                isSelected: currentMode == OrientationLockMode.lockedLandscape,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -348,9 +361,14 @@ class TopControls extends ConsumerWidget {
         subtitle,
         style: const TextStyle(color: Colors.white54, fontSize: 12),
       ),
-      trailing: isSelected
-          ? Icon(Icons.check_circle_rounded, color: scheme.primary, size: 22)
-          : null,
+      trailing:
+          isSelected
+              ? Icon(
+                Icons.check_circle_rounded,
+                color: scheme.primary,
+                size: 22,
+              )
+              : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onTap: () async {
         Navigator.pop(context);
@@ -400,11 +418,7 @@ class _TopIconButton extends StatelessWidget {
     );
 
     if (tooltip != null) {
-      button = Tooltip(
-        message: tooltip!,
-        preferBelow: false,
-        child: button,
-      );
+      button = Tooltip(message: tooltip!, preferBelow: false, child: button);
     }
 
     return button;

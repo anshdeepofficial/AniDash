@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
@@ -7,15 +8,19 @@ import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/features/details/view/widgets/horizontal_media_list.dart';
 import 'package:ani_dash/helpers/navigation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
+import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 
 class DetailsContent extends StatelessWidget {
   final UniversalMedia anime;
   final bool isLoading;
   final Function(UniversalMedia)? onMediaTap;
+  final String mediaId;
 
   const DetailsContent({
     super.key,
     required this.anime,
+    required this.mediaId,
     this.isLoading = false,
     this.onMediaTap,
   });
@@ -28,6 +33,8 @@ class DetailsContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           NextEpisodeWidget(anime: anime),
+          const SizedBox(height: 24),
+          AvailableLanguagesCard(mediaId: mediaId),
           const SizedBox(height: 24),
           AnimeSynopsis(
             description: anime.description ?? '',
@@ -118,6 +125,104 @@ class DetailsContent extends StatelessWidget {
     if (type.isEmpty) return type;
     final formatted = type.replaceAll('_', ' ');
     return formatted[0].toUpperCase() + formatted.substring(1).toLowerCase();
+  }
+}
+
+class AvailableLanguagesCard extends ConsumerStatefulWidget {
+  final String mediaId;
+
+  const AvailableLanguagesCard({super.key, required this.mediaId});
+
+  @override
+  ConsumerState<AvailableLanguagesCard> createState() =>
+      _AvailableLanguagesCardState();
+}
+
+class _AvailableLanguagesCardState
+    extends ConsumerState<AvailableLanguagesCard> {
+  String? _lookupKey;
+  Future<({bool sub, bool dub})>? _availability;
+
+  @override
+  Widget build(BuildContext context) {
+    final episodes = ref.watch(episodeListProvider);
+    final firstEpisode =
+        episodes.episodes.isEmpty ? null : episodes.episodes.first;
+    final key = '${widget.mediaId}:${episodes.animeId}:${firstEpisode?.id}';
+    if (firstEpisode != null && episodes.animeId != null && key != _lookupKey) {
+      _lookupKey = key;
+      _availability = ref
+          .read(episodeDataProvider.notifier)
+          .checkLanguageAvailability(firstEpisode);
+    }
+
+    return FutureBuilder<({bool sub, bool dub})>(
+      future: _availability,
+      builder: (context, snapshot) {
+        final result = snapshot.data;
+        final loading =
+            episodes.isLoading ||
+            firstEpisode == null ||
+            snapshot.connectionState == ConnectionState.waiting;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Available languages to watch',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                _LanguageChip(
+                  label: 'Japanese (SUB)',
+                  available: result?.sub,
+                  loading: loading,
+                ),
+                _LanguageChip(
+                  label: 'English (DUB)',
+                  available: result?.dub,
+                  loading: loading,
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LanguageChip extends StatelessWidget {
+  final String label;
+  final bool? available;
+  final bool loading;
+
+  const _LanguageChip({
+    required this.label,
+    required this.available,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text =
+        loading
+            ? '$label: Checking…'
+            : '$label: ${available == true ? 'Available' : 'Unavailable'}';
+    return Chip(
+      avatar: Icon(
+        loading
+            ? Icons.hourglass_top_rounded
+            : available == true
+            ? Icons.check_circle_outline
+            : Icons.cancel_outlined,
+        size: 18,
+      ),
+      label: Text(text),
+    );
   }
 }
 

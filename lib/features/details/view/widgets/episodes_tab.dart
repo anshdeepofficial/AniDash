@@ -283,7 +283,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final episodeListState = ref.watch(episodeListProvider);
 
-    final isMatchingAnime = episodeListState.animeId == state.animeIdForSource ||
+    final isMatchingAnime =
+        episodeListState.animeId == state.animeIdForSource ||
         (episodeListState.episodes.isNotEmpty &&
             (episodeListState.animeId != null &&
                 (episodeListState.animeTitle == state.bestMatchName ||
@@ -326,7 +327,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final loading =
         episodeListState.isLoading ||
         state.isSearchingMatch ||
-        (!isMatchingAnime && hasSourceMatch && episodes.isEmpty && episodeListState.error == null);
+        (!isMatchingAnime &&
+            hasSourceMatch &&
+            episodes.isEmpty &&
+            episodeListState.error == null);
     final error = state.error ?? episodeListState.error;
 
     final exposedName = state.bestMatchName;
@@ -1150,19 +1154,23 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   ) {
     final detailsMedia =
         ref.watch(detailsPageProvider(widget.mediaId)).details.value;
-    final isMature = widget.fromHentaiHub ||
+    final isMature =
+        widget.fromHentaiHub ||
         detailsMedia?.isMature == true ||
         detailsMedia?.isAdult == true;
 
     final sourceState = ref.watch(sourceProvider);
-    final allAvailable = isMature
-        ? [
-            ...sourceState.installedAdultAnimeExtensions,
-            ...sourceState.installedAnimeExtensions.where((s) => _isSource18Plus(s)),
-          ]
-        : sourceState.installedAnimeExtensions
-            .where((s) => !_isSource18Plus(s))
-            .toList();
+    final allAvailable =
+        isMature
+            ? [
+              ...sourceState.installedAdultAnimeExtensions,
+              ...sourceState.installedAnimeExtensions.where(
+                (s) => _isSource18Plus(s),
+              ),
+            ]
+            : sourceState.installedAnimeExtensions
+                .where((s) => !_isSource18Plus(s))
+                .toList();
 
     final sources =
         allAvailable.where((s) {
@@ -1176,9 +1184,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             return (a.name ?? '').compareTo(b.name ?? '');
           });
 
-    final activeId = isMature
-        ? (sourceState.activeAdultAnimeSource?.id ?? sourceState.activeAnimeSource?.id)
-        : sourceState.activeAnimeSource?.id;
+    final activeId =
+        isMature
+            ? (sourceState.activeAdultAnimeSource?.id ??
+                sourceState.activeAnimeSource?.id)
+            : sourceState.activeAnimeSource?.id;
 
     if (sources.isEmpty) {
       return Center(
@@ -1415,6 +1425,27 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     ),
                   ),
                 const Divider(height: 20),
+                FutureBuilder<({bool sub, bool dub})>(
+                  future: ref
+                      .read(episodeDataProvider.notifier)
+                      .checkLanguageAvailability(episode),
+                  builder: (context, snapshot) {
+                    final availability = snapshot.data;
+                    return ListTile(
+                      leading: const Icon(Icons.info_outline_rounded),
+                      title: const Text('Audio availability'),
+                      subtitle:
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? const Text(
+                                'Checking Japanese SUB and English DUB…',
+                              )
+                              : Text(
+                                'Japanese (SUB): ${availability?.sub == true ? "Available" : "Unavailable"}\n'
+                                'English (DUB): ${availability?.dub == true ? "Available" : "Unavailable"}',
+                              ),
+                    );
+                  },
+                ),
                 ListTile(
                   leading: Icon(
                     isWatched

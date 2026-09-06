@@ -92,6 +92,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                   padding: const EdgeInsets.fromLTRB(0, 16, 0, 100),
                   child: DetailsContent(
                     anime: displayedAnime,
+                    mediaId: id.toString(),
                     isLoading: isLoading,
                     onMediaTap: _onMediaTap,
                   ),

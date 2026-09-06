@@ -72,6 +72,21 @@ class ControlsOverlay extends ConsumerWidget {
       child: Stack(
         children: [
           CenterControls(onInteraction: onRestartHide),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 24),
+              child: IconButton(
+                onPressed: onLockPressed,
+                icon: const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 30,
+                  color: Colors.white,
+                ),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              ),
+            ),
+          ),
           AnimatedPositioned(
             duration: duration,
             curve: curve,

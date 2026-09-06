@@ -37,14 +37,14 @@ class ContinueSection extends ConsumerWidget {
             if (finalEpisode?.isCompleted == true) return false;
             final duration = finalEpisode?.durationInSeconds ?? 0;
             final progress = finalEpisode?.progressInSeconds ?? 0;
-            if (duration > 0 && progress / duration >= 0.85) return false;
+            if (duration > 0 && progress / duration >= 0.90) return false;
 
             if (entry.currentEpisode == entry.totalEpisodes) {
               final currEp = entry.episodesProgress[entry.currentEpisode];
               if (currEp?.isCompleted == true) return false;
               final curDur = currEp?.durationInSeconds ?? 0;
               final curProg = currEp?.progressInSeconds ?? 0;
-              if (curDur > 0 && curProg / curDur >= 0.85) return false;
+              if (curDur > 0 && curProg / curDur >= 0.90) return false;
             }
           }
           return true;
@@ -89,13 +89,13 @@ class ContinueSection extends ConsumerWidget {
               final entry = validEntries[index];
               final currentEp = entry.episodesProgress[entry.currentEpisode];
 
-              // If current episode is completed (or watched > 85%), show next episode
+              // Keep resuming the current episode until it is at least 90% watched.
               final isCurrentCompleted =
                   currentEp?.isCompleted == true ||
                   ((currentEp?.durationInSeconds ?? 0) > 0 &&
                       ((currentEp?.progressInSeconds ?? 0) /
                               currentEp!.durationInSeconds!) >=
-                          0.85);
+                          0.90);
 
               final baseEp =
                   entry.currentEpisode > 0 ? entry.currentEpisode : 1;

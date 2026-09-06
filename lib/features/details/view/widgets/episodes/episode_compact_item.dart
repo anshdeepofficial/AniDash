@@ -41,6 +41,10 @@ class EpisodeCompactItem extends StatelessWidget {
     return Column(
       children: [
         ListTile(
+          tileColor:
+              episode.isFiller == true
+                  ? theme.colorScheme.primary.withValues(alpha: 0.10)
+                  : null,
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
           leading: Row(

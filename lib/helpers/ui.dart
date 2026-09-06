@@ -166,11 +166,13 @@ class UIHelper {
     if (Platform.isAndroid) {
       try {
         await _orientationChannel.invokeMethod('lockCurrent');
+        // Android locks the display's exact current rotation. Do not apply the
+        // cached Flutter orientation afterwards, because it may be the opposite
+        // landscape side and visibly flip the player before locking.
+        return;
       } catch (_) {}
     }
-    await SystemChrome.setPreferredOrientations([
-      _currentLandscape,
-    ]);
+    await SystemChrome.setPreferredOrientations([_currentLandscape]);
   }
 
   /// Lock app to portrait (outside video player)

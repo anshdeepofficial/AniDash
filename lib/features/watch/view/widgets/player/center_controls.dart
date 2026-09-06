@@ -4,7 +4,6 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
-import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 
 class CenterControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -12,27 +11,21 @@ class CenterControls extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-
-    final (isPlaying, isBuffering) = ref.watch(
-      playerStateProvider.select((p) => (p.isPlaying, p.isBuffering)),
+    final (isPlaying, isBusyPlayer) = ref.watch(
+      playerStateProvider.select(
+        (p) => (p.isPlaying, p.isBuffering || p.isSeeking || p.isOpening),
+      ),
     );
-
-    final episodeStreamState = ref.watch(
-      episodeDataProvider.select((e) => e.states),
+    final episodeStates = ref.watch(
+      episodeDataProvider.select((episode) => episode.states),
     );
     final episodesLoading = ref.watch(
-      episodeListProvider.select((e) => e.isLoading),
+      episodeListProvider.select((episodes) => episodes.isLoading),
     );
+    final isBusy = isBusyPlayer || episodesLoading || episodeStates.isNotEmpty;
 
     final playerNotifier = ref.read(playerStateProvider.notifier);
     final settings = ref.watch(playerSettingsProvider);
-
-    final isBusy = isBuffering ||
-        episodesLoading ||
-        episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
-        episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
-        episodeStreamState.contains(EpisodeStreamState.QUALITY_LOADING);
 
     return Center(
       child: Row(
@@ -66,32 +59,21 @@ class CenterControls extends ConsumerWidget {
                   child: FadeTransition(opacity: animation, child: child),
                 );
               },
-              child: isBusy
-                  ? _BorderlessLoading(
-                      key: const ValueKey('loading'),
-                      scheme: scheme,
-                      sourceLoading: episodeStreamState.contains(
-                            EpisodeStreamState.SOURCE_LOADING,
-                          ) ||
-                          episodeStreamState.contains(
-                            EpisodeStreamState.SERVER_LOADING,
-                          ) ||
-                          episodeStreamState.contains(
-                            EpisodeStreamState.QUALITY_LOADING,
-                          ),
-                      episodesLoading: episodesLoading,
-                    )
-                  : _ShadowIconButton(
-                      key: ValueKey(isPlaying ? 'pause' : 'play'),
-                      icon: isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      size: 80,
-                      onTap: () {
-                        onInteraction();
-                        playerNotifier.togglePlay();
-                      },
-                    ),
+              child:
+                  isBusy
+                      ? const SizedBox.shrink()
+                      : _ShadowIconButton(
+                        key: ValueKey(isPlaying ? 'pause' : 'play'),
+                        icon:
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                        size: 80,
+                        onTap: () {
+                          onInteraction();
+                          playerNotifier.togglePlay();
+                        },
+                      ),
             ),
           ),
 
@@ -142,26 +124,6 @@ class _ShadowIconButton extends StatelessWidget {
           Shadow(color: Colors.black26, blurRadius: 24, offset: Offset(0, 2)),
         ],
       ),
-    );
-  }
-}
-
-class _BorderlessLoading extends StatelessWidget {
-  final ColorScheme scheme;
-  final bool sourceLoading;
-  final bool episodesLoading;
-
-  const _BorderlessLoading({
-    super.key,
-    required this.scheme,
-    required this.sourceLoading,
-    required this.episodesLoading,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FetchingProgressBadge(
-      isEpisode: episodesLoading,
     );
   }
 }

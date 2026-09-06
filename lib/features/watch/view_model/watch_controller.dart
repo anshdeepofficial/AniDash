@@ -203,12 +203,15 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _pos = next.position.inSeconds;
       _dur = next.duration.inSeconds;
 
+      // Fetch skip ranges as soon as the manifest duration is known. This lets
+      // auto-skip seek before the opening frames have to begin rendering.
+      if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);
+
       if (!_isPlayerReady) {
         if (_dur == 0 || next.position.inSeconds == 0) return;
         _isPlayerReady = true;
       }
 
-      if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);
       _checkAutoSkip(next.position);
       if (_dur > 30 && _pos >= _dur - 1) triggerAutoAdvance();
 
@@ -245,6 +248,16 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       }
 
       _handlePeriodicSave();
+    });
+
+    ref.listen(aniSkipProvider, (previous, next) {
+      if (_isDisposed ||
+          !ref.read(playerSettingsProvider).enableAutoSkip ||
+          next.isEmpty) {
+        return;
+      }
+      final position = ref.read(playerStateProvider).position;
+      _checkAutoSkip(position);
     });
 
     ref.listen(episodeDataProvider.select((p) => p.selectedEpisode), (

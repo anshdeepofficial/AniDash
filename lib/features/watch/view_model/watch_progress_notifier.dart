@@ -65,7 +65,8 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         if (thumb != null) currentThumb = thumb;
       }
 
-      var entry = _repo!.getProgress(mediaId) ??
+      var entry =
+          _repo!.getProgress(mediaId) ??
           AnimeWatchProgressEntry(
             animeId: mediaId,
             animeTitle: animeName,
@@ -84,7 +85,7 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         episodeThumbnail: currentThumb,
         progressInSeconds: pos,
         durationInSeconds: dur,
-        isCompleted: dur > 0 ? (pos / dur > 0.85) : false,
+        isCompleted: dur > 0 ? (pos / dur >= 0.90) : false,
         watchedAt: DateTime.now(),
       );
 
@@ -95,7 +96,7 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
     } catch (e) {
       AppLogger.e('WatchProgressNotifier: Save failed', e);
     }
-    
+
     return currentThumb;
   }
 }

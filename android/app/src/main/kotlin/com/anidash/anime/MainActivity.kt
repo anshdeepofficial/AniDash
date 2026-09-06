@@ -66,7 +66,7 @@ class MainActivity : FlutterFragmentActivity() {
                     return
                 }
                 if (requestedOrientation != candidate &&
-                    now - pendingLandscapeSince >= 900 &&
+                    now - pendingLandscapeSince >= 840 &&
                     now - lastOrientationChangeTime >= 1200) {
                     requestedOrientation = candidate
                     lastOrientationChangeTime = now

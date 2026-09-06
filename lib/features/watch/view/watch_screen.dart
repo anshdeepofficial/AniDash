@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
+import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/features/watch/view/widgets/episodes_panel.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/shonenx_video_player.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
@@ -157,6 +158,31 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             .read(watchSyncProvider.notifier)
             .updateTracking(mediaId: widget.mediaId, episodeNum: episodeNum);
       }
+    });
+
+    ref.listen(episodeDataProvider.select((s) => s.languageNotice), (
+      previous,
+      next,
+    ) {
+      if (next == null || next == previous || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(next),
+          action: SnackBarAction(
+            label: 'WATCH SUB',
+            onPressed:
+                () => ref
+                    .read(episodeDataProvider.notifier)
+                    .changeServer(
+                      ServerData(
+                        id: 'anineko',
+                        name: 'AniNeko (HLS)',
+                        isDub: false,
+                      ),
+                    ),
+          ),
+        ),
+      );
     });
 
     return PopScope(

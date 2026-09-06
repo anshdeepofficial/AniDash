@@ -47,7 +47,17 @@ class AnikotoProvider extends AnimeProvider {
 
   @override
   Future<SearchPage> getSearch(String keyword, String? type, int page) async {
-    final query = keyword.replaceAll("-", " ");
+    var query = keyword.replaceAll("-", " ");
+    final normalized =
+        query
+            .replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim()
+            .toLowerCase();
+    // AniKoto catalogs the original 2000 film as "One Piece Movie 1".
+    if (normalized == 'one piece the movie') {
+      query = 'One Piece Movie 1';
+    }
     final url = Uri.parse("$apiUrl?m=search&q=$query");
 
     final res = await UniversalHttpClient.instance.get(url, headers: headers);

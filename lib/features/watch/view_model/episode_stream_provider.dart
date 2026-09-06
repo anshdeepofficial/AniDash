@@ -12,6 +12,7 @@ import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
 import 'package:flutter/material.dart';
 import 'package:ani_dash/router/router_config.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:ani_dash/core/models/anime/episode_model.dart';
@@ -53,6 +54,7 @@ class EpisodeDataState {
   final ServerData? selectedServer;
   final Set<EpisodeStreamState> states;
   final String? error;
+  final String? languageNotice;
 
   const EpisodeDataState({
     this.headers,
@@ -67,6 +69,7 @@ class EpisodeDataState {
     this.selectedServer,
     this.states = const {},
     this.error,
+    this.languageNotice,
   });
 
   bool get isLoading => states.isNotEmpty;
@@ -85,7 +88,9 @@ class EpisodeDataState {
     EpisodeStreamState? addState,
     EpisodeStreamState? removeState,
     String? error,
+    String? languageNotice,
     bool clearError = false,
+    bool clearLanguageNotice = false,
   }) {
     final newStates = Set<EpisodeStreamState>.from(states);
     if (removeState != null) newStates.remove(removeState);
@@ -104,6 +109,8 @@ class EpisodeDataState {
       selectedServer: selectedServer ?? this.selectedServer,
       states: newStates,
       error: clearError ? null : (error ?? this.error),
+      languageNotice:
+          clearLanguageNotice ? null : (languageNotice ?? this.languageNotice),
     );
   }
 }
@@ -140,6 +147,7 @@ class EpisodeData extends _$EpisodeData {
       selectedEpisode: ep,
       addState: play ? EpisodeStreamState.SOURCE_LOADING : null,
       clearError: true,
+      clearLanguageNotice: true,
     );
 
     // Server lists are useful for manual switching, but they must not hold the
@@ -722,20 +730,81 @@ class EpisodeData extends _$EpisodeData {
       if (data == null || data.sources.isEmpty) {
         throw StateError('No playable sources found');
       }
+      final requestedDub = state.selectedServer?.isDub == true;
+      final fellBackToSub =
+          requestedDub && !data.sources.any((source) => source.isDub);
       state = state.copyWith(
         sources: data.sources,
         subtitles: [Subtitle(lang: 'None'), ...data.tracks],
         headers: data.headers?.cast<String, String>(),
+        selectedServer:
+            fellBackToSub ? state.selectedServer?.copyWith(isDub: false) : null,
+        languageNotice:
+            fellBackToSub
+                ? 'English DUB is not available. Japanese audio with subtitles is available.'
+                : null,
       );
       try {
         await _loadSourceStream(0, startAt: startAt);
       } catch (primaryError) {
-        AppLogger.w('Primary stream stalled; trying another provider');
+        AppLogger.w('Primary stream stalled; trying alternate stream');
+        if (state.selectedServer?.isDub == true && _provider != null) {
+          try {
+            final subFallback = await _provider!
+                .getSources(
+                  _epList.animeId ?? '',
+                  epModel.id ?? epNum.toString(),
+                  state.selectedServer?.id,
+                  'sub',
+                )
+                .timeout(const Duration(seconds: 8));
+            if (subFallback.sources.any((source) => !source.isDub)) {
+              state = state.copyWith(
+                sources: subFallback.sources,
+                subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
+                headers: subFallback.headers?.cast<String, String>(),
+                selectedServer: state.selectedServer?.copyWith(isDub: false),
+                languageNotice:
+                    'English DUB is unavailable or invalid. Playing Japanese audio with subtitles.',
+              );
+              await _loadSourceStream(0, startAt: startAt);
+              return;
+            }
+          } catch (_) {}
+        }
+
+        var alternateStarted = false;
+        for (var index = 1; index < state.sources.length; index++) {
+          try {
+            await _loadSourceStream(index, startAt: startAt);
+            alternateStarted = true;
+            break;
+          } catch (_) {}
+        }
+        if (alternateStarted) return;
+
         final category = state.selectedServer?.isDub == true ? 'dub' : 'sub';
-        final fallback = await _fetchFallbackNativeSourceData(
-          epModel,
-          category,
-        );
+        BaseSourcesModel? fallback;
+
+        // JustAnime's HLS host can return a valid playlist while never
+        // delivering playable frames on a device. Retry its independent MP4
+        // server before changing the user's selected provider.
+        if (_isNativeProvider && _provider?.providerName == 'justanime') {
+          try {
+            fallback = await _provider!
+                .getSources(
+                  _epList.animeId ?? '',
+                  epModel.id ?? epNum.toString(),
+                  'animegg',
+                  category,
+                )
+                .timeout(const Duration(seconds: 8));
+          } catch (e) {
+            AppLogger.w('JustAnime MP4 recovery failed: $e');
+          }
+        }
+
+        fallback ??= await _fetchFallbackNativeSourceData(epModel, category);
         if (fallback == null || fallback.sources.isEmpty) rethrow;
         state = state.copyWith(
           sources: fallback.sources,
@@ -754,6 +823,33 @@ class EpisodeData extends _$EpisodeData {
     }
   }
 
+  Future<({bool sub, bool dub})> checkLanguageAvailability(
+    EpisodeDataModel episode,
+  ) async {
+    final provider = _provider;
+    final animeId = _epList.animeId;
+    if (provider == null || animeId == null || animeId.isEmpty) {
+      return (sub: true, dub: false);
+    }
+    final episodeId = episode.id ?? episode.number?.toString() ?? '1';
+
+    Future<bool> hasAudio(String audio) async {
+      try {
+        final result = await provider
+            .getSources(animeId, episodeId, null, audio)
+            .timeout(const Duration(seconds: 10));
+        return audio == 'dub'
+            ? result.sources.any((source) => source.isDub)
+            : result.sources.any((source) => !source.isDub);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final availability = await Future.wait([hasAudio('sub'), hasAudio('dub')]);
+    return (sub: availability[0], dub: availability[1]);
+  }
+
   Future<void> _loadSourceStream(
     int sourceIdx, {
     required Duration startAt,
@@ -769,8 +865,13 @@ class EpisodeData extends _$EpisodeData {
       // Check if the primary source is M3U8 (master playlist with multiple qualities)
       final primarySrc = state.sources[sourceIdx];
       final streamHeaders = {...?state.headers, ...?primarySrc.headers};
+      final hasDiscreteVariants =
+          state.sources
+              .where((source) => source.url?.isNotEmpty == true)
+              .length >
+          1;
 
-      if (primarySrc.isM3U8) {
+      if (primarySrc.isM3U8 && !hasDiscreteVariants) {
         // Start with Auto/primary quality immediately so playback launches in 1-2s
         allQualities.add({
           'quality': primarySrc.quality ?? 'Auto',
@@ -824,9 +925,10 @@ class EpisodeData extends _$EpisodeData {
       // Pick best match for preferred quality
       final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
       int qIdx;
-      if (prefQuality.toLowerCase() == 'auto' && !primarySrc.isM3U8) {
-        // Direct files cannot adapt bitrate like HLS. Start Auto at a
-        // network-safe resolution and leave higher qualities user-selectable.
+      if (prefQuality.toLowerCase() == 'auto' &&
+          (!primarySrc.isM3U8 || hasDiscreteVariants)) {
+        // Separate files/playlists cannot adapt bitrate themselves. Start Auto
+        // at a network-safe resolution and leave higher qualities selectable.
         qIdx = allQualities.indexWhere(
           (q) => RegExp(r'(^|\D)480(\D|$)').hasMatch(q['quality'] as String),
         );
@@ -850,26 +952,47 @@ class EpisodeData extends _$EpisodeData {
         '(${allQualities.length} quality options available)',
       );
 
+      var playbackUrl = allQualities[qIdx]['url'] as String;
+      if (_isNativeProvider &&
+          _provider?.providerName == 'justanime' &&
+          playbackUrl.contains('.m3u8')) {
+        try {
+          final response = await HttpClient()
+              .getUrl(Uri.parse(playbackUrl))
+              .then((request) {
+                streamHeaders.forEach(request.headers.set);
+                return request.close();
+              })
+              .timeout(const Duration(seconds: 8));
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            final manifest = await response.transform(utf8.decoder).join();
+            if (manifest.startsWith('#EXTM3U')) {
+              final dir = await getTemporaryDirectory();
+              final file = File('${dir.path}/anidash_active_stream.m3u8');
+              await file.writeAsString(manifest, flush: true);
+              playbackUrl = file.path;
+            }
+          }
+        } catch (error) {
+          AppLogger.w('HLS manifest handoff failed; using remote URL: $error');
+        }
+      }
+
       await _player
-          .open(
-            allQualities[qIdx]['url'] as String,
-            startAt,
-            headers: streamHeaders,
-          )
+          .open(playbackUrl, startAt, headers: streamHeaders)
           .timeout(const Duration(seconds: 15));
 
-      // Probe stream to detect startup, without blocking playback if buffering
-      try {
-        await Future.any([
-          _player.videoController.player.stream.position.firstWhere(
-            (position) => position > Duration.zero,
-          ),
-          _player.videoController.player.stream.duration.firstWhere(
-            (duration) => duration > Duration.zero,
-          ),
-        ]).timeout(const Duration(milliseconds: 800));
-      } catch (_) {
-        AppLogger.d('Stream startup probe passed without blocking');
+      // A duration alone only proves that the manifest was parsed. Require
+      // actual playback progress so a dead HLS host cannot leave a black
+      // screen forever instead of activating server recovery.
+      await _player.videoController.player.stream.position
+          .firstWhere((position) => position > Duration.zero)
+          .timeout(const Duration(seconds: 8));
+
+      final openedDuration = _player.videoController.player.state.duration;
+      if (openedDuration > Duration.zero &&
+          openedDuration <= const Duration(seconds: 30)) {
+        throw StateError('Source returned an invalid short preview stream');
       }
 
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
@@ -887,7 +1010,7 @@ class EpisodeData extends _$EpisodeData {
       );
 
       // In background, extract sub-qualities for M3U8 without delaying playback start
-      if (primarySrc.isM3U8) {
+      if (primarySrc.isM3U8 && !hasDiscreteVariants) {
         _getQualities(primarySrc, streamHeaders)
             .then((extracted) {
               if (extracted.isNotEmpty) {

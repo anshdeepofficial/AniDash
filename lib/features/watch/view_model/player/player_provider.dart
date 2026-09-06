@@ -93,6 +93,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Duration? _pendingSeekTarget;
   Timer? _seekTimeout;
   Timer? _startupTimer;
+  bool _userPaused = false;
 
   Player get player => _player;
 
@@ -163,23 +164,24 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.position.listen((pos) {
-        if (_player.state.duration > Duration.zero) {
-          final target = _pendingSeekTarget;
-          final landed =
-              target != null &&
-              (pos - target).abs() <= const Duration(seconds: 2);
-          if (landed) {
-            _pendingSeekTarget = null;
-            _seekTimeout?.cancel();
-          }
-          state = state.copyWith(
-            position: pos,
-            isSeeking: landed ? false : null,
-            isOpening: pos > Duration.zero ? false : null,
-          );
-          if (_recoveryAttempts > 0 && pos.inSeconds % 30 == 0) {
-            _recoveryAttempts = 0;
-          }
+        if (pos > Duration.zero) {
+          _startupTimer?.cancel();
+        }
+        final target = _pendingSeekTarget;
+        final landed =
+            target != null &&
+            (pos - target).abs() <= const Duration(seconds: 2);
+        if (landed) {
+          _pendingSeekTarget = null;
+          _seekTimeout?.cancel();
+        }
+        state = state.copyWith(
+          position: pos,
+          isSeeking: landed ? false : null,
+          isOpening: pos > Duration.zero ? false : null,
+        );
+        if (_recoveryAttempts > 0 && pos.inSeconds % 30 == 0) {
+          _recoveryAttempts = 0;
         }
       }),
     );
@@ -216,7 +218,18 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       stream.subtitle.listen((subs) => state = state.copyWith(subtitle: subs)),
     );
 
-    _subs.add(stream.error.listen((_) => _recoverPlayback()));
+    _subs.add(
+      stream.error.listen((error) {
+        // HLS may emit recoverable segment/network warnings while playback is
+        // already progressing. Reopening on every warning causes blackouts.
+        // Only perform full recovery when media never started at all.
+        if (!state.isOpening &&
+            _player.state.position == Duration.zero &&
+            _player.state.duration == Duration.zero) {
+          _recoverPlayback();
+        }
+      }),
+    );
   }
 
   Future<void> _recoverPlayback() async {
@@ -236,7 +249,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       await _player.open(
         Media(url, httpHeaders: _lastHeaders, start: resumeAt),
-        play: true,
+        play: !_userPaused,
       );
       if (resumeAt > Duration.zero) await _player.seek(resumeAt);
     } catch (_) {
@@ -274,6 +287,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _lastUrl = url;
     _lastHeaders = effectiveHeaders;
     _recoveryAttempts = 0;
+    _userPaused = false;
     state = state.copyWith(
       isOpening: true,
       clearPlaybackError: true,
@@ -293,6 +307,11 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       final platform = _player.platform as dynamic;
       await platform.setProperty('user-agent', effectiveHeaders['User-Agent']!);
       await platform.setProperty('referrer', effectiveHeaders['Referer'] ?? '');
+      final forwardedHeaders = effectiveHeaders.entries
+          .where((entry) => entry.key.toLowerCase() != 'user-agent')
+          .map((entry) => '${entry.key}: ${entry.value}')
+          .join(',');
+      await platform.setProperty('http-header-fields', forwardedHeaders);
     } catch (_) {}
     await _player.open(
       Media(url, httpHeaders: effectiveHeaders, start: startAt),
@@ -322,7 +341,13 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   Future<void> togglePlay() async {
-    _player.state.playing ? await _player.pause() : await _player.play();
+    if (_player.state.playing) {
+      _userPaused = true;
+      await _player.pause();
+    } else {
+      _userPaused = false;
+      await _player.play();
+    }
   }
 
   Future<void> play() => _player.play();
