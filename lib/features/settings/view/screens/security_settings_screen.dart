@@ -62,11 +62,33 @@ class SecuritySettingsScreen extends ConsumerWidget {
                 value: security.appLockEnabled,
                 onChanged: (val) async {
                   if (val) {
+                    final type = await showDialog<String>(
+                      context: context,
+                      builder:
+                          (dialogContext) => SimpleDialog(
+                            title: const Text('Choose lock method'),
+                            children:
+                                ['pin4', 'pin6', 'password', 'pattern']
+                                    .map(
+                                      (method) => SimpleDialogOption(
+                                        onPressed:
+                                            () => Navigator.pop(
+                                              dialogContext,
+                                              method,
+                                            ),
+                                        child: Text(_typeLabel(method)),
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                    );
+                    if (type == null || !context.mounted) return;
+                    notifier.setPreferredAppLockType(type);
                     final pin = await PinLockDialog.showSetup(
                       context: context,
-                      title: 'Set App PIN',
-                      credentialLength: _length(security.appLockType),
-                      allowLetters: _letters(security.appLockType),
+                      title: 'Set ${_typeLabel(type)}',
+                      credentialLength: _length(type),
+                      allowLetters: _letters(type),
                     );
                     if (pin != null && pin.isNotEmpty) {
                       notifier.setAppLock(true, pin);

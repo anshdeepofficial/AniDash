@@ -302,26 +302,26 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<void> downloadEpisode(BuildContext context, int epNum) async {
-    if (!_isValidEp(epNum) || _epList.animeId == null) return;
-
-    final ep = _epList.episodes.firstWhereOrNull((i) => i.number == epNum);
-    if (ep == null) return;
-
-    final dlSettings = ref.read(downloadSettingsProvider);
-    if (dlSettings.rememberDownloadPreferences) {
-      await _directDownloadSingle(
-        context,
-        ep,
-        dlSettings.preferredLanguage,
-        dlSettings.preferredQuality,
-      );
-      return;
-    }
-
     final link = ref.keepAlive();
-    AppLogger.section('Initializing Download for Ep $epNum');
-
     try {
+      if (!_isValidEp(epNum) || _epList.animeId == null) return;
+
+      final ep = _epList.episodes.firstWhereOrNull((i) => i.number == epNum);
+      if (ep == null) return;
+
+      final dlSettings = ref.read(downloadSettingsProvider);
+      if (dlSettings.rememberDownloadPreferences) {
+        await _directDownloadSingle(
+          context,
+          ep,
+          dlSettings.preferredLanguage,
+          dlSettings.preferredQuality,
+        );
+        return;
+      }
+
+      AppLogger.section('Initializing Download for Ep $epNum');
+
       _showLoading(context);
       final servers = await _getRawServers(ep);
       if (!context.mounted) return;
@@ -623,7 +623,8 @@ class EpisodeData extends _$EpisodeData {
       // Allow episode 1 for movies/single-episode media
       return ep == 1;
     }
-    return _epList.episodes.any((i) => i.number == ep) || (ep == 1 && _epList.episodes.isEmpty);
+    return _epList.episodes.any((i) => i.number == ep) ||
+        (ep == 1 && _epList.episodes.isEmpty);
   }
 
   Future<List<ServerData>> _getRawServers(EpisodeDataModel ep) async {
@@ -1087,12 +1088,13 @@ class EpisodeData extends _$EpisodeData {
     final result = Completer<BaseSourcesModel?>();
     var completed = 0;
 
-    final cleanTitle = (_epList.animeTitle ?? '')
-        .replaceAll(':', ' ')
-        .replaceAll('-', ' ')
-        .replaceAll(RegExp(r'[^\w\s]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final cleanTitle =
+        (_epList.animeTitle ?? '')
+            .replaceAll(':', ' ')
+            .replaceAll('-', ' ')
+            .replaceAll(RegExp(r'[^\w\s]'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
 
     for (final altKey in candidateKeys) {
       () async {

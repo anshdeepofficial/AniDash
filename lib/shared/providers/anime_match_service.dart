@@ -196,8 +196,13 @@ class AnimeMatchService {
                   .map(
                     (item) => BaseAnimeModel(
                       id: item.id,
+                      anilistId: item.anilistId,
                       name: item.name,
+                      jname: item.jname,
+                      type: item.type,
                       poster: item.poster,
+                      releaseDate: item.releaseDate,
+                      number: item.number,
                     ),
                   )
                   .toList();

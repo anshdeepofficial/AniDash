@@ -464,6 +464,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final isBusy =
         state.isBuffering ||
         state.isSeeking ||
+        state.isOpening ||
         episodesLoading ||
         episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
         episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
@@ -555,11 +556,54 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 isLocal: widget.localFilePath != null,
               ),
 
-              // Standalone Loading Indicator when controls are hidden
-              if (isBusy && !uiState.isVisible)
-                const Center(
+              if (state.playbackError != null)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          state.playbackError!,
+                          style: const TextStyle(color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: notifier.retry,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (isBusy)
+                Center(
                   child: IgnorePointer(
-                    child: FetchingProgressBadge(isEpisode: false),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const FetchingProgressBadge(isEpisode: false),
+                        if (state.isOpening) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Starting video…',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
 

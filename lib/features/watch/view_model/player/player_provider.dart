@@ -17,6 +17,8 @@ class PlayerState {
   final bool isPlaying;
   final bool isBuffering;
   final bool isSeeking;
+  final bool isOpening;
+  final String? playbackError;
   final double playbackSpeed;
   final List<String> subtitle;
   final BoxFit fit;
@@ -28,6 +30,8 @@ class PlayerState {
     required this.isPlaying,
     required this.isBuffering,
     required this.isSeeking,
+    required this.isOpening,
+    this.playbackError,
     required this.playbackSpeed,
     required this.subtitle,
     required this.fit,
@@ -40,6 +44,7 @@ class PlayerState {
     isPlaying: false,
     isBuffering: false,
     isSeeking: false,
+    isOpening: false,
     playbackSpeed: 1.0,
     subtitle: [],
     fit: BoxFit.contain,
@@ -52,6 +57,9 @@ class PlayerState {
     bool? isPlaying,
     bool? isBuffering,
     bool? isSeeking,
+    bool? isOpening,
+    String? playbackError,
+    bool clearPlaybackError = false,
     double? playbackSpeed,
     List<String>? subtitle,
     BoxFit? fit,
@@ -63,6 +71,9 @@ class PlayerState {
       isPlaying: isPlaying ?? this.isPlaying,
       isBuffering: isBuffering ?? this.isBuffering,
       isSeeking: isSeeking ?? this.isSeeking,
+      isOpening: isOpening ?? this.isOpening,
+      playbackError:
+          clearPlaybackError ? null : (playbackError ?? this.playbackError),
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       subtitle: subtitle ?? this.subtitle,
       fit: fit ?? this.fit,
@@ -81,6 +92,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   bool _isRecovering = false;
   Duration? _pendingSeekTarget;
   Timer? _seekTimeout;
+  Timer? _startupTimer;
 
   Player get player => _player;
 
@@ -163,6 +175,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           state = state.copyWith(
             position: pos,
             isSeeking: landed ? false : null,
+            isOpening: pos > Duration.zero ? false : null,
           );
           if (_recoveryAttempts > 0 && pos.inSeconds % 30 == 0) {
             _recoveryAttempts = 0;
@@ -172,7 +185,13 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     );
 
     _subs.add(
-      stream.duration.listen((dur) => state = state.copyWith(duration: dur)),
+      stream.duration.listen((dur) {
+        state = state.copyWith(
+          duration: dur,
+          isOpening: dur > Duration.zero ? false : null,
+        );
+        if (dur > Duration.zero) _startupTimer?.cancel();
+      }),
     );
 
     _subs.add(
@@ -202,7 +221,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
   Future<void> _recoverPlayback() async {
     final url = _lastUrl;
-    if (url == null || _isRecovering || _recoveryAttempts >= 2) return;
+    if (url == null || _isRecovering) return;
+    if (_recoveryAttempts >= 2) {
+      state = state.copyWith(
+        isOpening: false,
+        playbackError: 'Video could not start. Check the source or retry.',
+      );
+      return;
+    }
     _isRecovering = true;
     _recoveryAttempts++;
     final resumeAt = _player.state.position;
@@ -222,6 +248,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
   void _dispose() {
     _seekTimeout?.cancel();
+    _startupTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
@@ -247,6 +274,21 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _lastUrl = url;
     _lastHeaders = effectiveHeaders;
     _recoveryAttempts = 0;
+    state = state.copyWith(
+      isOpening: true,
+      clearPlaybackError: true,
+      position: Duration.zero,
+      duration: Duration.zero,
+    );
+    _startupTimer?.cancel();
+    _startupTimer = Timer(const Duration(seconds: 18), () {
+      if (state.isOpening) {
+        state = state.copyWith(
+          isOpening: false,
+          playbackError: 'Video startup timed out. Tap Retry to try again.',
+        );
+      }
+    });
     try {
       final platform = _player.platform as dynamic;
       await platform.setProperty('user-agent', effectiveHeaders['User-Agent']!);
@@ -271,6 +313,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     } catch (_) {
       await _player.seek(startAt);
     }
+  }
+
+  Future<void> retry() async {
+    final url = _lastUrl;
+    if (url == null) return;
+    await open(url, _player.state.position, headers: _lastHeaders);
   }
 
   Future<void> togglePlay() async {
