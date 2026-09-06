@@ -12,7 +12,6 @@ import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
 import 'package:flutter/material.dart';
 import 'package:ani_dash/router/router_config.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:ani_dash/core/models/anime/episode_model.dart';
@@ -952,31 +951,10 @@ class EpisodeData extends _$EpisodeData {
         '(${allQualities.length} quality options available)',
       );
 
-      var playbackUrl = allQualities[qIdx]['url'] as String;
-      if (_isNativeProvider &&
-          _provider?.providerName == 'justanime' &&
-          playbackUrl.contains('.m3u8')) {
-        try {
-          final response = await HttpClient()
-              .getUrl(Uri.parse(playbackUrl))
-              .then((request) {
-                streamHeaders.forEach(request.headers.set);
-                return request.close();
-              })
-              .timeout(const Duration(seconds: 8));
-          if (response.statusCode >= 200 && response.statusCode < 300) {
-            final manifest = await response.transform(utf8.decoder).join();
-            if (manifest.startsWith('#EXTM3U')) {
-              final dir = await getTemporaryDirectory();
-              final file = File('${dir.path}/anidash_active_stream.m3u8');
-              await file.writeAsString(manifest, flush: true);
-              playbackUrl = file.path;
-            }
-          }
-        } catch (error) {
-          AppLogger.w('HLS manifest handoff failed; using remote URL: $error');
-        }
-      }
+      // Always hand the original HLS URL to mpv. Saving a live playlist as a
+      // local file freezes its segment window and breaks relative segment URLs;
+      // after the cached entries run out mpv stalls and reopens near startAt.
+      final playbackUrl = allQualities[qIdx]['url'] as String;
 
       await _player
           .open(playbackUrl, startAt, headers: streamHeaders)

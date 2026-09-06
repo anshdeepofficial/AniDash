@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
 
 part 'player_provider.g.dart';
 
@@ -88,12 +88,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   final List<StreamSubscription> _subs = [];
   String? _lastUrl;
   Map<String, String>? _lastHeaders;
-  int _recoveryAttempts = 0;
-  bool _isRecovering = false;
   Duration? _pendingSeekTarget;
   Timer? _seekTimeout;
   Timer? _startupTimer;
-  bool _userPaused = false;
 
   Player get player => _player;
 
@@ -117,29 +114,20 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Apply optimized fast-seeking and stream cache defaults
+    // Apply optimized stream cache defaults matching ShonenX
     final fastProperties = <String, String>{
+      'hwdec': 'auto-safe',
       'cache': 'yes',
-      'cache-pause': 'yes',
-      // Keep enough media queued before resuming after an underrun. A
-      // one-second target made weak connections alternate between playing and
-      // buffering every few seconds.
-      'cache-pause-wait': '8',
-      // With cache enabled this is the real time-based forward-buffer limit;
-      // demuxer-readahead-secs alone is mostly ignored by mpv.
-      'cache-secs': '30',
-      'demuxer-thread': 'yes',
-      'demuxer-lavf-o':
-          'reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,'
-          'reconnect_on_http_error=%7%4xx,5xx,reconnect_delay_max=5,'
-          'reconnect_delay_total_max=15',
-      'demuxer-max-bytes': '$effectiveBufferBytes',
-      // Continuously retain about twenty seconds ahead of the playhead.
-      'demuxer-readahead-secs': '20',
+      'demuxer-seekable-cache': 'yes',
+      'demuxer-max-bytes': '154857600',
+      'demuxer-max-back-bytes': '52428800',
+      'demuxer-lavf-probesize': '5000000',
+      'demuxer-lavf-analyzeduration': '5000000',
+      'cache-secs': '60',
+      'demuxer-readahead-secs': '60',
+      'force-seekable': 'yes',
       'hr-seek': 'default',
       'hr-seek-framedrop': 'yes',
-      'force-seekable': 'yes',
-      'network-timeout': '10',
     };
 
     final platform = _player.platform as dynamic;
@@ -159,9 +147,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     videoController = VideoController(
       _player,
-      configuration: VideoControllerConfiguration(
-        androidAttachSurfaceAfterVideoParameters:
-            Platform.isAndroid ? true : null,
+      configuration: const VideoControllerConfiguration(
+        enableHardwareAcceleration: true,
       ),
     );
 
@@ -193,9 +180,6 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           isSeeking: landed ? false : null,
           isOpening: pos > Duration.zero ? false : null,
         );
-        if (_recoveryAttempts > 0 && pos.inSeconds % 30 == 0) {
-          _recoveryAttempts = 0;
-        }
       }),
     );
 
@@ -233,43 +217,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.error.listen((error) {
-        // HLS may emit recoverable segment/network warnings while playback is
-        // already progressing. Reopening on every warning causes blackouts.
-        // Only perform full recovery when media never started at all.
-        if (!state.isOpening &&
-            _player.state.position == Duration.zero &&
-            _player.state.duration == Duration.zero) {
-          _recoverPlayback();
-        }
+        AppLogger.w('Player stream warning/error: $error');
       }),
     );
-  }
-
-  Future<void> _recoverPlayback() async {
-    final url = _lastUrl;
-    if (url == null || _isRecovering) return;
-    if (_recoveryAttempts >= 2) {
-      state = state.copyWith(
-        isOpening: false,
-        playbackError: 'Video could not start. Check the source or retry.',
-      );
-      return;
-    }
-    _isRecovering = true;
-    _recoveryAttempts++;
-    final resumeAt = _player.state.position;
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      await _player.open(
-        Media(url, httpHeaders: _lastHeaders, start: resumeAt),
-        play: !_userPaused,
-      );
-      if (resumeAt > Duration.zero) await _player.seek(resumeAt);
-    } catch (_) {
-      // A second fatal error may retry once more through the error stream.
-    } finally {
-      _isRecovering = false;
-    }
   }
 
   void _dispose() {
@@ -299,8 +249,6 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     }
     _lastUrl = url;
     _lastHeaders = effectiveHeaders;
-    _recoveryAttempts = 0;
-    _userPaused = false;
     state = state.copyWith(
       isOpening: true,
       clearPlaybackError: true,
@@ -330,21 +278,6 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       Media(url, httpHeaders: effectiveHeaders, start: startAt),
       play: true,
     );
-
-    if (startAt == null || startAt == Duration.zero) return;
-
-    try {
-      if (_player.state.duration == Duration.zero) {
-        await _player.stream.duration
-            .firstWhere((duration) => duration > Duration.zero)
-            .timeout(const Duration(seconds: 10));
-      }
-      if ((_player.state.position - startAt).inSeconds.abs() > 3) {
-        await _player.seek(startAt);
-      }
-    } catch (_) {
-      await _player.seek(startAt);
-    }
   }
 
   Future<void> retry() async {
@@ -354,13 +287,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   Future<void> togglePlay() async {
-    if (_player.state.playing) {
-      _userPaused = true;
-      await _player.pause();
-    } else {
-      _userPaused = false;
-      await _player.play();
-    }
+    _player.state.playing ? await _player.pause() : await _player.play();
   }
 
   Future<void> play() => _player.play();

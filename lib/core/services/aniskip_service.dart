@@ -61,7 +61,26 @@ class AniSkipService {
     List<AniSkipResultItem> results,
     int episodeLength,
   ) {
-    if (episodeLength <= 0) return const [];
+    if (episodeLength <= 0) {
+      // Preliminary lookup used before the player opens. Only accept a
+      // conservative opening near the beginning; duration-aware validation
+      // runs again once the real manifest duration is known.
+      return results
+          .where((item) {
+            final interval = item.interval;
+            if (interval == null) return false;
+            final isOpening =
+                item.skipType == SkipType.op || item.skipType == SkipType.mixed;
+            final length = interval.endTime - interval.startTime;
+            return isOpening &&
+                interval.startTime >= 0 &&
+                interval.startTime <= 180 &&
+                interval.endTime > interval.startTime &&
+                interval.endTime <= 600 &&
+                length <= 300;
+          })
+          .toList(growable: false);
+    }
     return results
         .where((item) {
           final interval = item.interval;

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -36,9 +37,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   String? _epTitle, _epThumb;
 
   int _lastSavedPos = -1;
-  int _lastScreenshotPos = -1;
   bool _trackingTriggered = false;
   bool _hasAutoAdvanced = false;
+  bool _hasAutoSkippedIntro = false;
   bool _fromHentaiHub = false;
   bool _prefetchTriggered = false;
   bool _nextPromptTriggered = false;
@@ -139,6 +140,41 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
             (savedDuration > 0 && savedSeconds >= savedDuration - 10))) {
       startAt = Duration(seconds: savedSeconds);
       AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
+    }
+
+    final playerSettings = ref.read(playerSettingsProvider);
+    if (playerSettings.enableAniSkip && playerSettings.enableAutoSkip) {
+      try {
+        await ref
+            .read(aniSkipProvider.notifier)
+            .fetchSkipTimes(
+              mediaId: mediaId,
+              animeTitle: _animeName ?? '',
+              episodeNumber: initialEpisode,
+              episodeLength: 0,
+            )
+            .timeout(const Duration(seconds: 4));
+
+        final opening =
+            ref.read(aniSkipProvider).where((item) {
+              final interval = item.interval;
+              return interval != null &&
+                  (item.skipType == SkipType.op ||
+                      item.skipType == SkipType.mixed) &&
+                  interval.startTime <= 180 &&
+                  interval.endTime <= 600;
+            }).firstOrNull;
+        final introEnd = opening?.interval?.endTime.toInt();
+        if (introEnd != null && introEnd > startAt.inSeconds) {
+          startAt = Duration(seconds: introEnd + 1);
+          _hasAutoSkippedIntro = true;
+          AppLogger.i(
+            'Auto Skip: opening stream after intro at ${startAt.inSeconds}s',
+          );
+        }
+      } catch (error) {
+        AppLogger.d('Pre-play intro lookup skipped: $error');
+      }
     }
 
     await ref
@@ -270,6 +306,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       }
 
       if (next != null) {
+        _hasAutoSkippedIntro = false;
         _epNum = next;
         _pos = 0;
         _dur = 0;
@@ -291,14 +328,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
   Future<void> _handlePeriodicSave() async {
     if (_lastSavedPos == -1) _lastSavedPos = _pos;
-    if (_lastScreenshotPos == -1) _lastScreenshotPos = _pos;
 
     if ((_pos - _lastSavedPos).abs() >= 5) {
       _lastSavedPos = _pos;
-      final bool captureScreenshot = (_pos - _lastScreenshotPos).abs() >= 15;
-
-      if (captureScreenshot) _lastScreenshotPos = _pos;
-      _triggerSave(takeScreenshot: captureScreenshot);
+      _triggerSave(takeScreenshot: false);
     }
   }
 
@@ -358,6 +391,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
     for (final skip in skips) {
       if (skip.interval == null) continue;
+      final isIntro =
+          skip.skipType == SkipType.op || skip.skipType == SkipType.mixed;
+      if (isIntro && _hasAutoSkippedIntro) continue;
+
       final start = Duration(seconds: skip.interval!.startTime.toInt());
       final end = Duration(seconds: skip.interval!.endTime.toInt() + 1);
 
@@ -374,6 +411,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           length.inSeconds <= (_dur * 0.25);
 
       if (validType && validTiming && position >= start && position < end) {
+        if (isIntro) _hasAutoSkippedIntro = true;
         ref.read(playerStateProvider.notifier).seek(end);
         return;
       }
