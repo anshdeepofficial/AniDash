@@ -275,8 +275,9 @@ Future<DownloadItem> _processM3U8(
   );
   task.port.send(currentItem);
 
-  final batchSize =
-      task.settings.parallelDownloads > 0 ? task.settings.parallelDownloads : 6;
+  // HLS segments are small. Keep enough requests in flight to saturate fast
+  // Wi-Fi while capping concurrency to avoid provider throttling.
+  final workerCount = task.settings.parallelDownloads.clamp(8, 12);
   int completed = 0;
   int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();
@@ -291,43 +292,39 @@ Future<DownloadItem> _processM3U8(
 
   final throttler = _Throttler(task.settings.speedLimitKBps);
 
-  for (var i = 0; i < segments.length; i += batchSize) {
-    if (isCancelled()) break;
+  var nextSegment = 0;
+  Future<void> worker() async {
+    while (!isCancelled()) {
+      final index = nextSegment++;
+      if (index >= segments.length) return;
+      final seg = segments[index];
+      final file = File(p.join(tempDir.path, '${seg.index}.ts'));
+      if (await file.exists()) continue;
 
-    final end =
-        (i + batchSize < segments.length) ? i + batchSize : segments.length;
-    final batch = segments.sublist(i, end);
+      final bytes = await _fetch(seg.url, task.item.headers, client);
+      if (bytes == null) continue;
+      final data =
+          seg.key != null
+              ? _decrypt(bytes, seg.key!, seg.iv, seg.index)
+              : bytes;
+      await file.writeAsBytes(data);
+      completed++;
+      downloadedBytesTotal += data.length;
+      await throttler.throttle(data.length);
 
-    await Future.wait(
-      batch.map((seg) async {
-        if (isCancelled()) return;
-        final file = File(p.join(tempDir.path, '${seg.index}.ts'));
-        if (await file.exists()) return;
-
-        final bytes = await _fetch(seg.url, task.item.headers, client);
-        if (bytes != null) {
-          final data =
-              seg.key != null
-                  ? _decrypt(bytes, seg.key!, seg.iv, seg.index)
-                  : bytes;
-          await file.writeAsBytes(data);
-          completed++;
-          downloadedBytesTotal += data.length;
-          await throttler.throttle(data.length);
-        }
-      }),
-    );
-
-    if (DateTime.now().difference(lastLog).inMilliseconds > 1000) {
-      task.port.send(
-        currentItem.copyWith(
-          progress: completed,
-          downloadedBytes: downloadedBytesTotal,
-        ),
-      );
-      lastLog = DateTime.now();
+      if (DateTime.now().difference(lastLog).inMilliseconds > 300) {
+        task.port.send(
+          currentItem.copyWith(
+            progress: completed,
+            downloadedBytes: downloadedBytesTotal,
+          ),
+        );
+        lastLog = DateTime.now();
+      }
     }
   }
+
+  await Future.wait(List.generate(workerCount, (_) => worker()));
 
   if (isCancelled()) throw Exception("Cancelled");
 
@@ -468,7 +465,7 @@ Future<Uint8List?> _fetch(String url, Map headers, http.Client client) async {
     try {
       final res = await client
           .get(Uri.parse(url), headers: headers.cast())
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) return res.bodyBytes;
     } catch (_) {
       await Future.delayed(Duration(seconds: i + 1));
