@@ -46,12 +46,10 @@ class DetailsPageState {
     return DetailsPageState(
       details: details ?? this.details,
       isSearchingMatch: isSearchingMatch ?? this.isSearchingMatch,
-      bestMatchName: setBestMatchNull
-          ? null
-          : (bestMatchName ?? this.bestMatchName),
-      animeIdForSource: setBestMatchNull
-          ? null
-          : (animeIdForSource ?? this.animeIdForSource),
+      bestMatchName:
+          setBestMatchNull ? null : (bestMatchName ?? this.bestMatchName),
+      animeIdForSource:
+          setBestMatchNull ? null : (animeIdForSource ?? this.animeIdForSource),
       selectedRange: selectedRange ?? this.selectedRange,
       rangeOptions: rangeOptions ?? this.rangeOptions,
       isSortedDescending: isSortedDescending ?? this.isSortedDescending,
@@ -80,14 +78,36 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
     try {
       final repo = ref.read(animeRepositoryProvider);
-      final fresh = await repo.getAnimeDetails(int.tryParse(animeId) ?? 0);
+      final detailsId =
+          int.tryParse(animeId) ??
+          int.tryParse(currentData?.idMal ?? '') ??
+          int.tryParse(currentData?.id ?? '') ??
+          0;
+      final fresh = await repo
+          .getAnimeDetails(detailsId)
+          .timeout(const Duration(seconds: 15));
 
       if (!ref.mounted) return;
 
       if (fresh != null) {
-        state = state.copyWith(details: AsyncData(fresh));
+        final enriched = fresh.copyWith(
+          description:
+              fresh.description?.trim().isNotEmpty == true
+                  ? fresh.description
+                  : currentData?.description,
+          episodes: fresh.episodes ?? currentData?.episodes,
+          duration: fresh.duration ?? currentData?.duration,
+          staff: fresh.staff.isNotEmpty ? fresh.staff : currentData?.staff,
+          studios:
+              fresh.studios.isNotEmpty ? fresh.studios : currentData?.studios,
+          relations:
+              fresh.relations.isNotEmpty
+                  ? fresh.relations
+                  : currentData?.relations,
+        );
+        state = state.copyWith(details: AsyncData(enriched));
         if (state.animeIdForSource == null) {
-          _fetchEpisodes(fresh.title);
+          _fetchEpisodes(enriched.title);
         }
       } else if (currentData != null) {
         state = state.copyWith(details: AsyncData(currentData));
@@ -128,16 +148,17 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     try {
       if (state.animeIdForSource == null) {
         state = state.copyWith(isSearchingMatch: true);
-        
+
         // Reset old episodes to avoid bleeding from previously opened anime
         ref.read(episodeListProvider.notifier).reset();
 
         // Try to restore source first
-        final restored = force
-            ? null
-            : await ref
-                  .read(animeMatchServiceProvider)
-                  .restoreSource(animeId, showSnackbar: false);
+        final restored =
+            force
+                ? null
+                : await ref
+                    .read(animeMatchServiceProvider)
+                    .restoreSource(animeId, showSnackbar: false);
 
         if (!ref.mounted) return;
 
@@ -148,7 +169,8 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
           );
         } else {
           // Fallback to search if restoration failed
-          final isAdultMedia = state.details.value?.isAdult == true ||
+          final isAdultMedia =
+              state.details.value?.isAdult == true ||
               state.details.value?.isMature == true;
           final match = await ref
               .read(animeMatchServiceProvider)

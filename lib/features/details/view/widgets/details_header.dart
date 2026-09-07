@@ -141,65 +141,77 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                   const SizedBox(width: 8),
                 ],
               ),
-              body: Center(
-                child: InteractiveViewer(
-                  minScale: 0.8,
-                  maxScale: 4.0,
-                  child: CachedNetworkImage(
-                    key: ValueKey(retryKey),
-                    imageUrl: imageUrl,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    placeholder:
-                        (_, _) =>
-                            const Center(child: CircularProgressIndicator()),
-                    errorWidget:
-                        (_, _, _) => Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.broken_image_rounded,
-                                color: Colors.white54,
-                                size: 64,
+              body: LayoutBuilder(
+                builder:
+                    (context, constraints) => InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 5.0,
+                      boundaryMargin: const EdgeInsets.all(80),
+                      child: SizedBox(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        child: CachedNetworkImage(
+                          key: ValueKey(retryKey),
+                          imageUrl: imageUrl,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                          placeholder:
+                              (_, _) => const Center(
+                                child: CircularProgressIndicator(),
                               ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Poster could not be loaded',
-                                style: TextStyle(color: Colors.white70),
+                          errorWidget:
+                              (_, _, _) => Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.broken_image_rounded,
+                                      color: Colors.white54,
+                                      size: 64,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Poster could not be loaded',
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed:
+                                          retrying
+                                              ? null
+                                              : () async {
+                                                setDialogState(
+                                                  () => retrying = true,
+                                                );
+                                                await CachedNetworkImage.evictFromCache(
+                                                  imageUrl,
+                                                );
+                                                if (ctx.mounted) {
+                                                  setDialogState(() {
+                                                    retrying = false;
+                                                    retryKey++;
+                                                  });
+                                                }
+                                              },
+                                      icon:
+                                          retrying
+                                              ? const SizedBox.square(
+                                                dimension: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                              : const Icon(
+                                                Icons.refresh_rounded,
+                                              ),
+                                      label: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              TextButton.icon(
-                                onPressed:
-                                    retrying
-                                        ? null
-                                        : () async {
-                                          setDialogState(() => retrying = true);
-                                          await CachedNetworkImage.evictFromCache(
-                                            imageUrl,
-                                          );
-                                          if (ctx.mounted) {
-                                            setDialogState(() {
-                                              retrying = false;
-                                              retryKey++;
-                                            });
-                                          }
-                                        },
-                                icon:
-                                    retrying
-                                        ? const SizedBox.square(
-                                          dimension: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                        : const Icon(Icons.refresh_rounded),
-                                label: const Text('Retry'),
-                              ),
-                            ],
-                          ),
                         ),
-                  ),
-                ),
+                      ),
+                    ),
               ),
             );
           },

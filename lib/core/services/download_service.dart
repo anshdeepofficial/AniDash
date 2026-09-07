@@ -21,7 +21,7 @@ import 'package:ani_dash/storage_provider.dart';
 class DownloadService {
   final Ref ref;
   final DownloadsNotifier _notifier;
-  static const int _maxConcurrent = 2;
+  int get _maxConcurrent => _settings.parallelDownloads.clamp(1, 10);
 
   final List<DownloadItem> _queue = [];
   final Map<String, Isolate> _isolates = {};
@@ -185,6 +185,10 @@ Future<void> _downloadWorker(_TaskConfig task) async {
       result = await _processFile(task, client, () => isCancelled);
     }
 
+    if (!isCancelled) {
+      result = await _downloadSubtitleSidecars(result, client);
+    }
+
     if (!isCancelled) task.port.send(result);
   } catch (e) {
     if (!isCancelled) task.port.send('err:$e');
@@ -192,6 +196,49 @@ Future<void> _downloadWorker(_TaskConfig task) async {
     client.close();
     Isolate.exit();
   }
+}
+
+Future<DownloadItem> _downloadSubtitleSidecars(
+  DownloadItem item,
+  http.Client client,
+) async {
+  if (item.subtitles == null || item.subtitles!.isEmpty) return item;
+  final localized = <dynamic>[];
+  var index = 0;
+  for (final raw in item.subtitles!) {
+    try {
+      final map = Map<String, dynamic>.from(
+        raw is String ? jsonDecode(raw) as Map : raw as Map,
+      );
+      final url = map['url']?.toString();
+      if (url == null || url.isEmpty) continue;
+      final bytes = await _fetch(url, item.headers, client);
+      if (bytes == null) {
+        localized.add(raw);
+        continue;
+      }
+      final uri = Uri.tryParse(url);
+      final remoteExt = uri == null ? '' : p.extension(uri.path).toLowerCase();
+      final ext =
+          const {'.vtt', '.srt', '.ass', '.ssa'}.contains(remoteExt)
+              ? remoteExt
+              : '.vtt';
+      final lang = (map['lang']?.toString() ?? 'subtitle').replaceAll(
+        RegExp(r'[^a-zA-Z0-9_-]'),
+        '_',
+      );
+      final sidecar = File(
+        '${p.withoutExtension(item.filePath)}.$lang.$index$ext',
+      );
+      await sidecar.writeAsBytes(bytes, flush: true);
+      map['url'] = sidecar.uri.toString();
+      localized.add(jsonEncode(map));
+      index++;
+    } catch (_) {
+      localized.add(raw);
+    }
+  }
+  return item.copyWith(subtitles: localized);
 }
 
 Future<DownloadItem> _processFile(
@@ -277,7 +324,7 @@ Future<DownloadItem> _processM3U8(
 
   // HLS segments are small. Keep enough requests in flight to saturate fast
   // Wi-Fi while capping concurrency to avoid provider throttling.
-  final workerCount = task.settings.parallelDownloads.clamp(8, 12);
+  const workerCount = 8;
   int completed = 0;
   int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();

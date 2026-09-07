@@ -1036,9 +1036,6 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               builder: (context, setState) {
                 return Consumer(
                   builder: (context, ref, _) {
-                    final useExtensions =
-                        ref.watch(experimentalProvider).useExtensions;
-
                     return Column(
                       children: [
                         Padding(
@@ -1091,37 +1088,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                             ],
                           ),
                         ),
-                        SwitchListTile(
-                          title: const Text('Use Extensions'),
-                          value: useExtensions,
-                          onChanged: (value) {
-                            ref
-                                .read(experimentalProvider.notifier)
-                                .updateSettings(
-                                  (state) =>
-                                      state.copyWith(useExtensions: value),
-                                );
-                            ref
-                                .read(episodeListProvider.notifier)
-                                .refreshEpisodes();
-                          },
-                        ),
                         const Divider(height: 1),
                         Expanded(
-                          child:
-                              useExtensions
-                                  ? _buildExtensionSourceList(
-                                    ref,
-                                    scrollController,
-                                    notifier,
-                                    searchQuery,
-                                  )
-                                  : _buildLegacySourceList(
-                                    ref,
-                                    scrollController,
-                                    notifier,
-                                    searchQuery,
-                                  ),
+                          child: _buildExtensionSourceList(
+                            ref,
+                            scrollController,
+                            notifier,
+                            searchQuery,
+                          ),
                         ),
                       ],
                     );

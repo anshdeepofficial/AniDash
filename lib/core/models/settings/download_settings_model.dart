@@ -9,13 +9,13 @@ class DownloadSettingsModel {
   final bool wifiOnly;
   final bool rememberDownloadPreferences;
   final String preferredLanguage; // 'sub', 'dub', 'hindi'
-  final String preferredQuality;  // '1080p', '720p', '480p', '360p'
+  final String preferredQuality; // '1080p', '720p', '480p', '360p'
 
   DownloadSettingsModel({
     this.customDownloadPath,
     this.useCustomPath = false,
-    this.folderStructure = 'Anime/Episode',
-    this.parallelDownloads = 5,
+    this.folderStructure = 'Anime',
+    this.parallelDownloads = 2,
     this.speedLimitKBps = 0,
     this.wifiOnly = false,
     this.rememberDownloadPreferences = false,
@@ -66,12 +66,11 @@ class DownloadSettingsModel {
     return DownloadSettingsModel(
       customDownloadPath: map['customDownloadPath'],
       useCustomPath: map['useCustomPath'] ?? false,
-      folderStructure: map['folderStructure'] ?? 'Anime/Episode',
-      parallelDownloads: map['parallelDownloads']?.toInt() ?? 5,
+      folderStructure: map['folderStructure'] ?? 'Anime',
+      parallelDownloads: (map['parallelDownloads']?.toInt() ?? 2).clamp(1, 10),
       speedLimitKBps: map['speedLimitKBps']?.toInt() ?? 0,
       wifiOnly: map['wifiOnly'] ?? false,
-      rememberDownloadPreferences:
-          map['rememberDownloadPreferences'] ?? false,
+      rememberDownloadPreferences: map['rememberDownloadPreferences'] ?? false,
       preferredLanguage: map['preferredLanguage'] ?? 'dub',
       preferredQuality: map['preferredQuality'] ?? '1080p',
     );

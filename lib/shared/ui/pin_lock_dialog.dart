@@ -40,6 +40,7 @@ class PinLockDialog extends StatefulWidget {
   }) async {
     final res = await showModalBottomSheet<bool>(
       context: context,
+      useSafeArea: true,
       isDismissible: false,
       enableDrag: false,
       isScrollControlled: true,
@@ -70,6 +71,7 @@ class PinLockDialog extends StatefulWidget {
     String? createdPin;
     await showModalBottomSheet<void>(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder:

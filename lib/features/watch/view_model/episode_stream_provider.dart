@@ -388,7 +388,16 @@ class EpisodeData extends _$EpisodeData {
 
     try {
       _showLoading(context);
-      final data = await _fetchSourceData(ep);
+      ServerData? preferredServer;
+      if (_isNativeProvider) {
+        final servers = await _getRawServers(
+          ep,
+        ).timeout(const Duration(seconds: 12), onTimeout: () => <ServerData>[]);
+        preferredServer = servers.firstWhereOrNull(
+          (server) => language == 'dub' ? server.isDub : !server.isDub,
+        );
+      }
+      final data = await _fetchSourceData(ep, server: preferredServer);
       if (!context.mounted) return;
       Navigator.pop(context);
 
@@ -408,8 +417,16 @@ class EpisodeData extends _$EpisodeData {
         );
       } else if (language == 'dub') {
         matchedSource = data.sources.firstWhereOrNull((s) => s.isDub);
+        matchedSource ??=
+            preferredServer?.isDub == true ? data.sources.firstOrNull : null;
       } else {
         matchedSource = data.sources.firstWhereOrNull((s) => !s.isDub);
+      }
+      if (matchedSource == null && language == 'dub') {
+        return _showSnack(
+          context,
+          'DUB could not be verified. Check the connection and retry.',
+        );
       }
       matchedSource ??= data.sources.firstOrNull;
 
@@ -516,7 +533,17 @@ class EpisodeData extends _$EpisodeData {
     for (final ep in epModels) {
       try {
         final epNum = ep.number!;
-        final data = await _fetchSourceData(ep);
+        ServerData? preferredServer;
+        if (_isNativeProvider) {
+          final servers = await _getRawServers(ep).timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => <ServerData>[],
+          );
+          preferredServer = servers.firstWhereOrNull(
+            (server) => targetLang == 'dub' ? server.isDub : !server.isDub,
+          );
+        }
+        final data = await _fetchSourceData(ep, server: preferredServer);
         if (data == null || data.sources.isEmpty) {
           AppLogger.w('Batch download: No sources for Ep $epNum');
           continue;
@@ -531,8 +558,14 @@ class EpisodeData extends _$EpisodeData {
           );
         } else if (targetLang == 'dub') {
           source = data.sources.firstWhereOrNull((s) => s.isDub);
+          source ??=
+              preferredServer?.isDub == true ? data.sources.firstOrNull : null;
         } else {
           source = data.sources.firstWhereOrNull((s) => !s.isDub);
+        }
+        if (source == null && targetLang == 'dub') {
+          AppLogger.w('Batch download: DUB not verified for Ep $epNum');
+          continue;
         }
         source ??= data.sources.firstOrNull;
 
@@ -729,19 +762,10 @@ class EpisodeData extends _$EpisodeData {
       if (data == null || data.sources.isEmpty) {
         throw StateError('No playable sources found');
       }
-      final requestedDub = state.selectedServer?.isDub == true;
-      final fellBackToSub =
-          requestedDub && !data.sources.any((source) => source.isDub);
       state = state.copyWith(
         sources: data.sources,
         subtitles: [Subtitle(lang: 'None'), ...data.tracks],
         headers: data.headers?.cast<String, String>(),
-        selectedServer:
-            fellBackToSub ? state.selectedServer?.copyWith(isDub: false) : null,
-        languageNotice:
-            fellBackToSub
-                ? 'English DUB is not available. Japanese audio with subtitles is available.'
-                : null,
       );
       try {
         await _loadSourceStream(0, startAt: startAt);

@@ -94,6 +94,29 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
         icon: const Icon(Iconsax.add),
         tooltip: 'Add Repository',
       ),
+      IconButton(
+        tooltip: 'Extension engines explained',
+        icon: const Icon(Icons.info_outline),
+        onPressed:
+            () => showDialog<void>(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Extension engines'),
+                    content: const Text(
+                      'AniYomi loads Android-compatible anime and manga repository indexes. '
+                      'MangaYomi loads JavaScript-based anime and manga repositories. '
+                      'A repository adds its sources to Available; install the source you want from there.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+            ),
+      ),
       PopupMenuButton<String>(
         icon: const Icon(Iconsax.translate),
         tooltip: 'Filter Language',
@@ -407,6 +430,17 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                     isManga
                                         ? _getSavedMangaRepos(targetManager)
                                         : _getSavedAnimeRepos(targetManager);
+                                if (currentRepos.contains(url)) {
+                                  if (context.mounted) Navigator.pop(context);
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Repository already installed. Open Available to choose its sources.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
                                 final updated = {...currentRepos, url}.toList();
                                 await sharedPrefs.setStringList(
                                   isManga
@@ -423,7 +457,7 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        '${isManga ? 'Manga' : 'Anime'} repository added successfully.',
+                                        '${isManga ? 'Manga' : 'Anime'} repository added. Open Available to install a source.',
                                       ),
                                     ),
                                   );
@@ -433,7 +467,7 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                   messenger.showSnackBar(
                                     const SnackBar(
                                       content: Text(
-                                        'Repository added successfully.',
+                                        'Repository added. Open Available to install a source.',
                                       ),
                                     ),
                                   );

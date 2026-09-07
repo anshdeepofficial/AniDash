@@ -54,7 +54,7 @@ class DownloadSettingsNotifier extends Notifier<DownloadSettingsModel> {
 
   void setParallelDownloads(int limit) {
     updateSettings(
-      (s) => s.copyWith(parallelDownloads: limit.clamp(1, 100).toInt()),
+      (s) => s.copyWith(parallelDownloads: limit.clamp(1, 10).toInt()),
     );
   }
 
@@ -83,8 +83,6 @@ class DownloadSettingsNotifier extends Notifier<DownloadSettingsModel> {
   }
 
   void resetDownloadPreferences() {
-    updateSettings(
-      (s) => s.copyWith(rememberDownloadPreferences: false),
-    );
+    updateSettings((s) => s.copyWith(rememberDownloadPreferences: false));
   }
 }

@@ -53,8 +53,8 @@ class DownloadSettingsScreen extends ConsumerWidget {
                   description:
                       settings.customDownloadPath ?? 'Tap to select...',
                   onTap: () async {
-                    String? selectedDirectory = await FilePicker.platform
-                        .getDirectoryPath();
+                    String? selectedDirectory =
+                        await FilePicker.platform.getDirectoryPath();
                     if (selectedDirectory != null) {
                       notifier.setCustomPath(selectedDirectory);
                     }
@@ -66,9 +66,10 @@ class DownloadSettingsScreen extends ConsumerWidget {
                 title: 'Folder Structure',
                 description: 'Organize downloaded files',
                 value: settings.folderStructure,
-                items: ['Anime/Episode', 'Anime', 'Flat']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
+                items:
+                    ['Anime/Episode', 'Anime', 'Flat']
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                 onChanged: (val) {
                   if (val != null) notifier.setFolderStructure(val);
                 },
@@ -83,22 +84,23 @@ class DownloadSettingsScreen extends ConsumerWidget {
             children: [
               SliderSettingsItem(
                 accent: colorScheme.primary,
-                title: 'Parallel Downloads (M3U8)',
+                title: 'Number of Downloads',
                 description:
-                    'Concurrent segments: ${settings.parallelDownloads}',
+                    '${settings.parallelDownloads} downloads at the same time',
                 value: settings.parallelDownloads.toDouble(),
                 min: 1,
-                max: 15,
-                divisions: 14,
+                max: 10,
+                divisions: 9,
                 onChanged: (val) => notifier.setParallelDownloads(val.toInt()),
                 icon: Icon(Iconsax.flash_1, color: colorScheme.primary),
               ),
               SliderSettingsItem(
                 accent: colorScheme.primary,
                 title: 'Speed Limit',
-                description: settings.speedLimitKBps == 0
-                    ? 'Unlimited'
-                    : '${settings.speedLimitKBps} KB/s',
+                description:
+                    settings.speedLimitKBps == 0
+                        ? 'Unlimited'
+                        : '${settings.speedLimitKBps} KB/s',
                 value: settings.speedLimitKBps.toDouble(),
                 min: 0,
                 max: 10000,
@@ -134,9 +136,10 @@ class DownloadSettingsScreen extends ConsumerWidget {
                 icon: Icon(Iconsax.tick_circle, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'Remember Preferences',
-                description: settings.rememberDownloadPreferences
-                    ? 'Downloads auto-start with saved language & quality'
-                    : 'Prompt for language & quality every time',
+                description:
+                    settings.rememberDownloadPreferences
+                        ? 'Downloads auto-start with saved language & quality'
+                        : 'Prompt for language & quality every time',
                 value: settings.rememberDownloadPreferences,
                 onChanged: (val) {
                   notifier.updateSettings(
@@ -152,9 +155,18 @@ class DownloadSettingsScreen extends ConsumerWidget {
                   description: 'Preferred audio / subtitle language',
                   value: settings.preferredLanguage,
                   items: const [
-                    DropdownMenuItem(value: 'sub', child: Text('Japanese (Sub)')),
-                    DropdownMenuItem(value: 'dub', child: Text('English (Dub)')),
-                    DropdownMenuItem(value: 'hindi', child: Text('Hindi (Dub)')),
+                    DropdownMenuItem(
+                      value: 'sub',
+                      child: Text('Japanese (Sub)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'dub',
+                      child: Text('English (Dub)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'hindi',
+                      child: Text('Hindi (Dub)'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -171,10 +183,16 @@ class DownloadSettingsScreen extends ConsumerWidget {
                   description: 'Preferred video resolution',
                   value: settings.preferredQuality,
                   items: const [
-                    DropdownMenuItem(value: '1080p', child: Text('1080p (FHD)')),
+                    DropdownMenuItem(
+                      value: '1080p',
+                      child: Text('1080p (FHD)'),
+                    ),
                     DropdownMenuItem(value: '720p', child: Text('720p (HD)')),
                     DropdownMenuItem(value: '480p', child: Text('480p (SD)')),
-                    DropdownMenuItem(value: '360p', child: Text('360p (Data Saver)')),
+                    DropdownMenuItem(
+                      value: '360p',
+                      child: Text('360p (Data Saver)'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {

@@ -405,13 +405,18 @@ final sortedWatchProgressProvider =
             .whereType<AnimeWatchProgressEntry>()
             .where((e) => !e.isAdult)
             .toList()
-          ..sort(
-            (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-              a.lastUpdated ?? DateTime(0),
-            ),
-          );
+          ..sort((a, b) => _latestWatchTime(b).compareTo(_latestWatchTime(a)));
       });
     });
+
+DateTime _latestWatchTime(AnimeWatchProgressEntry entry) {
+  var latest = entry.lastUpdated ?? DateTime(0);
+  for (final episode in entry.episodesProgress.values) {
+    final watchedAt = episode.watchedAt;
+    if (watchedAt != null && watchedAt.isAfter(latest)) latest = watchedAt;
+  }
+  return latest;
+}
 
 class _ContinueWatchingSection extends ConsumerWidget {
   const _ContinueWatchingSection();
@@ -423,10 +428,11 @@ class _ContinueWatchingSection extends ConsumerWidget {
     final watchlist = ref.watch(watchlistProvider);
     final watchingStatus = auth.isMalAuthenticated ? 'watching' : 'CURRENT';
     final dismissedIds = ref.watch(continueWatchingDismissedProvider);
-    final cloudWatching = watchlist
-        .listFor(watchingStatus)
-        .where((c) => !dismissedIds.contains(c.media.id))
-        .toList();
+    final cloudWatching =
+        watchlist
+            .listFor(watchingStatus)
+            .where((c) => !dismissedIds.contains(c.media.id))
+            .toList();
 
     return sortedAsync.when(
       data: (sorted) {
@@ -475,9 +481,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
         final combinedList =
             merged.values.toList()..sort(
-              (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-                a.lastUpdated ?? DateTime(0),
-              ),
+              (a, b) => _latestWatchTime(b).compareTo(_latestWatchTime(a)),
             );
 
         if (combinedList.isEmpty) return const SizedBox.shrink();
