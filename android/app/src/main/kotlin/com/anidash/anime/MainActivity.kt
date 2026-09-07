@@ -94,7 +94,16 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     "lockCurrent" -> {
                         disableLandscapeRotation()
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                        val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            display?.rotation
+                        } else {
+                            @Suppress("DEPRECATION")
+                            windowManager.defaultDisplay.rotation
+                        }
+                        requestedOrientation =
+                            if (rotation == android.view.Surface.ROTATION_270)
+                                ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                            else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         result.success(null)
                     }
                     "toggleLandscape" -> {

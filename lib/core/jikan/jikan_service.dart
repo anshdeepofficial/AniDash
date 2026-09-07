@@ -7,15 +7,15 @@ class JikanEpisode {
   final int malId;
   final String title;
   final String? aired;
-  final double? filler;
-  final double? recap;
+  final bool filler;
+  final bool recap;
 
   JikanEpisode({
     required this.malId,
     required this.title,
     this.aired,
-    this.filler,
-    this.recap,
+    this.filler = false,
+    this.recap = false,
   });
 
   factory JikanEpisode.fromJson(Map<String, dynamic> json) {
@@ -23,10 +23,8 @@ class JikanEpisode {
       malId: json['mal_id'] ?? 0,
       title: json['title'] ?? 'Episode ${json['mal_id']}',
       aired: json['aired']?.toString(),
-      filler: json['filler'] != null
-          ? (json['filler'] as num).toDouble()
-          : null,
-      recap: json['recap'] != null ? (json['recap'] as num).toDouble() : null,
+      filler: json['filler'] == true || json['filler'] == 1,
+      recap: json['recap'] == true || json['recap'] == 1,
     );
   }
 }
@@ -40,7 +38,10 @@ class JikanService {
   }) async {
     try {
       final url = '$_baseUrl/anime?q=$title&limit=$limit';
-      final response = await UniversalHttpClient.instance.get(Uri.parse(url), cacheConfig: CacheConfig.long);
+      final response = await UniversalHttpClient.instance.get(
+        Uri.parse(url),
+        cacheConfig: CacheConfig.long,
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -57,7 +58,10 @@ class JikanService {
   Future<List<JikanEpisode>> getEpisodes(int malId, int page) async {
     try {
       final url = '$_baseUrl/anime/$malId/episodes?page=$page';
-      final response = await UniversalHttpClient.instance.get(Uri.parse(url), cacheConfig: CacheConfig.long);
+      final response = await UniversalHttpClient.instance.get(
+        Uri.parse(url),
+        cacheConfig: CacheConfig.long,
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

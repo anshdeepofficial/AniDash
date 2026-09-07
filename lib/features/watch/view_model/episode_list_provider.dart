@@ -128,7 +128,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
     if (fetched.isEmpty) {
       final titleLow = animeTitle.toLowerCase();
-      final isLikelyMovie = titleLow.contains('movie') ||
+      final isLikelyMovie =
+          titleLow.contains('movie') ||
           titleLow.contains('film') ||
           (media?.title?.toLowerCase().contains('movie') == true) ||
           (media?.title?.toLowerCase().contains('film') == true);
@@ -196,12 +197,13 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
           ...registry.keys.where((k) => k != currentKey && k != 'justanime'),
         ];
 
-        final cleanTitle = state.animeTitle!
-            .replaceAll(':', ' ')
-            .replaceAll('-', ' ')
-            .replaceAll(RegExp(r'[^\w\s]'), ' ')
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim();
+        final cleanTitle =
+            state.animeTitle!
+                .replaceAll(':', ' ')
+                .replaceAll('-', ' ')
+                .replaceAll(RegExp(r'[^\w\s]'), ' ')
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
 
         for (final altKey in candidateKeys) {
           final altProvider = registry.get(altKey);
@@ -212,7 +214,11 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
               'Resolving episodes by title on: $altKey for "$cleanTitle"',
             );
             final searchResults = await altProvider
-                .getSearch(cleanTitle.isNotEmpty ? cleanTitle : state.animeTitle!, null, 1)
+                .getSearch(
+                  cleanTitle.isNotEmpty ? cleanTitle : state.animeTitle!,
+                  null,
+                  1,
+                )
                 .timeout(const Duration(seconds: 8));
             final altMatch = searchResults.results.firstOrNull;
             final matchId = altMatch?.id;
@@ -388,7 +394,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
       // Create a lookup by malId (episode number in Jikan)
       final titleByEpNum = <int, String>{};
+      final fillerByEpNum = <int, bool>{};
       for (final jEp in allJikanEpisodes) {
+        fillerByEpNum[jEp.malId] = jEp.filler;
         if (jEp.title.isNotEmpty &&
             !jEp.title.toLowerCase().startsWith('episode ')) {
           titleByEpNum[jEp.malId] = jEp.title;
@@ -404,6 +412,10 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       for (var i = 0; i < updated.length; i++) {
         final epNum = updated[i].number ?? (i + 1);
         final syncedTitle = titleByEpNum[epNum];
+        final isFiller = fillerByEpNum[epNum] == true;
+        if (isFiller && updated[i].isFiller != true) {
+          updated[i] = updated[i].copyWith(isFiller: true);
+        }
         if (syncedTitle != null && syncedTitle.isNotEmpty) {
           // If extension already gave a real title (not just "Episode X"), keep it or enrich it
           final currentTitle = updated[i].title ?? '';

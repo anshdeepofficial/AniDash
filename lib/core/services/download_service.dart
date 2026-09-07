@@ -33,19 +33,21 @@ class DownloadService {
 
   Future<void> startDownload(DownloadItem item) async {
     if (!_settings.useCustomPath || _settings.customDownloadPath == null) {
-      if (!await ref.read(permissionsProvider.notifier).requestStoragePermission()) {
+      if (!await ref
+          .read(permissionsProvider.notifier)
+          .requestStoragePermission()) {
         return _fail(item, 'Permission denied');
       }
     }
 
-    final basePath = _settings.useCustomPath
-        ? _settings.customDownloadPath!
-        : (await StorageProvider.getDefaultDirectory())!.path;
+    final basePath =
+        _settings.useCustomPath
+            ? _settings.customDownloadPath!
+            : (await StorageProvider.getDefaultDirectory())!.path;
 
     final itemPath = item.filePath;
-    final finalPath = p.isAbsolute(itemPath)
-        ? itemPath
-        : p.join(basePath, itemPath);
+    final finalPath =
+        p.isAbsolute(itemPath) ? itemPath : p.join(basePath, itemPath);
 
     final queuedItem = item.copyWith(
       state: DownloadStatus.queued,
@@ -272,9 +274,8 @@ Future<DownloadItem> _processM3U8(
   );
   task.port.send(currentItem);
 
-  final batchSize = task.settings.parallelDownloads > 0
-      ? task.settings.parallelDownloads
-      : 6;
+  final batchSize =
+      task.settings.parallelDownloads > 0 ? task.settings.parallelDownloads : 6;
   int completed = 0;
   int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();
@@ -292,9 +293,8 @@ Future<DownloadItem> _processM3U8(
   for (var i = 0; i < segments.length; i += batchSize) {
     if (isCancelled()) break;
 
-    final end = (i + batchSize < segments.length)
-        ? i + batchSize
-        : segments.length;
+    final end =
+        (i + batchSize < segments.length) ? i + batchSize : segments.length;
     final batch = segments.sublist(i, end);
 
     await Future.wait(
@@ -305,9 +305,10 @@ Future<DownloadItem> _processM3U8(
 
         final bytes = await _fetch(seg.url, task.item.headers, client);
         if (bytes != null) {
-          final data = seg.key != null
-              ? _decrypt(bytes, seg.key!, seg.iv, seg.index)
-              : bytes;
+          final data =
+              seg.key != null
+                  ? _decrypt(bytes, seg.key!, seg.iv, seg.index)
+                  : bytes;
           await file.writeAsBytes(data);
           completed++;
           downloadedBytesTotal += data.length;
@@ -317,15 +318,46 @@ Future<DownloadItem> _processM3U8(
     );
 
     if (DateTime.now().difference(lastLog).inMilliseconds > 1000) {
-      task.port.send(currentItem.copyWith(
-        progress: completed,
-        downloadedBytes: downloadedBytesTotal,
-      ));
+      task.port.send(
+        currentItem.copyWith(
+          progress: completed,
+          downloadedBytes: downloadedBytesTotal,
+        ),
+      );
       lastLog = DateTime.now();
     }
   }
 
   if (isCancelled()) throw Exception("Cancelled");
+
+  // Never mark a partial HLS file as completed. Retry any failed segments
+  // serially (friendlier to rate-limited hosts), then fail visibly if even one
+  // segment is still missing.
+  for (final segment in segments) {
+    final file = File(p.join(tempDir.path, '${segment.index}.ts'));
+    if (await file.exists()) continue;
+    final bytes = await _fetch(segment.url, task.item.headers, client);
+    if (bytes != null) {
+      final data =
+          segment.key != null
+              ? _decrypt(bytes, segment.key!, segment.iv, segment.index)
+              : bytes;
+      await file.writeAsBytes(data, flush: true);
+      completed++;
+      downloadedBytesTotal += data.length;
+    }
+  }
+  final missing = <int>[];
+  for (final segment in segments) {
+    if (!await File(p.join(tempDir.path, '${segment.index}.ts')).exists()) {
+      missing.add(segment.index);
+    }
+  }
+  if (missing.isNotEmpty) {
+    throw Exception(
+      'Download incomplete: ${missing.length} of ${segments.length} segments failed',
+    );
+  }
 
   final output = File(task.item.filePath);
   final sink = output.openWrite();
@@ -363,18 +395,31 @@ Future<List<_Segment>> _parsePlaylist(
   final segments = <_Segment>[];
 
   if (lines.any((l) => l.contains('#EXT-X-STREAM-INF'))) {
+    String? bestVariant;
+    var bestBandwidth = -1;
     for (int i = 0; i < lines.length; i++) {
       if (lines[i].startsWith('#EXT-X-STREAM-INF') && i + 1 < lines.length) {
         final next = lines[i + 1].trim();
         if (next.isNotEmpty && !next.startsWith('#')) {
-          return _parsePlaylist(
-            baseUri.resolve(next).toString(),
-            headers,
-            client,
-            port,
-          );
+          final bandwidth =
+              int.tryParse(
+                RegExp(r'BANDWIDTH=(\d+)').firstMatch(lines[i])?.group(1) ?? '',
+              ) ??
+              0;
+          if (bandwidth > bestBandwidth) {
+            bestBandwidth = bandwidth;
+            bestVariant = next;
+          }
         }
       }
+    }
+    if (bestVariant != null) {
+      return _parsePlaylist(
+        baseUri.resolve(bestVariant).toString(),
+        headers,
+        client,
+        port,
+      );
     }
   }
 

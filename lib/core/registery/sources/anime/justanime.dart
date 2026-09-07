@@ -173,7 +173,11 @@ class JustAnimeProvider extends AnimeProvider {
                 thumbnail: item['image'],
                 description: item['description'],
                 date: item['airDate'],
-                isFiller: item['filler'] == true,
+                isFiller:
+                    item['filler'] == true ||
+                    item['filler'] == 1 ||
+                    item['isFiller'] == true ||
+                    item['type']?.toString().toLowerCase() == 'filler',
               );
             })
             .where((episode) => episode.number != null)
