@@ -101,13 +101,13 @@ class UniversalMediaMapper {
               .toList() ??
           [],
       studios:
-          (node['studios']?['nodes'] as List?)
-              ?.map(
-                (e) => UniversalStudioMapper.fromAnilist(
-                  Map<String, dynamic>.from(e),
-                ),
-              )
-              .toList() ??
+          (node['studios']?['edges'] as List?)?.map((e) {
+            final edge = Map<String, dynamic>.from(e);
+            return UniversalStudioMapper.fromAnilist({
+              ...Map<String, dynamic>.from(edge['node'] ?? {}),
+              'isMain': edge['isMain'] ?? false,
+            });
+          }).toList() ??
           [],
       trailer:
           node['trailer'] != null

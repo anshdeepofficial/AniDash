@@ -130,7 +130,7 @@ class EpisodeCompactItem extends StatelessWidget {
           onTap: onTap,
           onLongPress: onLongPress,
         ),
-        if (watchProgress > 0)
+        if (watchProgress > 0 && !isWatched)
           LinearProgressIndicator(
             value: watchProgress,
             backgroundColor: Colors.transparent,

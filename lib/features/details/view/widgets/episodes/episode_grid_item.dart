@@ -128,7 +128,7 @@ class EpisodeGridItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (watchProgress > 0)
+                  if (watchProgress > 0 && !isWatched)
                     Positioned(
                       bottom: 0,
                       left: 0,

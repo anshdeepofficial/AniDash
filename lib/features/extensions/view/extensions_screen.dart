@@ -90,7 +90,8 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
   ) {
     return [
       IconButton(
-        onPressed: () => _showAddRepoDialog(context, onRepoSaved),
+        onPressed:
+            () => _showAddRepoDialog(context, tabController, onRepoSaved),
         icon: const Icon(Iconsax.add),
         tooltip: 'Add Repository',
       ),
@@ -104,9 +105,10 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                   (context) => AlertDialog(
                     title: const Text('Extension engines'),
                     content: const Text(
-                      'AniYomi loads Android-compatible anime and manga repository indexes. '
-                      'MangaYomi loads JavaScript-based anime and manga repositories. '
-                      'A repository adds its sources to Available; install the source you want from there.',
+                      'These are two ways AniDash can load community sources.\n\n'
+                      'AniYomi: best for the Android source lists shown in this app, including Yuzono.\n\n'
+                      'MangaYomi: supports a different type of community source file. Use it only when a repository says it is made for MangaYomi.\n\n'
+                      'Adding a repository does not install every source inside it. After adding it, open Available Anime or Available Manga and install the source you want.',
                     ),
                     actions: [
                       TextButton(
@@ -234,6 +236,7 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
 
   void _showAddRepoDialog(
     BuildContext context,
+    TabController tabController,
     Future<void> Function(List<String> repoUrl, ItemType type) onRepoSaved,
   ) {
     final controller = TextEditingController();
@@ -431,11 +434,34 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                         ? _getSavedMangaRepos(targetManager)
                                         : _getSavedAnimeRepos(targetManager);
                                 if (currentRepos.contains(url)) {
+                                  if (isAniyomiRepository) {
+                                    Get.find<ExtensionManager>()
+                                        .setCurrentManager(
+                                          ExtensionType.aniyomi,
+                                        );
+                                  }
+                                  await targetManager.onRepoSaved(
+                                    currentRepos,
+                                    selectedType,
+                                  );
+                                  if (!_repositoryLoaded(
+                                    targetManager,
+                                    selectedType,
+                                    url,
+                                  )) {
+                                    throw StateError(
+                                      'The repository was saved but its source list could not be loaded. Check the connection and retry.',
+                                    );
+                                  }
                                   if (context.mounted) Navigator.pop(context);
+                                  if (selectedType == ItemType.anime) {
+                                    tabController.animateTo(1);
+                                  }
+                                  if (mounted) setState(() {});
                                   messenger.showSnackBar(
                                     const SnackBar(
                                       content: Text(
-                                        'Repository already installed. Open Available to choose its sources.',
+                                        'Repository refreshed. Open Available Anime and search for the full source name, for example “hanime”.',
                                       ),
                                     ),
                                   );
@@ -449,11 +475,26 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                                   updated,
                                 );
                                 if (isAniyomiRepository) {
+                                  Get.find<ExtensionManager>()
+                                      .setCurrentManager(ExtensionType.aniyomi);
                                   await targetManager.onRepoSaved(
                                     updated,
                                     selectedType,
                                   );
+                                  if (!_repositoryLoaded(
+                                    targetManager,
+                                    selectedType,
+                                    url,
+                                  )) {
+                                    throw StateError(
+                                      'Repository index did not return any usable sources.',
+                                    );
+                                  }
                                   if (context.mounted) Navigator.pop(context);
+                                  if (selectedType == ItemType.anime) {
+                                    tabController.animateTo(1);
+                                  }
+                                  if (mounted) setState(() {});
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -501,6 +542,25 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
       },
     );
   }
+
+  bool _repositoryLoaded(dynamic manager, ItemType type, String repositoryUrl) {
+    final available =
+        type == ItemType.anime
+            ? manager.availableAnimeExtensions.value
+            : manager.availableMangaExtensions.value;
+    final installed =
+        type == ItemType.anime
+            ? manager.installedAnimeExtensions.value
+            : manager.installedMangaExtensions.value;
+    final sources = [...available, ...installed];
+    if (repositoryUrl.contains('yuzono/anime-repo')) {
+      return sources.any(
+        (source) =>
+            source.name?.toString().toLowerCase().contains('hanime') == true,
+      );
+    }
+    return sources.isNotEmpty;
+  }
 }
 
 class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
@@ -525,6 +585,15 @@ class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
 }
 
 class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
+  @override
+  Widget build(BuildContext context) {
+    // The repository dialog can switch to AniYomi. Refresh the manager held
+    // by this tab as well, otherwise the UI keeps showing the old engine's
+    // empty list even though the repository fetch succeeded.
+    manager = Get.find<ExtensionManager>().currentManager;
+    return super.build(context);
+  }
+
   @override
   Widget extensionItem(bool isHeader, String lang, Source? source) {
     if (isHeader) {

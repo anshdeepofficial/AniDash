@@ -99,7 +99,7 @@ class EpisodeBlockItem extends StatelessWidget {
               ),
 
             // Progress Bar
-            if (watchProgress > 0)
+            if (watchProgress > 0 && !isWatched)
               Positioned(
                 bottom: 8,
                 left: 8,

@@ -396,6 +396,11 @@ class EpisodeData extends _$EpisodeData {
         preferredServer = servers.firstWhereOrNull(
           (server) => language == 'dub' ? server.isDub : !server.isDub,
         );
+        preferredServer ??= ServerData(
+          name: 'Default',
+          id: 'default',
+          isDub: language == 'dub',
+        );
       }
       final data = await _fetchSourceData(ep, server: preferredServer);
       if (!context.mounted) return;
@@ -541,6 +546,11 @@ class EpisodeData extends _$EpisodeData {
           );
           preferredServer = servers.firstWhereOrNull(
             (server) => targetLang == 'dub' ? server.isDub : !server.isDub,
+          );
+          preferredServer ??= ServerData(
+            name: 'Default',
+            id: 'default',
+            isDub: targetLang == 'dub',
           );
         }
         final data = await _fetchSourceData(ep, server: preferredServer);

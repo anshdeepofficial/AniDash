@@ -269,7 +269,7 @@ class EpisodeBannerItem extends StatelessWidget {
                 ),
 
                 // Bottom watch progress indicator line
-                if (watchProgress > 0)
+                if (watchProgress > 0 && !isWatched)
                   Positioned(
                     left: 0,
                     right: 0,

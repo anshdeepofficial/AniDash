@@ -126,7 +126,7 @@ class EpisodeListItem extends StatelessWidget {
             onTap: onTap,
             onLongPress: onLongPress,
           ),
-          if (watchProgress > 0)
+          if (watchProgress > 0 && !isWatched)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10.0),
               child: LinearProgressIndicator(

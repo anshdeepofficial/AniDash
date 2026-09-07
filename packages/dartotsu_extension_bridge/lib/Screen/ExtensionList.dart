@@ -72,31 +72,36 @@ abstract class ExtensionList<T extends StatefulWidget> extends State<T> {
               : manager.availableNovelExtensions.value,
       };
 
-      final search = searchQuery.toLowerCase();
-      final filterLang = selectedLanguage == 'All' || selectedLanguage == 'all'
-          ? null
-          : selectedLanguage;
+      final search = searchQuery.trim().toLowerCase();
+      final searchTerms =
+          search == 'hnm' ? const ['hnm', 'hanime'] : <String>[search];
+      final filterLang =
+          selectedLanguage == 'All' || selectedLanguage == 'all'
+              ? null
+              : selectedLanguage;
 
       final Map<String, List<Source>> grouped = {};
       for (final source in fullList) {
         final lang = source.lang ?? 'Unknown';
         if (filterLang != null && lang != filterLang) continue;
         if (search.isNotEmpty &&
-            !(source.name?.toLowerCase().contains(search) ?? false)) {
+            !searchTerms.any(
+              (term) => source.name?.toLowerCase().contains(term) ?? false,
+            )) {
           continue;
         }
 
         grouped.putIfAbsent(lang, () => []).add(source);
       }
 
-      final sortedEntries = grouped.entries.toList()
-        ..sort((a, b) {
-          if (a.key == 'all') return -1;
-          if (b.key == 'all') return 1;
-          if (a.key == 'en') return -1;
-          if (b.key == 'en') return 1;
-          return a.key.compareTo(b.key);
-        });
+      final sortedEntries =
+          grouped.entries.toList()..sort((a, b) {
+            if (a.key == 'all') return -1;
+            if (b.key == 'all') return 1;
+            if (a.key == 'en') return -1;
+            if (b.key == 'en') return 1;
+            return a.key.compareTo(b.key);
+          });
 
       final flattenedList = <({bool isHeader, String lang, Source? source})>[];
       for (final entry in sortedEntries) {

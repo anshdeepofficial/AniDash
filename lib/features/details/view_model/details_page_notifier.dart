@@ -6,6 +6,7 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
+import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/shared/providers/anime_match_service.dart';
 
 part 'details_page_notifier.g.dart';
@@ -77,15 +78,24 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     final currentData = state.details.value;
 
     try {
-      final repo = ref.read(animeRepositoryProvider);
-      final detailsId =
-          int.tryParse(animeId) ??
-          int.tryParse(currentData?.idMal ?? '') ??
-          int.tryParse(currentData?.id ?? '') ??
-          0;
-      final fresh = await repo
-          .getAnimeDetails(detailsId)
-          .timeout(const Duration(seconds: 15));
+      final anilistId = int.tryParse(currentData?.id ?? animeId);
+      var fresh =
+          anilistId == null
+              ? null
+              : await ref
+                  .read(anilistServiceProvider)
+                  .getAnimeDetails(anilistId)
+                  .timeout(const Duration(seconds: 15));
+      if (fresh == null) {
+        final repo = ref.read(animeRepositoryProvider);
+        final fallbackId =
+            int.tryParse(currentData?.idMal ?? '') ??
+            int.tryParse(animeId) ??
+            0;
+        fresh = await repo
+            .getAnimeDetails(fallbackId)
+            .timeout(const Duration(seconds: 15));
+      }
 
       if (!ref.mounted) return;
 
