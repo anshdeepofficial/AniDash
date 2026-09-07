@@ -78,45 +78,50 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [DetailsHeader(anime: displayedAnime, tag: widget.tag)];
-        },
-        body: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _KeepAliveWrapper(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(0, 16, 0, 100),
-                  child: DetailsContent(
-                    anime: displayedAnime,
-                    mediaId: id.toString(),
-                    isLoading: isLoading,
-                    onMediaTap: _onMediaTap,
+      body: SafeArea(
+        bottom: false,
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [DetailsHeader(anime: displayedAnime, tag: widget.tag)];
+          },
+          body: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _KeepAliveWrapper(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 100),
+                    child: DetailsContent(
+                      anime: displayedAnime,
+                      mediaId: id.toString(),
+                      isLoading: isLoading,
+                      onMediaTap: _onMediaTap,
+                    ),
                   ),
                 ),
-              ),
-              _KeepAliveWrapper(
-                child: EpisodesTab(
-                  mediaId: displayedAnime.id.toString(),
-                  mediaTitle: displayedAnime.title,
-                  mediaFormat: displayedAnime.format ?? '',
-                  mediaCover:
-                      displayedAnime.coverImage.large ??
-                      displayedAnime.coverImage.medium ??
-                      '',
-                  fromHentaiHub: widget.fromHentaiHub,
+                _KeepAliveWrapper(
+                  child: EpisodesTab(
+                    mediaId: displayedAnime.id.toString(),
+                    mediaTitle: displayedAnime.title,
+                    mediaFormat: displayedAnime.format ?? '',
+                    mediaCover:
+                        displayedAnime.coverImage.large ??
+                        displayedAnime.coverImage.medium ??
+                        '',
+                    fromHentaiHub: widget.fromHentaiHub,
+                  ),
                 ),
-              ),
-              _KeepAliveWrapper(
-                child: CharactersTab(
-                  characters: displayedAnime.characters,
-                  isLoading: isLoading,
+                _KeepAliveWrapper(
+                  child: CharactersTab(
+                    characters: displayedAnime.characters,
+                    isLoading: isLoading,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -106,6 +106,7 @@ class DownloadService {
       );
 
       _isolates[item.id] = isolate;
+      _processQueue();
 
       receivePort.listen((msg) {
         if (msg is SendPort) {
@@ -378,6 +379,10 @@ Future<DownloadItem> _processM3U8(
     size: totalSize,
     downloadedBytes: totalSize,
     progress: totalSize,
+    durationSeconds: segments.fold<int>(
+      0,
+      (total, segment) => total + segment.duration.ceil(),
+    ),
   );
 }
 
@@ -424,11 +429,15 @@ Future<List<_Segment>> _parsePlaylist(
   }
 
   Uint8List? key, iv;
+  var pendingDuration = 0.0;
   for (final line in lines) {
     final trim = line.trim();
     if (trim.isEmpty) continue;
 
-    if (trim.startsWith('#EXT-X-KEY')) {
+    if (trim.startsWith('#EXTINF:')) {
+      pendingDuration =
+          double.tryParse(trim.substring(8).split(',').first) ?? 0.0;
+    } else if (trim.startsWith('#EXT-X-KEY')) {
       final keyUri = RegExp(r'URI="([^"]+)"').firstMatch(trim)?.group(1);
       final ivHex = RegExp(r'IV=0x([0-9A-Fa-f]+)').firstMatch(trim)?.group(1);
 
@@ -438,8 +447,15 @@ Future<List<_Segment>> _parsePlaylist(
       if (ivHex != null) iv = _hexToBytes(ivHex);
     } else if (!trim.startsWith('#')) {
       segments.add(
-        _Segment(baseUri.resolve(trim).toString(), key, iv, segments.length),
+        _Segment(
+          baseUri.resolve(trim).toString(),
+          key,
+          iv,
+          segments.length,
+          pendingDuration,
+        ),
       );
+      pendingDuration = 0;
     }
   }
 
@@ -448,12 +464,14 @@ Future<List<_Segment>> _parsePlaylist(
 }
 
 Future<Uint8List?> _fetch(String url, Map headers, http.Client client) async {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 6; i++) {
     try {
-      final res = await client.get(Uri.parse(url), headers: headers.cast());
+      final res = await client
+          .get(Uri.parse(url), headers: headers.cast())
+          .timeout(const Duration(seconds: 25));
       if (res.statusCode == 200) return res.bodyBytes;
     } catch (_) {
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(Duration(seconds: i + 1));
     }
   }
   return null;
@@ -491,7 +509,8 @@ class _Segment {
   final Uint8List? key;
   final Uint8List? iv;
   final int index;
-  _Segment(this.url, this.key, this.iv, this.index);
+  final double duration;
+  _Segment(this.url, this.key, this.iv, this.index, this.duration);
 }
 
 class _Throttler {

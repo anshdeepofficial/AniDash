@@ -456,13 +456,14 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       totalSegments: (fields[14] as num?)?.toInt(),
       downloadedBytes: (fields[18] as num?)?.toInt(),
       isAdult: fields[19] == null ? false : fields[19] as bool,
+      durationSeconds: (fields[20] as num?)?.toInt(),
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadItem obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -502,7 +503,9 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       ..writeByte(18)
       ..write(obj.downloadedBytes)
       ..writeByte(19)
-      ..write(obj.isAdult);
+      ..write(obj.isAdult)
+      ..writeByte(20)
+      ..write(obj.durationSeconds);
   }
 
   @override

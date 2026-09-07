@@ -175,8 +175,13 @@ class DownloadCard extends ConsumerWidget {
 
   Widget _buildCompletedStatus(ThemeData theme) {
     final sizeMB = ((item.size ?? 0) / 1024 / 1024).toStringAsFixed(1);
+    final seconds = item.durationSeconds;
+    final durationText =
+        seconds != null && seconds > 0
+            ? ' • ${formatDuration(Duration(seconds: seconds))}'
+            : '';
     return Text(
-      '$sizeMB MB • Downloaded',
+      '$sizeMB MB$durationText • Downloaded',
       style: theme.textTheme.labelSmall?.copyWith(
         color: theme.colorScheme.primary,
       ),

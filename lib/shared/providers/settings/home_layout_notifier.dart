@@ -34,14 +34,24 @@ class HomeLayoutNotifier extends Notifier<List<HomeSection>> {
         final box = Hive.box(_boxName);
         final List<dynamic>? data = box.get(_hiveKey);
         if (data != null) {
-          result = data
-              .map((e) => HomeSection.fromJson(Map<String, dynamic>.from(e)))
-              .toList();
+          result =
+              data
+                  .map(
+                    (e) => HomeSection.fromJson(Map<String, dynamic>.from(e)),
+                  )
+                  .toList();
         }
       } catch (_) {}
     }
 
     if (result != null) {
+      var changed = false;
+      for (final defaultSection in _defaults()) {
+        if (!result.any((section) => section.id == defaultSection.id)) {
+          result.add(defaultSection);
+          changed = true;
+        }
+      }
       final index = result.indexWhere(
         (s) =>
             s.type == HomeSectionType.continueWatching ||
@@ -60,6 +70,8 @@ class HomeLayoutNotifier extends Notifier<List<HomeSection>> {
         _saveList(result);
       } else if (!result[index].enabled) {
         result[index] = result[index].copyWith(enabled: true);
+        _saveList(result);
+      } else if (changed) {
         _saveList(result);
       }
       return result;

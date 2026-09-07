@@ -18,7 +18,9 @@ class DownloadsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allDownloads = ref.watch(downloadsProvider.select((d) => d.downloads));
+    final allDownloads = ref.watch(
+      downloadsProvider.select((d) => d.downloads),
+    );
     final downloads =
         allDownloads.where((d) => isAdult ? d.isAdult : !d.isAdult).toList();
     final theme = Theme.of(context);
@@ -61,43 +63,46 @@ class DownloadsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        floatingActionButton: kDebugMode
-            ? FloatingActionButton(
-                onPressed: () async {
-                  final path =
-                      (await StorageProvider.getDefaultDirectory())!.path;
-                  AppLogger.d(
-                    "$path/Offline/One piece/1 - I am gonna be king of the pirates/Auto",
-                  );
+        floatingActionButton:
+            kDebugMode
+                ? FloatingActionButton(
+                  onPressed: () async {
+                    final path =
+                        (await StorageProvider.getDefaultDirectory())!.path;
+                    AppLogger.d(
+                      "$path/Offline/One piece/1 - I am gonna be king of the pirates/Auto",
+                    );
 
-                  ref
-                      .read(downloadsProvider.notifier)
-                      .addDownload(
-                        DownloadItem(
-                          animeTitle: 'One piece',
-                          episodeTitle: '1 - I am gonna be king of the pirates',
-                          episodeNumber: 1,
-                          thumbnail:
-                              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbUFgoWQMHU93hyXCzppyDfhPEcAf76WscJg&s',
-                          state: DownloadStatus.downloading,
-                          downloadUrl:
-                              'https://proxy.animetsu.cc/oppai/pahe/Fw8cARFZQkZuChkMER0eWl4OHkYeEQYWFC1KX1BdSUdbSQNbWA8GEktNIVdXW0EaEUAfB1hQVQQWQEAiBw8HFEpHTElUCghYAEMRRnNVDFBLHUFMT1FbDQxTTBBCcwBbV10MBwEEDF0cVQ',
-                          quality: 'Auto',
-                          progress: 0,
-                          filePath: '$path/Anime Title/1 - Episode Title/Auto',
-                          headers: {
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                            // 'Referer':
-                            //     'https://megacloud.blog/embed-2/v3/e-1/j7cbMWEbkUys?k=1',
-                            // 'Origin': 'https://megacloud.blog',
-                          },
-                        ),
-                      );
-                },
-                child: const Icon(Iconsax.add),
-              )
-            : null,
+                    ref
+                        .read(downloadsProvider.notifier)
+                        .addDownload(
+                          DownloadItem(
+                            animeTitle: 'One piece',
+                            episodeTitle:
+                                '1 - I am gonna be king of the pirates',
+                            episodeNumber: 1,
+                            thumbnail:
+                                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbUFgoWQMHU93hyXCzppyDfhPEcAf76WscJg&s',
+                            state: DownloadStatus.downloading,
+                            downloadUrl:
+                                'https://proxy.animetsu.cc/oppai/pahe/Fw8cARFZQkZuChkMER0eWl4OHkYeEQYWFC1KX1BdSUdbSQNbWA8GEktNIVdXW0EaEUAfB1hQVQQWQEAiBw8HFEpHTElUCghYAEMRRnNVDFBLHUFMT1FbDQxTTBBCcwBbV10MBwEEDF0cVQ',
+                            quality: 'Auto',
+                            progress: 0,
+                            filePath:
+                                '$path/Anime Title/1 - Episode Title/Auto',
+                            headers: {
+                              'User-Agent':
+                                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                              // 'Referer':
+                              //     'https://megacloud.blog/embed-2/v3/e-1/j7cbMWEbkUys?k=1',
+                              // 'Origin': 'https://megacloud.blog',
+                            },
+                          ),
+                        );
+                  },
+                  child: const Icon(Iconsax.add),
+                )
+                : null,
       ),
     );
   }
@@ -129,7 +134,12 @@ class DownloadsScreen extends ConsumerWidget {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.fromLTRB(
+        10,
+        10,
+        10,
+        MediaQuery.paddingOf(context).bottom + 110,
+      ),
       itemCount: items.length,
       itemBuilder: (context, index) {
         return DownloadCard(item: items[index]);

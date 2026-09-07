@@ -18,6 +18,7 @@ class DownloadItem {
   final List<dynamic>? subtitles;
   final int? totalSegments;
   final int? downloadedBytes;
+  final int? durationSeconds;
 
   final int speed;
   final Duration? eta;
@@ -47,6 +48,7 @@ class DownloadItem {
     this.subtitles,
     this.totalSegments,
     this.downloadedBytes,
+    this.durationSeconds,
     this.isAdult = false,
   }) : id = id ?? randomId();
 
@@ -69,6 +71,7 @@ class DownloadItem {
     String? contentType,
     int? totalSegments,
     int? downloadedBytes,
+    int? durationSeconds,
     List<dynamic>? subtitles,
     bool? isAdult,
   }) {
@@ -91,6 +94,7 @@ class DownloadItem {
       contentType: contentType ?? this.contentType,
       totalSegments: totalSegments ?? this.totalSegments,
       downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
       subtitles: subtitles ?? this.subtitles,
       isAdult: isAdult ?? this.isAdult,
     );
@@ -130,7 +134,12 @@ extension DownloadItemLogic on DownloadItem {
     } else if (downloadedBytes != null && downloadedBytes! > 0) {
       final currentMB = (downloadedBytes! / 1024 / 1024).toStringAsFixed(1);
       if (hasSegmentCount && progress > 0) {
-        final estTotal = (downloadedBytes! / progress * totalSegments! / 1024 / 1024).toStringAsFixed(1);
+        final estTotal = (downloadedBytes! /
+                progress *
+                totalSegments! /
+                1024 /
+                1024)
+            .toStringAsFixed(1);
         return '$currentMB / $estTotal MB';
       }
       return '$currentMB MB';
