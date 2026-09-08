@@ -150,7 +150,9 @@ class DownloadService {
   void _fail(DownloadItem item, String reason) {
     AppLogger.e(reason);
     NotificationService().cancelNotification(item.id.hashCode);
-    _notifier.updateDownloadState(item.copyWith(state: DownloadStatus.failed));
+    _notifier.updateDownloadState(
+      item.copyWith(state: DownloadStatus.failed, error: reason),
+    );
     _cleanup(item.id);
   }
 }
@@ -265,8 +267,11 @@ Future<DownloadItem> _processFile(
     if (range != null && range != '*') total = int.parse(range);
   }
 
-  final sink = file.openWrite(mode: FileMode.append);
-  int current = existing;
+  final canResume = existing > 0 && res.statusCode == 206;
+  final sink = file.openWrite(
+    mode: canResume ? FileMode.append : FileMode.write,
+  );
+  int current = canResume ? existing : 0;
   DateTime lastLog = DateTime.now();
 
   final throttler = _Throttler(task.settings.speedLimitKBps);

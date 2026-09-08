@@ -153,7 +153,7 @@ types:
         index: 6
   DownloadItem:
     typeId: 12
-    nextIndex: 20
+    nextIndex: 21
     fields:
       id:
         index: 0
@@ -195,6 +195,8 @@ types:
         index: 18
       isAdult:
         index: 19
+      audioLanguage:
+        index: 20
   DownloadStatus:
     typeId: 13
     nextIndex: 6

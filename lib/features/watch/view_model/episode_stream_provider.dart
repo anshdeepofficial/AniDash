@@ -497,6 +497,7 @@ class EpisodeData extends _$EpisodeData {
           ...?matchedSource.headers,
         },
         isAdult: _epList.isAdult,
+        audioLanguage: language == 'dub' ? 'English DUB' : 'Japanese SUB',
       );
 
       await ref.read(downloadsProvider.notifier).addDownload(item);
@@ -638,6 +639,7 @@ class EpisodeData extends _$EpisodeData {
             ...?source.headers,
           },
           isAdult: _epList.isAdult,
+          audioLanguage: targetLang == 'dub' ? 'English DUB' : 'Japanese SUB',
         );
 
         await ref.read(downloadsProvider.notifier).addDownload(item);

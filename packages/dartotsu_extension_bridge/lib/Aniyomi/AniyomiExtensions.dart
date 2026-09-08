@@ -163,10 +163,10 @@ class AniyomiExtensions extends Extension {
       rx.value = rx.value.where((s) => s.id != source.id).toList();
       switch (source.itemType) {
         case ItemType.anime:
-          getInstalledAnimeExtensions(); // because it also update extension on kotlin side
+          await getInstalledAnimeExtensions();
           break;
         case ItemType.manga:
-          getInstalledMangaExtensions();
+          await getInstalledMangaExtensions();
           break;
         case ItemType.novel:
           break;

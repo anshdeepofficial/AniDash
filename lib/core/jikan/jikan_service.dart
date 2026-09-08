@@ -74,4 +74,34 @@ class JikanService {
       return [];
     }
   }
+
+  Future<({Map<String, dynamic> details, List<dynamic> staff})?> getFullDetails(
+    int malId,
+  ) async {
+    try {
+      final responses = await Future.wait([
+        UniversalHttpClient.instance.get(
+          Uri.parse('$_baseUrl/anime/$malId/full'),
+          cacheConfig: CacheConfig.long,
+        ),
+        UniversalHttpClient.instance.get(
+          Uri.parse('$_baseUrl/anime/$malId/staff'),
+          cacheConfig: CacheConfig.long,
+        ),
+      ]).timeout(const Duration(seconds: 20));
+      if (responses.first.statusCode != 200) return null;
+      final detailsJson = json.decode(responses.first.body);
+      final staffJson =
+          responses.last.statusCode == 200
+              ? json.decode(responses.last.body)
+              : const <String, dynamic>{};
+      return (
+        details: Map<String, dynamic>.from(detailsJson['data'] ?? {}),
+        staff: List<dynamic>.from(staffJson['data'] ?? const []),
+      );
+    } catch (e) {
+      AppLogger.e('Jikan Full Details Error: $e');
+      return null;
+    }
+  }
 }

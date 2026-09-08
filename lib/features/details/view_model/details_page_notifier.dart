@@ -3,6 +3,7 @@ import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
+import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
@@ -86,6 +87,24 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
                   .read(anilistServiceProvider)
                   .getAnimeDetails(anilistId)
                   .timeout(const Duration(seconds: 15));
+      if (fresh == null && currentData != null) {
+        var malId = int.tryParse(currentData.idMal ?? '');
+        if (malId == null) {
+          final title =
+              currentData.title.english ?? currentData.title.romaji ?? '';
+          final matches = await JikanService().getSearch(
+            title: title,
+            limit: 1,
+          );
+          malId = matches.isEmpty ? null : matches.first.malId;
+        }
+        if (malId != null) {
+          final jikan = await JikanService().getFullDetails(malId);
+          if (jikan != null) {
+            fresh = _mergeJikanDetails(currentData, malId, jikan);
+          }
+        }
+      }
       if (fresh == null) {
         final repo = ref.read(animeRepositoryProvider);
         final fallbackId =
@@ -131,6 +150,84 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
         state = state.copyWith(details: AsyncError(e, st));
       }
     }
+  }
+
+  UniversalMedia _mergeJikanDetails(
+    UniversalMedia current,
+    int malId,
+    ({Map<String, dynamic> details, List<dynamic> staff}) jikan,
+  ) {
+    final data = jikan.details;
+    final studios =
+        (data['studios'] as List? ?? const [])
+            .map((item) => Map<String, dynamic>.from(item))
+            .map(
+              (item) => UniversalStudio(
+                name: item['name']?.toString() ?? '',
+                isMain: true,
+              ),
+            )
+            .where((studio) => studio.name.isNotEmpty)
+            .toList();
+    final staff =
+        jikan.staff.map((item) => Map<String, dynamic>.from(item)).map((item) {
+          final person = Map<String, dynamic>.from(item['person'] ?? {});
+          final images = Map<String, dynamic>.from(person['images'] ?? {});
+          final jpg = Map<String, dynamic>.from(images['jpg'] ?? {});
+          return UniversalStaff(
+            id: person['mal_id'] as int?,
+            name: UniversalStaffName(full: person['name']?.toString()),
+            image: UniversalStaffImage(
+              large: jpg['image_url']?.toString(),
+              medium: jpg['image_url']?.toString(),
+            ),
+            role: (item['positions'] as List? ?? const []).join(', '),
+          );
+        }).toList();
+    final genres =
+        <String>{
+          for (final key in const [
+            'genres',
+            'explicit_genres',
+            'themes',
+            'demographics',
+          ])
+            for (final item in data[key] as List? ?? const [])
+              if (item['name']?.toString().isNotEmpty == true)
+                item['name'].toString(),
+        }.toList();
+    final duration = int.tryParse(
+      RegExp(r'\d+').firstMatch(data['duration']?.toString() ?? '')?.group(0) ??
+          '',
+    );
+    final trailer = Map<String, dynamic>.from(data['trailer'] ?? {});
+    final trailerId = trailer['youtube_id']?.toString();
+    return current.copyWith(
+      idMal: malId.toString(),
+      description: data['synopsis']?.toString(),
+      episodes: data['episodes'] as int?,
+      duration: duration,
+      averageScore:
+          data['score'] is num ? (data['score'] as num).toDouble() * 10 : null,
+      popularity: data['popularity'] as int?,
+      genres: genres.isNotEmpty ? genres : null,
+      synonyms:
+          (data['title_synonyms'] as List? ?? const [])
+              .map((item) => item.toString())
+              .toList(),
+      source: data['source']?.toString(),
+      studios: studios,
+      staff: staff,
+      trailer:
+          trailerId == null
+              ? null
+              : UniversalTrailer(
+                id: trailerId,
+                site: 'youtube',
+                thumbnail: trailer['images']?['large_image_url']?.toString(),
+              ),
+      siteUrl: data['url']?.toString(),
+    );
   }
 
   Future<void> _fetchEpisodes(

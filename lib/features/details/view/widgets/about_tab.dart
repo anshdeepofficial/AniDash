@@ -164,31 +164,49 @@ class _AvailableLanguagesCardState
             episodes.isLoading ||
             firstEpisode == null ||
             snapshot.connectionState == ConnectionState.waiting;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Available languages to watch',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              children: [
-                _LanguageChip(
-                  label: 'Japanese (SUB)',
-                  available: result?.sub,
-                  loading: loading,
-                ),
-                _LanguageChip(
-                  label: 'English (DUB)',
-                  available: result?.dub,
-                  loading: loading,
-                ),
-              ],
-            ),
-          ],
+        final colors = Theme.of(context).colorScheme;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainer,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Available to watch',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              Text(
+                'Audio and subtitle availability',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _LanguageChip(
+                    label: 'Japanese (SUB)',
+                    available: result?.sub,
+                    loading: loading,
+                  ),
+                  _LanguageChip(
+                    label: 'English (DUB)',
+                    available: result?.dub,
+                    loading: loading,
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
@@ -213,6 +231,9 @@ class _LanguageChip extends StatelessWidget {
             ? '$label: Checking…'
             : '$label: ${available == true ? 'Available' : 'Unavailable'}';
     return Chip(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       avatar: Icon(
         loading
             ? Icons.hourglass_top_rounded

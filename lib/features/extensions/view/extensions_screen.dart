@@ -626,6 +626,27 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
           messenger.showSnackBar(
             SnackBar(content: Text('${source.name ?? 'Extension'} installed.')),
           );
+          if (context.mounted) {
+            final engine = source.extensionType ?? ExtensionType.mangayomi;
+            await showDialog<void>(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: Text('Installed in ${engine.toString()}'),
+                    content: Text(
+                      engine == ExtensionType.aniyomi
+                          ? 'You are viewing AniYomi sources. To return to your previous MangaYomi sources, tap the grid icon at the top and select MangaYomi.'
+                          : 'You are viewing MangaYomi sources. To find Android AniYomi sources, tap the grid icon at the top and select AniYomi.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Got it'),
+                      ),
+                    ],
+                  ),
+            );
+          }
         } catch (error) {
           messenger.showSnackBar(
             SnackBar(content: Text('Installation failed: $error')),
@@ -640,7 +661,7 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
           () => (source.extensionType?.getManager() ?? manager).updateSource(
             source,
           ),
-      onTap: () {
+      onTap: () async {
         // Open details or settings if installed
         if (widget.isInstalled) {
           context.push(
@@ -648,7 +669,9 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
             extra: source,
           );
         } else {
-          (source.extensionType?.getManager() ?? manager).installSource(source);
+          await (source.extensionType?.getManager() ?? manager).installSource(
+            source,
+          );
         }
       },
     );

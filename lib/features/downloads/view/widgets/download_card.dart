@@ -161,6 +161,25 @@ class DownloadCard extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Iconsax.volume_high,
+              size: 13,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              item.audioLanguage,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
         if (isCompleted)
           _buildCompletedStatus(theme)
         else if (isFailed)
@@ -190,7 +209,11 @@ class DownloadCard extends ConsumerWidget {
 
   Widget _buildFailedStatus(ThemeData theme) {
     return Text(
-      'Download Failed',
+      item.error == null
+          ? 'Download failed — tap Resume to retry'
+          : 'Failed: ${item.error}',
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
       style: theme.textTheme.labelSmall?.copyWith(
         color: theme.colorScheme.error,
       ),

@@ -152,7 +152,29 @@ class AnimeMatchService {
           }
         } catch (_) {}
       }
-      return [];
+
+      // Mature catalogues are incomplete by nature. If dedicated 18+ sources
+      // have no match, try installed regular extensions before native sources.
+      for (final s in sourceState.installedAnimeExtensions) {
+        try {
+          final res = await s.methods.search(query, 1, const []);
+          final list =
+              res.list
+                  .where((r) => r.title != null && r.url != null)
+                  .map(
+                    (r) => BaseAnimeModel(
+                      id: r.url,
+                      name: r.title,
+                      poster: r.cover,
+                    ),
+                  )
+                  .toList();
+          if (list.isNotEmpty) {
+            _ref.read(sourceProvider.notifier).setActiveSource(s);
+            return list;
+          }
+        } catch (_) {}
+      }
     }
 
     final useExtensions = _ref.read(experimentalProvider).useExtensions;

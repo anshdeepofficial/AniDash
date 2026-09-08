@@ -19,6 +19,7 @@ class DownloadItem {
   final int? totalSegments;
   final int? downloadedBytes;
   final int? durationSeconds;
+  final String audioLanguage;
 
   final int speed;
   final Duration? eta;
@@ -49,6 +50,7 @@ class DownloadItem {
     this.totalSegments,
     this.downloadedBytes,
     this.durationSeconds,
+    this.audioLanguage = 'Unknown',
     this.isAdult = false,
   }) : id = id ?? randomId();
 
@@ -72,6 +74,7 @@ class DownloadItem {
     int? totalSegments,
     int? downloadedBytes,
     int? durationSeconds,
+    String? audioLanguage,
     List<dynamic>? subtitles,
     bool? isAdult,
   }) {
@@ -95,6 +98,7 @@ class DownloadItem {
       totalSegments: totalSegments ?? this.totalSegments,
       downloadedBytes: downloadedBytes ?? this.downloadedBytes,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      audioLanguage: audioLanguage ?? this.audioLanguage,
       subtitles: subtitles ?? this.subtitles,
       isAdult: isAdult ?? this.isAdult,
     );

@@ -245,6 +245,8 @@ class _DownloadSourceSelectorState
         ...?matchedSource?.headers,
       },
       isAdult: widget.isAdult,
+      audioLanguage:
+          _selectedLanguage == 'dub' ? 'English DUB' : 'Japanese SUB',
     );
 
     await ref.read(downloadsProvider.notifier).addDownload(item);
@@ -277,9 +279,7 @@ class _DownloadSourceSelectorState
             label: 'Cancel',
             onPressed: () {
               messenger.hideCurrentSnackBar();
-              ref
-                  .read(downloadsProvider.notifier)
-                  .cancelDownload(item.id);
+              ref.read(downloadsProvider.notifier).cancelDownload(item.id);
             },
           ),
         ),
