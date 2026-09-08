@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/features/browse/view/browse_screen.dart';
@@ -65,6 +66,20 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
     _pageController = PageController(
       initialPage: widget.navigationShell.currentIndex,
     );
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _openDownloadsOffline(),
+    );
+  }
+
+  Future<void> _openDownloadsOffline() async {
+    final connections = await Connectivity().checkConnectivity();
+    if (!mounted || widget.navigationShell.currentIndex != 0) return;
+    if (connections.every(
+      (connection) => connection == ConnectivityResult.none,
+    )) {
+      widget.navigationShell.goBranch(3);
+      _pageController.jumpToPage(3);
+    }
   }
 
   @override

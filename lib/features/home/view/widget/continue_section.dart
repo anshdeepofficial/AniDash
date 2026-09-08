@@ -29,26 +29,31 @@ class ContinueSection extends ConsumerWidget {
             : List<AnimeWatchProgressEntry>.from(allProgress);
     final validEntries =
         scopedEntries.where((entry) {
-          if (dismissedIds.contains(entry.animeId)) return false;
-          if (entry.status.toLowerCase() == 'completed') return false;
-          if (entry.totalEpisodes > 0) {
-            if (entry.currentEpisode > entry.totalEpisodes) return false;
-            final finalEpisode = entry.episodesProgress[entry.totalEpisodes];
-            if (finalEpisode?.isCompleted == true) return false;
-            final duration = finalEpisode?.durationInSeconds ?? 0;
-            final progress = finalEpisode?.progressInSeconds ?? 0;
-            if (duration > 0 && progress / duration >= 0.90) return false;
+            if (dismissedIds.contains(entry.animeId)) return false;
+            if (entry.status.toLowerCase() == 'completed') return false;
+            if (entry.totalEpisodes > 0) {
+              if (entry.currentEpisode > entry.totalEpisodes) return false;
+              final finalEpisode = entry.episodesProgress[entry.totalEpisodes];
+              if (finalEpisode?.isCompleted == true) return false;
+              final duration = finalEpisode?.durationInSeconds ?? 0;
+              final progress = finalEpisode?.progressInSeconds ?? 0;
+              if (duration > 0 && progress / duration >= 0.90) return false;
 
-            if (entry.currentEpisode == entry.totalEpisodes) {
-              final currEp = entry.episodesProgress[entry.currentEpisode];
-              if (currEp?.isCompleted == true) return false;
-              final curDur = currEp?.durationInSeconds ?? 0;
-              final curProg = currEp?.progressInSeconds ?? 0;
-              if (curDur > 0 && curProg / curDur >= 0.90) return false;
+              if (entry.currentEpisode == entry.totalEpisodes) {
+                final currEp = entry.episodesProgress[entry.currentEpisode];
+                if (currEp?.isCompleted == true) return false;
+                final curDur = currEp?.durationInSeconds ?? 0;
+                final curProg = currEp?.progressInSeconds ?? 0;
+                if (curDur > 0 && curProg / curDur >= 0.90) return false;
+              }
             }
-          }
-          return true;
-        }).toList();
+            return true;
+          }).toList()
+          ..sort(
+            (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
+              a.lastUpdated ?? DateTime(0),
+            ),
+          );
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 

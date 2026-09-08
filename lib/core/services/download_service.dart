@@ -180,12 +180,22 @@ Future<void> _downloadWorker(_TaskConfig task) async {
   task.port.send('log: Processing as ${isM3U8 ? "M3U8" : "File"}');
 
   try {
-    DownloadItem result;
-    if (isM3U8) {
-      result = await _processM3U8(task, client, () => isCancelled);
-    } else {
-      result = await _processFile(task, client, () => isCancelled);
+    DownloadItem? result;
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3 && !isCancelled; attempt++) {
+      try {
+        result =
+            isM3U8
+                ? await _processM3U8(task, client, () => isCancelled)
+                : await _processFile(task, client, () => isCancelled);
+        break;
+      } catch (error) {
+        lastError = error;
+        task.port.send('log:Download attempt $attempt failed: $error');
+        if (attempt < 3) await Future.delayed(Duration(seconds: attempt));
+      }
     }
+    if (result == null) throw lastError ?? Exception('Download failed');
 
     if (!isCancelled) {
       result = await _downloadSubtitleSidecars(result, client);
@@ -276,24 +286,27 @@ Future<DownloadItem> _processFile(
 
   final throttler = _Throttler(task.settings.speedLimitKBps);
 
-  await for (final chunk in res.stream) {
-    if (isCancelled()) throw Exception("Cancelled");
-    sink.add(chunk);
-    current += chunk.length;
-    await throttler.throttle(chunk.length);
+  try {
+    await for (final chunk in res.stream.timeout(const Duration(seconds: 12))) {
+      if (isCancelled()) throw Exception("Cancelled");
+      sink.add(chunk);
+      current += chunk.length;
+      await throttler.throttle(chunk.length);
 
-    if (DateTime.now().difference(lastLog).inMilliseconds > 500) {
-      task.port.send(
-        task.item.copyWith(
-          state: DownloadStatus.downloading,
-          size: total,
-          progress: current,
-        ),
-      );
-      lastLog = DateTime.now();
+      if (DateTime.now().difference(lastLog).inMilliseconds > 500) {
+        task.port.send(
+          task.item.copyWith(
+            state: DownloadStatus.downloading,
+            size: total,
+            progress: current,
+          ),
+        );
+        lastLog = DateTime.now();
+      }
     }
+  } finally {
+    await sink.close();
   }
-  await sink.close();
 
   return task.item.copyWith(
     state: DownloadStatus.downloaded,
@@ -513,14 +526,15 @@ Future<List<_Segment>> _parsePlaylist(
 }
 
 Future<Uint8List?> _fetch(String url, Map headers, http.Client client) async {
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 5; i++) {
     try {
       final res = await client
           .get(Uri.parse(url), headers: headers.cast())
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 8));
       if (res.statusCode == 200) return res.bodyBytes;
-    } catch (_) {
-      await Future.delayed(Duration(seconds: i + 1));
+    } catch (_) {}
+    if (i < 4) {
+      await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
     }
   }
   return null;

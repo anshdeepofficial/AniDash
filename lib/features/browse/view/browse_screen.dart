@@ -16,6 +16,7 @@ import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/features/browse/view/widgets/filter_bottom_sheet.dart';
 import 'package:ani_dash/features/browse/view/section_screen.dart';
 import 'package:ani_dash/main.dart';
+import 'package:ani_dash/core/jikan/jikan_service.dart';
 
 class BrowseScreen extends ConsumerStatefulWidget {
   final String? keyword;
@@ -100,6 +101,24 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
         _repo.getUpcomingAnime(),
       ]);
 
+      if (results.every((result) => result.data.isEmpty)) {
+        final jikan = JikanService();
+        final fallback = await Future.wait([
+          jikan.getTopUniversal(),
+          jikan.getPopularUniversal(),
+          jikan.getUpcomingUniversal(),
+        ]);
+        if (mounted) {
+          setState(() {
+            _trending = fallback[0];
+            _popular = fallback[1];
+            _upcoming = fallback[2];
+            _isExploreLoading = false;
+          });
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
           _trending = results[0].data;
@@ -110,7 +129,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       }
     } catch (e, s) {
       AppLogger.e("Failed to fetch explore data", e, s);
-      if (mounted) setState(() => _isExploreLoading = false);
+      final jikan = JikanService();
+      final fallback = await Future.wait([
+        jikan.getTopUniversal(),
+        jikan.getPopularUniversal(),
+        jikan.getUpcomingUniversal(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _trending = fallback[0];
+          _popular = fallback[1];
+          _upcoming = fallback[2];
+          _isExploreLoading = false;
+        });
+      }
     }
   }
 
@@ -129,12 +161,17 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
         filter: _currentFilter,
       );
 
+      final effectiveResults =
+          page == 1 && results.isEmpty
+              ? await JikanService().searchUniversal(keyword)
+              : results;
+
       if (mounted) {
         setState(() {
           if (page == 1) {
-            _results = results;
+            _results = effectiveResults;
           } else {
-            _results.addAll(results);
+            _results.addAll(effectiveResults);
           }
           _hasMore = results.isNotEmpty;
           _isLoading = false;
@@ -142,7 +179,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       }
     } catch (e, stackTrace) {
       AppLogger.e("Search error", e, stackTrace);
-      if (mounted) setState(() => _isLoading = false);
+      final fallback = await JikanService().searchUniversal(keyword);
+      if (mounted) {
+        setState(() {
+          if (page == 1) _results = fallback;
+          _hasMore = false;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -187,7 +231,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
 
   List<String> get _suggestions {
     final query = _searchController.text.trim().toLowerCase();
-    if (query.length < 3) return const [];
+    if (query.isEmpty) return _searchHistory.take(8).toList();
     final titles = [..._trending, ..._popular, ..._upcoming]
         .map((anime) => anime.title.userPreferred)
         .where((title) => title.isNotEmpty);
@@ -277,22 +321,23 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: _searchController.text.isEmpty && _currentFilter.isEmpty
-                      ? _ExploreView(
-                          trending: _trending,
-                          popular: _popular,
-                          upcoming: _upcoming,
-                          isLoading: _isExploreLoading,
-                        )
-                      : _results.isEmpty && !_isLoading
+                  child:
+                      _searchController.text.isEmpty && _currentFilter.isEmpty
+                          ? _ExploreView(
+                            trending: _trending,
+                            popular: _popular,
+                            upcoming: _upcoming,
+                            isLoading: _isExploreLoading,
+                          )
+                          : _results.isEmpty && !_isLoading
                           ? _EmptyState()
                           : _ResultsGrid(
-                              results: _results,
-                              scrollController: _scrollController,
-                              columnCount: _getColumnCount(),
-                              isLoading: _isLoading,
-                              animation: _animationController,
-                            ),
+                            results: _results,
+                            scrollController: _scrollController,
+                            columnCount: _getColumnCount(),
+                            isLoading: _isLoading,
+                            animation: _animationController,
+                          ),
                 ),
                 if (_isSearchFocused && _suggestions.isNotEmpty)
                   Positioned(

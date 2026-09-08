@@ -37,6 +37,7 @@ class AniDashVideoPlayer extends ConsumerStatefulWidget {
   final ScreenshotController? screenshotController;
   final String? localFilePath;
   final String? localTitle;
+  final Duration localStartAt;
 
   const AniDashVideoPlayer({
     super.key,
@@ -45,6 +46,7 @@ class AniDashVideoPlayer extends ConsumerStatefulWidget {
     this.screenshotController,
     this.localFilePath,
     this.localTitle,
+    this.localStartAt = Duration.zero,
   });
 
   @override
@@ -91,7 +93,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         ref.read(playerUIControllerProvider.notifier).restartHideTimer();
         final path = widget.localFilePath;
         if (path != null) {
-          ref.read(playerStateProvider.notifier).open(path, Duration.zero);
+          ref
+              .read(playerStateProvider.notifier)
+              .open(path, widget.localStartAt);
         }
       }
     });

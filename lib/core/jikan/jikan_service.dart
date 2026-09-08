@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:ani_dash/core/jikan/models/jikan_media.dart';
+import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
@@ -53,6 +54,88 @@ class JikanService {
       AppLogger.e('Jikan Search Error: $e');
       return [];
     }
+  }
+
+  Future<List<UniversalMedia>> searchUniversal(String title) =>
+      _getUniversalList('/anime?q=${Uri.encodeQueryComponent(title)}&limit=20');
+
+  Future<List<UniversalMedia>> getTopUniversal() =>
+      _getUniversalList('/top/anime?limit=20');
+
+  Future<List<UniversalMedia>> getPopularUniversal() =>
+      _getUniversalList('/top/anime?filter=bypopularity&limit=20');
+
+  Future<List<UniversalMedia>> getUpcomingUniversal() =>
+      _getUniversalList('/seasons/upcoming?limit=20');
+
+  Future<List<UniversalMedia>> _getUniversalList(String path) async {
+    try {
+      final response = await UniversalHttpClient.instance
+          .get(Uri.parse('$_baseUrl$path'), cacheConfig: CacheConfig.long)
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return const [];
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      return (body['data'] as List<dynamic>? ?? const [])
+          .map((raw) => Map<String, dynamic>.from(raw as Map))
+          .map(_toUniversalMedia)
+          .toList();
+    } catch (error) {
+      AppLogger.e('Jikan browse fallback error: $error');
+      return const [];
+    }
+  }
+
+  UniversalMedia _toUniversalMedia(Map<String, dynamic> data) {
+    final images = Map<String, dynamic>.from(data['images'] as Map? ?? {});
+    final jpg = Map<String, dynamic>.from(images['jpg'] as Map? ?? {});
+    final titles =
+        (data['titles'] as List<dynamic>? ?? const [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+    String? titleOf(String type) {
+      for (final title in titles) {
+        if (title['type'] == type) return title['title']?.toString();
+      }
+      return null;
+    }
+
+    final malId = data['mal_id']?.toString() ?? '';
+    return UniversalMedia(
+      id: 'mal:$malId',
+      idMal: malId,
+      title: UniversalTitle(
+        romaji: titleOf('Default') ?? data['title']?.toString(),
+        english: titleOf('English') ?? data['title_english']?.toString(),
+        native: titleOf('Japanese') ?? data['title_japanese']?.toString(),
+      ),
+      coverImage: UniversalCoverImage(
+        extraLarge: jpg['large_image_url']?.toString(),
+        large: jpg['large_image_url']?.toString(),
+        medium: jpg['image_url']?.toString(),
+      ),
+      format: data['type']?.toString(),
+      status: data['status']?.toString(),
+      description: data['synopsis']?.toString(),
+      episodes: (data['episodes'] as num?)?.toInt(),
+      duration:
+          (data['duration']?.toString().isNotEmpty ?? false)
+              ? int.tryParse(
+                RegExp(
+                      r'\d+',
+                    ).firstMatch(data['duration'].toString())?.group(0) ??
+                    '',
+              )
+              : null,
+      averageScore: (data['score'] as num?)?.toDouble(),
+      popularity: (data['popularity'] as num?)?.toInt(),
+      isAdult: data['rating']?.toString().startsWith('Rx') == true,
+      genres:
+          (data['genres'] as List<dynamic>? ?? const [])
+              .map((e) => (e as Map)['name']?.toString() ?? '')
+              .where((e) => e.isNotEmpty)
+              .toList(),
+      siteUrl: data['url']?.toString(),
+    );
   }
 
   Future<List<JikanEpisode>> getEpisodes(int malId, int page) async {

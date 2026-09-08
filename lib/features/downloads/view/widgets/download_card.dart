@@ -41,11 +41,7 @@ class DownloadCard extends ConsumerWidget {
             isCompleted
                 ? () => Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute(
-                    builder:
-                        (context) => LocalPlayerScreen(
-                          filePath: item.filePath,
-                          title: '${item.animeTitle} - ${item.episodeTitle}',
-                        ),
+                    builder: (context) => LocalPlayerScreen(item: item),
                   ),
                 )
                 : null,
