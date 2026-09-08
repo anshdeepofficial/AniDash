@@ -9,6 +9,8 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
 import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
+import 'package:ani_dash/features/downloads/view/local_player_screen.dart';
+import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
@@ -171,6 +173,27 @@ class ContinueSection extends ConsumerWidget {
                         onTap: () async {
                           if (isLoading) return;
                           setState(() => isLoading = true);
+                          final localDownload = await ref
+                              .read(downloadsProvider.notifier)
+                              .findDownloadedEpisode(
+                                animeTitle: entry.animeTitle,
+                                episodeNumber: nextEpisodeNum,
+                              );
+                          if (localDownload != null && context.mounted) {
+                            await Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).push(
+                              MaterialPageRoute(
+                                builder:
+                                    (_) =>
+                                        LocalPlayerScreen(item: localDownload),
+                              ),
+                            );
+                            if (context.mounted)
+                              setState(() => isLoading = false);
+                            return;
+                          }
                           await providerAnimeMatchSearch(
                             context: context,
                             ref: ref,

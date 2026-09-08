@@ -161,4 +161,17 @@ class DownloadsNotifier extends _$DownloadsNotifier {
     state = state.copyWith(downloads: []);
     _repository.clearAll();
   }
+
+  Future<DownloadItem?> findDownloadedEpisode({
+    required String animeTitle,
+    required int episodeNumber,
+  }) async {
+    await _repository.init();
+    final normalized = animeTitle.trim().toLowerCase();
+    return _repository.getDownloads().where((item) {
+      return item.state == DownloadStatus.downloaded &&
+          item.episodeNumber == episodeNumber &&
+          item.animeTitle.trim().toLowerCase() == normalized;
+    }).firstOrNull;
+  }
 }

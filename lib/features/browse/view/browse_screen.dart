@@ -328,6 +328,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                             popular: _popular,
                             upcoming: _upcoming,
                             isLoading: _isExploreLoading,
+                            onRetry: _fetchExploreData,
                           )
                           : _results.isEmpty && !_isLoading
                           ? _EmptyState()
@@ -761,18 +762,39 @@ class _ExploreView extends StatelessWidget {
   final List<UniversalMedia> popular;
   final List<UniversalMedia> upcoming;
   final bool isLoading;
+  final VoidCallback onRetry;
 
   const _ExploreView({
     required this.trending,
     required this.popular,
     required this.upcoming,
     required this.isLoading,
+    required this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (trending.isEmpty && popular.isEmpty && upcoming.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 48),
+            const SizedBox(height: 12),
+            const Text('Could not load anime right now'),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
     }
 
     return SingleChildScrollView(

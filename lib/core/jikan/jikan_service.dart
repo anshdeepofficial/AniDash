@@ -69,20 +69,29 @@ class JikanService {
       _getUniversalList('/seasons/upcoming?limit=20');
 
   Future<List<UniversalMedia>> _getUniversalList(String path) async {
-    try {
-      final response = await UniversalHttpClient.instance
-          .get(Uri.parse('$_baseUrl$path'), cacheConfig: CacheConfig.long)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return const [];
-      final body = json.decode(response.body) as Map<String, dynamic>;
-      return (body['data'] as List<dynamic>? ?? const [])
-          .map((raw) => Map<String, dynamic>.from(raw as Map))
-          .map(_toUniversalMedia)
-          .toList();
-    } catch (error) {
-      AppLogger.e('Jikan browse fallback error: $error');
-      return const [];
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final response = await UniversalHttpClient.instance
+            .get(Uri.parse('$_baseUrl$path'), cacheConfig: CacheConfig.long)
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode == 200) {
+          final body = json.decode(response.body) as Map<String, dynamic>;
+          return (body['data'] as List<dynamic>? ?? const [])
+              .map((raw) => Map<String, dynamic>.from(raw as Map))
+              .map(_toUniversalMedia)
+              .toList();
+        }
+        lastError = 'HTTP ${response.statusCode}';
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < 2) {
+        await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+      }
     }
+    AppLogger.e('Jikan browse fallback error: $lastError');
+    return const [];
   }
 
   UniversalMedia _toUniversalMedia(Map<String, dynamic> data) {

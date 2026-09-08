@@ -36,16 +36,27 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
 
   AnimeWatchProgressEntry? _matchingEntry() {
     final title = widget.item.animeTitle.trim().toLowerCase();
-    for (final entry
-        in ref.read(watchProgressRepositoryProvider).getAllProgress()) {
-      if (entry.animeTitle.trim().toLowerCase() == title) return entry;
-    }
-    return null;
+    final matches =
+        ref
+            .read(watchProgressRepositoryProvider)
+            .getAllProgress()
+            .where((entry) => entry.animeTitle.trim().toLowerCase() == title)
+            .toList();
+    if (matches.isEmpty) return null;
+    return matches.firstWhere(
+      (entry) => !entry.animeId.startsWith('offline:'),
+      orElse: () => matches.first,
+    );
   }
 
-  Future<void> _saveProgress(Duration position, Duration duration) async {
+  Future<void> _saveProgress(
+    Duration position,
+    Duration duration, {
+    bool force = false,
+  }) async {
     if (duration.inSeconds <= 0 || position.inSeconds <= 0) return;
-    if (_lastSavedSecond >= 0 &&
+    if (!force &&
+        _lastSavedSecond >= 0 &&
         (position.inSeconds - _lastSavedSecond).abs() < 5)
       return;
     _lastSavedSecond = position.inSeconds;
@@ -162,6 +173,12 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        final playerState = ref.read(playerStateProvider);
+        await _saveProgress(
+          playerState.position,
+          playerState.duration,
+          force: true,
+        );
         await UIHelper.forcePortrait();
         await UIHelper.exitImmersiveMode();
         if (context.mounted) Navigator.pop(context);
