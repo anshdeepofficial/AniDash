@@ -58,7 +58,10 @@ class _AnimeCardState extends State<AnimeCard> {
                       averageScore:
                           widget.anime.averageScore == null
                               ? null
-                              : widget.anime.averageScore! / 10,
+                              : double.parse(
+                                (widget.anime.averageScore! / 10)
+                                    .toStringAsFixed(2),
+                              ),
                     ),
                     tag: widget.tag,
                     isHovered: _isHovered,

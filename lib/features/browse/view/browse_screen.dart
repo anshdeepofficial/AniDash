@@ -95,10 +95,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   Future<void> _fetchExploreData() async {
     if (mounted) setState(() => _isExploreLoading = true);
     try {
+      Future<UniversalPageResponse<UniversalMedia>> safeRepo(
+        Future<UniversalPageResponse<UniversalMedia>> Function() request,
+      ) async {
+        try {
+          return await request();
+        } catch (_) {
+          return UniversalPageResponse<UniversalMedia>.empty();
+        }
+      }
+
       final results = await Future.wait([
-        _repo.getTrendingAnime(),
-        _repo.getPopularAnime(),
-        _repo.getUpcomingAnime(),
+        safeRepo(_repo.getTrendingAnime),
+        safeRepo(_repo.getPopularAnime),
+        safeRepo(_repo.getUpcomingAnime),
       ]);
 
       if (results.every((result) => result.data.isEmpty)) {
@@ -695,14 +705,14 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'Start Your Search',
+              'No Anime Found',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'Enter an anime title to discover amazing series',
+              'Try another title or adjust your filters',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: Theme.of(
                   context,

@@ -56,17 +56,29 @@ class JikanService {
     }
   }
 
-  Future<List<UniversalMedia>> searchUniversal(String title) =>
-      _getUniversalList('/anime?q=${Uri.encodeQueryComponent(title)}&limit=20');
+  Future<List<UniversalMedia>> searchUniversal(String title) async {
+    final result = await _getUniversalList(
+      '/anime?q=${Uri.encodeQueryComponent(title)}&limit=20',
+    );
+    return result.isNotEmpty ? result : _getKitsuList(query: title);
+  }
 
-  Future<List<UniversalMedia>> getTopUniversal() =>
-      _getUniversalList('/top/anime?limit=20');
+  Future<List<UniversalMedia>> getTopUniversal() async {
+    final result = await _getUniversalList('/top/anime?limit=20');
+    return result.isNotEmpty ? result : _getKitsuList(sort: '-averageRating');
+  }
 
-  Future<List<UniversalMedia>> getPopularUniversal() =>
-      _getUniversalList('/top/anime?filter=bypopularity&limit=20');
+  Future<List<UniversalMedia>> getPopularUniversal() async {
+    final result = await _getUniversalList(
+      '/top/anime?filter=bypopularity&limit=20',
+    );
+    return result.isNotEmpty ? result : _getKitsuList(sort: 'popularityRank');
+  }
 
-  Future<List<UniversalMedia>> getUpcomingUniversal() =>
-      _getUniversalList('/seasons/upcoming?limit=20');
+  Future<List<UniversalMedia>> getUpcomingUniversal() async {
+    final result = await _getUniversalList('/seasons/upcoming?limit=20');
+    return result.isNotEmpty ? result : _getKitsuList(sort: '-startDate');
+  }
 
   Future<List<UniversalMedia>> _getUniversalList(String path) async {
     Object? lastError;
@@ -135,7 +147,11 @@ class JikanService {
                     '',
               )
               : null,
-      averageScore: (data['score'] as num?)?.toDouble(),
+      // UniversalMedia follows AniList's 0-100 score scale.
+      averageScore:
+          (data['score'] as num?)?.toDouble() == null
+              ? null
+              : (data['score'] as num).toDouble() * 10,
       popularity: (data['popularity'] as num?)?.toInt(),
       isAdult: data['rating']?.toString().startsWith('Rx') == true,
       genres:
@@ -145,6 +161,66 @@ class JikanService {
               .toList(),
       siteUrl: data['url']?.toString(),
     );
+  }
+
+  Future<List<UniversalMedia>> _getKitsuList({
+    String? query,
+    String? sort,
+  }) async {
+    try {
+      final parameters = <String, String>{'page[limit]': '20'};
+      if (query?.trim().isNotEmpty == true) {
+        parameters['filter[text]'] = query!.trim();
+      }
+      if (sort != null) parameters['sort'] = sort;
+      final uri = Uri.https('kitsu.io', '/api/edge/anime', parameters);
+      final response = await UniversalHttpClient.instance
+          .get(uri, cacheConfig: CacheConfig.long)
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return const [];
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      return (body['data'] as List<dynamic>? ?? const []).map((raw) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        final attributes = Map<String, dynamic>.from(
+          item['attributes'] as Map? ?? const {},
+        );
+        final titles = Map<String, dynamic>.from(
+          attributes['titles'] as Map? ?? const {},
+        );
+        final poster = Map<String, dynamic>.from(
+          attributes['posterImage'] as Map? ?? const {},
+        );
+        final rating = double.tryParse(
+          attributes['averageRating']?.toString() ?? '',
+        );
+        return UniversalMedia(
+          id: 'kitsu:${item['id']}',
+          title: UniversalTitle(
+            romaji:
+                titles['en_jp']?.toString() ??
+                attributes['canonicalTitle']?.toString(),
+            english: titles['en']?.toString(),
+            native: titles['ja_jp']?.toString(),
+          ),
+          coverImage: UniversalCoverImage(
+            extraLarge: poster['original']?.toString(),
+            large: poster['large']?.toString(),
+            medium: poster['medium']?.toString(),
+          ),
+          format: attributes['subtype']?.toString(),
+          status: attributes['status']?.toString(),
+          description: attributes['synopsis']?.toString(),
+          episodes: (attributes['episodeCount'] as num?)?.toInt(),
+          duration: (attributes['episodeLength'] as num?)?.toInt(),
+          averageScore: rating,
+          isAdult: attributes['ageRating']?.toString() == 'R18',
+          siteUrl: 'https://kitsu.io/anime/${item['id']}',
+        );
+      }).toList();
+    } catch (error) {
+      AppLogger.e('Kitsu browse fallback error: $error');
+      return const [];
+    }
   }
 
   Future<List<JikanEpisode>> getEpisodes(int malId, int page) async {

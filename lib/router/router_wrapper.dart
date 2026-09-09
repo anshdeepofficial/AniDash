@@ -11,6 +11,9 @@ import 'package:ani_dash/features/home/view/home_screen.dart' as h_screen;
 import 'package:ani_dash/features/loading/view_model/initialization_notifier.dart';
 import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
 import 'package:ani_dash/features/manga/view/manga_screen.dart';
+import 'package:ani_dash/core/services/update_scheduler.dart';
+import 'package:ani_dash/core/utils/updater.dart';
+import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
 
 class NavItem {
   final String path;
@@ -54,21 +57,52 @@ class AppRouterScreen extends ConsumerStatefulWidget {
   ConsumerState<AppRouterScreen> createState() => _AppRouterScreenState();
 }
 
-class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
+class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
+    with WidgetsBindingObserver {
   late final PageController _pageController;
+  bool _updateCheckInProgress = false;
+  DateTime? _lastForegroundUpdateCheck;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(
       () => ref.read(initializationProvider.notifier).initialize(),
     );
     _pageController = PageController(
       initialPage: widget.navigationShell.currentIndex,
     );
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _openDownloadsOffline(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openDownloadsOffline();
+      _checkForScheduledUpdate();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForScheduledUpdate();
+    }
+  }
+
+  Future<void> _checkForScheduledUpdate() async {
+    if (_updateCheckInProgress || !mounted) return;
+    final settings = ref.read(updateSettingsProvider);
+    if (!settings.autoCheckEnabled ||
+        !UpdateScheduler.isInsideWindow(settings)) {
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastForegroundUpdateCheck != null &&
+        now.difference(_lastForegroundUpdateCheck!).inMinutes < 1) {
+      return;
+    }
+    _updateCheckInProgress = true;
+    _lastForegroundUpdateCheck = now;
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) await checkForUpdates(context);
+    _updateCheckInProgress = false;
   }
 
   Future<void> _openDownloadsOffline() async {
@@ -96,6 +130,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
   }

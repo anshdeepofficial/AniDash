@@ -6,16 +6,23 @@ import 'package:ani_dash/core/models/settings/update_settings_model.dart';
 const updateCheckTask = 'anidash_update_check';
 
 class UpdateScheduler {
+  static bool isInsideWindow(
+    UpdateSettingsModel settings, [
+    DateTime? dateTime,
+  ]) {
+    final now = dateTime ?? DateTime.now();
+    return settings.startHour <= settings.endHour
+        ? now.hour >= settings.startHour && now.hour < settings.endHour
+        : now.hour >= settings.startHour || now.hour < settings.endHour;
+  }
+
   static Future<void> apply(UpdateSettingsModel settings) async {
     if (!Platform.isAndroid) return;
     await Workmanager().cancelByUniqueName(updateCheckTask);
     if (!settings.autoCheckEnabled) return;
 
     final now = DateTime.now();
-    final insideWindow =
-        settings.startHour <= settings.endHour
-            ? now.hour >= settings.startHour && now.hour < settings.endHour
-            : now.hour >= settings.startHour || now.hour < settings.endHour;
+    final insideWindow = isInsideWindow(settings, now);
     var firstRun =
         insideWindow
             ? now.add(const Duration(minutes: 1))
