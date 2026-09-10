@@ -10,6 +10,7 @@ import 'package:ani_dash/features/watch/view_model/watch_controller.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 
 class WatchScreen extends ConsumerStatefulWidget {
   final String mediaId;
@@ -101,6 +102,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   @override
   void dispose() {
+    ref.read(playerStateProvider.notifier).stop();
     _resetSystemUI();
     _panelController.dispose();
     super.dispose();
@@ -188,6 +190,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
+        ref.read(playerStateProvider.notifier).stop();
         _resetSystemUI();
         if (!didPop && context.mounted) {
           Navigator.pop(context);

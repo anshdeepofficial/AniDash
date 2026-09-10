@@ -80,23 +80,26 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
     try {
       final anilistId = int.tryParse(currentData?.id ?? animeId);
-      var fresh =
-          anilistId == null
-              ? null
-              : await ref
-                  .read(anilistServiceProvider)
-                  .getAnimeDetails(anilistId)
-                  .timeout(const Duration(seconds: 15));
+      UniversalMedia? fresh;
+      if (anilistId != null) {
+        try {
+          fresh = await ref
+              .read(anilistServiceProvider)
+              .getAnimeDetails(anilistId)
+              .timeout(const Duration(seconds: 15));
+        } catch (error) {
+          // AniList outages must not prevent the MAL/Jikan fallback below.
+          AppLogger.w('AniList details unavailable; trying fallback: $error');
+        }
+      }
       if (fresh == null && currentData != null) {
         var malId = int.tryParse(currentData.idMal ?? '');
         if (malId == null) {
           final title =
               currentData.title.english ?? currentData.title.romaji ?? '';
-          final matches = await JikanService().getSearch(
-            title: title,
-            limit: 1,
-          );
-          malId = matches.isEmpty ? null : matches.first.malId;
+          final matches = await JikanService().searchUniversal(title);
+          malId =
+              matches.isEmpty ? null : int.tryParse(matches.first.idMal ?? '');
         }
         if (malId != null) {
           final jikan = await JikanService().getFullDetails(malId);

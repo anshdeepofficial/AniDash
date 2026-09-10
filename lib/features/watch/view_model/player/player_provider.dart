@@ -293,6 +293,16 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Future<void> play() => _player.play();
   Future<void> pause() => _player.pause();
 
+  Future<void> stop() async {
+    _seekTimeout?.cancel();
+    _startupTimer?.cancel();
+    _pendingSeekTarget = null;
+    _lastUrl = null;
+    _lastHeaders = null;
+    await _player.stop();
+    state = PlayerState.initial();
+  }
+
   Future<void> seek(Duration pos) async {
     final needsNetwork = pos > state.buffer + const Duration(seconds: 1);
     if (needsNetwork) {

@@ -105,6 +105,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                 _KeepAliveWrapper(
                   child: EpisodesTab(
                     mediaId: displayedAnime.id.toString(),
+                    malId: int.tryParse(displayedAnime.idMal ?? ''),
                     mediaTitle: displayedAnime.title,
                     mediaFormat: displayedAnime.format ?? '',
                     mediaCover:

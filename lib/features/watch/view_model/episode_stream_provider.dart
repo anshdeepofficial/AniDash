@@ -783,31 +783,6 @@ class EpisodeData extends _$EpisodeData {
         await _loadSourceStream(0, startAt: startAt);
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
-        if (state.selectedServer?.isDub == true && _provider != null) {
-          try {
-            final subFallback = await _provider!
-                .getSources(
-                  _epList.animeId ?? '',
-                  epModel.id ?? epNum.toString(),
-                  state.selectedServer?.id,
-                  'sub',
-                )
-                .timeout(const Duration(seconds: 8));
-            if (subFallback.sources.any((source) => !source.isDub)) {
-              state = state.copyWith(
-                sources: subFallback.sources,
-                subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
-                headers: subFallback.headers?.cast<String, String>(),
-                selectedServer: state.selectedServer?.copyWith(isDub: false),
-                languageNotice:
-                    'English DUB is unavailable or invalid. Playing Japanese audio with subtitles.',
-              );
-              await _loadSourceStream(0, startAt: startAt);
-              return;
-            }
-          } catch (_) {}
-        }
-
         var alternateStarted = false;
         for (var index = 1; index < state.sources.length; index++) {
           try {
@@ -840,13 +815,40 @@ class EpisodeData extends _$EpisodeData {
         }
 
         fallback ??= await _fetchFallbackNativeSourceData(epModel, category);
-        if (fallback == null || fallback.sources.isEmpty) rethrow;
-        state = state.copyWith(
-          sources: fallback.sources,
-          subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
-          headers: fallback.headers?.cast<String, String>(),
-        );
-        await _loadSourceStream(0, startAt: startAt);
+        if (fallback != null && fallback.sources.isNotEmpty) {
+          state = state.copyWith(
+            sources: fallback.sources,
+            subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
+            headers: fallback.headers?.cast<String, String>(),
+          );
+          await _loadSourceStream(0, startAt: startAt);
+          return;
+        }
+
+        // Only offer SUB after every available DUB stream/server failed.
+        if (state.selectedServer?.isDub == true && _provider != null) {
+          final subFallback = await _provider!
+              .getSources(
+                _epList.animeId ?? '',
+                epModel.id ?? epNum.toString(),
+                state.selectedServer?.id,
+                'sub',
+              )
+              .timeout(const Duration(seconds: 8));
+          if (subFallback.sources.any((source) => !source.isDub)) {
+            state = state.copyWith(
+              sources: subFallback.sources,
+              subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
+              headers: subFallback.headers?.cast<String, String>(),
+              selectedServer: state.selectedServer?.copyWith(isDub: false),
+              languageNotice:
+                  'The English DUB stream could not be loaded. Japanese SUB is available.',
+            );
+            await _loadSourceStream(0, startAt: startAt);
+            return;
+          }
+        }
+        rethrow;
       }
     } catch (e, stack) {
       AppLogger.e('Episode playback failed', e, stack);

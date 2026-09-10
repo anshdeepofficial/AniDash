@@ -42,6 +42,7 @@ ValueNotifier<Set<int>> _getEpisodesSelectionNotifier(String mediaId) {
 
 class EpisodesTab extends ConsumerStatefulWidget {
   final String mediaId;
+  final int? malId;
   final UniversalTitle mediaTitle;
   final String mediaFormat;
   final String mediaCover;
@@ -50,6 +51,7 @@ class EpisodesTab extends ConsumerStatefulWidget {
   const EpisodesTab({
     super.key,
     required this.mediaId,
+    this.malId,
     required this.mediaTitle,
     required this.mediaFormat,
     required this.mediaCover,
@@ -282,6 +284,15 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             );
 
     final episodeListState = ref.watch(episodeListProvider);
+    if (widget.malId != null &&
+        episodeListState.episodes.isNotEmpty &&
+        episodeListState.malId != widget.malId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(episodeListProvider.notifier).attachMalId(widget.malId!);
+        }
+      });
+    }
 
     final isMatchingAnime =
         episodeListState.animeId == state.animeIdForSource ||

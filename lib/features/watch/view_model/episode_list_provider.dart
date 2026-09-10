@@ -170,6 +170,12 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
   void reset() => state = const EpisodeListState();
 
+  void attachMalId(int malId) {
+    if (state.malId == malId) return;
+    state = state.copyWith(malId: malId);
+    _syncJikanIfEnabled();
+  }
+
   // --- Internal Source Routing ---
 
   Future<List<EpisodeDataModel>> _fetchEpisodesInternal(
