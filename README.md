@@ -1,244 +1,102 @@
 <div align="center">
 
-   <img src="assets/icons/app_icon-modified-2.png" alt="ShonenX Logo" width="120"/>
+<img src="assets/icons/app_icon-modified-2.png" alt="AniDash Logo" width="120" />
 
 # AniDash
 
-### A Modern Anime Streaming & Discovery Client
+**A modern anime streaming, tracking, discovery, and manga client built with Flutter.**
 
-[![Flutter](https://img.shields.io/badge/Flutter-≥3.8.1-02569B?logo=flutter)](https://flutter.dev/)
-[![Dart](https://img.shields.io/badge/Dart-≥3.8.1-0175C2?logo=dart)](https://dart.dev)
-[![Version](https://img.shields.io/badge/Version-1.7.5-blue)](https://github.com/anshdeepofficial/AniDash/releases)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-orange.svg)](https://opensource.org/licenses/apache-2-0)
-[![GitHub stars](https://img.shields.io/github/stars/anshdeepofficial/AniDash?style=social)](https://github.com/anshdeepofficial/AniDash/stargazers)
+[![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial/AniDash?style=for-the-badge&logo=github&label=Latest)](https://github.com/anshdeepofficial/AniDash/releases/latest)
+![Flutter](https://img.shields.io/badge/Flutter-3.8%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.8%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows-111827?style=for-the-badge)
 
-<br/>
-
-<a href="https://github.com/sponsors/anshdeepofficial"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" height="32" /></a>
-<a href="https://buymeacoffee.com/anshdeepofficial"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="32" /></a>
-
-<br/>
-
-Track, discover, and stream your anime library & read manga with AniList and Community Extensions. Built with Flutter for Android and Windows.
-
-[Features](#-features) • [Screenshots](#-screenshots) • [Installation](#-installation) • [Contributing](#-contributing)
+<a href="https://github.com/anshdeepofficial/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-22C55E?style=for-the-badge&logo=android&logoColor=white" alt="Download latest AniDash APK" /></a>
+<a href="https://github.com/sponsors/anshdeepofficial"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub" /></a>
+<a href="https://buymeacoffee.com/anshdeepofficial"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000" alt="Buy Me a Coffee" /></a>
 
 </div>
 
 ---
 
-## ✨ Features
+## ✨ About AniDash
 
-### 📊 Anime Tracking
-- **AniList Integration** - Manage your anime library *(In Development)*
-- **MyAnimeList Support** - MAL client features *(Early Development)*
-- **Local Progress Tracking** - Continue watching without login
-- **Watch History** - Track your viewing locally
+AniDash brings anime discovery, streaming, progress tracking, and manga access into a customizable Flutter experience. It combines local progress features with external metadata and community-source support while keeping the interface focused on watching and discovering content.
 
-### 🎨 Customization
-- **Custom Design System** - Unique UI with smooth animations
-- **Extensive Theming** - Wide range of theme options
-- **Light/Dark Mode** - Comfortable viewing anytime
-- **Advanced Settings** - Personalize your experience
+## 🚀 Highlights
 
-### 🔌 Extensions
-- **Extensions** - Anime-focused extension support *(Experimental)*
-- **Built-in Sources** - Pre-configured providers
-- **Jikan Sync** - Episode metadata *(Experimental)*
+- Anime search and discovery
+- Streaming with SUB/DUB source handling
+- Local watch progress and history
+- AniList integration direction
+- MyAnimeList support in development
+- Filler episode detection and skip support
+- Manga reading support
+- Community extension/source system
+- Light and dark themes
+- Extensive appearance and playback customization
+- Android and Windows codebase via Flutter
 
-### 🔍 Search & Discovery
-- **Advanced Search** - Comprehensive filtering
-- **Content Filters** - Adult content toggle (off by default)
-- **Continue Watching** - Resume where you left off
+## 🎬 Playback & Library
 
-### 🌐 Platform Support
-- **Android** - Fully supported mobile experience
-- **Windows** - Native desktop build supported
-- **Linux** - Experimental builds (via install script)
-- **iOS/macOS** - Not planned currently
+AniDash is designed to preserve playback state, recover from source failures, and fall back between supported sources when needed. Local progress lets users continue watching even without signing into a tracking service.
 
----
+## 🔌 Integrations
 
-## 📸 Screenshots
+- **AniList** — anime metadata and tracking integration
+- **MyAnimeList / Jikan** — metadata and filler information
+- **Community Extensions** — experimental source support
+- **Local storage** — watch progress and history
 
-<details>
-<summary><b>📱 Android Screenshots (Click to expand)</b></summary>
+## 🛠️ Tech Stack
 
-<br/>
+| Area | Technology |
+| --- | --- |
+| Framework | Flutter |
+| Language | Dart |
+| Platforms | Android, Windows |
+| Architecture | Cross-platform client application |
+| License | Apache 2.0 |
 
-<div align="center">
-<table>
-  <tr>
-    <td align="center">
-      <img src="screenshots/mobile/home.jpg" width="200" alt="Home"/>
-      <br/><b>Home</b>
-    </td>
-    <td align="center">
-      <img src="screenshots/mobile/details.jpg" width="200" alt="Details"/>
-      <br/><b>Details</b>
-    </td>
-    <td align="center">
-      <img src="screenshots/mobile/stream.jpg" width="200" alt="Player"/>
-      <br/><b>Player</b>
-    </td>
-    <td align="center">
-      <img src="screenshots/mobile/anilist.jpg" width="200" alt="AniList"/>
-      <br/><b>AniList</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/mobile/image1.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image2.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image3.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image4.jpg" width="200"/></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/mobile/image5.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image6.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image7.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image8.jpg" width="200"/></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/mobile/image9.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image10.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image11.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image12.jpg" width="200"/></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/mobile/image13.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image14.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image15.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image16.jpg" width="200"/></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/mobile/image17.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image18.jpg" width="200"/></td>
-    <td align="center"><img src="screenshots/mobile/image19.jpg" width="200"/></td>
-    <td></td>
-  </tr>
-</table>
-</div>
+## 📥 Install AniDash
 
-</details>
+### Android
 
-<details>
-<summary><b>🖥️ Desktop Views (Windows/Linux)</b></summary>
+Use the **[Latest Release](https://github.com/anshdeepofficial/AniDash/releases/latest)** page and download the newest `.apk` asset published by this repository.
 
-<br/>
+> The README intentionally uses GitHub's `releases/latest` URL instead of a hard-coded APK version, so the download entry always leads to the newest published release.
 
-<div align="center">
-<table>
-  <tr>
-    <td align="center">
-      <img src="screenshots/desktop/home.jpg" width="400" alt="Desktop Home"/>
-      <br/><b>Home Screen</b>
-    </td>
-    <td align="center">
-      <img src="screenshots/desktop/details.jpg" width="400" alt="Desktop Details"/>
-      <br/><b>Anime Details</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="screenshots/desktop/stream.jpg" width="400" alt="Desktop Player"/>
-      <br/><b>Video Player</b>
-    </td>
-    <td align="center">
-      <img src="screenshots/desktop/anilist.jpg" width="400" alt="Desktop AniList"/>
-      <br/><b>AniList Integration</b>
-    </td>
-  </tr>
-</table>
-</div>
+After downloading, Android may ask you to allow installation from your browser or file manager.
 
-</details>
+### Build From Source
 
----
-
-## 🛠️ Technology Stack
-
-**Framework**: Flutter ≥3.8.1 | **Language**: Dart ≥3.8.1 | **Version**: 1.7.5
-
-<details>
-<summary><b>View Key Dependencies</b></summary>
-
-```yaml
-dependencies:
-  flutter_riverpod: ^3.0.1
-  go_router: ^14.7.1
-  hive_ce: ^2.16.0
-  hive_ce_flutter: ^2.1.0
-  media_kit: ^1.2.6
-  media_kit_video: ^2.0.1
-  graphql: ^5.2.3
-  google_fonts: ^6.2.1
-  cached_network_image: ^3.4.1
-  isar_community: ^3.3.0
-  dio: ^5.9.0
-  flex_color_scheme: ^8.4.0
-  dynamic_color: 1.7.0
-```
-
-</details>
-
----
-
-## 🚀 Installation
-
-### 📱 Android
-Download the latest `.apk` from the [Releases](https://github.com/Darkx-dev/ShonenX/releases) page.
-
-### 🪟 Windows
-Download the `Windows-Portable.zip` or the `.exe` installer from the [Releases](https://github.com/Darkx-dev/ShonenX/releases) page.
-
-### 🐧 Linux
-Run the following command to install/update:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/ShonenX/main/install.sh)
-```
-
-### 🛠️ Build from Source
-**Prerequisites**: Flutter SDK ≥3.8.1, Git
-```bash
-git clone https://github.com/roshancodespace/ShonenX.git
-cd ShonenX
+git clone https://github.com/anshdeepofficial/AniDash.git
+cd AniDash
 flutter pub get
-flutter pub run build_runner build --delete-conflicting-outputs
-flutter run # Select your device/platform
+flutter run
 ```
 
----
+A compatible Flutter SDK and platform toolchain are required.
+
+## 📦 Releases
+
+The latest stable build is always available here:
+
+**[github.com/anshdeepofficial/AniDash/releases/latest](https://github.com/anshdeepofficial/AniDash/releases/latest)**
+
+Release notes document playback fixes, source behavior, filler detection changes, verification, and package details for each published build.
 
 ## 🤝 Contributing
 
-Contributions welcome! Fork the repo, create a feature branch, and submit a PR.
+Contributions are welcome. Keep changes focused, test affected playback or UI flows, and avoid committing private provider credentials or copyrighted media.
 
----
+## ⚖️ Disclaimer
 
-## 📄 License
-
-Apache 2.0 License - see [LICENSE](LICENSE.md) file.
-
----
-
-## 📖 Documentation
-
-- [**Extension Development Guide**](EXTENSION_GUIDE.md) - Learn how to build extensions for ShonenX.
-
----
-
-## 📞 Support & Author
-
-**Developer**: Anshdeep Singh  
-**GitHub**: [@anshdeepofficial](https://github.com/anshdeepofficial)  
-**Repository**: [AniDash](https://github.com/anshdeepofficial/AniDash)
+AniDash is a client application. Content availability depends on configured sources and third-party services. Users are responsible for complying with applicable content licenses, service terms, and local laws.
 
 ---
 
 <div align="center">
-
-### ⭐ Star this repo if you find it useful!
-
-**Made with ❤️ by [Anshdeep Singh](https://github.com/anshdeepofficial)**
-
+Built by <a href="https://github.com/anshdeepofficial">Anshdeep Singh</a>
 </div>
