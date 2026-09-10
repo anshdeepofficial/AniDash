@@ -1001,9 +1001,23 @@ class EpisodeData extends _$EpisodeData {
       // A duration alone only proves that the manifest was parsed. Require
       // actual playback progress so a dead HLS host cannot leave a black
       // screen forever instead of activating server recovery.
-      await _player.videoController.player.stream.position
-          .firstWhere((position) => position > Duration.zero)
-          .timeout(const Duration(seconds: 8));
+      try {
+        await Future.any([
+          _player.videoController.player.stream.position.firstWhere(
+            (position) => position > Duration.zero,
+          ),
+          _player.videoController.player.stream.playing.firstWhere(
+            (playing) => playing,
+          ),
+        ]).timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        final nativeState = _player.videoController.player.state;
+        // Buffering can remain true after decoded frames/audio have started.
+        // Never reject that active stream and falsely label DUB unavailable.
+        if (!nativeState.playing && nativeState.position == Duration.zero) {
+          rethrow;
+        }
+      }
 
       final openedDuration = _player.videoController.player.state.duration;
       if (openedDuration > Duration.zero &&

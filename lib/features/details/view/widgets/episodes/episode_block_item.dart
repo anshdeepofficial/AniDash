@@ -47,6 +47,8 @@ class EpisodeBlockItem extends StatelessWidget {
                   ? theme.colorScheme.surfaceContainerHighest.withValues(
                     alpha: 0.5,
                   )
+                  : episode.isFiller == true
+                  ? theme.colorScheme.primary.withValues(alpha: 0.22)
                   : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
           border:

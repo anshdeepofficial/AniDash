@@ -56,12 +56,13 @@ class EpisodeListState {
     bool? isJikanSyncing,
     String? error,
     bool? isAdult,
+    bool clearMalId = false,
   }) {
     return EpisodeListState(
       animeId: animeId ?? this.animeId,
       animeTitle: animeTitle ?? this.animeTitle,
       animeCover: animeCover ?? this.animeCover,
-      malId: malId ?? this.malId,
+      malId: clearMalId ? null : (malId ?? this.malId),
       episodes: episodes ?? this.episodes,
       jikanMatches: jikanMatches ?? this.jikanMatches,
       isLoading: isLoading ?? this.isLoading,
@@ -111,6 +112,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       animeTitle: animeTitle,
       animeCover: animeCover ?? media?.cover,
       malId: malId,
+      clearMalId: malId == null,
+      jikanMatches: const [],
       isAdult: isAdult,
     );
     AppLogger.section('Fetching Episodes: $animeTitle');
