@@ -17,3 +17,4 @@ export './Settings/Settings.dart';
 
 // maybe needed sometimes
 export './Mangayomi/Models/Source.dart';
+export 'package:flutter_inappwebview/flutter_inappwebview.dart';

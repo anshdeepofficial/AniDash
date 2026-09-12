@@ -57,8 +57,9 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
     if (duration.inSeconds <= 0 || position.inSeconds <= 0) return;
     if (!force &&
         _lastSavedSecond >= 0 &&
-        (position.inSeconds - _lastSavedSecond).abs() < 5)
+        (position.inSeconds - _lastSavedSecond).abs() < 5) {
       return;
+    }
     _lastSavedSecond = position.inSeconds;
 
     final repository = ref.read(watchProgressRepositoryProvider);

@@ -389,10 +389,9 @@ class SubtitleCustomizationScreen extends ConsumerWidget {
                                       final m = presets[index].model;
                                       return prev.copyWith(
                                         fontSize:
-                                            m.fontSize *
-                                            MediaQuery.of(
+                                            MediaQuery.textScalerOf(
                                               context,
-                                            ).textScaleFactor,
+                                            ).scale(m.fontSize),
                                         textColor: m.textColor,
                                         outlineColor: m.outlineColor,
                                         outlineWidth:
@@ -414,10 +413,9 @@ class SubtitleCustomizationScreen extends ConsumerWidget {
                                           '${presets[index].name} Applied',
                                           style: TextStyle(
                                             fontSize:
-                                                14 *
-                                                MediaQuery.of(
+                                                MediaQuery.textScalerOf(
                                                   context,
-                                                ).textScaleFactor,
+                                                ).scale(14),
                                           ),
                                         ),
                                         duration: const Duration(

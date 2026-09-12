@@ -134,7 +134,8 @@ class _TrackerSearchSheetState extends ConsumerState<TrackerSearchSheet> {
               decoration: InputDecoration(
                 hintText: 'Search anime...',
                 filled: true,
-                fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                fillColor:
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 prefixIcon: Icon(
                   Iconsax.search_normal,
                   color: colorScheme.onSurfaceVariant,

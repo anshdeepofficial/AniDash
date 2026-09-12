@@ -100,7 +100,7 @@ class ColorPickerSettingsItem extends BaseSettingsItem {
           title: const Text('Customize Color'),
           content: ColorPicker(
             color: Color(selectedColor),
-            onColorChanged: (color) => tempColor = color.value,
+            onColorChanged: (color) => tempColor = color.toARGB32(),
             width: 40,
             height: 40,
             borderRadius: 4,

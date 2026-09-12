@@ -1,5 +1,5 @@
-﻿import 'dart:async';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'dart:async';
+import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
 class VideoSnifferService {

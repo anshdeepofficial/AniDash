@@ -16,6 +16,7 @@ part 'details_page_notifier.g.dart';
 @immutable
 class DetailsPageState {
   final AsyncValue<UniversalMedia> details;
+  final bool isLoadingDetails;
   final bool isSearchingMatch;
   final String? bestMatchName;
   final String? animeIdForSource;
@@ -26,6 +27,7 @@ class DetailsPageState {
 
   const DetailsPageState({
     this.details = const AsyncLoading(),
+    this.isLoadingDetails = false,
     this.isSearchingMatch = false,
     this.bestMatchName,
     this.animeIdForSource,
@@ -35,8 +37,11 @@ class DetailsPageState {
     this.error,
   });
 
+  bool get isLoading => isLoadingDetails || details.isLoading;
+
   DetailsPageState copyWith({
     AsyncValue<UniversalMedia>? details,
+    bool? isLoadingDetails,
     bool? isSearchingMatch,
     String? bestMatchName,
     String? animeIdForSource,
@@ -48,6 +53,7 @@ class DetailsPageState {
   }) {
     return DetailsPageState(
       details: details ?? this.details,
+      isLoadingDetails: isLoadingDetails ?? this.isLoadingDetails,
       isSearchingMatch: isSearchingMatch ?? this.isSearchingMatch,
       bestMatchName:
           setBestMatchNull ? null : (bestMatchName ?? this.bestMatchName),
@@ -68,11 +74,18 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     return const DetailsPageState();
   }
 
-  void init(UniversalMedia media) {
+  Future<void> init(UniversalMedia media) async {
     if (state.details is AsyncLoading) {
-      state = state.copyWith(details: AsyncData(media));
-      fetchDetails();
-      _fetchEpisodes(media.title);
+      state = state.copyWith(
+        details: AsyncData(media),
+        isLoadingDetails: true,
+        error: null,
+      );
+      ref.read(episodeListProvider.notifier).reset();
+      await fetchDetails();
+      if (!ref.mounted) return;
+      final enrichedMedia = state.details.value ?? media;
+      await _fetchEpisodes(enrichedMedia.title);
     }
   }
 
@@ -140,6 +153,14 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       if (!ref.mounted) return;
 
       if (fresh != null) {
+        var characters = fresh.characters;
+        if (characters.isEmpty && (currentData?.characters.isNotEmpty ?? false)) {
+          characters = currentData!.characters;
+        }
+        if (characters.isEmpty) {
+          characters = await _fetchFallbackCharacters(fresh);
+        }
+
         final enriched = fresh.copyWith(
           description:
               fresh.description?.trim().isNotEmpty == true
@@ -154,25 +175,41 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
               fresh.relations.isNotEmpty
                   ? fresh.relations
                   : currentData?.relations,
-          characters:
-              fresh.characters.isNotEmpty
-                  ? fresh.characters
-                  : currentData?.characters ?? const [],
+          characters: characters,
         );
-        state = state.copyWith(details: AsyncData(enriched));
-        if (state.animeIdForSource == null) {
+        state = state.copyWith(
+          details: AsyncData(enriched),
+          isLoadingDetails: false,
+        );
+        if (state.animeIdForSource == null && !state.isSearchingMatch) {
           _fetchEpisodes(enriched.title);
         }
       } else if (currentData != null) {
-        state = state.copyWith(details: AsyncData(currentData));
+        var enriched = currentData;
+        if (enriched.characters.isEmpty) {
+          final fallbackChars = await _fetchFallbackCharacters(enriched);
+          if (fallbackChars.isNotEmpty) {
+            enriched = enriched.copyWith(characters: fallbackChars);
+          }
+        }
+        state = state.copyWith(
+          details: AsyncData(enriched),
+          isLoadingDetails: false,
+        );
       }
     } catch (e, st) {
       AppLogger.e('Failed to fetch anime details for $animeId', e, st);
       if (!ref.mounted) return;
       if (currentData != null) {
-        state = state.copyWith(details: AsyncData(currentData));
+        state = state.copyWith(
+          details: AsyncData(currentData),
+          isLoadingDetails: false,
+        );
       } else {
-        state = state.copyWith(details: AsyncError(e, st));
+        state = state.copyWith(
+          details: AsyncError(e, st),
+          isLoadingDetails: false,
+        );
       }
     }
   }
@@ -213,23 +250,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
             role: (item['positions'] as List? ?? const []).join(', '),
           );
         }).toList();
-    final characters = jikan.characters
-        .map((item) => Map<String, dynamic>.from(item as Map? ?? {}))
-        .map((item) {
-          final charMap =
-              Map<String, dynamic>.from(item['character'] as Map? ?? {});
-          final images =
-              Map<String, dynamic>.from(charMap['images'] as Map? ?? {});
-          final jpg = Map<String, dynamic>.from(images['jpg'] as Map? ?? {});
-          return UniversalCharacter(
-            id: (charMap['mal_id'] as num?)?.toInt() ?? 0,
-            name: charMap['name']?.toString() ?? '',
-            image: jpg['image_url']?.toString(),
-            role: item['role']?.toString(),
-          );
-        })
-        .where((c) => c.name.isNotEmpty)
-        .toList();
+    final characters = _mapJikanCharacters(jikan.characters);
     final genres =
         <String>{
           for (final key in const [
@@ -277,6 +298,58 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     );
   }
 
+  Future<List<UniversalCharacter>> _fetchFallbackCharacters(
+    UniversalMedia media,
+  ) async {
+    final malId = int.tryParse(media.idMal ?? '');
+    if (malId != null) {
+      try {
+        final jikan = await JikanService().getFullDetails(malId);
+        if (jikan != null && jikan.characters.isNotEmpty) {
+          return _mapJikanCharacters(jikan.characters);
+        }
+      } catch (_) {}
+    }
+
+    final title =
+        media.title.english ?? media.title.romaji ?? media.title.userPreferred;
+    if (title.isNotEmpty) {
+      try {
+        final matches = await JikanService().searchUniversal(title);
+        if (matches.isNotEmpty) {
+          final matchedMalId = int.tryParse(matches.first.idMal ?? '');
+          if (matchedMalId != null) {
+            final jikan = await JikanService().getFullDetails(matchedMalId);
+            if (jikan != null && jikan.characters.isNotEmpty) {
+              return _mapJikanCharacters(jikan.characters);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  List<UniversalCharacter> _mapJikanCharacters(List<dynamic> rawCharacters) {
+    return rawCharacters
+        .map((item) => Map<String, dynamic>.from(item as Map? ?? {}))
+        .map((item) {
+          final charMap =
+              Map<String, dynamic>.from(item['character'] as Map? ?? {});
+          final images =
+              Map<String, dynamic>.from(charMap['images'] as Map? ?? {});
+          final jpg = Map<String, dynamic>.from(images['jpg'] as Map? ?? {});
+          return UniversalCharacter(
+            id: (charMap['mal_id'] as num?)?.toInt() ?? 0,
+            name: charMap['name']?.toString() ?? '',
+            image: jpg['image_url']?.toString(),
+            role: item['role']?.toString(),
+          );
+        })
+        .where((c) => c.name.isNotEmpty)
+        .toList();
+  }
+
   Future<void> _fetchEpisodes(
     UniversalTitle mediaTitle, {
     bool force = false,
@@ -301,7 +374,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
     try {
       if (state.animeIdForSource == null) {
-        state = state.copyWith(isSearchingMatch: true);
+        state = state.copyWith(isSearchingMatch: true, error: null);
 
         // Reset old episodes to avoid bleeding from previously opened anime
         ref.read(episodeListProvider.notifier).reset();
@@ -353,7 +426,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
         }
       }
 
-      state = state.copyWith(isSearchingMatch: false);
+      state = state.copyWith(isSearchingMatch: false, error: null);
 
       if (state.bestMatchName == null || state.animeIdForSource == null) {
         return;

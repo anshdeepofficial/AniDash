@@ -75,22 +75,32 @@ class BackupService {
       final fileName = 'AniDash_backup_${DateTime.now().millisecondsSinceEpoch}.json';
 
       if (Platform.isAndroid) {
-        final hasPermission = await _ref.read(permissionsProvider.notifier).requestStoragePermission();
-        
-        if (hasPermission) {
-          final dir = await StorageProvider.getDefaultDirectory();
-          if (dir != null) {
-            final file = File('${dir.path}/$fileName');
-            await file.writeAsString(jsonString);
-            AppLogger.i('Backup saved to ${file.path}');
-            return;
+        bool saved = false;
+        try {
+          final hasPermission = await _ref
+              .read(permissionsProvider.notifier)
+              .requestStoragePermission();
+
+          if (hasPermission) {
+            final dir = await StorageProvider.getDefaultDirectory();
+            if (dir != null) {
+              final file = File('${dir.path}/$fileName');
+              await file.writeAsString(jsonString);
+              AppLogger.i('Backup saved to ${file.path}');
+              saved = true;
+              return;
+            }
           }
+        } catch (err) {
+          AppLogger.w('Storage permission check failed or denied, sharing backup file: $err');
         }
 
-        final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/$fileName');
-        await file.writeAsString(jsonString);
-        await Share.shareXFiles([XFile(file.path)], text: 'AniDash Backup');
+        if (!saved) {
+          final tempDir = await getTemporaryDirectory();
+          final file = File('${tempDir.path}/$fileName');
+          await file.writeAsString(jsonString);
+          await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'AniDash Backup'));
+        }
       } else {
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Backup',

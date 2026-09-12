@@ -28,6 +28,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var isScreenshotPrivacyEnabled = false
     private var displayListener: DisplayManager.DisplayListener? = null
     private var audioFocusChannel: MethodChannel? = null
+    private var pipChannel: MethodChannel? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
@@ -336,25 +337,58 @@ class MainActivity : FlutterFragmentActivity() {
                 }
             }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/pip")
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "enterPiP" -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            try {
-                                val params = android.app.PictureInPictureParams.Builder().build()
-                                val success = enterPictureInPictureMode(params)
-                                result.success(success)
-                            } catch (e: Exception) {
-                                result.success(false)
-                            }
-                        } else {
+        pipChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/pip")
+        pipChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "enterPiP" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            val params = android.app.PictureInPictureParams.Builder().build()
+                            val success = enterPictureInPictureMode(params)
+                            result.success(success)
+                        } catch (e: Exception) {
                             result.success(false)
                         }
+                    } else {
+                        result.success(false)
                     }
-                    else -> result.notImplemented()
                 }
+                "exitPiP" -> {
+                    try {
+                        val intent = Intent(this@MainActivity, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "closePiP" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+                            moveTaskToBack(true)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "isPiP" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        result.success(isInPictureInPictureMode)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        pipChannel?.invokeMethod("onPiPChanged", isInPictureInPictureMode)
     }
 
     override fun onUserLeaveHint() {

@@ -190,10 +190,12 @@ class ContinueSection extends ConsumerWidget {
                                         LocalPlayerScreen(item: localDownload),
                               ),
                             );
-                            if (context.mounted)
+                            if (context.mounted) {
                               setState(() => isLoading = false);
+                            }
                             return;
                           }
+                          if (!context.mounted) return;
                           await providerAnimeMatchSearch(
                             context: context,
                             ref: ref,

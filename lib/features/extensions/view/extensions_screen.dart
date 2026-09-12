@@ -626,7 +626,7 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
           messenger.showSnackBar(
             SnackBar(content: Text('${source.name ?? 'Extension'} installed.')),
           );
-          if (context.mounted) {
+          if (mounted) {
             final engine = source.extensionType ?? ExtensionType.mangayomi;
             await showDialog<void>(
               context: context,

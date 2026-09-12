@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
@@ -12,6 +11,7 @@ import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/orientation_lock_provider.dart';
+import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -258,8 +258,7 @@ class TopControls extends ConsumerWidget {
                     tooltip: 'Picture-in-Picture',
                     onTap: () async {
                       try {
-                        const MethodChannel('shonenx/pip')
-                            .invokeMethod('enterPiP');
+                        await ref.read(pipProvider.notifier).enterPiP();
                       } catch (_) {}
                       onInteraction();
                     },

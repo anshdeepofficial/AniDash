@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -14,6 +13,7 @@ import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
+import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
 
 class WatchScreen extends ConsumerStatefulWidget {
   final String mediaId;
@@ -107,7 +107,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     } catch (_) {}
     try {
       await FlutterVolumeController.updateShowSystemUI(true);
-      const MethodChannel('shonenx/pip').invokeMethod('interceptVolumeKeys', false);
+      await UIHelper.disableVolumeInterception();
     } catch (_) {}
     await UIHelper.resetOrientation();
     await UIHelper.exitImmersiveMode();
@@ -213,13 +213,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         backgroundColor: Colors.black,
         body: OrientationBuilder(
           builder: (_, orientation) {
+            final isPiP = ref.watch(pipProvider);
+            if (isPiP && _panelController.value > 0) {
+              _panelController.reset();
+            }
+
             final player = AniDashVideoPlayer(
               onEpisodesPressed: _togglePanel,
               onPanelCloseRequest: () => _panelController.reverse(),
               screenshotController: _screenshotController,
             );
 
-            if (orientation == Orientation.landscape) {
+            if (orientation == Orientation.landscape && !isPiP) {
               return Row(
                 children: [
                   Expanded(child: player),

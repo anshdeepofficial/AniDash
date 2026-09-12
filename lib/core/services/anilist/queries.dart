@@ -150,17 +150,19 @@ class AnilistQueries {
         }
       }
     }
-    characters(sort: ROLE, perPage: 10) {
+    characters(sort: ROLE, perPage: 50) {
       edges {
         role
         node {
           id
           name {
             full
+            userPreferred
             native
           }
           image {
             large
+            medium
           }
         }
       }

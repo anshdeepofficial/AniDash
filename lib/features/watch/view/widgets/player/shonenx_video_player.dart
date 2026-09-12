@@ -20,6 +20,8 @@ import 'package:ani_dash/features/watch/view/widgets/player/sheets/subtitle_sele
 import 'package:ani_dash/features/watch/view/widgets/player/speed_indicator_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/subtitle_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/volume_brightness_overlay.dart';
+import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/pip_overlay.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
@@ -485,6 +487,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final state = ref.watch(playerStateProvider);
     final uiState = ref.watch(playerUIControllerProvider);
     final uiController = ref.watch(playerUIControllerProvider.notifier);
+    final isPiP = ref.watch(pipProvider);
 
     final episodeStreamState = ref.watch(
       episodeDataProvider.select((e) => e.states),
@@ -548,8 +551,13 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               // Video Layer
               videoView,
 
-              // Gesture Layer (Background)
-              Positioned.fill(
+              if (isPiP)
+                const Positioned.fill(
+                  child: PiPControlsOverlay(),
+                )
+              else ...[
+                // Gesture Layer (Background)
+                Positioned.fill(
                 child: PlayerGestureHandler(
                   onTap: () {
                     widget.onPanelCloseRequest?.call();
@@ -698,9 +706,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               // Floating Next Episode Recommendation Prompt (at 95% progress)
               const NextEpisodePromptOverlay(),
             ],
-          ),
+          ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

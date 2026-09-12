@@ -336,21 +336,28 @@ class UniversalMediaRankingMapper {
 
 class UniversalCharacterMapper {
   static UniversalCharacter fromAnilist(Map<String, dynamic> edge) {
-    final charNode = edge['node'] ?? {};
+    final charNode = Map<String, dynamic>.from(edge['node'] as Map? ?? {});
+    final nameMap = Map<String, dynamic>.from(charNode['name'] as Map? ?? {});
+    final imageMap = Map<String, dynamic>.from(charNode['image'] as Map? ?? {});
+    final name = nameMap['full'] ??
+        nameMap['userPreferred'] ??
+        nameMap['native'] ??
+        'Unknown';
+    final image = imageMap['large'] ?? imageMap['medium'];
     return UniversalCharacter(
-      id: charNode['id'] ?? 0,
-      name: charNode['name']?['full'] ?? 'Unknown',
-      image: charNode['image']?['large'],
-      role: edge['role'],
+      id: (charNode['id'] as num?)?.toInt() ?? 0,
+      name: name.toString(),
+      image: image?.toString(),
+      role: edge['role']?.toString(),
     );
   }
 
   static UniversalCharacter fromJson(Map<String, dynamic> json) {
     return UniversalCharacter(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? 'Unknown',
-      image: json['image'],
-      role: json['role'],
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: json['name']?.toString() ?? 'Unknown',
+      image: json['image']?.toString(),
+      role: json['role']?.toString(),
     );
   }
 }

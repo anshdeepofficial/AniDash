@@ -5,11 +5,13 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 class CharactersTab extends StatelessWidget {
   final List<UniversalCharacter> characters;
   final bool isLoading;
+  final VoidCallback? onRetry;
 
   const CharactersTab({
     super.key,
     required this.characters,
     this.isLoading = false,
+    this.onRetry,
   });
 
   @override
@@ -39,6 +41,14 @@ class CharactersTab extends StatelessWidget {
                 ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Retry'),
+              ),
+            ],
           ],
         ),
       );
@@ -47,7 +57,7 @@ class CharactersTab extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = (constraints.maxWidth / 140).floor().clamp(
-          1,
+          2,
           10,
         );
         return GridView.builder(

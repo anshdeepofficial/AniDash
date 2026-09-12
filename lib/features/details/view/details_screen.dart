@@ -74,7 +74,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
     final id = widget.anime.id;
     final pageState = ref.watch(detailsPageProvider(id));
     final displayedAnime = pageState.details.value ?? widget.anime;
-    final isLoading = pageState.details.isLoading;
+    final isLoading = pageState.isLoading;
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
@@ -119,6 +119,10 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                   child: CharactersTab(
                     characters: displayedAnime.characters,
                     isLoading: isLoading,
+                    onRetry:
+                        () => ref
+                            .read(detailsPageProvider(id).notifier)
+                            .fetchDetails(),
                   ),
                 ),
               ],

@@ -6,6 +6,7 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/utils/html_parser.dart';
 import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/features/details/view/widgets/horizontal_media_list.dart';
+import 'package:ani_dash/features/details/view_model/details_page_notifier.dart';
 import 'package:ani_dash/helpers/navigation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
@@ -32,10 +33,12 @@ class DetailsContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          NextEpisodeWidget(anime: anime),
-          const SizedBox(height: 24),
+          if (anime.nextAiringEpisode != null) ...[
+            NextEpisodeWidget(anime: anime),
+            const SizedBox(height: 12),
+          ],
           AvailableLanguagesCard(mediaId: mediaId),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           AnimeSynopsis(
             description: anime.description ?? '',
             isLoading: isLoading && (anime.description?.isEmpty ?? true),
@@ -146,8 +149,11 @@ class _AvailableLanguagesCardState
   @override
   Widget build(BuildContext context) {
     final episodes = ref.watch(episodeListProvider);
+    final detailsState = ref.watch(detailsPageProvider(widget.mediaId));
+    final isMatching = detailsState.animeIdForSource != null &&
+        episodes.animeId == detailsState.animeIdForSource;
     final firstEpisode =
-        episodes.episodes.isEmpty ? null : episodes.episodes.first;
+        (!isMatching || episodes.episodes.isEmpty) ? null : episodes.episodes.first;
     final key = '${widget.mediaId}:${episodes.animeId}:${firstEpisode?.id}';
     if (firstEpisode != null && episodes.animeId != null && key != _lookupKey) {
       _lookupKey = key;
@@ -164,46 +170,45 @@ class _AvailableLanguagesCardState
             episodes.isLoading ||
             firstEpisode == null ||
             snapshot.connectionState == ConnectionState.waiting;
-        final colors = Theme.of(context).colorScheme;
+        final theme = Theme.of(context);
+        final colors = theme.colorScheme;
+
         return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: colors.surfaceContainer,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colors.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.35),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                'Available to watch',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              Icon(
+                Iconsax.headphone,
+                size: 16,
+                color: colors.primary,
               ),
+              const SizedBox(width: 8),
               Text(
-                'Audio and subtitle availability',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                'Audio & Subs',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
+                  letterSpacing: 0.2,
+                ),
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _LanguageChip(
-                    label: 'Japanese (SUB)',
-                    available: result?.sub,
-                    loading: loading,
-                  ),
-                  _LanguageChip(
-                    label: 'English (DUB)',
-                    available: result?.dub,
-                    loading: loading,
-                  ),
-                ],
+              const Spacer(),
+              _AudioBadge(
+                label: 'SUB',
+                available: result?.sub,
+                loading: loading,
+              ),
+              const SizedBox(width: 8),
+              _AudioBadge(
+                label: 'DUB',
+                available: result?.dub,
+                loading: loading,
               ),
             ],
           ),
@@ -213,12 +218,12 @@ class _AvailableLanguagesCardState
   }
 }
 
-class _LanguageChip extends StatelessWidget {
+class _AudioBadge extends StatelessWidget {
   final String label;
   final bool? available;
   final bool loading;
 
-  const _LanguageChip({
+  const _AudioBadge({
     required this.label,
     required this.available,
     required this.loading,
@@ -226,23 +231,85 @@ class _LanguageChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text =
-        loading
-            ? '$label: Checking…'
-            : '$label: ${available == true ? 'Available' : 'Unavailable'}';
-    return Chip(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      avatar: Icon(
-        loading
-            ? Icons.hourglass_top_rounded
-            : available == true
-            ? Icons.check_circle_outline
-            : Icons.cancel_outlined,
-        size: 18,
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    if (loading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHigh.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  colors.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isAvail = available == true;
+    final badgeColor = isAvail ? Colors.green : colors.outlineVariant;
+    final bgColor = isAvail
+        ? Colors.green.withValues(alpha: 0.12)
+        : colors.surfaceContainerHighest.withValues(alpha: 0.4);
+    final textColor = isAvail
+        ? (theme.brightness == Brightness.dark
+            ? Colors.greenAccent
+            : Colors.green.shade800)
+        : colors.onSurfaceVariant.withValues(alpha: 0.5);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isAvail
+              ? badgeColor.withValues(alpha: 0.35)
+              : Colors.transparent,
+        ),
       ),
-      label: Text(text),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAvail ? Icons.check_circle_rounded : Icons.cancel_outlined,
+            size: 13,
+            color: textColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

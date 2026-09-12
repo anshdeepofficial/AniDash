@@ -1,4 +1,4 @@
-﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -131,9 +131,12 @@ class _AnimeSearchDialogState extends ConsumerState<AnimeSearchDialog> {
   Widget _buildResults(ThemeData theme) {
     final searchState = ref.watch(animeSearchProvider);
 
-    if (searchState.isLoading)
+    if (searchState.isLoading) {
       return const Center(child: CircularProgressIndicator());
-    if (searchState.results.isEmpty) return _buildEmptyState(theme);
+    }
+    if (searchState.results.isEmpty) {
+      return _buildEmptyState(theme);
+    }
 
     return ListView.separated(
       itemCount: searchState.results.length,
