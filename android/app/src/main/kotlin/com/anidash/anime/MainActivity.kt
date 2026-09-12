@@ -357,6 +357,16 @@ class MainActivity : FlutterFragmentActivity() {
             }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (interceptVolumeKeys && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val params = android.app.PictureInPictureParams.Builder().build()
+                enterPictureInPictureMode(params)
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun onPause() {
         interceptVolumeKeys = false
         try {

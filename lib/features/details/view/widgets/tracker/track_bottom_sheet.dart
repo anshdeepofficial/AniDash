@@ -229,7 +229,7 @@ class _TrackerListItem extends ConsumerWidget {
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -268,17 +268,43 @@ class _TrackerListItem extends ConsumerWidget {
                 Divider(
                   height: 1,
                   thickness: 1,
-                  color: colorScheme.outlineVariant.withOpacity(0.3),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                 ),
                 IntrinsicHeight(
                   child: Row(
                     children: [
                       Expanded(
-                        child: _StatCell(value: '29/09/25', onTap: () {}),
+                        child: _StatCell(
+                          value: 'Rewatches: ${entry!.repeat}',
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Rewatched ${entry!.repeat} times on ${type.name.toUpperCase()}',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                       _buildDivider(colorScheme.outlineVariant),
                       Expanded(
-                        child: _StatCell(value: '09/01/26', onTap: () {}),
+                        child: _StatCell(
+                          value: entry!.isPrivate ? 'Private' : 'Public Entry',
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  entry!.isPrivate
+                                      ? 'This list entry is set to private'
+                                      : 'This list entry is publicly visible on your profile',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -295,7 +321,7 @@ class _TrackerListItem extends ConsumerWidget {
     return VerticalDivider(
       width: 1,
       thickness: 1,
-      color: color.withOpacity(0.3),
+      color: color.withValues(alpha: 0.3),
     );
   }
 

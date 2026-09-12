@@ -19,10 +19,10 @@ class EpisodeReleaseTask {
       final appDir = await getApplicationSupportDirectory();
       Hive.init(p.join(appDir.path, 'AniDash', 'appdata'));
 
-      if (!Hive.isBoxOpen('watch_progress')) {
-        await Hive.openBox<AnimeWatchProgressEntry>('watch_progress');
+      if (!Hive.isBoxOpen('anime_watch_progress')) {
+        await Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress');
       }
-      final box = Hive.box<AnimeWatchProgressEntry>('watch_progress');
+      final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
 
       for (final entry in box.values) {
         if (entry.status == 'watching') {

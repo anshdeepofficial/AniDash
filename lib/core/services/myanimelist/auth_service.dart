@@ -8,12 +8,21 @@ import 'package:ani_dash/core/utils/env_loader.dart';
 
 class MyAnimeListAuthService extends BaseOAuthService {
   // --- Configuration ---
-  String get _clientId =>
-      isDesktop ? MAL_CLIENT_ID.split('|')[1] : MAL_CLIENT_ID.split('|')[0];
+  String get _clientId {
+    final parts = MAL_CLIENT_ID.split('|');
+    if (parts.length > 1) {
+      return isDesktop ? parts[1] : parts[0];
+    }
+    return MAL_CLIENT_ID;
+  }
 
-  String get _clientSecret => isDesktop
-      ? MAL_CLIENT_SECRET.split('|')[1]
-      : MAL_CLIENT_SECRET.split('|')[0];
+  String get _clientSecret {
+    final parts = MAL_CLIENT_SECRET.split('|');
+    if (parts.length > 1) {
+      return isDesktop ? parts[1] : parts[0];
+    }
+    return MAL_CLIENT_SECRET;
+  }
 
   static const String _authUrl = 'https://myanimelist.net/v1/oauth2/authorize';
   static const String _tokenUrl = 'https://myanimelist.net/v1/oauth2/token';
@@ -27,6 +36,10 @@ class MyAnimeListAuthService extends BaseOAuthService {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   Future<String?> authenticate() async {
+    if (_clientId.trim().isEmpty) {
+      AppLogger.w('MyAnimeList Client ID not configured in this build.');
+      throw Exception('MyAnimeList client credentials not configured.');
+    }
     try {
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);

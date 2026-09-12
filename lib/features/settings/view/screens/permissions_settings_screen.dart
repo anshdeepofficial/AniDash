@@ -2,12 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:ani_dash/shared/providers/permissions_provider.dart';
 
 class PermissionsSettingsScreen extends ConsumerWidget {
   const PermissionsSettingsScreen({super.key});
+
+  void _promptRevoke(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Manage Permissions'),
+        content: const Text(
+          'Granted system permissions on Android can only be revoked from the device App Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,7 +65,10 @@ class PermissionsSettingsScreen extends ConsumerWidget {
                   description: 'Allow access to storage to download anime.',
                   value: permissionsState.storage,
                   onChanged: (val) async {
-                    if (val == false) return;
+                    if (val == false) {
+                      _promptRevoke(context);
+                      return;
+                    }
                     await ref
                         .read(permissionsProvider.notifier)
                         .requestStoragePermission();
@@ -53,7 +82,10 @@ class PermissionsSettingsScreen extends ConsumerWidget {
                       'Allow access to notifications to get notified about new anime news.',
                   value: permissionsState.notification,
                   onChanged: (val) async {
-                    if (val == false) return;
+                    if (val == false) {
+                      _promptRevoke(context);
+                      return;
+                    }
                     await ref
                         .read(permissionsProvider.notifier)
                         .requestNotificationPermission();

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'manga_details_screen.dart';
@@ -232,12 +233,24 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                 style: TextStyle(color: colorScheme.onSurfaceVariant),
                               ),
                               const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => _loadPopularManga(
-                                  _searchController.text.isNotEmpty ? _searchController.text : 'One Piece',
-                                ),
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Retry'),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  FilledButton.tonalIcon(
+                                    onPressed: () => context.push('/settings/extensions'),
+                                    icon: const Icon(Icons.extension_outlined),
+                                    label: const Text('Install Extensions'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _loadPopularManga(
+                                      _searchController.text.isNotEmpty ? _searchController.text : 'One Piece',
+                                    ),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

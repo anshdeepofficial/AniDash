@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -32,6 +33,15 @@ class DownloadService {
   DownloadSettingsModel get _settings => ref.read(downloadSettingsProvider);
 
   Future<void> startDownload(DownloadItem item) async {
+    if (_settings.wifiOnly) {
+      try {
+        final connectivity = await Connectivity().checkConnectivity();
+        if (!connectivity.contains(ConnectivityResult.wifi)) {
+          return _fail(item, 'Waiting for Wi-Fi (Wi-Fi only enabled)');
+        }
+      } catch (_) {}
+    }
+
     if (!_settings.useCustomPath || _settings.customDownloadPath == null) {
       if (!await ref
           .read(permissionsProvider.notifier)
@@ -46,8 +56,30 @@ class DownloadService {
             : (await StorageProvider.getDefaultDirectory())!.path;
 
     final itemPath = item.filePath;
-    final finalPath =
-        p.isAbsolute(itemPath) ? itemPath : p.join(basePath, itemPath);
+    String finalPath;
+    if (p.isAbsolute(itemPath)) {
+      finalPath = itemPath;
+    } else {
+      final cleanTitle = item.animeTitle
+          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+          .trim();
+      String targetDir;
+      if (_settings.folderStructure == 'Anime/Episode') {
+        targetDir = p.join(
+          basePath,
+          cleanTitle,
+          'Episode ${item.episodeNumber}',
+        );
+      } else if (_settings.folderStructure == 'Anime') {
+        targetDir = p.join(basePath, cleanTitle);
+      } else {
+        targetDir = basePath;
+      }
+      try {
+        Directory(targetDir).createSync(recursive: true);
+      } catch (_) {}
+      finalPath = p.join(targetDir, p.basename(itemPath));
+    }
 
     final queuedItem = item.copyWith(
       state: DownloadStatus.queued,

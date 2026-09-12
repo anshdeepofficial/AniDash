@@ -27,7 +27,7 @@ class HeaderSection extends ConsumerWidget {
             activePlatform == AuthPlatform.anilist ? s.anilistUser : s.malUser,
       ),
     );
-    final useNewUI = ref.read(experimentalProvider.select((s) => s.newUI));
+    final useNewUI = ref.watch(experimentalProvider.select((s) => s.newUI));
     final colorScheme = Theme.of(context);
     return Column(
       children: [
