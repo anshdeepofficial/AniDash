@@ -18,6 +18,7 @@ import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
+import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
@@ -164,17 +165,8 @@ class EpisodeData extends _$EpisodeData {
     );
 
     // Server lists are useful for manual switching, but they must not hold the
-    // first frame hostage. Give the preferred provider a short opportunity to
-    // resolve them, then start source resolution while it finishes in background.
-    if (state.servers.isNotEmpty && state.selectedServer != null) {
-      _fetchServers(ep); // refresh in background
-    } else {
-      try {
-        await _fetchServers(ep).timeout(const Duration(milliseconds: 2500));
-      } on TimeoutException {
-        AppLogger.d('Server discovery continuing in background');
-      }
-    }
+    // first frame hostage. Discover servers concurrently in background.
+    _fetchServers(ep);
 
     if (play) await _playCurrent(startAt ?? Duration.zero);
   }
@@ -804,6 +796,9 @@ class EpisodeData extends _$EpisodeData {
       if (data == null || data.sources.isEmpty) {
         throw StateError('No playable sources found');
       }
+      ref
+          .read(aniSkipProvider.notifier)
+          .setFallbackFromSource(intro: data.intro, outro: data.outro);
       state = state.copyWith(
         sources: data.sources,
         subtitles: [Subtitle(lang: 'None'), ...data.tracks],
@@ -846,6 +841,9 @@ class EpisodeData extends _$EpisodeData {
 
         fallback ??= await _fetchFallbackNativeSourceData(epModel, category);
         if (fallback != null && fallback.sources.isNotEmpty) {
+          ref
+              .read(aniSkipProvider.notifier)
+              .setFallbackFromSource(intro: fallback.intro, outro: fallback.outro);
           state = state.copyWith(
             sources: fallback.sources,
             subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
@@ -866,6 +864,9 @@ class EpisodeData extends _$EpisodeData {
               )
               .timeout(const Duration(seconds: 8));
           if (subFallback.sources.any((source) => !source.isDub)) {
+            ref
+                .read(aniSkipProvider.notifier)
+                .setFallbackFromSource(intro: subFallback.intro, outro: subFallback.outro);
             state = state.copyWith(
               sources: subFallback.sources,
               subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
@@ -925,93 +926,52 @@ class EpisodeData extends _$EpisodeData {
     state = state.copyWith(addState: EpisodeStreamState.QUALITY_LOADING);
 
     try {
-      // Build quality options from ALL available sources
+      // Build quality options with Auto and all available discrete qualities
       final allQualities = <Map<String, dynamic>>[];
-
-      // Check if the primary source is M3U8 (master playlist with multiple qualities)
       final primarySrc = state.sources[sourceIdx];
       final streamHeaders = {...?state.headers, ...?primarySrc.headers};
-      final hasDiscreteVariants =
-          state.sources
-              .where((source) => source.url?.isNotEmpty == true)
-              .length >
-          1;
 
-      if (primarySrc.isM3U8 && !hasDiscreteVariants) {
-        // Start with Auto/primary quality immediately so playback launches in 1-2s
-        allQualities.add({
-          'quality': primarySrc.quality ?? 'Auto',
-          'url': primarySrc.url,
-        });
-      } else {
-        // Non-M3U8 sources: each Source object IS a quality variant
-        // Aggregate all sources that share the same dub/sub type
-        for (final src in state.sources) {
-          if (src.url != null && src.url!.isNotEmpty) {
-            allQualities.add({
-              'quality': src.quality ?? 'Default',
-              'url': src.url,
-            });
-          }
+      allQualities.add({
+        'quality': 'Auto',
+        'url': primarySrc.url,
+      });
+
+      for (final src in state.sources) {
+        if (src.url != null && src.url!.isNotEmpty && src.url != primarySrc.url) {
+          allQualities.add({
+            'quality': src.quality ?? 'Default',
+            'url': src.url,
+          });
         }
-
-        // Deduplicate by URL
-        final seen = <String>{};
-        allQualities.retainWhere((q) {
-          final url = q['url'] as String?;
-          if (url == null || seen.contains(url)) return false;
-          seen.add(url);
-          return true;
-        });
-
-        // Sort: highest resolution first (e.g. 1080p > 720p > 480p)
-        allQualities.sort((a, b) {
-          final aVal =
-              int.tryParse(
-                (a['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
-              ) ??
-              0;
-          final bVal =
-              int.tryParse(
-                (b['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
-              ) ??
-              0;
-          return bVal.compareTo(aVal);
-        });
       }
 
-      if (allQualities.isEmpty) {
-        // Fallback: just use the primary source
-        allQualities.add({
-          'quality': primarySrc.quality ?? 'Default',
-          'url': primarySrc.url,
-        });
-      }
+      // Sort discrete qualities: 1080p > 720p > 480p > 360p
+      final discrete = allQualities.skip(1).toList();
+      discrete.sort((a, b) {
+        final aVal =
+            int.tryParse(
+              (a['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+            ) ??
+            0;
+        final bVal =
+            int.tryParse(
+              (b['quality'] as String).replaceAll(RegExp(r'[^0-9]'), ''),
+            ) ??
+            0;
+        return bVal.compareTo(aVal);
+      });
+      allQualities.removeRange(1, allQualities.length);
+      allQualities.addAll(discrete);
 
       // Pick best match for preferred quality
       final prefQuality = ref.read(playerSettingsProvider).defaultQuality;
-      int qIdx;
-      if (prefQuality.toLowerCase() == 'auto' &&
-          (!primarySrc.isM3U8 || hasDiscreteVariants)) {
-        // Separate files/playlists cannot adapt bitrate themselves. Start Auto
-        // at a network-safe resolution and leave higher qualities selectable.
-        qIdx = allQualities.indexWhere(
-          (q) => RegExp(r'(^|\D)480(\D|$)').hasMatch(q['quality'] as String),
+      int qIdx = 0;
+      if (prefQuality.toLowerCase() != 'auto') {
+        final matchIdx = allQualities.indexWhere(
+          (q) => (q['quality'] as String).toLowerCase().contains(prefQuality.toLowerCase()),
         );
-        if (qIdx == -1) {
-          qIdx = allQualities.indexWhere(
-            (q) => RegExp(r'(^|\D)360(\D|$)').hasMatch(q['quality'] as String),
-          );
-        }
-        if (qIdx == -1 && allQualities.isNotEmpty) {
-          qIdx = allQualities.length - 1;
-        }
-      } else {
-        qIdx = allQualities.indexWhere(
-          (q) => (q['quality'] as String).contains(prefQuality),
-        );
+        if (matchIdx != -1) qIdx = matchIdx;
       }
-      if (qIdx == -1) qIdx = 0;
 
       AppLogger.d(
         'Opening stream: ${allQualities[qIdx]['quality']} '
@@ -1069,19 +1029,24 @@ class EpisodeData extends _$EpisodeData {
       );
 
       // In background, extract sub-qualities for M3U8 without delaying playback start
-      if (primarySrc.isM3U8 && !hasDiscreteVariants) {
+      if (primarySrc.isM3U8) {
         _getQualities(primarySrc, streamHeaders)
             .then((extracted) {
               if (extracted.isNotEmpty) {
                 final merged = [
                   {'quality': 'Auto', 'url': primarySrc.url},
                   ...extracted,
+                  ...state.qualityOptions.where((q) => q['quality'] != 'Auto'),
                 ];
                 final seenUrls = <String>{};
+                final seenNames = <String>{};
                 merged.retainWhere((m) {
                   final u = m['url'] as String?;
+                  final q = m['quality'] as String?;
                   if (u == null || seenUrls.contains(u)) return false;
+                  if (q != null && q != 'Auto' && seenNames.contains(q)) return false;
                   seenUrls.add(u);
+                  if (q != null) seenNames.add(q);
                   return true;
                 });
                 state = state.copyWith(qualityOptions: merged);

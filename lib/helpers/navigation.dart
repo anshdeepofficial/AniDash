@@ -37,6 +37,7 @@ void navigateToWatch({
   required int currentEpisode,
   String? animeId,
   int? startAt,
+  int? malId,
   bool fromHentaiHub = false,
 }) {
   final queryParams = <String, String>{
@@ -48,6 +49,10 @@ void navigateToWatch({
 
   if (animeId != null) {
     queryParams['animeId'] = animeId;
+  }
+
+  if (malId != null) {
+    queryParams['malId'] = malId.toString();
   }
 
   if (startAt != null) {

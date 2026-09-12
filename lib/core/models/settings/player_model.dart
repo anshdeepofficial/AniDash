@@ -13,6 +13,8 @@ class PlayerModel {
   final bool prefetchNextEpisode;
   final bool showNextEpisodePrompt;
   final double bufferSize;
+  final bool stopAfterCurrentEpisode;
+  final double defaultPlaybackSpeed;
   final Map<String, String> mpvSettings;
 
   PlayerModel({
@@ -28,6 +30,8 @@ class PlayerModel {
     this.showNextPrevButtons = true,
     this.prefetchNextEpisode = true,
     this.showNextEpisodePrompt = true,
+    this.stopAfterCurrentEpisode = false,
+    this.defaultPlaybackSpeed = 1.0,
     this.mpvSettings = const {},
   });
 
@@ -44,6 +48,8 @@ class PlayerModel {
     bool? showNextPrevButtons,
     bool? prefetchNextEpisode,
     bool? showNextEpisodePrompt,
+    bool? stopAfterCurrentEpisode,
+    double? defaultPlaybackSpeed,
     Map<String, String>? mpvSettings,
   }) {
     return PlayerModel(
@@ -60,6 +66,10 @@ class PlayerModel {
       prefetchNextEpisode: prefetchNextEpisode ?? this.prefetchNextEpisode,
       showNextEpisodePrompt:
           showNextEpisodePrompt ?? this.showNextEpisodePrompt,
+      stopAfterCurrentEpisode:
+          stopAfterCurrentEpisode ?? this.stopAfterCurrentEpisode,
+      defaultPlaybackSpeed:
+          defaultPlaybackSpeed ?? this.defaultPlaybackSpeed,
       mpvSettings: mpvSettings ?? this.mpvSettings,
     );
   }
@@ -78,6 +88,8 @@ class PlayerModel {
       'showNextPrevButtons': showNextPrevButtons,
       'prefetchNextEpisode': prefetchNextEpisode,
       'showNextEpisodePrompt': showNextEpisodePrompt,
+      'stopAfterCurrentEpisode': stopAfterCurrentEpisode,
+      'defaultPlaybackSpeed': defaultPlaybackSpeed,
       'mpvSettings': mpvSettings,
     };
   }
@@ -92,10 +104,12 @@ class PlayerModel {
       seekDuration: map['seekDuration'] ?? 10,
       autoHideDuration: map['autoHideDuration'] ?? 5,
       lockAutoHideDuration: map['lockAutoHideDuration'] ?? 3,
-      bufferSize: map['bufferSize'] ?? 32,
+      bufferSize: (map['bufferSize'] as num?)?.toDouble() ?? 32.0,
       showNextPrevButtons: map['showNextPrevButtons'] ?? true,
       prefetchNextEpisode: map['prefetchNextEpisode'] ?? true,
       showNextEpisodePrompt: map['showNextEpisodePrompt'] ?? true,
+      stopAfterCurrentEpisode: map['stopAfterCurrentEpisode'] ?? false,
+      defaultPlaybackSpeed: (map['defaultPlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
       mpvSettings: Map<String, String>.from(map['mpvSettings'] ?? {}),
     );
   }

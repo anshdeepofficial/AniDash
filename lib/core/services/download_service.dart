@@ -394,22 +394,41 @@ Future<DownloadItem> _processM3U8(
   if (isCancelled()) throw Exception("Cancelled");
 
   // Never mark a partial HLS file as completed. Retry any failed segments
-  // serially (friendlier to rate-limited hosts), then fail visibly if even one
-  // segment is still missing.
-  for (final segment in segments) {
-    final file = File(p.join(tempDir.path, '${segment.index}.ts'));
-    if (await file.exists()) continue;
-    final bytes = await _fetch(segment.url, task.item.headers, client);
-    if (bytes != null) {
-      final data =
-          segment.key != null
-              ? _decrypt(bytes, segment.key!, segment.iv, segment.index)
-              : bytes;
-      await file.writeAsBytes(data, flush: true);
-      completed++;
-      downloadedBytesTotal += data.length;
+  // with exponential backoff to handle temporary network disconnections/travel drops.
+  for (int attempt = 0; attempt < 3; attempt++) {
+    final missingSegments = <_Segment>[];
+    for (final segment in segments) {
+      if (!await File(p.join(tempDir.path, '${segment.index}.ts')).exists()) {
+        missingSegments.add(segment);
+      }
+    }
+    if (missingSegments.isEmpty) break;
+    if (isCancelled()) throw Exception("Cancelled");
+
+    if (attempt > 0) {
+      task.port.send(
+        'log:Retrying ${missingSegments.length} missing segments (attempt $attempt)...',
+      );
+      await Future.delayed(Duration(seconds: 1 << attempt));
+    }
+
+    for (final segment in missingSegments) {
+      if (isCancelled()) throw Exception("Cancelled");
+      final file = File(p.join(tempDir.path, '${segment.index}.ts'));
+      if (await file.exists()) continue;
+      final bytes = await _fetch(segment.url, task.item.headers, client);
+      if (bytes != null) {
+        final data =
+            segment.key != null
+                ? _decrypt(bytes, segment.key!, segment.iv, segment.index)
+                : bytes;
+        await file.writeAsBytes(data, flush: true);
+        completed++;
+        downloadedBytesTotal += data.length;
+      }
     }
   }
+
   final missing = <int>[];
   for (final segment in segments) {
     if (!await File(p.join(tempDir.path, '${segment.index}.ts')).exists()) {
@@ -418,7 +437,7 @@ Future<DownloadItem> _processM3U8(
   }
   if (missing.isNotEmpty) {
     throw Exception(
-      'Download incomplete: ${missing.length} of ${segments.length} segments failed',
+      'Download incomplete: ${missing.length} of ${segments.length} segments failed after retries',
     );
   }
 

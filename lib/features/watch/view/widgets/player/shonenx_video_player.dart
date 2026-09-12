@@ -29,6 +29,7 @@ import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dar
 import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/next_episode_prompt_overlay.dart';
 import 'package:ani_dash/helpers/ui.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:window_manager/window_manager.dart';
 
 class AniDashVideoPlayer extends ConsumerStatefulWidget {
@@ -85,6 +86,21 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         onVolumeUp: () => _handleHardwareVolumeKey(true),
         onVolumeDown: () => _handleHardwareVolumeKey(false),
       );
+      FlutterVolumeController.addListener((volume) {
+        if (!mounted) return;
+        ref.read(playerUIControllerProvider.notifier).setVolume(volume);
+        setState(() {
+          _isChangingVolume = true;
+        });
+        _volumeOverlayTimer?.cancel();
+        _volumeOverlayTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            setState(() {
+              _isChangingVolume = false;
+            });
+          }
+        });
+      });
     }
     // Restart auto-hide timer on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -110,7 +126,11 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
       UIHelper.removeVolumeKeyHandler();
+      FlutterVolumeController.removeListener();
       FlutterVolumeController.updateShowSystemUI(true);
+      try {
+        ScreenBrightness().resetApplicationScreenBrightness();
+      } catch (_) {}
     }
     if (!(Platform.isAndroid || Platform.isIOS)) {
       windowManager.setFullScreen(false);

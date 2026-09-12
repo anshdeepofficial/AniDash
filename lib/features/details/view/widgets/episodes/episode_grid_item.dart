@@ -44,9 +44,11 @@ class EpisodeGridItem extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       color:
-          episode.isFiller == true
-              ? theme.colorScheme.primary.withValues(alpha: 0.18)
-              : Colors.transparent,
+          episode.isMixed == true
+              ? Colors.purple.withValues(alpha: 0.12)
+              : (episode.isFiller == true
+                  ? Colors.orange.withValues(alpha: 0.12)
+                  : Colors.transparent),
       child: InkWell(
         onLongPress: onLongPress,
         onTap: onTap,
@@ -170,7 +172,7 @@ class EpisodeGridItem extends StatelessWidget {
                       height: 1.1,
                     ),
                   ),
-                  if (episode.isFiller == true)
+                  if (episode.isMixed == true)
                     Container(
                       margin: const EdgeInsets.only(top: 2),
                       padding: const EdgeInsets.symmetric(
@@ -178,17 +180,42 @@ class EpisodeGridItem extends StatelessWidget {
                         vertical: 1,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                        color: Colors.purple.withValues(alpha: 0.15),
                         border: Border.all(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                          color: Colors.purpleAccent.withValues(alpha: 0.6),
                           width: 0.8,
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
+                      child: const Text(
+                        'MIXED',
+                        style: TextStyle(
+                          color: Colors.purpleAccent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    )
+                  else if (episode.isFiller == true)
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.15),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.6),
+                          width: 0.8,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
                         'FILLER',
                         style: TextStyle(
-                          color: theme.colorScheme.primary,
+                          color: Colors.orange,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.4,

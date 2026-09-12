@@ -166,6 +166,7 @@ final routerConfig = GoRouter(
             animeCover: state.uri.queryParameters['animeCover']!,
             episode:
                 int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
+            malId: int.tryParse(state.uri.queryParameters['malId'] ?? ''),
             episodes: (state.extra is List<EpisodeDataModel>)
                 ? state.extra as List<EpisodeDataModel>
                 : ((state.extra is List)

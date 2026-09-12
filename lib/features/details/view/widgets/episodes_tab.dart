@@ -25,6 +25,7 @@ import 'package:ani_dash/features/details/view/widgets/episodes/episode_list_ite
 import 'package:ani_dash/features/details/view/widgets/episodes/episode_banner_item.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
+import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
@@ -68,6 +69,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   bool get wantKeepAlive => true;
 
   late final ValueNotifier<Set<int>> _selectionNotifier;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -79,6 +83,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   @override
   void dispose() {
     _selectionNotifier.removeListener(_onSelectionChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -364,6 +369,20 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       visibleEpisodes = visibleEpisodes.reversed.toList();
     }
 
+    if (_searchQuery.trim().isNotEmpty) {
+      final query = _searchQuery.trim().toLowerCase();
+      final queryNum = int.tryParse(query);
+      visibleEpisodes = episodes.where((e) {
+        if (queryNum != null && e.number == queryNum) return true;
+        if (e.number?.toString().contains(query) == true) return true;
+        if (e.title?.toLowerCase().contains(query) == true) return true;
+        return false;
+      }).toList();
+      if (state.isSortedDescending) {
+        visibleEpisodes = visibleEpisodes.reversed.toList();
+      }
+    }
+
     final totalEpisodes = episodes.length;
 
     return RefreshIndicator(
@@ -586,176 +605,293 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                   ],
                                 )
                                 : Row(
-                                  children: [
-                                    Text(
-                                      '$totalEpisodes Episodes',
-                                      style: theme.textTheme.titleSmall,
-                                    ),
-                                    const Spacer(),
-                                    IconButton(
-                                      icon: const Icon(Icons.sync_rounded),
-                                      tooltip: 'Sync with AniList',
-                                      onPressed: () async {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Syncing watched episodes from AniList...',
+                                    children: [
+                                      if (_showSearch)
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 36,
+                                            child: TextField(
+                                              controller: _searchController,
+                                              autofocus: true,
+                                              decoration: InputDecoration(
+                                                hintText:
+                                                    'Jump to episode (e.g. 50)...',
+                                                hintStyle: TextStyle(
+                                                  fontSize: 12,
+                                                  color: theme.hintColor,
+                                                ),
+                                                isDense: true,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 8,
+                                                    ),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                                filled: true,
+                                                fillColor:
+                                                    theme.colorScheme
+                                                        .surfaceContainerHighest,
+                                                prefixIcon: const Icon(
+                                                  Icons.search_rounded,
+                                                  size: 16,
+                                                ),
+                                                suffixIcon:
+                                                    _searchQuery.isNotEmpty
+                                                        ? IconButton(
+                                                          icon: const Icon(
+                                                            Icons.clear,
+                                                            size: 14,
+                                                          ),
+                                                          onPressed: () {
+                                                            setState(() {
+                                                              _searchQuery = '';
+                                                              _searchController
+                                                                  .clear();
+                                                            });
+                                                          },
+                                                        )
+                                                        : null,
+                                              ),
+                                              keyboardType: TextInputType.text,
+                                              onChanged: (val) {
+                                                setState(() {
+                                                  _searchQuery = val;
+                                                });
+                                              },
                                             ),
-                                            duration: Duration(seconds: 1),
-                                            behavior: SnackBarBehavior.floating,
                                           ),
-                                        );
-                                        await ref
-                                            .read(
-                                              mediaTrackerProvider(
-                                                widget.mediaId,
-                                              ).notifier,
-                                            )
-                                            .fetchRemoteEntries();
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.checklist_rounded),
-                                      tooltip: 'Select Episodes',
-                                      onPressed: () {
-                                        final firstEp =
-                                            visibleEpisodes.firstOrNull?.number;
-                                        if (firstEp != null) {
-                                          _enterSelectionMode(firstEp);
-                                        }
-                                      },
-                                    ),
-                                    // View Mode Toggle
-                                    PopupMenuButton<EpisodeViewMode>(
-                                      icon: const Icon(
-                                        Icons.view_agenda_outlined,
+                                        )
+                                      else
+                                        Text(
+                                          '$totalEpisodes Episodes',
+                                          style: theme.textTheme.titleSmall,
+                                        ),
+                                      if (!_showSearch) const Spacer(),
+                                      IconButton(
+                                        icon: Icon(
+                                          _showSearch
+                                              ? Icons.close
+                                              : Icons.search_rounded,
+                                          size: 20,
+                                        ),
+                                        tooltip:
+                                            _showSearch
+                                                ? 'Close Search'
+                                                : 'Search / Jump to Episode',
+                                        onPressed: () {
+                                          setState(() {
+                                            _showSearch = !_showSearch;
+                                            if (!_showSearch) {
+                                              _searchQuery = '';
+                                              _searchController.clear();
+                                            }
+                                          });
+                                        },
                                       ),
-                                      tooltip: 'View Mode',
-                                      initialValue: viewMode,
-                                      onSelected: (mode) {
-                                        if (mode == EpisodeViewMode.banner) {
-                                          ref
-                                              .read(
-                                                experimentalProvider.notifier,
-                                              )
-                                              .updateSettings(
-                                                (s) => s.copyWith(
-                                                  useEpisodeBannerStyle: true,
+                                      if (!_showSearch) ...[
+                                        IconButton(
+                                          icon: const Icon(Icons.sync_rounded),
+                                          tooltip: 'Sync with AniList',
+                                          onPressed: () async {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Syncing watched episodes from AniList...',
                                                 ),
-                                              );
-                                        } else {
-                                          ref
-                                              .read(
-                                                experimentalProvider.notifier,
-                                              )
-                                              .updateSettings(
-                                                (s) => s.copyWith(
-                                                  useEpisodeBannerStyle: false,
-                                                ),
-                                              );
-                                        }
-                                        ref
-                                            .read(uiSettingsProvider.notifier)
-                                            .updateSettings(
-                                              (s) => s.copyWith(
-                                                episodeViewMode: mode.name,
+                                                duration: Duration(seconds: 1),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
                                               ),
                                             );
-                                      },
-                                      itemBuilder:
-                                          (context) => [
-                                            const PopupMenuItem(
-                                              value: EpisodeViewMode.list,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.view_list),
-                                                  SizedBox(width: 8),
-                                                  Text('List'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: EpisodeViewMode.grid,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.grid_view),
-                                                  SizedBox(width: 8),
-                                                  Text('Grid'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: EpisodeViewMode.compact,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.view_headline),
-                                                  SizedBox(width: 8),
-                                                  Text('Compact'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: EpisodeViewMode.block,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.view_module),
-                                                  SizedBox(width: 8),
-                                                  Text('Block'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: EpisodeViewMode.banner,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.video_library),
-                                                  SizedBox(width: 8),
-                                                  Text('Banner'),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        state.isSortedDescending
-                                            ? Icons.arrow_downward_rounded
-                                            : Icons.arrow_upward_rounded,
-                                      ),
-                                      tooltip:
-                                          state.isSortedDescending
-                                              ? 'Sort Ascending'
-                                              : 'Sort Descending',
-                                      onPressed: () => notifier.toggleSort(),
-                                    ),
-                                  ],
-                                ),
+                                            await ref
+                                                .read(
+                                                  mediaTrackerProvider(
+                                                    widget.mediaId,
+                                                  ).notifier,
+                                                )
+                                                .fetchRemoteEntries();
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.checklist_rounded),
+                                          tooltip: 'Select Episodes',
+                                          onPressed: () {
+                                            final firstEp =
+                                                visibleEpisodes.firstOrNull?.number;
+                                            if (firstEp != null) {
+                                              _enterSelectionMode(firstEp);
+                                            }
+                                          },
+                                        ),
+                                        // View Mode Toggle
+                                        PopupMenuButton<EpisodeViewMode>(
+                                          icon: const Icon(
+                                            Icons.view_agenda_outlined,
+                                          ),
+                                          tooltip: 'View Mode',
+                                          initialValue: viewMode,
+                                          onSelected: (mode) {
+                                            if (mode == EpisodeViewMode.banner) {
+                                              ref
+                                                  .read(
+                                                    experimentalProvider.notifier,
+                                                  )
+                                                  .updateSettings(
+                                                    (s) => s.copyWith(
+                                                      useEpisodeBannerStyle: true,
+                                                    ),
+                                                  );
+                                            } else {
+                                              ref
+                                                  .read(
+                                                    experimentalProvider.notifier,
+                                                  )
+                                                  .updateSettings(
+                                                    (s) => s.copyWith(
+                                                      useEpisodeBannerStyle: false,
+                                                    ),
+                                                  );
+                                            }
+                                            ref
+                                                .read(uiSettingsProvider.notifier)
+                                                .updateSettings(
+                                                  (s) => s.copyWith(
+                                                    episodeViewMode: mode.name,
+                                                  ),
+                                                );
+                                          },
+                                          itemBuilder:
+                                              (context) => [
+                                                const PopupMenuItem(
+                                                  value: EpisodeViewMode.list,
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.view_list),
+                                                      SizedBox(width: 8),
+                                                      Text('List'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: EpisodeViewMode.grid,
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.grid_view),
+                                                      SizedBox(width: 8),
+                                                      Text('Grid'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: EpisodeViewMode.compact,
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.view_headline),
+                                                      SizedBox(width: 8),
+                                                      Text('Compact'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: EpisodeViewMode.block,
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.view_module),
+                                                      SizedBox(width: 8),
+                                                      Text('Block'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: EpisodeViewMode.banner,
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.video_library),
+                                                      SizedBox(width: 8),
+                                                      Text('Banner'),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            state.isSortedDescending
+                                                ? Icons.arrow_downward_rounded
+                                                : Icons.arrow_upward_rounded,
+                                          ),
+                                          tooltip:
+                                              state.isSortedDescending
+                                                  ? 'Sort Ascending'
+                                                  : 'Sort Descending',
+                                          onPressed: () => notifier.toggleSort(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                       ),
                       SizedBox(
                         height: 50,
-                        child: ListView.builder(
+                        child: ListView(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: state.rangeOptions.length,
-                          itemBuilder: (context, index) {
-                            final range = state.rangeOptions[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4.0,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6.0),
+                              child: Center(
+                                child: FilterChip(
+                                  avatar: Icon(
+                                    ref.watch(playerSettingsProvider).skipFillerEpisodes
+                                        ? Icons.check_circle_rounded
+                                        : Icons.skip_next_rounded,
+                                    size: 15,
+                                    color: ref.watch(playerSettingsProvider).skipFillerEpisodes
+                                        ? theme.colorScheme.primary
+                                        : null,
+                                  ),
+                                  label: Text(
+                                    'Skip Filler',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: ref.watch(playerSettingsProvider).skipFillerEpisodes
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  selected: ref.watch(playerSettingsProvider).skipFillerEpisodes,
+                                  onSelected: (val) {
+                                    ref.read(playerSettingsProvider.notifier).updateSettings(
+                                      (s) => s.copyWith(skipFillerEpisodes: val),
+                                    );
+                                  },
+                                ),
                               ),
-                              child: ChoiceChip(
-                                label: Text(range),
-                                selected: state.selectedRange == range,
-                                onSelected: (isSelected) {
-                                  if (isSelected) {
-                                    notifier.updateRange(range);
-                                  }
-                                },
-                              ),
-                            );
-                          },
+                            ),
+                            ...state.rangeOptions.map((range) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4.0,
+                                ),
+                                child: Center(
+                                  child: ChoiceChip(
+                                    label: Text(range),
+                                    selected: state.selectedRange == range,
+                                    onSelected: (isSelected) {
+                                      if (isSelected) {
+                                        notifier.updateRange(range);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       ),
                     ],
@@ -1017,6 +1153,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       context: context,
       episodes: episodes,
       currentEpisode: ep.number ?? 1,
+      malId: widget.malId,
       fromHentaiHub: widget.fromHentaiHub,
     );
   }

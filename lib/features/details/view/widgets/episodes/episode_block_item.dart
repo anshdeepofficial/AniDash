@@ -47,15 +47,19 @@ class EpisodeBlockItem extends StatelessWidget {
                   ? theme.colorScheme.surfaceContainerHighest.withValues(
                     alpha: 0.5,
                   )
+                  : episode.isMixed == true
+                  ? Colors.purple.withValues(alpha: 0.18)
                   : episode.isFiller == true
-                  ? theme.colorScheme.primary.withValues(alpha: 0.22)
+                  ? Colors.orange.withValues(alpha: 0.18)
                   : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
           border:
               isSelected
                   ? Border.all(color: theme.colorScheme.primary, width: 2)
+                  : episode.isMixed == true
+                  ? Border.all(color: Colors.purpleAccent, width: 2)
                   : episode.isFiller == true
-                  ? Border.all(color: theme.colorScheme.primary, width: 2)
+                  ? Border.all(color: Colors.orange, width: 2)
                   : null,
         ),
         child: Stack(

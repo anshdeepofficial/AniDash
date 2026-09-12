@@ -7,6 +7,7 @@ import 'package:ani_dash/core/models/aniskip/aniskip_result.dart';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/services/aniskip_service.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 
 part 'aniskip_notifier.g.dart';
@@ -26,23 +27,22 @@ class AniSkipNotifier extends _$AniSkipNotifier {
     required String animeTitle,
     required int episodeNumber,
     required int episodeLength,
+    int? malId,
   }) async {
     state = [];
-    int? malId;
 
     try {
       final cacheKey = animeTitle.trim().toLowerCase();
 
-      // 1. Check in-memory cache
-      if (_malIdCache.containsKey(mediaId)) {
-        malId = _malIdCache[mediaId];
-      } else if (_malIdCache.containsKey(cacheKey)) {
-        malId = _malIdCache[cacheKey];
-      }
-
-      // 2. Check EpisodeListState.malId
-      if (malId == null) {
-        malId = ref.read(episodeListProvider).malId;
+      // 1. Direct MAL ID parameter if provided
+      if (malId == null || malId <= 0) {
+        if (_malIdCache.containsKey(mediaId)) {
+          malId = _malIdCache[mediaId];
+        } else if (_malIdCache.containsKey(cacheKey)) {
+          malId = _malIdCache[cacheKey];
+        } else {
+          malId = ref.read(episodeListProvider).malId;
+        }
       }
 
       // 3. Query AniList directly by numeric ID (fast GraphQL, ~200ms)
@@ -136,6 +136,49 @@ class AniSkipNotifier extends _$AniSkipNotifier {
       }
     } catch (e) {
       AppLogger.w('Failed to fetch skip times for ep $episodeNumber: $e');
+    }
+  }
+
+  void setFallbackFromSource({Intro? intro, Intro? outro}) {
+    if (state.isNotEmpty) return; // already has AniSkip data
+    final items = <AniSkipResultItem>[];
+    if (intro != null &&
+        intro.start != null &&
+        intro.end != null &&
+        intro.end! > intro.start!) {
+      items.add(
+        AniSkipResultItem(
+          interval: AniSkipInterval(
+            startTime: intro.start!.toDouble(),
+            endTime: intro.end!.toDouble(),
+          ),
+          skipType: SkipType.op,
+          action: 'skip',
+          episodeLength: 0,
+        ),
+      );
+    }
+    if (outro != null &&
+        outro.start != null &&
+        outro.end != null &&
+        outro.end! > outro.start!) {
+      items.add(
+        AniSkipResultItem(
+          interval: AniSkipInterval(
+            startTime: outro.start!.toDouble(),
+            endTime: outro.end!.toDouble(),
+          ),
+          skipType: SkipType.ed,
+          action: 'skip',
+          episodeLength: 0,
+        ),
+      );
+    }
+    if (items.isNotEmpty) {
+      state = items;
+      AppLogger.d(
+        'AniSkip: Applied ${items.length} intro/outro from streaming source fallback',
+      );
     }
   }
 

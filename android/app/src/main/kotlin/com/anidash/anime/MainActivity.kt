@@ -335,6 +335,36 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/pip")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "enterPiP" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            try {
+                                val params = android.app.PictureInPictureParams.Builder().build()
+                                val success = enterPictureInPictureMode(params)
+                                result.success(success)
+                            } catch (e: Exception) {
+                                result.success(false)
+                            }
+                        } else {
+                            result.success(false)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    override fun onPause() {
+        interceptVolumeKeys = false
+        try {
+            val lp = window.attributes
+            lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window.attributes = lp
+        } catch (_: Exception) {}
+        super.onPause()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -360,6 +390,11 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onDestroy() {
         disableLandscapeRotation()
         abandonAudioFocus()
+        try {
+            val lp = window.attributes
+            lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            window.attributes = lp
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 }

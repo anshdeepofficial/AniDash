@@ -114,20 +114,26 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Apply optimized stream cache defaults matching ShonenX
+    // Apply ultra-fast stream cache defaults optimized for instant start and slow networks
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '154857600',
-      'demuxer-max-back-bytes': '52428800',
-      'demuxer-lavf-probesize': '5000000',
-      'demuxer-lavf-analyzeduration': '5000000',
-      'cache-secs': '60',
-      'demuxer-readahead-secs': '60',
+      'demuxer-max-bytes': '67108864',
+      'demuxer-max-back-bytes': '33554432',
+      'demuxer-lavf-probesize': '500000',
+      'demuxer-lavf-analyzeduration': '500000',
+      'cache-secs': '30',
+      'demuxer-readahead-secs': '15',
+      'cache-pause': 'no',
+      'cache-pause-wait': '1',
+      'demuxer-lavf-buffersize': '32768',
+      'demuxer-lavf-hacks': 'yes',
+      'stream-buffer-size': '131072',
+      'network-timeout': '10',
       'force-seekable': 'yes',
-      'hr-seek': 'default',
-      'hr-seek-framedrop': 'yes',
+      'hr-seek': 'yes',
+      'hr-seek-framedrop': 'no',
     };
 
     final platform = _player.platform as dynamic;

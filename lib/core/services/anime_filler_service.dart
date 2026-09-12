@@ -2,12 +2,22 @@ import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
+class AnimeFillerInfo {
+  final Set<int> fillers;
+  final Set<int> mixed;
+
+  const AnimeFillerInfo({
+    this.fillers = const {},
+    this.mixed = const {},
+  });
+}
+
 class AnimeFillerService {
   static final AnimeFillerService _instance = AnimeFillerService._internal();
   factory AnimeFillerService() => _instance;
   AnimeFillerService._internal();
 
-  final Map<String, Set<int>> _cache = {};
+  final Map<String, AnimeFillerInfo> _cache = {};
   final JikanService _jikan = JikanService();
 
   static const Map<String, String> _headers = {
@@ -16,8 +26,8 @@ class AnimeFillerService {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   };
 
-  /// Returns the set of episode numbers that are identified as filler.
-  Future<Set<int>> getFillerEpisodes({
+  /// Returns full filler and mixed canon/filler info for the specified anime.
+  Future<AnimeFillerInfo> getFillerInfo({
     required String title,
     int? malId,
     List<String> alternateTitles = const [],
@@ -28,35 +38,51 @@ class AnimeFillerService {
     }
 
     // 1. Try AnimeFillerList (fastest, most accurate, 1 request)
-    final aflFillers = await _fetchFromAnimeFillerList(
+    final aflInfo = await _fetchFromAnimeFillerList(
       title,
       alternateTitles: alternateTitles,
     );
-    if (aflFillers.isNotEmpty) {
-      _cache[cacheKey] = aflFillers;
+    if (aflInfo.fillers.isNotEmpty || aflInfo.mixed.isNotEmpty) {
+      _cache[cacheKey] = aflInfo;
       AppLogger.success(
-        '[AnimeFillerService] Found ${aflFillers.length} filler episodes from AnimeFillerList for "$title"',
+        '[AnimeFillerService] Found ${aflInfo.fillers.length} fillers and ${aflInfo.mixed.length} mixed episodes from AnimeFillerList for "$title"',
       );
-      return aflFillers;
+      return aflInfo;
     }
 
     // 2. Fallback to Jikan if MAL ID is available
     if (malId != null && malId > 0) {
       final jikanFillers = await _fetchFromJikan(malId);
       if (jikanFillers.isNotEmpty) {
-        _cache[cacheKey] = jikanFillers;
+        final jikanInfo = AnimeFillerInfo(fillers: jikanFillers);
+        _cache[cacheKey] = jikanInfo;
         AppLogger.success(
           '[AnimeFillerService] Found ${jikanFillers.length} filler episodes from Jikan for MAL ID: $malId',
         );
-        return jikanFillers;
+        return jikanInfo;
       }
     }
 
-    _cache[cacheKey] = <int>{};
-    return <int>{};
+    const empty = AnimeFillerInfo();
+    _cache[cacheKey] = empty;
+    return empty;
   }
 
-  Future<Set<int>> _fetchFromAnimeFillerList(
+  /// Returns the set of episode numbers that are identified as filler.
+  Future<Set<int>> getFillerEpisodes({
+    required String title,
+    int? malId,
+    List<String> alternateTitles = const [],
+  }) async {
+    final info = await getFillerInfo(
+      title: title,
+      malId: malId,
+      alternateTitles: alternateTitles,
+    );
+    return info.fillers;
+  }
+
+  Future<AnimeFillerInfo> _fetchFromAnimeFillerList(
     String title, {
     List<String> alternateTitles = const [],
   }) async {
@@ -82,25 +108,28 @@ class AnimeFillerService {
         if (matches.isEmpty) continue;
 
         final fillers = <int>{};
+        final mixed = <int>{};
         for (final m in matches) {
           final rowClass = (m.group(1) ?? '').toLowerCase();
           final epNum = int.tryParse(m.group(2) ?? '') ?? 0;
           final type = (m.group(3) ?? '').toLowerCase();
 
-          if (rowClass.contains('filler') || type.contains('filler')) {
+          if (rowClass.contains('mixed') || type.contains('mixed')) {
+            mixed.add(epNum);
+          } else if (rowClass.contains('filler') || type.contains('filler')) {
             fillers.add(epNum);
           }
         }
 
-        if (fillers.isNotEmpty) {
-          return fillers;
+        if (fillers.isNotEmpty || mixed.isNotEmpty) {
+          return AnimeFillerInfo(fillers: fillers, mixed: mixed);
         }
       } catch (e) {
         AppLogger.d('[AnimeFillerService] AFL probe failed for slug "$slug": $e');
       }
     }
 
-    return <int>{};
+    return const AnimeFillerInfo();
   }
 
   List<String> _generateSlugs(List<String> titles) {

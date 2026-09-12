@@ -10,6 +10,8 @@ abstract class BaseEpisode {
 
   bool? get isFiller;
 
+  bool? get isMixed;
+
   int? get number;
 }
 
@@ -32,6 +34,8 @@ class EpisodeDataModel implements BaseEpisode {
   @override
   final bool? isFiller;
   @override
+  final bool? isMixed;
+  @override
   final int? number;
   final String? description;
   final String? date;
@@ -45,6 +49,7 @@ class EpisodeDataModel implements BaseEpisode {
     this.url,
     this.thumbnail,
     this.isFiller,
+    this.isMixed,
     this.number,
     this.description,
     this.date,
@@ -58,6 +63,7 @@ class EpisodeDataModel implements BaseEpisode {
     String? url,
     String? thumbnail,
     bool? isFiller,
+    bool? isMixed,
     int? number,
     String? description,
     String? date,
@@ -70,6 +76,7 @@ class EpisodeDataModel implements BaseEpisode {
       url: url ?? this.url,
       thumbnail: thumbnail ?? this.thumbnail,
       isFiller: isFiller ?? this.isFiller,
+      isMixed: isMixed ?? this.isMixed,
       number: number ?? this.number,
       description: description ?? this.description,
       date: date ?? this.date,

@@ -337,25 +337,33 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
       // 1. Instant Filler Sync via AnimeFillerService (AnimeFillerList + Jikan cache)
       try {
-        final fillers = await AnimeFillerService().getFillerEpisodes(
+        final fillerInfo = await AnimeFillerService().getFillerInfo(
           title: currentTitle,
           malId: malId,
         );
 
-        if (fillers.isNotEmpty && state.episodes.isNotEmpty) {
+        if ((fillerInfo.fillers.isNotEmpty || fillerInfo.mixed.isNotEmpty) &&
+            state.episodes.isNotEmpty) {
           final updated = List<EpisodeDataModel>.of(state.episodes);
           var fillerCount = 0;
           for (var i = 0; i < updated.length; i++) {
             final epNum = updated[i].number ?? (i + 1);
-            final isFiller = fillers.contains(epNum) || updated[i].isFiller == true;
-            if (isFiller && updated[i].isFiller != true) {
-              updated[i] = updated[i].copyWith(isFiller: true);
-              fillerCount++;
+            final isFiller =
+                fillerInfo.fillers.contains(epNum) ||
+                updated[i].isFiller == true;
+            final isMixed = fillerInfo.mixed.contains(epNum);
+            if (isFiller != (updated[i].isFiller ?? false) ||
+                isMixed != (updated[i].isMixed ?? false)) {
+              updated[i] = updated[i].copyWith(
+                isFiller: isFiller,
+                isMixed: isMixed,
+              );
+              if (isFiller || isMixed) fillerCount++;
             }
           }
           if (fillerCount > 0) {
             AppLogger.success(
-              'Highlighted $fillerCount filler episodes for "$currentTitle"',
+              'Highlighted $fillerCount filler/mixed episodes for "$currentTitle"',
             );
             state = state.copyWith(episodes: updated);
           }

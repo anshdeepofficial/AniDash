@@ -48,9 +48,11 @@ class EpisodeListItem extends StatelessWidget {
         children: [
           ListTile(
             tileColor:
-                episode.isFiller == true
-                    ? theme.colorScheme.primary.withValues(alpha: 0.18)
-                    : null,
+                episode.isMixed == true
+                    ? Colors.purple.withValues(alpha: 0.12)
+                    : (episode.isFiller == true
+                        ? Colors.orange.withValues(alpha: 0.12)
+                        : null),
             contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
             leading: Row(
               mainAxisSize: MainAxisSize.min,
@@ -89,7 +91,7 @@ class EpisodeListItem extends StatelessWidget {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (episode.isFiller == true)
+                if (episode.isMixed == true)
                   Container(
                     margin: const EdgeInsets.only(top: 2),
                     padding: const EdgeInsets.symmetric(
@@ -97,17 +99,42 @@ class EpisodeListItem extends StatelessWidget {
                       vertical: 1.5,
                     ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                      color: Colors.purple.withValues(alpha: 0.15),
                       border: Border.all(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                        color: Colors.purpleAccent.withValues(alpha: 0.6),
                         width: 0.9,
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
+                    child: const Text(
+                      'MIXED',
+                      style: TextStyle(
+                        color: Colors.purpleAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  )
+                else if (episode.isFiller == true)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.6),
+                        width: 0.9,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
                       'FILLER',
                       style: TextStyle(
-                        color: theme.colorScheme.primary,
+                        color: Colors.orange,
                         fontWeight: FontWeight.bold,
                         fontSize: 10,
                         letterSpacing: 0.5,

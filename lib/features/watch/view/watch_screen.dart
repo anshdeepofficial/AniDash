@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:screen_brightness/screen_brightness.dart';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/models/anime/server_model.dart';
 import 'package:ani_dash/features/watch/view/widgets/episodes_panel.dart';
@@ -19,6 +22,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String? animeFormat;
   final String animeCover;
   final int episode;
+  final int? malId;
   final List<EpisodeDataModel>? episodes;
 
   const WatchScreen({
@@ -29,6 +33,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     required this.animeCover,
     this.animeId,
     this.episode = 1,
+    this.malId,
     this.episodes = const [],
     this.fromHentaiHub = false,
   });
@@ -74,6 +79,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             animeFormat: widget.animeFormat,
             animeCover: widget.animeCover,
             fromHentaiHub: widget.fromHentaiHub,
+            malId: widget.malId,
           );
       ref
           .read(watchControllerProvider.notifier)
@@ -96,6 +102,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   }
 
   Future<void> _resetSystemUI() async {
+    try {
+      await ScreenBrightness().resetApplicationScreenBrightness();
+    } catch (_) {}
+    try {
+      await FlutterVolumeController.updateShowSystemUI(true);
+      const MethodChannel('shonenx/pip').invokeMethod('interceptVolumeKeys', false);
+    } catch (_) {}
     await UIHelper.resetOrientation();
     await UIHelper.exitImmersiveMode();
   }

@@ -60,8 +60,17 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
           )
           .toList();
 
+      final progressEntry = watchProgressRepo.getProgress(mediaId);
+      final isCompleted = progressEntry?.totalEpisodes != null &&
+          progressEntry.totalEpisodes > 0 &&
+          episodeNum >= progressEntry.totalEpisodes;
+      final trackingStatus = isCompleted ? 'COMPLETED' : 'CURRENT';
+
       if (syncSettings.syncMode == 'background') {
-        final inputData = <String, dynamic>{'progress': episodeNum};
+        final inputData = <String, dynamic>{
+          'progress': episodeNum,
+          'status': trackingStatus,
+        };
         for (final b in activeBindings) {
           if (b.type == TrackerType.anilist) {
             inputData['anilistId'] = b.remoteId;
@@ -85,14 +94,14 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
         tasks.add(
           trackerNotifier.syncTrackers(
             bindings: activeBindings,
-            status: 'CURRENT',
+            status: trackingStatus,
             progress: episodeNum,
           ),
         );
       }
 
       if (syncNotifier.shouldSyncLocal) {
-        final entry = watchProgressRepo.getProgress(mediaId);
+        final entry = progressEntry;
         final localEntry = await trackerNotifier.getLocalEntry();
 
         tasks.add(
@@ -105,7 +114,7 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
               format: entry?.animeFormat,
               episodes: entry?.totalEpisodes,
             ),
-            status: 'CURRENT',
+            status: trackingStatus,
             progress: episodeNum,
             score: localEntry?.score ?? 0.0,
             repeat: localEntry?.repeat ?? 0,

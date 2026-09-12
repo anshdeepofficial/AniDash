@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -33,6 +32,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _isPlayerReady = false;
 
   String? _mediaId, _animeName, _animeFormat, _animeCover;
+  int? _malId;
   int _pos = 0, _dur = 0, _totalEps = 0;
   int? _epNum;
   String? _epTitle, _epThumb;
@@ -44,6 +44,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _fromHentaiHub = false;
   bool _prefetchTriggered = false;
   bool _nextPromptTriggered = false;
+  bool _wasPlayingBeforeLock = false;
 
   @override
   void build() {
@@ -82,16 +83,26 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
+      final isPlaying = ref.read(playerStateProvider).isPlaying;
+      if (isPlaying) {
+        _wasPlayingBeforeLock = true;
+        // Pause safely before hardware rendering surface detaches to keep MPV memory cache intact
+        ref.read(playerStateProvider.notifier).pause();
+      }
       _triggerSave();
     } else if (state == AppLifecycleState.resumed) {
       if (AudioFocusService().isPausedByInterruption) {
-        // App returned to foreground after call
+        // App returned to foreground after call interruption
         AudioFocusService().requestAudioFocus().then((granted) {
           if (granted && AudioFocusService().isPausedByInterruption) {
             AudioFocusService().isPausedByInterruption = false;
             ref.read(playerStateProvider.notifier).play();
           }
         });
+      } else if (_wasPlayingBeforeLock) {
+        _wasPlayingBeforeLock = false;
+        // Cleanly resume from existing buffer without re-fetching stream from network
+        ref.read(playerStateProvider.notifier).play();
       }
     }
   }
@@ -110,6 +121,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     required String mediaId,
     required String? animeFormat,
     required String animeCover,
+    int? malId,
     bool fromHentaiHub = false,
   }) async {
     if (_isDisposed) return;
@@ -120,6 +132,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _animeCover = animeCover;
     _totalEps = episodes.length;
     _fromHentaiHub = fromHentaiHub;
+    _malId = malId;
 
     await ref
         .read(episodeListProvider.notifier)
@@ -153,6 +166,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _isPlayerReady = false;
     _epNum = initialEpisode;
 
+    // Immediately update currentEpisode in repository so Continue Watching is updated on tap
+    ref
+        .read(watchProgressRepositoryProvider)
+        .updateCurrentEpisode(mediaId, initialEpisode);
+
     Duration startAt = Duration.zero;
     final saved = ref
         .read(watchProgressRepositoryProvider)
@@ -166,39 +184,24 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
     }
 
-    final playerSettings = ref.read(playerSettingsProvider);
-    if (playerSettings.enableAniSkip && playerSettings.enableAutoSkip) {
-      try {
-        await ref
-            .read(aniSkipProvider.notifier)
-            .fetchSkipTimes(
-              mediaId: mediaId,
-              animeTitle: _animeName ?? '',
-              episodeNumber: initialEpisode,
-              episodeLength: 0,
-            )
-            .timeout(const Duration(seconds: 4));
+    // Restore saved playback speed if customized
+    final savedSpeed = ref.read(playerSettingsProvider).defaultPlaybackSpeed;
+    if (savedSpeed != 1.0) {
+      ref.read(playerStateProvider.notifier).setSpeed(savedSpeed);
+    }
 
-        final opening =
-            ref.read(aniSkipProvider).where((item) {
-              final interval = item.interval;
-              return interval != null &&
-                  (item.skipType == SkipType.op ||
-                      item.skipType == SkipType.mixed) &&
-                  interval.startTime <= 180 &&
-                  interval.endTime <= 600;
-            }).firstOrNull;
-        final introEnd = opening?.interval?.endTime.toInt();
-        if (introEnd != null && introEnd > startAt.inSeconds) {
-          startAt = Duration(seconds: introEnd + 1);
-          _hasAutoSkippedIntro = true;
-          AppLogger.i(
-            'Auto Skip: opening stream after intro at ${startAt.inSeconds}s',
+    final playerSettings = ref.read(playerSettingsProvider);
+    if (playerSettings.enableAniSkip) {
+      // Non-blocking: fetch skip times in background asynchronously without blocking stream loading
+      ref
+          .read(aniSkipProvider.notifier)
+          .fetchSkipTimes(
+            mediaId: mediaId,
+            animeTitle: _animeName ?? '',
+            episodeNumber: initialEpisode,
+            episodeLength: 0,
+            malId: _malId,
           );
-        }
-      } catch (error) {
-        AppLogger.d('Pre-play intro lookup skipped: $error');
-      }
     }
 
     await ref
@@ -213,6 +216,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   ) {
     void triggerAutoAdvance() {
       if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
+
+      // VLC Mode: Halt playback if "Stop after this episode" is enabled
+      if (ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
+        AppLogger.i('Stop After This Episode active: Halting auto-advance.');
+        ref.read(playerSettingsProvider.notifier).updateSettings(
+          (s) => s.copyWith(stopAfterCurrentEpisode: false),
+        );
+        ref.read(playerStateProvider.notifier).pause();
+        return;
+      }
+
       final epList = ref.read(episodeListProvider).episodes;
       final effectiveTotal = _totalEps > 0 ? _totalEps : epList.length;
       if (effectiveTotal <= 1) return;
@@ -220,9 +234,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       var target = (_epNum ?? 0) + 1;
       if (target > effectiveTotal) return;
       if (ref.read(playerSettingsProvider).skipFillerEpisodes) {
-        while (target <= _totalEps) {
+        while (target <= effectiveTotal) {
           EpisodeDataModel? episode;
-          for (final item in episodes) {
+          for (final item in epList) {
             if (item.number == target) {
               episode = item;
               break;
@@ -232,6 +246,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           target++;
         }
       }
+      if (target > effectiveTotal) return;
       AppLogger.i('Auto-advancing to episode $target');
       ref.read(episodeDataProvider.notifier).changeEpisode(target);
     }

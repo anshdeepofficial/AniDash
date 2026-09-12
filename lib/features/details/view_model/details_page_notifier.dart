@@ -136,6 +136,10 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
               fresh.relations.isNotEmpty
                   ? fresh.relations
                   : currentData?.relations,
+          characters:
+              fresh.characters.isNotEmpty
+                  ? fresh.characters
+                  : currentData?.characters ?? const [],
         );
         state = state.copyWith(details: AsyncData(enriched));
         if (state.animeIdForSource == null) {

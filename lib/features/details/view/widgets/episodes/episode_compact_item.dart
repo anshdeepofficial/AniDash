@@ -42,9 +42,11 @@ class EpisodeCompactItem extends StatelessWidget {
       children: [
         ListTile(
           tileColor:
-              episode.isFiller == true
-                  ? theme.colorScheme.primary.withValues(alpha: 0.18)
-                  : null,
+              episode.isMixed == true
+                  ? Colors.purple.withValues(alpha: 0.12)
+                  : (episode.isFiller == true
+                      ? Colors.orange.withValues(alpha: 0.12)
+                      : null),
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
           leading: Row(
@@ -65,13 +67,13 @@ class EpisodeCompactItem extends StatelessWidget {
                   ),
                 ),
               SizedBox(
-                width: 36,
+                width: 44,
                 child: Center(
                   child: Text(
                     '${episode.number ?? index + 1}',
                     style: TextStyle(
-                      fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      fontSize: 16,
                       color:
                           isWatched
                               ? theme.hintColor
@@ -89,10 +91,10 @@ class EpisodeCompactItem extends StatelessWidget {
             style: TextStyle(color: isWatched ? theme.hintColor : null),
           ),
           subtitle:
-              (download != null || episode.isFiller == true)
+              (download != null || episode.isFiller == true || episode.isMixed == true)
                   ? Row(
                     children: [
-                      if (episode.isFiller == true)
+                      if (episode.isMixed == true)
                         Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: Container(
@@ -101,17 +103,44 @@ class EpisodeCompactItem extends StatelessWidget {
                               vertical: 1.5,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                              color: Colors.purple.withValues(alpha: 0.15),
                               border: Border.all(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                                color: Colors.purpleAccent.withValues(alpha: 0.6),
                                 width: 0.8,
                               ),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
+                            child: const Text(
+                              'MIXED',
+                              style: TextStyle(
+                                color: Colors.purpleAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (episode.isFiller == true)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.15),
+                              border: Border.all(
+                                color: Colors.orange.withValues(alpha: 0.6),
+                                width: 0.8,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
                               'FILLER',
                               style: TextStyle(
-                                color: theme.colorScheme.primary,
+                                color: Colors.orange,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.4,

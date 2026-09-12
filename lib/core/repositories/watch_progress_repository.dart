@@ -271,6 +271,18 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   }
 
   @override
+  Future<void> updateCurrentEpisode(String animeId, int currentEpisode) async {
+    final entry = getProgress(animeId);
+    if (entry != null) {
+      final updated = entry.copyWith(
+        currentEpisode: currentEpisode,
+        lastUpdated: DateTime.now(),
+      );
+      await saveProgress(updated);
+    }
+  }
+
+  @override
   Future<void> markPreviousEpisodesWatched({
     required String animeId,
     required String animeTitle,

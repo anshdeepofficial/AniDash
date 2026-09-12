@@ -189,7 +189,7 @@ class EpisodeBannerItem extends StatelessWidget {
                                       size: 13,
                                     ),
                                   ],
-                                  if (episode.isFiller == true) ...[
+                                  if (episode.isMixed == true) ...[
                                     const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
@@ -197,7 +197,27 @@ class EpisodeBannerItem extends StatelessWidget {
                                         vertical: 1.5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary,
+                                        color: Colors.purple,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'MIXED',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ] else if (episode.isFiller == true) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.deepOrange,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
