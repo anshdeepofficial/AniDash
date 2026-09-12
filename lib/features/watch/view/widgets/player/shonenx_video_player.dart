@@ -164,15 +164,15 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final w = MediaQuery.of(context).size.width;
     _isDragLeft = details.globalPosition.dx < w / 2;
     // A swipe that begins below 100% stops at normal maximum. Starting a new
-    // upward swipe at 100% explicitly unlocks VLC-style amplified volume.
+    // upward swipe on the right side at 100% explicitly unlocks VLC-style amplified volume.
     _allowVolumeBoostForGesture =
-        _isDragLeft && ref.read(playerUIControllerProvider).volume >= 0.99;
+        !_isDragLeft && ref.read(playerUIControllerProvider).volume >= 0.99;
 
     setState(() {
       if (_isDragLeft) {
-        _isChangingVolume = true;
-      } else {
         _isChangingBrightness = true;
+      } else {
+        _isChangingVolume = true;
       }
     });
 
@@ -190,6 +190,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final state = ref.read(playerUIControllerProvider);
 
     if (_isDragLeft) {
+      double newB = (state.brightness + delta).clamp(0.0, 1.0);
+      controller.setBrightness(newB);
+    } else {
       final maxVolume = _allowVolumeBoostForGesture ? 2.0 : 1.0;
       double newV = (state.volume + delta).clamp(0.0, maxVolume);
 
@@ -211,9 +214,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
             .player
             .setVolume(100.0);
       }
-    } else {
-      double newB = (state.brightness + delta).clamp(0.0, 1.0);
-      controller.setBrightness(newB);
     }
   }
 
@@ -648,7 +648,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (_isChangingBrightness)
                 Positioned.fill(
                   child: Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.centerLeft,
                     child: VolumeBrightnessOverlay(
                       isVolume: false,
                       value: uiState.brightness,
@@ -658,7 +658,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               if (_isChangingVolume)
                 Positioned.fill(
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: Alignment.centerRight,
                     child: VolumeBrightnessOverlay(
                       isVolume: true,
                       value: uiState.volume,

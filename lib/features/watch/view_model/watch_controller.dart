@@ -9,6 +9,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:ani_dash/core/models/aniskip/aniskip_result.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/core/services/audio_focus_service.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
@@ -71,6 +72,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _playbackActionSubscription?.cancel();
       NotificationService().hidePlaybackNotification();
       WidgetsBinding.instance.removeObserver(this);
+      AudioFocusService().abandonAudioFocus();
+      AudioFocusService().reset();
       _triggerSave();
     });
   }
@@ -80,6 +83,16 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _triggerSave();
+    } else if (state == AppLifecycleState.resumed) {
+      if (AudioFocusService().isPausedByInterruption) {
+        // App returned to foreground after call
+        AudioFocusService().requestAudioFocus().then((granted) {
+          if (granted && AudioFocusService().isPausedByInterruption) {
+            AudioFocusService().isPausedByInterruption = false;
+            ref.read(playerStateProvider.notifier).play();
+          }
+        });
+      }
     }
   }
 
@@ -118,6 +131,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           force: false,
           isAdult: fromHentaiHub,
         );
+
+    AudioFocusService().initialize(
+      onPauseRequested: () async {
+        if (_isDisposed) return;
+        await ref.read(playerStateProvider.notifier).pause();
+      },
+      onResumeRequested: () async {
+        if (_isDisposed) return;
+        await ref.read(playerStateProvider.notifier).play();
+      },
+    );
 
     await _initEpisode(mediaId, initialEpisode);
     _attachPlaybackListeners(mediaId, animeName, episodes);
@@ -243,6 +267,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       // Fetch skip ranges as soon as the manifest duration is known. This lets
       // auto-skip seek before the opening frames have to begin rendering.
       if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);
+
+      if (next.isPlaying && !(prev?.isPlaying ?? false)) {
+        AudioFocusService().requestAudioFocus();
+      }
 
       if (!_isPlayerReady) {
         if (_dur == 0 || next.position.inSeconds == 0) return;

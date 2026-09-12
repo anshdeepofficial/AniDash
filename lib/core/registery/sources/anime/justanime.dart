@@ -138,11 +138,11 @@ class JustAnimeProvider extends AnimeProvider {
     }
 
     if (totalPages != null && totalPages > 1) {
-      pages.addAll(
-        await Future.wait([
-          for (var page = 2; page <= totalPages; page++) fetchPage(page),
-        ]),
-      );
+      final additionalPages = await Future.wait([
+        for (var page = 2; page <= totalPages; page++)
+          fetchPage(page).catchError((_) => <String, dynamic>{'episodes': []}),
+      ]);
+      pages.addAll(additionalPages.where((p) => p.isNotEmpty));
     } else if (firstEps.length >= 100) {
       // Loop until less than 100 items or empty (up to max 25 pages)
       int currentPage = 2;
@@ -202,7 +202,7 @@ class JustAnimeProvider extends AnimeProvider {
     final rawEp = episodeId.split('+').last.replaceAll(RegExp(r'[^0-9]'), '');
     final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId) ?? 1;
     final requestedAudio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
-    final audioOrder = requestedAudio == 'dub' ? ['dub', 'sub'] : ['sub'];
+    final audioOrder = [requestedAudio];
 
     Future<Map<String, dynamic>?> request(String path) async {
       try {
@@ -220,25 +220,42 @@ class JustAnimeProvider extends AnimeProvider {
       }
     }
 
-    // Default to AniNeko (HLS .m3u8 with subtitles, fast start) and fallback to AnimeGG (direct MP4)
-    final preferAnimeGG = serverName?.toLowerCase().contains('animegg') == true;
+    // Prioritize AnimeGG (direct MP4) which reliably returns HTTP 200 without CDN 403 errors,
+    // unless the user explicitly requested AniNeko.
+    final isExplicitAniNeko =
+        serverName?.toLowerCase().contains('anineko') == true;
     final hlsEndpoints = [
       for (final audio in audioOrder)
         '/watch/$animeId/episode/$episode/anineko/$audio',
     ];
+    final animeggEndpoint = '/watch/$animeId/episode/$episode/animegg';
     final endpoints =
-        preferAnimeGG
-            ? ['/watch/$animeId/episode/$episode/animegg', ...hlsEndpoints]
-            : [...hlsEndpoints, '/watch/$animeId/episode/$episode/animegg'];
+        isExplicitAniNeko
+            ? [...hlsEndpoints, animeggEndpoint]
+            : [animeggEndpoint, ...hlsEndpoints];
 
     for (final endpoint in endpoints) {
       final payload = await request(endpoint);
       if (payload == null) continue;
       final endpointAudio = endpoint.contains('/anineko/dub') ? 'dub' : 'sub';
+
+      if (endpoint.contains('/anineko/') && requestedAudio != endpointAudio) {
+        // Do not silently accept sub stream if user explicitly requested dub
+        continue;
+      }
+
       final animeGGRaw =
           endpoint.contains('animegg')
-              ? (payload[requestedAudio] ?? payload['sub'])
+              ? (requestedAudio == 'dub'
+                  ? payload['dub']
+                  : (payload['sub'] ?? payload['dub']))
               : null;
+
+      if (endpoint.contains('animegg') && requestedAudio == 'dub' && payload['dub'] == null) {
+        // Requested DUB, but AnimeGG has no dub payload -> fall through to try other endpoints
+        continue;
+      }
+
       final raw =
           endpoint.contains('animegg')
               ? animeGGRaw as Map<String, dynamic>?
@@ -316,13 +333,13 @@ class JustAnimeProvider extends AnimeProvider {
   @override
   Future<BaseServerModel> getSupportedServers({dynamic metadata}) async {
     final subServers = [
-      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: false),
       ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: false),
+      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: false),
     ];
 
     final dubServers = [
-      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: true),
       ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: true),
+      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: true),
     ];
 
     return BaseServerModel(sub: subServers, dub: dubServers);

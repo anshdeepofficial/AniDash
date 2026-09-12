@@ -17,6 +17,9 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import androidx.core.content.FileProvider
 import android.content.ComponentName
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 
 class MainActivity : FlutterFragmentActivity() {
     private var landscapeListener: OrientationEventListener? = null
@@ -24,6 +27,70 @@ class MainActivity : FlutterFragmentActivity() {
     private var interceptVolumeKeys = false
     private var isScreenshotPrivacyEnabled = false
     private var displayListener: DisplayManager.DisplayListener? = null
+    private var audioFocusChannel: MethodChannel? = null
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var hasAudioFocus = false
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        runOnUiThread {
+            when (focusChange) {
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    audioFocusChannel?.invokeMethod("onAudioFocusLossTransient", null)
+                }
+                AudioManager.AUDIOFOCUS_LOSS -> {
+                    hasAudioFocus = false
+                    audioFocusChannel?.invokeMethod("onAudioFocusLoss", null)
+                }
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    hasAudioFocus = true
+                    audioFocusChannel?.invokeMethod("onAudioFocusGain", null)
+                }
+            }
+        }
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        val am = audioManager ?: (getSystemService(Context.AUDIO_SERVICE) as? AudioManager).also { audioManager = it }
+        if (am == null) return false
+
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val playbackAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                .build()
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(playbackAttributes)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            audioFocusRequest = request
+            am.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+
+        hasAudioFocus = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        return hasAudioFocus
+    }
+
+    private fun abandonAudioFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(audioFocusChangeListener)
+        }
+        hasAudioFocus = false
+    }
 
     private fun updateSecureFlag() {
         val displayManager = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
@@ -254,6 +321,20 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        audioFocusChannel =
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "shonenx/audio_focus").apply {
+                setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "requestAudioFocus" -> result.success(requestAudioFocus())
+                        "abandonAudioFocus" -> {
+                            abandonAudioFocus()
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                }
+            }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -278,6 +359,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onDestroy() {
         disableLandscapeRotation()
+        abandonAudioFocus()
         super.onDestroy()
     }
 }

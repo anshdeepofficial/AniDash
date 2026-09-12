@@ -23,15 +23,21 @@ final selectedProviderKeyProvider =
 class SelectedProviderKeyNotifier extends Notifier<String?> {
   @override
   String? build() {
-    // Migration
-    if (!Hive.isBoxOpen(selectedProviderBox)) {
-      final box = Hive.box<String>(selectedProviderBox);
-      final key = box.get(selectedProviderKey);
-      if (box.isNotEmpty && key != null && key.isNotEmpty) select(key);
-      box.delete(selectedProviderKey);
-    }
-    final selectedKey = sharedPrefs.getString(selectedProvider);
-    AppLogger.w("[Registery] Selected $selectedKey");
+    ref.keepAlive();
+    // Safely check Hive migration only if box is open
+    try {
+      if (Hive.isBoxOpen(selectedProviderBox)) {
+        final box = Hive.box<String>(selectedProviderBox);
+        final key = box.get(selectedProviderKey);
+        if (box.isNotEmpty && key != null && key.isNotEmpty) {
+          sharedPrefs.setString(selectedProvider, key.trim().toLowerCase());
+        }
+        box.delete(selectedProviderKey);
+      }
+    } catch (_) {}
+
+    final selectedKey = sharedPrefs.getString(selectedProvider)?.trim().toLowerCase();
+    AppLogger.w("[Registry] Selected $selectedKey");
     if (selectedKey == null || selectedKey.isEmpty) {
       sharedPrefs.setString(selectedProvider, 'justanime');
       return 'justanime';
@@ -40,11 +46,13 @@ class SelectedProviderKeyNotifier extends Notifier<String?> {
   }
 
   void select(String key) {
-    sharedPrefs.setString(selectedProvider, key);
-    state = key;
+    final lowerKey = key.trim().toLowerCase();
+    sharedPrefs.setString(selectedProvider, lowerKey);
+    state = lowerKey;
   }
 
   void clear() {
+    sharedPrefs.remove(selectedProvider);
     state = null;
   }
 }
@@ -53,7 +61,7 @@ final selectedAnimeProvider = Provider<AnimeProvider?>((ref) {
   final registry = ref.watch(animeSourceRegistryProvider);
   final key = ref.watch(selectedProviderKeyProvider);
   if (key != null && key.isNotEmpty) {
-    final p = registry.get(key);
+    final p = registry.get(key.trim().toLowerCase());
     if (p != null) return p;
   }
   return registry.get('justanime') ??

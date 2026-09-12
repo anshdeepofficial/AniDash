@@ -171,12 +171,28 @@ class EpisodeGridItem extends StatelessWidget {
                     ),
                   ),
                   if (episode.isFiller == true)
-                    Text(
-                      'FILLER',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                          width: 0.8,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'FILLER',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.4,
+                        ),
                       ),
                     ),
                 ],

@@ -321,6 +321,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               animeTitle: titleForSearch,
               animeId: state.animeIdForSource,
               force: false,
+              malId: widget.malId,
               media: DMedia(
                 title: titleForSearch,
                 url: state.animeIdForSource,
@@ -1047,68 +1048,95 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               builder: (context, setState) {
                 return Consumer(
                   builder: (context, ref, _) {
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: theme.dividerColor.withValues(
-                                  alpha: 0.5,
+                    final useExtensions =
+                        ref.watch(experimentalProvider).useExtensions;
+                    final nativeKey = ref.watch(selectedProviderKeyProvider);
+                    final isNative =
+                        nativeKey != null &&
+                        ref.watch(animeSourceRegistryProvider).has(nativeKey);
+                    final initialIndex = (useExtensions && !isNative) ? 1 : 0;
+
+                    return DefaultTabController(
+                      length: 2,
+                      initialIndex: initialIndex,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            child: Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: theme.dividerColor.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
                                 ),
-                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Select Source',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                decoration: InputDecoration(
-                                  hintText: 'Search extension...',
-                                  prefixIcon: const Icon(Icons.search),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  fillColor:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  filled: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Select Source',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                onChanged: (value) {
-                                  setState(() => searchQuery = value);
-                                },
-                              ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  decoration: InputDecoration(
+                                    hintText: 'Search sources...',
+                                    prefixIcon: const Icon(Icons.search),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    fillColor:
+                                        theme.colorScheme.surfaceContainerHighest,
+                                    filled: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() => searchQuery = value);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const TabBar(
+                            tabs: [
+                              Tab(text: 'Built-in Sources'),
+                              Tab(text: 'Extensions'),
                             ],
                           ),
-                        ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: _buildExtensionSourceList(
-                            ref,
-                            scrollController,
-                            notifier,
-                            searchQuery,
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                _buildLegacySourceList(
+                                  ref,
+                                  scrollController,
+                                  notifier,
+                                  searchQuery,
+                                ),
+                                _buildExtensionSourceList(
+                                  ref,
+                                  scrollController,
+                                  notifier,
+                                  searchQuery,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                 );
@@ -1120,45 +1148,22 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     );
   }
 
-  bool _isSource18Plus(dynamic s) {
-    if (s == null) return false;
-    if (s is Source) {
-      if (s.isNsfw == true) return true;
-      final name = (s.name ?? '').toLowerCase();
-      return name.contains('hanime') || name.contains('hentai');
-    }
-    final str = s.toString().toLowerCase();
-    return str.contains('hanime') || str.contains('hentai');
-  }
-
   Widget _buildExtensionSourceList(
     WidgetRef ref,
     ScrollController scrollController,
     DetailsPageNotifier notifier,
     String query,
   ) {
-    final detailsMedia =
-        ref.watch(detailsPageProvider(widget.mediaId)).details.value;
-    final isMature =
-        widget.fromHentaiHub ||
-        detailsMedia?.isMature == true ||
-        detailsMedia?.isAdult == true;
-
     final sourceState = ref.watch(sourceProvider);
-    final allAvailable =
-        isMature
-            ? [
-              ...sourceState.installedAdultAnimeExtensions,
-              ...sourceState.installedAnimeExtensions.where(
-                (s) => _isSource18Plus(s),
-              ),
-            ]
-            : sourceState.installedAnimeExtensions
-                .where((s) => !_isSource18Plus(s))
-                .toList();
+    final allAvailable = <Source>[
+      ...sourceState.installedAdultAnimeExtensions,
+      ...sourceState.installedAnimeExtensions,
+    ];
+    final seenIds = <dynamic>{};
+    final uniqueAvailable = allAvailable.where((s) => seenIds.add(s.id)).toList();
 
     final sources =
-        allAvailable.where((s) {
+        uniqueAvailable.where((s) {
             if (query.isEmpty) return true;
             return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
           }).toList()
@@ -1170,19 +1175,15 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           });
 
     final activeId =
-        isMature
-            ? (sourceState.activeAdultAnimeSource?.id ??
-                sourceState.activeAnimeSource?.id)
-            : sourceState.activeAnimeSource?.id;
+        sourceState.activeAdultAnimeSource?.id ??
+        sourceState.activeAnimeSource?.id;
 
     if (sources.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Text(
-            isMature
-                ? 'No 18+ extensions found.\nPlease install Hanime.tv or HentaiHaven from Extensions.'
-                : 'No extensions found.',
+            'No extensions found.',
             textAlign: TextAlign.center,
           ),
         ),
@@ -1237,6 +1238,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           onTap: () {
             ref.read(selectedProviderKeyProvider.notifier).clear();
             ref.read(sourceProvider.notifier).setActiveSource(source);
+            ref.read(experimentalProvider.notifier).toggleExtensions(true);
             Navigator.pop(context);
             notifier.refresh();
           },
@@ -1251,33 +1253,16 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     DetailsPageNotifier notifier,
     String query,
   ) {
-    final detailsMedia =
-        ref.watch(detailsPageProvider(widget.mediaId)).details.value;
-    final isMature = widget.fromHentaiHub && detailsMedia?.isMature == true;
-
-    if (isMature) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            'Built-in sources only support regular anime.\nFor 18+ content, switch to the Extensions tab.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
     final registry = ref.read(animeSourceRegistryProvider);
     final selectedAnimeSource = ref.watch(selectedAnimeProvider);
     final sources =
         registry.keys.where((s) {
-          if (_isSource18Plus(s)) return false;
           if (query.isEmpty) return true;
           return s.toLowerCase().contains(query.toLowerCase());
         }).toList();
 
     if (sources.isEmpty) {
-      return const Center(child: Text('No legacy sources found.'));
+      return const Center(child: Text('No sources found.'));
     }
 
     return ListView.builder(
@@ -1302,6 +1287,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                   : null,
           onTap: () {
             ref.read(selectedProviderKeyProvider.notifier).select(source);
+            ref.read(experimentalProvider.notifier).toggleExtensions(false);
             Navigator.pop(context);
             notifier.refresh();
           },

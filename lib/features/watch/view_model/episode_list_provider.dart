@@ -8,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/jikan/models/jikan_media.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
+import 'package:ani_dash/core/services/anime_filler_service.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
@@ -111,8 +112,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       animeId: animeId,
       animeTitle: animeTitle,
       animeCover: animeCover ?? media?.cover,
-      malId: malId,
-      clearMalId: malId == null,
+      malId: malId ?? state.malId,
+      clearMalId: malId == null && state.malId == null,
       jikanMatches: const [],
       isAdult: isAdult,
     );
@@ -319,7 +320,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     }
 
     state = state.copyWith(isJikanSyncing: true);
-    AppLogger.i('Initializing Jikan title sync for: ${state.animeTitle}');
+    AppLogger.i('Initializing metadata and filler sync for: ${state.animeTitle}');
 
     // unawaited ensures Riverpod doesn't block while fetching non-critical metadata
     unawaited(
@@ -331,15 +332,46 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
   Future<void> _syncWithJikan() async {
     try {
+      final currentTitle = state.animeTitle!;
       int? malId = state.malId;
 
+      // 1. Instant Filler Sync via AnimeFillerService (AnimeFillerList + Jikan cache)
+      try {
+        final fillers = await AnimeFillerService().getFillerEpisodes(
+          title: currentTitle,
+          malId: malId,
+        );
+
+        if (fillers.isNotEmpty && state.episodes.isNotEmpty) {
+          final updated = List<EpisodeDataModel>.of(state.episodes);
+          var fillerCount = 0;
+          for (var i = 0; i < updated.length; i++) {
+            final epNum = updated[i].number ?? (i + 1);
+            final isFiller = fillers.contains(epNum) || updated[i].isFiller == true;
+            if (isFiller && updated[i].isFiller != true) {
+              updated[i] = updated[i].copyWith(isFiller: true);
+              fillerCount++;
+            }
+          }
+          if (fillerCount > 0) {
+            AppLogger.success(
+              'Highlighted $fillerCount filler episodes for "$currentTitle"',
+            );
+            state = state.copyWith(episodes: updated);
+          }
+        }
+      } catch (e) {
+        AppLogger.d('AnimeFillerService sync error: $e');
+      }
+
+      // 2. Title and metadata sync via Jikan (MAL)
       if (malId == null) {
         var matches = state.jikanMatches;
 
         // Only search Jikan if we haven't already cached the matches
         if (matches.isEmpty) {
           final cleanedTitle =
-              state.animeTitle!
+              currentTitle
                   .replaceAll(
                     RegExp(
                       r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)',
@@ -360,7 +392,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                   )
                   .trim();
           final searchTitle =
-              cleanedTitle.isNotEmpty ? cleanedTitle : state.animeTitle!;
+              cleanedTitle.isNotEmpty ? cleanedTitle : currentTitle;
 
           final searchResults = await _jikan.getSearch(
             title: searchTitle,
@@ -374,80 +406,80 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
           );
         }
 
-        if (matches.isEmpty || matches.first.similarity < 0.55) {
-          AppLogger.warning(
-            'No strong Jikan match found for title sync. Aborting sync.',
-          );
-          return;
-        }
-
-        state = state.copyWith(jikanMatches: matches);
-        malId = matches.first.result.malId;
-      }
-
-      AppLogger.d('Fetching MAL episode data for ID: $malId');
-      final allJikanEpisodes = <JikanEpisode>[];
-      int page = 1;
-      final totalNeeded = state.episodes.length;
-
-      while (allJikanEpisodes.length < totalNeeded) {
-        final jikanEpisodes = await _jikan.getEpisodes(malId, page);
-        if (jikanEpisodes.isEmpty) break;
-        allJikanEpisodes.addAll(jikanEpisodes);
-        if (jikanEpisodes.length < 100) break; // Last page
-        page++;
-        if (page > 15) break; // Safety cap ~1500 episodes
-      }
-
-      if (allJikanEpisodes.isEmpty) return;
-
-      // Create a lookup by malId (episode number in Jikan)
-      final titleByEpNum = <int, String>{};
-      final fillerByEpNum = <int, bool>{};
-      for (final jEp in allJikanEpisodes) {
-        fillerByEpNum[jEp.malId] = jEp.filler;
-        if (jEp.title.isNotEmpty &&
-            !jEp.title.toLowerCase().startsWith('episode ')) {
-          titleByEpNum[jEp.malId] = jEp.title;
-        } else if (jEp.title.isNotEmpty) {
-          titleByEpNum[jEp.malId] = jEp.title;
+        if (matches.isNotEmpty && matches.first.similarity >= 0.55) {
+          state = state.copyWith(jikanMatches: matches);
+          malId = matches.first.result.malId;
         }
       }
 
-      // Create a mutable copy of the list to update titles
-      final updated = List<EpisodeDataModel>.of(state.episodes);
-      int syncedCount = 0;
+      if (malId != null && malId > 0) {
+        AppLogger.d('Fetching MAL episode data for ID: $malId');
+        final allJikanEpisodes = <JikanEpisode>[];
+        int page = 1;
+        final totalNeeded = state.episodes.length;
 
-      for (var i = 0; i < updated.length; i++) {
-        final epNum = updated[i].number ?? (i + 1);
-        final syncedTitle = titleByEpNum[epNum];
-        final isFiller = fillerByEpNum[epNum] == true;
-        if (isFiller && updated[i].isFiller != true) {
-          updated[i] = updated[i].copyWith(isFiller: true);
+        while (allJikanEpisodes.length < totalNeeded && page <= 15) {
+          final jikanEpisodes = await _jikan
+              .getEpisodes(malId, page)
+              .timeout(const Duration(seconds: 10));
+          if (jikanEpisodes.isEmpty) break;
+          allJikanEpisodes.addAll(jikanEpisodes);
+          if (jikanEpisodes.length < 100) break; // Last page
+          page++;
+          await Future.delayed(const Duration(milliseconds: 300));
         }
-        if (syncedTitle != null && syncedTitle.isNotEmpty) {
-          // If extension already gave a real title (not just "Episode X"), keep it or enrich it
-          final currentTitle = updated[i].title ?? '';
-          final isGeneric =
-              currentTitle.isEmpty ||
-              RegExp(
-                r'^(episode|ep\.?)\s*\d+$',
-                caseSensitive: false,
-              ).hasMatch(currentTitle.trim());
 
-          if (isGeneric) {
-            updated[i] = updated[i].copyWith(title: 'EP $epNum - $syncedTitle');
-            syncedCount++;
+        if (allJikanEpisodes.isNotEmpty) {
+          // Create a lookup by malId (episode number in Jikan)
+          final titleByEpNum = <int, String>{};
+          final fillerByEpNum = <int, bool>{};
+          for (final jEp in allJikanEpisodes) {
+            fillerByEpNum[jEp.malId] = jEp.filler;
+            if (jEp.title.isNotEmpty) {
+              titleByEpNum[jEp.malId] = jEp.title;
+            }
           }
+
+          // Create a mutable copy of the list to update titles and fillers
+          final updated = List<EpisodeDataModel>.of(state.episodes);
+          int syncedCount = 0;
+
+          for (var i = 0; i < updated.length; i++) {
+            final epNum = updated[i].number ?? (i + 1);
+            final syncedTitle = titleByEpNum[epNum];
+            final isFiller =
+                fillerByEpNum[epNum] == true || updated[i].isFiller == true;
+            if (isFiller && updated[i].isFiller != true) {
+              updated[i] = updated[i].copyWith(isFiller: true);
+            }
+            if (syncedTitle != null && syncedTitle.isNotEmpty) {
+              final currentEpTitle = updated[i].title ?? '';
+              final isGeneric =
+                  currentEpTitle.isEmpty ||
+                  RegExp(
+                    r'^(episode|ep\.?)\s*\d+$',
+                    caseSensitive: false,
+                  ).hasMatch(currentEpTitle.trim());
+
+              if (isGeneric) {
+                updated[i] = updated[i].copyWith(
+                  title: 'EP $epNum - $syncedTitle',
+                );
+                syncedCount++;
+              }
+            }
+          }
+
+          if (syncedCount > 0) {
+            AppLogger.success(
+              'Successfully synced $syncedCount episode titles from Jikan',
+            );
+          }
+          state = state.copyWith(episodes: updated);
         }
       }
-
-      AppLogger.success(
-        'Successfully synced $syncedCount episode titles from Jikan',
-      );
-      state = state.copyWith(episodes: updated);
     } catch (e, st) {
-      AppLogger.w('Jikan sync failed dynamically', e, st);
+      AppLogger.w('Metadata and filler sync failed: $e', e, st);
     }
   }
 }

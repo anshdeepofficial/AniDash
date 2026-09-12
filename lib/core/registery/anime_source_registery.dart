@@ -42,7 +42,7 @@ class AnimeSourceRegistry {
 
   AnimeProvider? get(String key) {
     if (!isInitialized) return _warn<AnimeProvider>('Not initialized: $key');
-    return _providers[key] ?? _warn<AnimeProvider>('Not found: $key');
+    return _providers[key] ?? _providers[key.toLowerCase()] ?? _warn<AnimeProvider>('Not found: $key');
   }
 
   void setStatus(RegistryStatus status, [String? error]) {
@@ -57,7 +57,7 @@ class AnimeSourceRegistry {
     AppLogger.i('Providers cleared');
   }
 
-  bool has(String key) => _providers.containsKey(key);
+  bool has(String key) => _providers.containsKey(key) || _providers.containsKey(key.toLowerCase());
   int get count => _providers.length;
   List<String> get keys => _providers.keys.toList();
   List<AnimeProvider> get values => _providers.values.toList();

@@ -95,11 +95,27 @@ class EpisodeCompactItem extends StatelessWidget {
                       if (episode.isFiller == true)
                         Padding(
                           padding: const EdgeInsets.only(right: 8.0),
-                          child: Text(
-                            'FILLER',
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                              fontSize: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                                width: 0.8,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'FILLER',
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
                             ),
                           ),
                         ),

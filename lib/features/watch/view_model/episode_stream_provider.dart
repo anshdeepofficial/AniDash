@@ -142,8 +142,22 @@ class EpisodeData extends _$EpisodeData {
     }
 
     AppLogger.section('Loading Episode $ep');
+    final preferDub = ref.read(playerSettingsProvider).preferDub;
+    ServerData? currentServer = state.selectedServer;
+    if (currentServer != null && currentServer.isDub != preferDub) {
+      final matching = state.servers.firstWhereOrNull(
+        (s) =>
+            s.isDub == preferDub &&
+            (s.id == currentServer?.id || s.name == currentServer?.name),
+      ) ?? state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
+      currentServer = matching ?? currentServer.copyWith(isDub: preferDub);
+    } else if (currentServer == null && state.servers.isNotEmpty) {
+      currentServer = state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
+    }
+
     state = state.copyWith(
       selectedEpisode: ep,
+      selectedServer: currentServer,
       addState: play ? EpisodeStreamState.SOURCE_LOADING : null,
       clearError: true,
       clearLanguageNotice: true,
@@ -214,6 +228,9 @@ class EpisodeData extends _$EpisodeData {
 
   Future<void> changeServer(ServerData server) async {
     AppLogger.infoPair('Changing Server', server.name ?? server.id);
+    ref.read(playerSettingsProvider.notifier).updateSettings(
+      (s) => s.copyWith(preferDub: server.isDub),
+    );
     state = state.copyWith(selectedServer: server);
     await _playCurrent(ref.read(playerStateProvider).position);
   }
@@ -221,6 +238,10 @@ class EpisodeData extends _$EpisodeData {
   Future<void> toggleDubSub() async {
     final current = state.selectedServer;
     final targetIsDub = !(current?.isDub ?? false);
+
+    ref.read(playerSettingsProvider.notifier).updateSettings(
+      (s) => s.copyWith(preferDub: targetIsDub),
+    );
 
     // 1. Try to find the matching server with the target dub status
     ServerData? alt = state.servers.firstWhereOrNull(
@@ -240,7 +261,8 @@ class EpisodeData extends _$EpisodeData {
     AppLogger.i(
       'Toggling Dub/Sub to: ${targetIsDub ? "DUB" : "SUB"} on server: ${alt.name ?? alt.id}',
     );
-    await changeServer(alt);
+    state = state.copyWith(selectedServer: alt);
+    await _playCurrent(ref.read(playerStateProvider).position);
   }
 
   Future<void> changeSource(int idx) async {
@@ -725,9 +747,17 @@ class EpisodeData extends _$EpisodeData {
       }
 
       final preferDub = ref.read(playerSettingsProvider).preferDub;
-      final selected =
-          list.firstWhereOrNull((s) => s.isDub == preferDub) ??
-          list.firstOrNull;
+      final currentServer = state.selectedServer;
+      ServerData? selected;
+      if (currentServer != null) {
+        selected = list.firstWhereOrNull(
+          (s) =>
+              (s.id == currentServer.id || s.name == currentServer.name) &&
+              s.isDub == currentServer.isDub,
+        );
+      }
+      selected ??= list.firstWhereOrNull((s) => s.isDub == preferDub);
+      selected ??= list.firstOrNull;
 
       state = state.copyWith(servers: list, selectedServer: selected);
       AppLogger.success(
@@ -840,9 +870,8 @@ class EpisodeData extends _$EpisodeData {
               sources: subFallback.sources,
               subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
               headers: subFallback.headers?.cast<String, String>(),
-              selectedServer: state.selectedServer?.copyWith(isDub: false),
               languageNotice:
-                  'The English DUB stream could not be loaded. Japanese SUB is available.',
+                  'The English DUB stream could not be loaded for this episode. Japanese SUB is playing.',
             );
             await _loadSourceStream(0, startAt: startAt);
             return;
@@ -1071,8 +1100,10 @@ class EpisodeData extends _$EpisodeData {
     EpisodeDataModel ep, {
     ServerData? server,
   }) async {
+    final preferDub = ref.read(playerSettingsProvider).preferDub;
+    final isDubRequested = server?.isDub ?? preferDub;
     AppLogger.d(
-      'Fetching source data via ${server?.name ?? "Extension"} (${server?.isDub == true ? "DUB" : "SUB"})',
+      'Fetching source data via ${server?.name ?? "Extension"} (${isDubRequested ? "DUB" : "SUB"})',
     );
     final epTargetUrl =
         (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
@@ -1084,7 +1115,6 @@ class EpisodeData extends _$EpisodeData {
         final res = await _srcNotifier.getSources(
           DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
         );
-        final isDubRequested = server?.isDub == true;
         final extractedHeaders =
             res
                 .firstWhereOrNull(
@@ -1171,7 +1201,7 @@ class EpisodeData extends _$EpisodeData {
       }
     }
 
-    final category = server?.isDub == true ? 'dub' : 'sub';
+    final category = isDubRequested ? 'dub' : 'sub';
     final targetEpId =
         (ep.id != null && ep.id!.isNotEmpty)
             ? ep.id!
@@ -1262,12 +1292,21 @@ class EpisodeData extends _$EpisodeData {
           );
           final altMatch = altSearch.results.firstOrNull;
           if (altMatch == null || altMatch.id == null) return;
-          final altEps = await altProvider.getEpisodes(altMatch.id!);
-          final targetEp = altEps.episodes?.firstWhereOrNull(
-            (e) => e.number == ep.number,
-          );
-          final resolvedEpId =
-              targetEp?.id ?? altEps.episodes?.firstOrNull?.id ?? targetEpId;
+
+          String resolvedEpId = ep.number?.toString() ?? targetEpId;
+          if (altProvider.providerName != 'justanime') {
+            try {
+              final altEps = await altProvider
+                  .getEpisodes(altMatch.id!)
+                  .timeout(const Duration(seconds: 4));
+              final targetEp = altEps.episodes?.firstWhereOrNull(
+                (e) => e.number == ep.number,
+              );
+              resolvedEpId =
+                  targetEp?.id ?? altEps.episodes?.firstOrNull?.id ?? resolvedEpId;
+            } catch (_) {}
+          }
+
           final altSources = await altProvider.getSources(
             altMatch.id!,
             resolvedEpId,

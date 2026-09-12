@@ -9,7 +9,6 @@ import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/content_settings_notifier.dart';
 import 'package:collection/collection.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
-import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 
 part 'anime_match_service.g.dart';
 
@@ -118,65 +117,6 @@ class AnimeMatchService {
     String query, {
     bool isAdult = false,
   }) async {
-    if (isAdult) {
-      final sourceState = _ref.read(sourceProvider);
-      final adultSources = [
-        ...sourceState.installedAdultAnimeExtensions,
-        ...sourceState.installedAnimeExtensions.where((s) {
-          final name = (s.name ?? '').toLowerCase();
-          return s.isNsfw == true ||
-              name.contains('hanime') ||
-              name.contains('hentai') ||
-              name.contains('adult');
-        }),
-      ];
-
-      for (final s in adultSources) {
-        try {
-          final res = await s.methods.search(query, 1, const []);
-          final list =
-              res.list
-                  .where((r) => r.title != null && r.url != null)
-                  .map(
-                    (r) => BaseAnimeModel(
-                      id: r.url,
-                      name: r.title,
-                      poster: r.cover,
-                    ),
-                  )
-                  .toList();
-          if (list.isNotEmpty) {
-            _ref.read(sourceProvider.notifier).setActiveSource(s);
-            _ref.read(experimentalProvider.notifier).toggleExtensions(true);
-            return list;
-          }
-        } catch (_) {}
-      }
-
-      // Mature catalogues are incomplete by nature. If dedicated 18+ sources
-      // have no match, try installed regular extensions before native sources.
-      for (final s in sourceState.installedAnimeExtensions) {
-        try {
-          final res = await s.methods.search(query, 1, const []);
-          final list =
-              res.list
-                  .where((r) => r.title != null && r.url != null)
-                  .map(
-                    (r) => BaseAnimeModel(
-                      id: r.url,
-                      name: r.title,
-                      poster: r.cover,
-                    ),
-                  )
-                  .toList();
-          if (list.isNotEmpty) {
-            _ref.read(sourceProvider.notifier).setActiveSource(s);
-            return list;
-          }
-        } catch (_) {}
-      }
-    }
-
     final useExtensions = _ref.read(experimentalProvider).useExtensions;
     final nativeKey = _ref.read(selectedProviderKeyProvider);
     final isNative =
@@ -184,14 +124,8 @@ class AnimeMatchService {
         _ref.read(animeSourceRegistryProvider).has(nativeKey);
 
     final activeSource = _ref.read(sourceProvider).activeAnimeSource;
-    final isSourceAdult =
-        activeSource != null &&
-        (activeSource.isNsfw == true ||
-            (activeSource.name ?? '').toLowerCase().contains('hanime') ||
-            (activeSource.name ?? '').toLowerCase().contains('hentai') ||
-            (activeSource.name ?? '').toLowerCase().contains('adult'));
 
-    if (useExtensions && !isNative && !isSourceAdult && activeSource != null) {
+    if (useExtensions && !isNative && activeSource != null) {
       final res = await _ref.read(sourceProvider.notifier).search(query);
 
       return res.list
