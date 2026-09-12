@@ -103,8 +103,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
-      64 * 1024 * 1024,
       128 * 1024 * 1024,
+      256 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -114,22 +114,22 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Apply ultra-fast stream cache defaults optimized for instant start and slow networks
+    // Apply ultra-fast stream cache defaults with ~100 seconds forward buffer preservation
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '67108864',
-      'demuxer-max-back-bytes': '33554432',
+      'demuxer-max-bytes': '209715200',
+      'demuxer-max-back-bytes': '67108864',
       'demuxer-lavf-probesize': '500000',
       'demuxer-lavf-analyzeduration': '500000',
-      'cache-secs': '30',
-      'demuxer-readahead-secs': '15',
+      'cache-secs': '120',
+      'demuxer-readahead-secs': '100',
       'cache-pause': 'no',
       'cache-pause-wait': '1',
-      'demuxer-lavf-buffersize': '32768',
+      'demuxer-lavf-buffersize': '65536',
       'demuxer-lavf-hacks': 'yes',
-      'stream-buffer-size': '131072',
+      'stream-buffer-size': '262144',
       'network-timeout': '10',
       'force-seekable': 'yes',
       'hr-seek': 'yes',
@@ -311,9 +311,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
   Future<void> seek(Duration pos) async {
     final needsNetwork = pos > state.buffer + const Duration(seconds: 1);
+    _pendingSeekTarget = pos;
+    state = state.copyWith(
+      position: pos,
+      isSeeking: needsNetwork,
+    );
     if (needsNetwork) {
-      _pendingSeekTarget = pos;
-      state = state.copyWith(isSeeking: true);
       _seekTimeout?.cancel();
       _seekTimeout = Timer(const Duration(seconds: 8), () {
         _pendingSeekTarget = null;

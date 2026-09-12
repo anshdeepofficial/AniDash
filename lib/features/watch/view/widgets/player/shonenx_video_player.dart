@@ -307,10 +307,11 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     }
     _tapSeekTarget = target;
     _tapSeekForward = forward;
-    // Coalesce rapid taps into one seek. Repeated decoder flushes were causing
-    // a stop-start 10 second jump instead of a continuous +20/+30 sequence.
+
+    // Fast-responsive seek commit: 180ms delay gives instant feedback while
+    // cleanly coalescing rapid multi-taps like VLC/YouTube
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 650), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 180), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);
@@ -318,7 +319,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     });
 
     _tapSeekResetTimer?.cancel();
-    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1200), () {
+    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1000), () {
       _tapSeekTarget = null;
       _tapSeekForward = null;
     });

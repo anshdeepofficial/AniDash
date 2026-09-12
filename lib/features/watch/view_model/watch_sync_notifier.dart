@@ -61,9 +61,10 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
           .toList();
 
       final progressEntry = watchProgressRepo.getProgress(mediaId);
-      final isCompleted = progressEntry?.totalEpisodes != null &&
-          progressEntry.totalEpisodes > 0 &&
-          episodeNum >= progressEntry.totalEpisodes;
+      final totalEpisodes = progressEntry?.totalEpisodes;
+      final isCompleted = totalEpisodes != null &&
+          totalEpisodes > 0 &&
+          episodeNum >= totalEpisodes;
       final trackingStatus = isCompleted ? 'COMPLETED' : 'CURRENT';
 
       if (syncSettings.syncMode == 'background') {

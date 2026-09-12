@@ -83,7 +83,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
 
     final forward = isRight;
     final isConsecutive = _lastTapTime != null &&
-        now.difference(_lastTapTime!).inMilliseconds < 650 &&
+        now.difference(_lastTapTime!).inMilliseconds < 750 &&
         _lastTapForward == forward;
 
     _lastTapTime = now;
@@ -97,7 +97,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       widget.onDoubleTap(forward);
 
       _multiTapResetTimer?.cancel();
-      _multiTapResetTimer = Timer(const Duration(milliseconds: 650), () {
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 750), () {
         _resetTapState();
       });
     } else {
@@ -106,7 +106,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       _lastTapTime = now;
       _lastTapForward = forward;
 
-      _singleTapTimer = Timer(const Duration(milliseconds: 280), () {
+      _singleTapTimer = Timer(const Duration(milliseconds: 230), () {
         _resetTapState();
         widget.onTap();
       });
