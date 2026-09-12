@@ -208,7 +208,7 @@ class JustAnimeProvider extends AnimeProvider {
       try {
         final response = await UniversalHttpClient.instance
             .get(Uri.parse('$apiUrl$path'), headers: headers)
-            .timeout(const Duration(seconds: 25));
+            .timeout(const Duration(seconds: 7));
         if (response.statusCode < 200 || response.statusCode >= 300) {
           return null;
         }
@@ -234,8 +234,17 @@ class JustAnimeProvider extends AnimeProvider {
             ? [...hlsEndpoints, animeggEndpoint]
             : [animeggEndpoint, ...hlsEndpoints];
 
-    for (final endpoint in endpoints) {
-      final payload = await request(endpoint);
+    // Fetch endpoints concurrently to drastically reduce initial stream startup time
+    final endpointResults = await Future.wait(
+      endpoints.map((ep) async {
+        final payload = await request(ep);
+        return (endpoint: ep, payload: payload);
+      }),
+    );
+
+    for (final item in endpointResults) {
+      final endpoint = item.endpoint;
+      final payload = item.payload;
       if (payload == null) continue;
       final endpointAudio = endpoint.contains('/anineko/dub') ? 'dub' : 'sub';
 

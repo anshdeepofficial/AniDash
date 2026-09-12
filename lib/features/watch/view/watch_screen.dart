@@ -64,8 +64,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
       curve: Curves.easeOutCubic,
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(const Duration(milliseconds: 300));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
       ref

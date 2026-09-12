@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -424,6 +425,61 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                       ),
                     ),
                   ),
+                  if (!_downloading && _downloadedApkPath == null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.snooze_rounded, size: 16),
+                            label: const Text('Remind in 1h'),
+                            onPressed: () async {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.setInt(
+                                'remind_update_after',
+                                DateTime.now()
+                                    .add(const Duration(hours: 1))
+                                    .millisecondsSinceEpoch,
+                              );
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            label: const Text('Skip'),
+                            onPressed: () async {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final clean = widget.latestVersion
+                                  .replaceAll('v', '')
+                                  .trim();
+                              await prefs.setString(
+                                'skipped_update_version',
+                                clean,
+                              );
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

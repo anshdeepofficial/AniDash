@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,7 +57,34 @@ class DownloadSettingsScreen extends ConsumerWidget {
                     String? selectedDirectory =
                         await FilePicker.platform.getDirectoryPath();
                     if (selectedDirectory != null) {
-                      notifier.setCustomPath(selectedDirectory);
+                      try {
+                        final dir = Directory(selectedDirectory);
+                        if (!dir.existsSync()) {
+                          dir.createSync(recursive: true);
+                        }
+                        final testFile = File('${dir.path}/.shonenx_test');
+                        testFile.writeAsStringSync('write_ok');
+                        testFile.deleteSync();
+                        notifier.setCustomPath(selectedDirectory);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Download directory set to $selectedDirectory'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Selected directory is not writable: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                 ),

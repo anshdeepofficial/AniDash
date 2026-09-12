@@ -1,7 +1,25 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) async {
+  if (response.actionId == 'update_remind_1h') {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+      'remind_update_after',
+      DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
+    );
+  } else if (response.actionId == 'update_skip') {
+    final prefs = await SharedPreferences.getInstance();
+    final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
+    if (version.isNotEmpty) {
+      await prefs.setString('skipped_update_version', version);
+    }
+  }
+}
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -44,12 +62,25 @@ class NotificationService {
 
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.actionId != null) {
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        if (response.actionId == 'update_remind_1h') {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(
+            'remind_update_after',
+            DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
+          );
+        } else if (response.actionId == 'update_skip') {
+          final prefs = await SharedPreferences.getInstance();
+          final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
+          if (version.isNotEmpty) {
+            await prefs.setString('skipped_update_version', version);
+          }
+        } else if (response.actionId != null) {
           _instance.playbackActionController.add(response.actionId!);
         }
         AppLogger.infoPair('Notification tapped', response.payload);
       },
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
     await _createNotificationChannels();
@@ -296,7 +327,7 @@ class NotificationService {
   }
 
   Future<void> showUpdateAvailableNotification(String version) async {
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: AndroidNotificationDetails(
         'AniDash_updates_channel',
         'App Updates',
@@ -305,16 +336,30 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: _iconName,
-        largeIcon: DrawableResourceAndroidBitmap(_largeIconName),
+        largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
         color: _brandColor,
+        actions: const <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'update_remind_1h',
+            'Remind in 1 hour',
+            cancelNotification: true,
+            showsUserInterface: false,
+          ),
+          AndroidNotificationAction(
+            'update_skip',
+            'Skip',
+            cancelNotification: true,
+            showsUserInterface: false,
+          ),
+        ],
       ),
     );
     await flutterLocalNotificationsPlugin.show(
       1901,
-      'AniDash $version is available',
-      'Open AniDash to download and install the update.',
+      'AniDash v$version is available',
+      'A new version has been released on GitHub. Tap to update or snooze.',
       details,
-      payload: 'update',
+      payload: 'update:$version',
     );
   }
 

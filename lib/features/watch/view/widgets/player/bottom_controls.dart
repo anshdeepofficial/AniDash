@@ -489,7 +489,23 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
           ),
     );
 
-    if (currentSkip.interval == null) return const SizedBox.shrink();
+    if (currentSkip.interval == null) {
+      if (settings.showManualSkip && pos.inSeconds < 480) {
+        final skipSec = settings.manualSkipDuration;
+        return _FlatActionBtn(
+          text: 'Skip Op (+${skipSec}s)',
+          icon: Icons.fast_forward_rounded,
+          onTap: () {
+            final target = pos + Duration(seconds: skipSec);
+            ref.read(playerStateProvider.notifier).seek(target);
+            widget.onInteraction();
+          },
+          color: Color.lerp(scheme.primary, Colors.black, 0.45)!,
+          textColor: Colors.white,
+        );
+      }
+      return const SizedBox.shrink();
+    }
 
     final isOp =
         currentSkip.skipType == SkipType.op ||

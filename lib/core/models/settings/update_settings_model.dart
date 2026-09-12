@@ -5,6 +5,7 @@ class UpdateSettingsModel {
   final int checkIntervalMinutes;
   final int startHour;
   final int endHour;
+  final bool fullDay;
   final String? skippedVersion;
 
   const UpdateSettingsModel({
@@ -12,6 +13,7 @@ class UpdateSettingsModel {
     this.checkIntervalMinutes = 15,
     this.startHour = 20,
     this.endHour = 6,
+    this.fullDay = true,
     this.skippedVersion,
   });
 
@@ -20,6 +22,7 @@ class UpdateSettingsModel {
     int? checkIntervalMinutes,
     int? startHour,
     int? endHour,
+    bool? fullDay,
     String? skippedVersion,
   }) {
     return UpdateSettingsModel(
@@ -27,6 +30,7 @@ class UpdateSettingsModel {
       checkIntervalMinutes: checkIntervalMinutes ?? this.checkIntervalMinutes,
       startHour: startHour ?? this.startHour,
       endHour: endHour ?? this.endHour,
+      fullDay: fullDay ?? this.fullDay,
       skippedVersion: skippedVersion ?? this.skippedVersion,
     );
   }
@@ -37,6 +41,7 @@ class UpdateSettingsModel {
       'checkIntervalMinutes': checkIntervalMinutes,
       'startHour': startHour,
       'endHour': endHour,
+      'fullDay': fullDay,
       'skippedVersion': skippedVersion,
     };
   }
@@ -47,6 +52,7 @@ class UpdateSettingsModel {
       checkIntervalMinutes: map['checkIntervalMinutes']?.toInt() ?? 15,
       startHour: map['startHour']?.toInt() ?? 20,
       endHour: map['endHour']?.toInt() ?? 6,
+      fullDay: map['fullDay'] ?? true,
       skippedVersion: map['skippedVersion'],
     );
   }

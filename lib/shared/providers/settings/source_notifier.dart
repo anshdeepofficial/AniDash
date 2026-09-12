@@ -364,7 +364,7 @@ class SourceNotifier extends _$SourceNotifier {
       }
       return await state.activeAnimeSource!.methods
           .getVideoList(episode)
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 10));
     } catch (err) {
       AppLogger.e(err);
       return [];

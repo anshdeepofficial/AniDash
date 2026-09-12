@@ -80,6 +80,16 @@ final routerConfig = GoRouter(
     final isGoingToOnboarding = state.matchedLocation == '/onboarding';
     if (!isOnboarded && !isGoingToOnboarding) return '/onboarding';
     if (isOnboarded && isGoingToOnboarding) return '/';
+
+    // Handle incoming deep links (e.g. anidash://anime/123 or https://anilist.co/anime/123/...)
+    final path = state.uri.path;
+    if (path.startsWith('/anime/')) {
+      final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+      if (segments.length >= 2) {
+        final id = segments[1];
+        return '/details/$id';
+      }
+    }
     return null;
   },
   routes: [
@@ -136,6 +146,27 @@ final routerConfig = GoRouter(
     ),
     AnimatedGoRoute(
       path: '/details/:id',
+      contentBuilder: (context, state) {
+        final anime =
+            state.extra is UniversalMedia
+                ? state.extra as UniversalMedia
+                : UniversalMedia(
+                  id: state.pathParameters['id']!,
+                  title: const UniversalTitle(
+                    english: 'Anime',
+                    romaji: 'Anime',
+                  ),
+                  coverImage: const UniversalCoverImage(),
+                );
+        return AnimeDetailsScreen(
+          anime: anime,
+          tag: state.uri.queryParameters['tag'] ?? '',
+          forceFetch: true,
+        );
+      },
+    ),
+    AnimatedGoRoute(
+      path: '/anime/:id',
       contentBuilder: (context, state) {
         final anime =
             state.extra is UniversalMedia

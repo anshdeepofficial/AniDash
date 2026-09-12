@@ -91,6 +91,35 @@ class PlayerSettingsScreen extends ConsumerWidget {
                     }
                   },
                 ),
+                ToggleableSettingsItem(
+                  icon: Icon(
+                    Iconsax.forward_5_seconds,
+                    color: colorScheme.primary,
+                  ),
+                  accent: colorScheme.primary,
+                  title: 'Manual Op Skip Button',
+                  description:
+                      'Show a one-tap skip button during opening intros',
+                  value: playerSettings.showManualSkip,
+                  onChanged: (value) => playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(showManualSkip: value),
+                  ),
+                ),
+                if (playerSettings.showManualSkip)
+                  SliderSettingsItem(
+                    icon: Icon(Iconsax.timer, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Manual Skip Duration',
+                    description:
+                        'Skip ${playerSettings.manualSkipDuration} seconds (standard anime intro: 85s)',
+                    value: playerSettings.manualSkipDuration.toDouble(),
+                    min: 30,
+                    max: 120,
+                    divisions: 18,
+                    onChanged: (value) => playerNotifier.updateSettings(
+                      (prev) => prev.copyWith(manualSkipDuration: value.toInt()),
+                    ),
+                  ),
               ],
             ),
             SettingsSection(

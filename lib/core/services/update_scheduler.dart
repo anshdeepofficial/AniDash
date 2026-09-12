@@ -10,6 +10,7 @@ class UpdateScheduler {
     UpdateSettingsModel settings, [
     DateTime? dateTime,
   ]) {
+    if (settings.fullDay) return true;
     final now = dateTime ?? DateTime.now();
     return settings.startHour <= settings.endHour
         ? now.hour >= settings.startHour && now.hour < settings.endHour
@@ -38,7 +39,11 @@ class UpdateScheduler {
       initialDelay: firstRun.difference(now),
       existingWorkPolicy: ExistingWorkPolicy.replace,
       constraints: Constraints(networkType: NetworkType.connected),
-      inputData: {'startHour': settings.startHour, 'endHour': settings.endHour},
+      inputData: {
+        'startHour': settings.startHour,
+        'endHour': settings.endHour,
+        'fullDay': settings.fullDay,
+      },
     );
   }
 }

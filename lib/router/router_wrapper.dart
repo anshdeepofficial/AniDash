@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:ani_dash/features/home/view/home_screen.dart' as h_screen;
 import 'package:ani_dash/features/loading/view_model/initialization_notifier.dart';
 import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
 import 'package:ani_dash/features/manga/view/manga_screen.dart';
+import 'package:ani_dash/core/services/offline_sync_queue_service.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
@@ -62,6 +64,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   late final PageController _pageController;
   bool _updateCheckInProgress = false;
   DateTime? _lastForegroundUpdateCheck;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
@@ -73,24 +76,40 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     _pageController = PageController(
       initialPage: widget.navigationShell.currentIndex,
     );
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      if (results.any((r) => r != ConnectivityResult.none)) {
+        OfflineSyncQueueService.flushQueue(ref);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openDownloadsOffline();
       _checkForScheduledUpdate();
+      OfflineSyncQueueService.flushQueue(ref);
     });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkForScheduledUpdate();
+      OfflineSyncQueueService.flushQueue(ref);
     }
   }
 
   Future<void> _checkForScheduledUpdate() async {
     if (_updateCheckInProgress || !mounted) return;
     final settings = ref.read(updateSettingsProvider);
-    if (!settings.autoCheckEnabled ||
-        !UpdateScheduler.isInsideWindow(settings)) {
+    if (!settings.autoCheckEnabled) return;
+    if (!settings.fullDay && !UpdateScheduler.isInsideWindow(settings)) {
       return;
     }
     final now = DateTime.now();
@@ -128,12 +147,6 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     }
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _pageController.dispose();
-    super.dispose();
-  }
 
   void _onPageChanged(int index) {
     if (index != widget.navigationShell.currentIndex) {

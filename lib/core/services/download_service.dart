@@ -42,18 +42,26 @@ class DownloadService {
       } catch (_) {}
     }
 
-    if (!_settings.useCustomPath || _settings.customDownloadPath == null) {
-      if (!await ref
-          .read(permissionsProvider.notifier)
-          .requestStoragePermission()) {
-        return _fail(item, 'Permission denied');
-      }
+    if (!await ref
+        .read(permissionsProvider.notifier)
+        .requestStoragePermission()) {
+      return _fail(item, 'Storage permission denied');
     }
 
-    final basePath =
-        _settings.useCustomPath
-            ? _settings.customDownloadPath!
-            : (await StorageProvider.getDefaultDirectory())!.path;
+    String basePath;
+    if (_settings.useCustomPath && _settings.customDownloadPath != null) {
+      final customDir = Directory(_settings.customDownloadPath!);
+      if (!customDir.existsSync()) {
+        try {
+          customDir.createSync(recursive: true);
+        } catch (_) {}
+      }
+      basePath = customDir.existsSync()
+          ? customDir.path
+          : (await StorageProvider.getDefaultDirectory())!.path;
+    } else {
+      basePath = (await StorageProvider.getDefaultDirectory())!.path;
+    }
 
     final itemPath = item.filePath;
     String finalPath;

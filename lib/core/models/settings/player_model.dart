@@ -16,6 +16,8 @@ class PlayerModel {
   final bool stopAfterCurrentEpisode;
   final double defaultPlaybackSpeed;
   final Map<String, String> mpvSettings;
+  final bool showManualSkip;
+  final int manualSkipDuration;
 
   PlayerModel({
     this.defaultQuality = 'Auto',
@@ -33,6 +35,8 @@ class PlayerModel {
     this.stopAfterCurrentEpisode = false,
     this.defaultPlaybackSpeed = 1.0,
     this.mpvSettings = const {},
+    this.showManualSkip = true,
+    this.manualSkipDuration = 85,
   });
 
   PlayerModel copyWith({
@@ -51,6 +55,8 @@ class PlayerModel {
     bool? stopAfterCurrentEpisode,
     double? defaultPlaybackSpeed,
     Map<String, String>? mpvSettings,
+    bool? showManualSkip,
+    int? manualSkipDuration,
   }) {
     return PlayerModel(
       defaultQuality: defaultQuality ?? this.defaultQuality,
@@ -71,6 +77,8 @@ class PlayerModel {
       defaultPlaybackSpeed:
           defaultPlaybackSpeed ?? this.defaultPlaybackSpeed,
       mpvSettings: mpvSettings ?? this.mpvSettings,
+      showManualSkip: showManualSkip ?? this.showManualSkip,
+      manualSkipDuration: manualSkipDuration ?? this.manualSkipDuration,
     );
   }
 
@@ -91,6 +99,8 @@ class PlayerModel {
       'stopAfterCurrentEpisode': stopAfterCurrentEpisode,
       'defaultPlaybackSpeed': defaultPlaybackSpeed,
       'mpvSettings': mpvSettings,
+      'showManualSkip': showManualSkip,
+      'manualSkipDuration': manualSkipDuration,
     };
   }
 
@@ -111,6 +121,8 @@ class PlayerModel {
       stopAfterCurrentEpisode: map['stopAfterCurrentEpisode'] ?? false,
       defaultPlaybackSpeed: (map['defaultPlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
       mpvSettings: Map<String, String>.from(map['mpvSettings'] ?? {}),
+      showManualSkip: map['showManualSkip'] ?? true,
+      manualSkipDuration: map['manualSkipDuration'] ?? 85,
     );
   }
 

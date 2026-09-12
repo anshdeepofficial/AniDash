@@ -30,6 +30,7 @@ import 'package:ani_dash/features/watch/view/widgets/download_source_selector.da
 import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 
 enum EpisodeViewMode { list, compact, grid, block, banner }
 
@@ -958,7 +959,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
         if (_isSelectionMode) {
           _toggleSelection(epNum);
         } else {
-          _enterSelectionMode(epNum);
+          _showEpisodeMenu(
+            context,
+            ep,
+            isWatched,
+            download: download,
+          );
         }
       }
 
@@ -983,6 +989,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             onTap: onItemTap,
             onLongPress: onLongPressItem,
             onDownload: onDownloadItem,
+            onMoreOptions:
+                () => _showEpisodeMenu(
+                  context,
+                  ep,
+                  isWatched,
+                  download: download,
+                ),
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
           );
@@ -1562,6 +1575,22 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   onTap: () {
+                    final newWatched = !isWatched;
+                    final existing = repo.getProgress(widget.mediaId);
+                    if (existing == null) {
+                      repo.saveProgress(
+                        AnimeWatchProgressEntry(
+                          animeId: widget.mediaId,
+                          animeTitle: animeTitle,
+                          animeCover: widget.mediaCover,
+                          animeFormat: widget.mediaFormat,
+                          totalEpisodes: 0,
+                          lastUpdated: DateTime.now(),
+                          currentEpisode: epNum,
+                          episodesProgress: {},
+                        ),
+                      );
+                    }
                     repo.updateEpisodeProgress(
                       widget.mediaId,
                       EpisodeProgress(
@@ -1569,10 +1598,48 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         episodeTitle: episode.title ?? 'Episode $epNum',
                         episodeThumbnail:
                             episode.thumbnail ?? widget.mediaCover,
-                        isCompleted: !isWatched,
+                        progressInSeconds: newWatched ? 1440 : 0,
+                        durationInSeconds: 1440,
+                        isCompleted: newWatched,
+                        watchedAt: DateTime.now(),
                       ),
                     );
+                    if (newWatched) {
+                      ref
+                          .read(watchSyncProvider.notifier)
+                          .handleTrackingUpdate(
+                            mediaId: widget.mediaId,
+                            episodeNum: epNum,
+                          );
+                    }
                     Navigator.pop(sheetContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          newWatched
+                              ? 'Marked Episode $epNum as watched'
+                              : 'Marked Episode $epNum as unwatched',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.checklist_rounded,
+                    color: Colors.purpleAccent,
+                  ),
+                  title: const Text(
+                    'Select Episodes',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Enter multi-selection mode',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _enterSelectionMode(epNum);
                   },
                 ),
                 ListTile(

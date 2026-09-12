@@ -18,7 +18,6 @@ class ThemeSettingsScreen extends ConsumerWidget {
     final theme = ref.watch(themeSettingsProvider);
     final themeNotifier = ref.read(themeSettingsProvider.notifier);
     final colorScheme = Theme.of(context).colorScheme;
-    final isCurrentlyDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -130,23 +129,22 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         () =>
                             _showColorSchemeSheet(context, ref, themeNotifier),
                   ),
-                  if (theme.themeMode == 'dark' ||
-                      (theme.themeMode == 'system' && isCurrentlyDark))
-                    ToggleableSettingsItem(
-                      icon: Icon(
-                        Iconsax.colorfilter,
-                        color: colorScheme.primary,
-                      ),
-                      accent: colorScheme.primary,
-                      title: 'AMOLED Dark',
-                      description: 'Use pure black for dark backgrounds',
-                      value: theme.amoled,
-                      onChanged: (value) {
-                        themeNotifier.updateSettings(
-                          (prev) => prev.copyWith(amoled: value),
-                        );
-                      },
+                  ToggleableSettingsItem(
+                    icon: Icon(
+                      Iconsax.colorfilter,
+                      color: colorScheme.primary,
                     ),
+                    accent: colorScheme.primary,
+                    title: 'AMOLED Pure Black',
+                    description:
+                        'Use pure pitch-black (#000000) in dark mode for OLED displays',
+                    value: theme.amoled,
+                    onChanged: (value) {
+                      themeNotifier.updateSettings(
+                        (prev) => prev.copyWith(amoled: value),
+                      );
+                    },
+                  ),
                   ToggleableSettingsItem(
                     icon: Icon(Iconsax.arrow_swap, color: colorScheme.primary),
                     accent: colorScheme.primary,

@@ -22,6 +22,7 @@ class PlayerState {
   final double playbackSpeed;
   final List<String> subtitle;
   final BoxFit fit;
+  final double subtitleDelay;
 
   const PlayerState({
     required this.position,
@@ -35,6 +36,7 @@ class PlayerState {
     required this.playbackSpeed,
     required this.subtitle,
     required this.fit,
+    this.subtitleDelay = 0.0,
   });
 
   factory PlayerState.initial() => const PlayerState(
@@ -48,6 +50,7 @@ class PlayerState {
     playbackSpeed: 1.0,
     subtitle: [],
     fit: BoxFit.contain,
+    subtitleDelay: 0.0,
   );
 
   PlayerState copyWith({
@@ -63,6 +66,7 @@ class PlayerState {
     double? playbackSpeed,
     List<String>? subtitle,
     BoxFit? fit,
+    double? subtitleDelay,
   }) {
     return PlayerState(
       position: position ?? this.position,
@@ -77,6 +81,7 @@ class PlayerState {
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       subtitle: subtitle ?? this.subtitle,
       fit: fit ?? this.fit,
+      subtitleDelay: subtitleDelay ?? this.subtitleDelay,
     );
   }
 }
@@ -103,8 +108,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
-      128 * 1024 * 1024,
-      256 * 1024 * 1024,
+      24 * 1024 * 1024,
+      64 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -114,22 +119,27 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Apply ultra-fast stream cache defaults with ~100 seconds forward buffer preservation
+    // Ultra-fast stream startup & low-data friendly configuration
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '104857600',
-      'demuxer-max-back-bytes': '33554432',
-      'cache-secs': '120',
-      'demuxer-readahead-secs': '100',
-      'cache-pause': 'yes',
-      'cache-pause-wait': '2',
+      'demuxer-max-bytes': '33554432', // 32MB max buffer (Low data friendly)
+      'demuxer-max-back-bytes': '16777216', // 16MB back cache
+      'cache-secs': '30', // 30s stream cache
+      'demuxer-readahead-secs': '20', // 20s forward readahead for instant start
+      'cache-pause': 'no', // Play immediately without holding first frame hostage
+      'cache-pause-initial': 'no',
+      'cache-pause-wait': '0',
+      'demuxer-lavf-probesize': '1048576', // 1MB probe (cuts 5-10s off initial stream startup)
+      'demuxer-lavf-analyzeduration': '1.5', // 1.5s max analyze duration
+      'demuxer-lavf-buffersize': '32768',
       'demuxer-lavf-hacks': 'yes',
-      'network-timeout': '20',
+      'network-timeout': '10',
       'force-seekable': 'yes',
       'hr-seek': 'yes',
       'hr-seek-framedrop': 'no',
+      'hls-bitrate': 'auto',
     };
 
     final platform = _player.platform as dynamic;
@@ -374,4 +384,20 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       _player.setVolume((_player.state.volume - 10).clamp(0, 100));
 
   void toggleMute() => _player.setVolume(_player.state.volume == 0 ? 100 : 0);
+
+  Future<void> setSubtitleDelay(double seconds) async {
+    try {
+      final platform = _player.platform as dynamic;
+      await platform.setProperty('sub-delay', seconds.toString());
+      state = state.copyWith(subtitleDelay: seconds);
+      AppLogger.i('Subtitle delay set to: ${seconds}s');
+    } catch (e) {
+      AppLogger.e('Failed to set subtitle delay: $e');
+    }
+  }
+
+  Future<void> adjustSubtitleDelay(double deltaSeconds) async {
+    final newDelay = ((state.subtitleDelay + deltaSeconds) * 10).round() / 10.0;
+    await setSubtitleDelay(newDelay.clamp(-10.0, 10.0));
+  }
 }

@@ -27,13 +27,22 @@ void callbackDispatcher() {
 Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
   try {
     final now = DateTime.now();
-    final start = inputData?['startHour'] as int? ?? 20;
-    final end = inputData?['endHour'] as int? ?? 6;
-    final insideWindow =
-        start <= end
-            ? now.hour >= start && now.hour < end
-            : now.hour >= start || now.hour < end;
-    if (!insideWindow) return true;
+    final fullDay = inputData?['fullDay'] as bool? ?? true;
+    if (!fullDay) {
+      final start = inputData?['startHour'] as int? ?? 20;
+      final end = inputData?['endHour'] as int? ?? 6;
+      final insideWindow =
+          start <= end
+              ? now.hour >= start && now.hour < end
+              : now.hour >= start || now.hour < end;
+      if (!insideWindow) return true;
+    }
+
+    final preferences = await SharedPreferences.getInstance();
+
+    // Check if user snoozed ("Remind in 1 hour")
+    final remindAfter = preferences.getInt('remind_update_after') ?? 0;
+    if (now.millisecondsSinceEpoch < remindAfter) return true;
 
     final response = await http.get(
       Uri.parse(
@@ -50,13 +59,21 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     final current = (await PackageInfo.fromPlatform()).version;
     if (!_newer(latest, current)) return true;
 
-    final preferences = await SharedPreferences.getInstance();
-    if (preferences.getString('last_notified_update') == latest) return true;
+    // Check if user clicked "Skip" for this release
+    final skippedVersion = preferences.getString('skipped_update_version');
+    if (skippedVersion == latest) return true;
+
+    if (preferences.getString('last_notified_update') == latest && remindAfter == 0) {
+      return true;
+    }
 
     final notifications = NotificationService();
     await notifications.initialize();
     await notifications.showUpdateAvailableNotification(latest);
     await preferences.setString('last_notified_update', latest);
+    if (remindAfter != 0) {
+      await preferences.remove('remind_update_after');
+    }
     return true;
   } catch (_) {
     return false;

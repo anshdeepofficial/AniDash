@@ -6,6 +6,7 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/repositories/local_media_repository.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/services/offline_sync_queue_service.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
@@ -128,7 +129,19 @@ class WatchSyncNotifier extends _$WatchSyncNotifier {
 
       if (tasks.isNotEmpty) await Future.wait(tasks);
     } catch (e) {
-      AppLogger.e('Tracking update failed', e);
+      AppLogger.e('Tracking update failed; queuing for offline sync: $e');
+      final watchProgressRepo = ref.read(watchProgressRepositoryProvider);
+      final progressEntry = watchProgressRepo.getProgress(mediaId);
+      final totalEpisodes = progressEntry?.totalEpisodes;
+      final isCompleted = totalEpisodes != null &&
+          totalEpisodes > 0 &&
+          episodeNum >= totalEpisodes;
+      final fallbackStatus = isCompleted ? 'COMPLETED' : 'CURRENT';
+      await OfflineSyncQueueService.enqueue(
+        mediaId: mediaId,
+        episodeNum: episodeNum,
+        status: fallbackStatus,
+      );
     }
   }
 }

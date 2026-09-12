@@ -16,6 +16,7 @@ class EpisodeGridItem extends StatelessWidget {
   final Function() onTap;
   final Function() onLongPress;
   final VoidCallback? onDownload;
+  final VoidCallback? onMoreOptions;
   final bool isSelected;
   final bool isSelectionMode;
 
@@ -31,6 +32,7 @@ class EpisodeGridItem extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onDownload,
+    this.onMoreOptions,
     this.isSelected = false,
     this.isSelectionMode = false,
   });
@@ -110,7 +112,30 @@ class EpisodeGridItem extends StatelessWidget {
                         ),
                       ),
                     )
-                  else if (onDownload != null)
+                  else ...[
+                    if (onMoreOptions != null)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: InkWell(
+                          onTap: onMoreOptions,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Icon(
+                              Icons.more_vert,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                  if (onDownload != null)
                     Positioned(
                       bottom: 4,
                       right: 4,

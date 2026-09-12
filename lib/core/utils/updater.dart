@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/main.dart';
@@ -15,6 +16,7 @@ enum UpdateType { stable, beta, alpha, hotfix }
 Future<void> checkForUpdates(
   BuildContext context, {
   bool debugMode = false,
+  bool isManual = false,
   bool includeBeta = false,
   bool includeAlpha = false,
   bool useTestReleases = false,
@@ -75,6 +77,19 @@ Future<void> checkForUpdates(
     }
 
     bool isNewer = _isNewerVersion(tagName, currentVersion);
+
+    if (!isManual && !debugMode) {
+      final preferences = await SharedPreferences.getInstance();
+      final skipped = preferences.getString('skipped_update_version');
+      final cleanLatest = tagName.replaceAll(RegExp(r'^v'), '').trim();
+      if (skipped != null && (tagName.contains(skipped) || cleanLatest == skipped)) {
+        return;
+      }
+      final remindAfter = preferences.getInt('remind_update_after') ?? 0;
+      if (DateTime.now().millisecondsSinceEpoch < remindAfter) {
+        return;
+      }
+    }
 
     if (debugMode || isNewer) {
       final assets = latestRelease['assets'] as List<dynamic>;

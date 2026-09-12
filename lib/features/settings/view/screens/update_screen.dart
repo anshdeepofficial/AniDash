@@ -123,6 +123,18 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                 },
               ),
               if (settings.autoCheckEnabled) ...[
+                ToggleableSettingsItem(
+                  icon: Icon(Iconsax.clock, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Run 24 Hours',
+                  description: 'Continuously check for updates round the clock',
+                  value: settings.fullDay,
+                  onChanged: (value) {
+                    notifier.updateSettings(
+                      (state) => state.copyWith(fullDay: value),
+                    );
+                  },
+                ),
                 SliderSettingsItem(
                   icon: Icon(Iconsax.timer, color: colorScheme.primary),
                   accent: colorScheme.primary,
@@ -140,45 +152,47 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                     );
                   },
                 ),
-                NormalSettingsItem(
-                  icon: Icon(Iconsax.clock, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Auto-Check Start Hour',
-                  description:
-                      '${settings.startHour.toString().padLeft(2, '0')}:00',
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay(
-                        hour: settings.startHour,
-                        minute: 0,
-                      ),
-                    );
-                    if (time != null) {
-                      notifier.updateSettings(
-                        (state) => state.copyWith(startHour: time.hour),
+                if (!settings.fullDay) ...[
+                  NormalSettingsItem(
+                    icon: Icon(Iconsax.clock, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Auto-Check Start Hour',
+                    description:
+                        '${settings.startHour.toString().padLeft(2, '0')}:00',
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(
+                          hour: settings.startHour,
+                          minute: 0,
+                        ),
                       );
-                    }
-                  },
-                ),
-                NormalSettingsItem(
-                  icon: Icon(Iconsax.clock, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Auto-Check End Hour',
-                  description:
-                      '${settings.endHour.toString().padLeft(2, '0')}:00',
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay(hour: settings.endHour, minute: 0),
-                    );
-                    if (time != null) {
-                      notifier.updateSettings(
-                        (state) => state.copyWith(endHour: time.hour),
+                      if (time != null) {
+                        notifier.updateSettings(
+                          (state) => state.copyWith(startHour: time.hour),
+                        );
+                      }
+                    },
+                  ),
+                  NormalSettingsItem(
+                    icon: Icon(Iconsax.clock, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Auto-Check End Hour',
+                    description:
+                        '${settings.endHour.toString().padLeft(2, '0')}:00',
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(hour: settings.endHour, minute: 0),
                       );
-                    }
-                  },
-                ),
+                      if (time != null) {
+                        notifier.updateSettings(
+                          (state) => state.copyWith(endHour: time.hour),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ],
             ],
           ),

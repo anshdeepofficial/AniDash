@@ -76,11 +76,14 @@ class MyApp extends ConsumerWidget {
         final darkTheme = FlexThemeData.dark(
           colorScheme: darkScheme,
           swapColors: theme.swapColors,
-          blendLevel: theme.blendLevel,
+          blendLevel: theme.amoled ? 0 : theme.blendLevel,
           scheme: darkScheme != null ? null : theme.flexSchemeEnum,
           darkIsTrueBlack: theme.amoled,
           useMaterial3: theme.useMaterial3,
           textTheme: GoogleFonts.montserratTextTheme(),
+        ).copyWith(
+          scaffoldBackgroundColor: theme.amoled ? Colors.black : null,
+          canvasColor: theme.amoled ? Colors.black : null,
         );
 
         final themeMode = theme.themeMode == 'light'

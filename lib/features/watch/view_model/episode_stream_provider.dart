@@ -1050,9 +1050,11 @@ class EpisodeData extends _$EpisodeData {
         epTargetUrl != null &&
         epTargetUrl.isNotEmpty) {
       try {
-        final res = await _srcNotifier.getSources(
-          DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
-        );
+        final res = await _srcNotifier
+            .getSources(
+              DEpisode(episodeNumber: ep.number.toString(), url: epTargetUrl),
+            )
+            .timeout(const Duration(seconds: 10));
         final extractedHeaders =
             res
                 .firstWhereOrNull(
