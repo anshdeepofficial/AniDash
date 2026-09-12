@@ -1,4 +1,4 @@
-## ⚡ What's New in v1.12.0
+## ⚡ What's New in v1.12.1
 
 ### 🚀 Ultra-Fast Video Startup & 100-Second Forward Buffer
 - **Instant Playback (< 1–3s Startup)**: Heavily tuned MPV demuxing and buffering properties so anime begins playing almost instantaneously even on slow travel or mobile data networks.
@@ -44,5 +44,5 @@
 ---
 
 **Package:** com.anidash.anime
-**Version:** 1.12.0 (54)
+**Version:** 1.12.1 (55)
 **SHA‑256:** `127E17E83D92A370EFC10A98763BD7E231AA9A93DD5A3DA2DAA737D8255870ED`
