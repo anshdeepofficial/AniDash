@@ -987,33 +987,6 @@ class EpisodeData extends _$EpisodeData {
           .open(playbackUrl, startAt, headers: streamHeaders)
           .timeout(const Duration(seconds: 15));
 
-      // A duration alone only proves that the manifest was parsed. Require
-      // actual playback progress so a dead HLS host cannot leave a black
-      // screen forever instead of activating server recovery.
-      try {
-        await Future.any([
-          _player.videoController.player.stream.position.firstWhere(
-            (position) => position > Duration.zero,
-          ),
-          _player.videoController.player.stream.playing.firstWhere(
-            (playing) => playing,
-          ),
-        ]).timeout(const Duration(seconds: 10));
-      } on TimeoutException {
-        final nativeState = _player.videoController.player.state;
-        // Buffering can remain true after decoded frames/audio have started.
-        // Never reject that active stream and falsely label DUB unavailable.
-        if (!nativeState.playing && nativeState.position == Duration.zero) {
-          rethrow;
-        }
-      }
-
-      final openedDuration = _player.videoController.player.state.duration;
-      if (openedDuration > Duration.zero &&
-          openedDuration <= const Duration(seconds: 30)) {
-        throw StateError('Source returned an invalid short preview stream');
-      }
-
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
       if (!isDub) {
         final engIdx = state.subtitles.indexWhere(

@@ -43,9 +43,9 @@ class EpisodeCompactItem extends StatelessWidget {
         ListTile(
           tileColor:
               episode.isMixed == true
-                  ? Colors.purple.withValues(alpha: 0.12)
+                  ? theme.colorScheme.primary.withValues(alpha: 0.16)
                   : (episode.isFiller == true
-                      ? Colors.orange.withValues(alpha: 0.12)
+                      ? theme.colorScheme.primary.withValues(alpha: 0.08)
                       : null),
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 10.0),
@@ -103,17 +103,17 @@ class EpisodeCompactItem extends StatelessWidget {
                               vertical: 1.5,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.purple.withValues(alpha: 0.15),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.25),
                               border: Border.all(
-                                color: Colors.purpleAccent.withValues(alpha: 0.6),
-                                width: 0.8,
+                                color: theme.colorScheme.primary,
+                                width: 1.0,
                               ),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
+                            child: Text(
                               'MIXED',
                               style: TextStyle(
-                                color: Colors.purpleAccent,
+                                color: theme.colorScheme.primary,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.4,
@@ -130,17 +130,17 @@ class EpisodeCompactItem extends StatelessWidget {
                               vertical: 1.5,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.15),
+                              color: theme.colorScheme.primary.withValues(alpha: 0.10),
                               border: Border.all(
-                                color: Colors.orange.withValues(alpha: 0.6),
+                                color: theme.colorScheme.primary.withValues(alpha: 0.5),
                                 width: 0.8,
                               ),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Text(
+                            child: Text(
                               'FILLER',
                               style: TextStyle(
-                                color: Colors.orange,
+                                color: theme.colorScheme.primary.withValues(alpha: 0.85),
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.4,

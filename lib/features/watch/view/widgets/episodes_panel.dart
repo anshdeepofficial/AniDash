@@ -27,6 +27,8 @@ class EpisodesPanel extends ConsumerStatefulWidget {
 class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
   int _rangeSize = 50;
   int _currentStart = 1;
+  bool _initializedForEp = false;
+  int? _lastSelectedEp;
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -58,25 +60,29 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
           title: const Text("Episode Range Size"),
           content: Wrap(
             spacing: 8,
-            children:
-                [10, 25, 50, 100].map((size) {
-                  return ChoiceChip(
-                    label: Text("$size"),
-                    selected: temp == size,
-                    onSelected: (_) => setState(() => temp = size),
-                  );
-                }).toList(),
+            children: [25, 50, 100].map((size) {
+              return ChoiceChip(
+                label: Text("$size"),
+                selected: temp == size,
+                onSelected: (_) {
+                  setState(() {
+                    temp = size;
+                  });
+                },
+              );
+            }).toList(),
           ),
           actions: [
             TextButton(
-              onPressed: Navigator.of(context).pop,
+              onPressed: () => Navigator.pop(context),
               child: const Text("Cancel"),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
                 setState(() {
                   _rangeSize = temp;
                   _currentStart = 1;
+                  _initializedForEp = false;
                 });
                 Navigator.pop(context);
               },
@@ -102,6 +108,25 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
 
     final total = episodes.length;
     final ranges = _generateRanges(total);
+
+    if (selectedEp != null && selectedEp > 0) {
+      if (!_initializedForEp || _lastSelectedEp != selectedEp) {
+        _lastSelectedEp = selectedEp;
+        _initializedForEp = true;
+        _currentStart = ((selectedEp - 1) ~/ _rangeSize) * _rangeSize + 1;
+      }
+    }
+
+    if (ranges.isNotEmpty && !ranges.any((r) => r.$1 == _currentStart)) {
+      if (selectedEp != null && selectedEp > 0) {
+        final matching = ranges.firstWhereOrNull(
+          (r) => selectedEp >= r.$1 && selectedEp <= r.$2,
+        );
+        _currentStart = matching?.$1 ?? ranges.first.$1;
+      } else {
+        _currentStart = ranges.first.$1;
+      }
+    }
 
     final startIdx = (_currentStart - 1).clamp(0, total);
     final endIdx = (_currentStart + _rangeSize - 1).clamp(0, total);
@@ -203,6 +228,7 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
 
                     return EpisodeTile(
                       isFiller: episode.isFiller ?? false,
+                      isMixed: episode.isMixed ?? false,
                       isCompleted: isCompleted,
                       watchProgress: watchProgress,
                       episodeNumber: episode.number?.toString() ?? "?",
@@ -228,6 +254,7 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
 
 class EpisodeTile extends StatelessWidget {
   final bool isFiller;
+  final bool isMixed;
   final bool isCompleted;
   final double watchProgress;
   final String episodeNumber;
@@ -239,6 +266,7 @@ class EpisodeTile extends StatelessWidget {
   const EpisodeTile({
     super.key,
     required this.isFiller,
+    this.isMixed = false,
     required this.isCompleted,
     this.watchProgress = 0.0,
     required this.episodeNumber,
@@ -263,6 +291,8 @@ class EpisodeTile extends StatelessWidget {
     final bgColor =
         isSelected
             ? theme.colorScheme.primary
+            : isMixed
+            ? theme.colorScheme.primary.withValues(alpha: 0.28)
             : isFiller
             ? theme.colorScheme.primaryContainer
             : isCompleted
@@ -279,12 +309,16 @@ class EpisodeTile extends StatelessWidget {
           color:
               isSelected
                   ? theme.colorScheme.primaryContainer
+                  : isMixed
+                  ? theme.colorScheme.primary.withValues(alpha: 0.24)
                   : isFiller
-                  ? theme.colorScheme.primary.withValues(alpha: 0.18)
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
                   : Colors.transparent,
           border:
-              isFiller
-                  ? Border.all(color: theme.colorScheme.primary, width: 1.4)
+              isMixed
+                  ? Border.all(color: theme.colorScheme.primary, width: 1.6)
+                  : isFiller
+                  ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.6), width: 1.2)
                   : null,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -361,7 +395,7 @@ class EpisodeTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (isFiller)
+                if (isMixed)
                   Container(
                     margin: const EdgeInsets.only(right: 6),
                     padding: const EdgeInsets.symmetric(
@@ -369,9 +403,33 @@ class EpisodeTile extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.28),
                       border: Border.all(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                        color: theme.colorScheme.primary,
+                        width: 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Mixed',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  )
+                else if (isFiller)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
                         width: 0.8,
                       ),
                       borderRadius: BorderRadius.circular(4),

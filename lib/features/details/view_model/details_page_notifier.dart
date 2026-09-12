@@ -9,6 +9,7 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/shared/providers/anime_match_service.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 part 'details_page_notifier.g.dart';
 
@@ -94,14 +95,31 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       }
       if (fresh == null && currentData != null) {
         var malId = int.tryParse(currentData.idMal ?? '');
-        if (malId == null) {
-          final title =
-              currentData.title.english ?? currentData.title.romaji ?? '';
+        final title =
+            currentData.title.english ??
+            currentData.title.romaji ??
+            currentData.title.userPreferred;
+        if (title.isNotEmpty) {
+          try {
+            final anilistSearch =
+                await ref.read(anilistServiceProvider).searchAnime(title);
+            if (anilistSearch.isNotEmpty) {
+              final matchedId = int.tryParse(anilistSearch.first.id);
+              if (matchedId != null) {
+                fresh = await ref
+                    .read(anilistServiceProvider)
+                    .getAnimeDetails(matchedId)
+                    .timeout(const Duration(seconds: 15));
+              }
+            }
+          } catch (_) {}
+        }
+        if (fresh == null && malId == null && title.isNotEmpty) {
           final matches = await JikanService().searchUniversal(title);
           malId =
               matches.isEmpty ? null : int.tryParse(matches.first.idMal ?? '');
         }
-        if (malId != null) {
+        if (fresh == null && malId != null) {
           final jikan = await JikanService().getFullDetails(malId);
           if (jikan != null) {
             fresh = _mergeJikanDetails(currentData, malId, jikan);
@@ -162,7 +180,11 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
   UniversalMedia _mergeJikanDetails(
     UniversalMedia current,
     int malId,
-    ({Map<String, dynamic> details, List<dynamic> staff}) jikan,
+    ({
+      Map<String, dynamic> details,
+      List<dynamic> staff,
+      List<dynamic> characters
+    }) jikan,
   ) {
     final data = jikan.details;
     final studios =
@@ -191,6 +213,23 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
             role: (item['positions'] as List? ?? const []).join(', '),
           );
         }).toList();
+    final characters = jikan.characters
+        .map((item) => Map<String, dynamic>.from(item as Map? ?? {}))
+        .map((item) {
+          final charMap =
+              Map<String, dynamic>.from(item['character'] as Map? ?? {});
+          final images =
+              Map<String, dynamic>.from(charMap['images'] as Map? ?? {});
+          final jpg = Map<String, dynamic>.from(images['jpg'] as Map? ?? {});
+          return UniversalCharacter(
+            id: (charMap['mal_id'] as num?)?.toInt() ?? 0,
+            name: charMap['name']?.toString() ?? '',
+            image: jpg['image_url']?.toString(),
+            role: item['role']?.toString(),
+          );
+        })
+        .where((c) => c.name.isNotEmpty)
+        .toList();
     final genres =
         <String>{
           for (final key in const [
@@ -225,6 +264,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       source: data['source']?.toString(),
       studios: studios,
       staff: staff,
+      characters: characters.isNotEmpty ? characters : current.characters,
       trailer:
           trailerId == null
               ? null
@@ -398,8 +438,33 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       ranges.add('$start–$end');
     }
 
-    if (!listEquals(state.rangeOptions, ranges)) {
-      state = state.copyWith(rangeOptions: ranges);
+    String selectedRange = state.selectedRange;
+    if (selectedRange == 'All' && ranges.length > 2) {
+      final progress =
+          ref.read(watchProgressRepositoryProvider).getProgress(animeId);
+      final currentEp = progress?.currentEpisode;
+      if (currentEp != null && currentEp > 0) {
+        for (final r in ranges) {
+          if (r == 'All') continue;
+          final parts = r.split('–');
+          if (parts.length == 2) {
+            final s = int.tryParse(parts[0]) ?? 1;
+            final e = int.tryParse(parts[1]) ?? total;
+            if (currentEp >= s && currentEp <= e) {
+              selectedRange = r;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!listEquals(state.rangeOptions, ranges) ||
+        state.selectedRange != selectedRange) {
+      state = state.copyWith(
+        rangeOptions: ranges,
+        selectedRange: selectedRange,
+      );
     }
   }
 }

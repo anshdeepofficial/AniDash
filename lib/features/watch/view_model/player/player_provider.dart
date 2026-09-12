@@ -119,18 +119,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '209715200',
-      'demuxer-max-back-bytes': '67108864',
-      'demuxer-lavf-probesize': '500000',
-      'demuxer-lavf-analyzeduration': '500000',
+      'demuxer-max-bytes': '104857600',
+      'demuxer-max-back-bytes': '33554432',
       'cache-secs': '120',
       'demuxer-readahead-secs': '100',
-      'cache-pause': 'no',
-      'cache-pause-wait': '1',
-      'demuxer-lavf-buffersize': '65536',
+      'cache-pause': 'yes',
+      'cache-pause-wait': '2',
       'demuxer-lavf-hacks': 'yes',
-      'stream-buffer-size': '262144',
-      'network-timeout': '10',
+      'network-timeout': '20',
       'force-seekable': 'yes',
       'hr-seek': 'yes',
       'hr-seek-framedrop': 'no',
@@ -172,6 +168,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       stream.position.listen((pos) {
         if (pos > Duration.zero) {
           _startupTimer?.cancel();
+          _startupTimer = null;
         }
         final target = _pendingSeekTarget;
         final landed =
@@ -191,11 +188,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.duration.listen((dur) {
+        if (dur > Duration.zero) {
+          _startupTimer?.cancel();
+          _startupTimer = null;
+        }
         state = state.copyWith(
           duration: dur,
           isOpening: dur > Duration.zero ? false : null,
         );
-        if (dur > Duration.zero) _startupTimer?.cancel();
       }),
     );
 
@@ -210,7 +210,16 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     );
 
     _subs.add(
-      stream.playing.listen((play) => state = state.copyWith(isPlaying: play)),
+      stream.playing.listen((play) {
+        if (play) {
+          _startupTimer?.cancel();
+          _startupTimer = null;
+        }
+        state = state.copyWith(
+          isPlaying: play,
+          isOpening: play ? false : null,
+        );
+      }),
     );
 
     _subs.add(
@@ -262,7 +271,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       duration: Duration.zero,
     );
     _startupTimer?.cancel();
-    _startupTimer = Timer(const Duration(seconds: 18), () {
+    _startupTimer = Timer(const Duration(seconds: 25), () {
       if (state.isOpening) {
         state = state.copyWith(
           isOpening: false,

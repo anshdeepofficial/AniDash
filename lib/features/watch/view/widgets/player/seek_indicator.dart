@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
 
 class SeekIndicatorOverlay extends StatelessWidget {
   final bool isForward;
@@ -34,18 +33,19 @@ class SeekIndicatorOverlay extends StatelessWidget {
         children: [
           Icon(
             isForward
-                ? Iconsax.forward_10_seconds
-                : Iconsax.backward_10_seconds,
+                ? Icons.fast_forward_rounded
+                : Icons.fast_rewind_rounded,
             color: Colors.white,
-            size: 48,
+            size: 46,
           ),
           const SizedBox(height: 8),
           Text(
-            '${seconds}s',
+            '${isForward ? '+' : '-'}${seconds}s',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
         ],

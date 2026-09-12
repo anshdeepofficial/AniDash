@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
@@ -249,6 +250,18 @@ class TopControls extends ConsumerWidget {
                           onInteraction();
                         },
                       );
+                    },
+                  ),
+
+                  _TopIconButton(
+                    icon: Icons.picture_in_picture_alt_rounded,
+                    tooltip: 'Picture-in-Picture',
+                    onTap: () async {
+                      try {
+                        const MethodChannel('shonenx/pip')
+                            .invokeMethod('enterPiP');
+                      } catch (_) {}
+                      onInteraction();
                     },
                   ),
 

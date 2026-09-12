@@ -197,13 +197,13 @@ class EpisodeBannerItem extends StatelessWidget {
                                         vertical: 1.5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.purple,
+                                        color: theme.colorScheme.primary,
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'MIXED',
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: theme.colorScheme.onPrimary,
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -217,13 +217,13 @@ class EpisodeBannerItem extends StatelessWidget {
                                         vertical: 1.5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.deepOrange,
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.35),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'FILLER',
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: theme.colorScheme.onPrimary,
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                         ),

@@ -254,7 +254,7 @@ class JikanService {
     return [];
   }
 
-  Future<({Map<String, dynamic> details, List<dynamic> staff})?> getFullDetails(
+  Future<({Map<String, dynamic> details, List<dynamic> staff, List<dynamic> characters})?> getFullDetails(
     int malId,
   ) async {
     Object? lastError;
@@ -287,9 +287,28 @@ class JikanService {
         } catch (_) {
           // Core details are still useful when the optional staff call fails.
         }
+
+        List<dynamic> characters = const [];
+        try {
+          final charactersResponse = await UniversalHttpClient.instance
+              .get(
+                Uri.parse('$_baseUrl/anime/$malId/characters'),
+                cacheConfig: CacheConfig.long,
+              )
+              .timeout(const Duration(seconds: 10));
+          if (charactersResponse.statusCode == 200) {
+            characters = List<dynamic>.from(
+              json.decode(charactersResponse.body)['data'] ?? const [],
+            );
+          }
+        } catch (_) {
+          // Core details are still useful when the optional characters call fails.
+        }
+
         return (
           details: Map<String, dynamic>.from(detailsJson['data'] ?? {}),
           staff: staff,
+          characters: characters,
         );
       } catch (error) {
         lastError = error;

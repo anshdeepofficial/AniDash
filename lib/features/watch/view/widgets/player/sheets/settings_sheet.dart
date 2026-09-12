@@ -222,6 +222,19 @@ class SettingsSheetContent extends ConsumerWidget {
                   );
                 },
               ),
+              SwitchListTile(
+                secondary: const Icon(Icons.stop_circle_outlined),
+                title: const Text('Stop After This Episode'),
+                subtitle: const Text(
+                  'Prevents auto-playing next episode when current episode finishes',
+                ),
+                value: playerSettings.stopAfterCurrentEpisode,
+                onChanged: (val) {
+                  playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(stopAfterCurrentEpisode: val),
+                  );
+                },
+              ),
               ListTile(
                 leading: const Icon(Iconsax.speedometer),
                 title: const Text("Playback Speed"),
