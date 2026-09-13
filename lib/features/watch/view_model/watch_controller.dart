@@ -265,7 +265,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
             return;
           }
           if (_isPlayerReady &&
-              _dur > 120 &&
+              _dur > 30 &&
               _pos >= _dur - 2 &&
               !_hasAutoAdvanced &&
               !_isDisposed) {
@@ -281,7 +281,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       // Fetch skip ranges as soon as the manifest duration is known. This lets
       // auto-skip seek before the opening frames have to begin rendering.
-      if (_dur > 120) _checkAniSkip(mediaId, animeName, next.duration);
+      if (_dur > 30) _checkAniSkip(mediaId, animeName, next.duration);
 
       if (next.isPlaying && !(prev?.isPlaying ?? false)) {
         AudioFocusService().requestAudioFocus();
