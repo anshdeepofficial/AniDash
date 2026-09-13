@@ -451,6 +451,7 @@ class ContinueSection extends ConsumerWidget {
                           .fetchEpisodes(
                             animeTitle: entry.animeTitle,
                             animeId: entry.animeId,
+                            mediaId: entry.animeId,
                             animeCover: entry.animeCover,
                             episodes: [],
                             force: true,

@@ -475,6 +475,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
           .fetchEpisodes(
             animeTitle: state.bestMatchName!,
             animeId: state.animeIdForSource,
+            mediaId: state.details.value?.id ?? animeId,
             force: force,
             malId: int.tryParse(state.details.value?.idMal ?? ''),
             media: DMedia(

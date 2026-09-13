@@ -11,6 +11,7 @@ import 'package:ani_dash/core/models/anime/episode_model.dart';
 import 'package:ani_dash/core/services/anime_filler_service.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
+import 'package:ani_dash/core/registery/sources/anime/justanime.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/models/settings/experimental_model.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
@@ -22,6 +23,7 @@ part 'episode_list_provider.g.dart';
 
 @immutable
 class EpisodeListState {
+  final String? mediaId;
   final String? animeId;
   final String? animeTitle;
   final String? animeCover;
@@ -34,6 +36,7 @@ class EpisodeListState {
   final bool isAdult;
 
   const EpisodeListState({
+    this.mediaId,
     this.animeId,
     this.animeTitle,
     this.animeCover,
@@ -47,6 +50,7 @@ class EpisodeListState {
   });
 
   EpisodeListState copyWith({
+    String? mediaId,
     String? animeId,
     String? animeTitle,
     String? animeCover,
@@ -60,6 +64,7 @@ class EpisodeListState {
     bool clearMalId = false,
   }) {
     return EpisodeListState(
+      mediaId: mediaId ?? this.mediaId,
       animeId: animeId ?? this.animeId,
       animeTitle: animeTitle ?? this.animeTitle,
       animeCover: animeCover ?? this.animeCover,
@@ -93,6 +98,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   Future<List<EpisodeDataModel>> fetchEpisodes({
     required String animeTitle,
     String? animeId,
+    String? mediaId,
     String? animeCover,
     required bool force,
     List<EpisodeDataModel> episodes = const [],
@@ -109,6 +115,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     state = state.copyWith(
       isLoading: true,
       error: null,
+      mediaId: mediaId ?? state.mediaId,
       animeId: animeId,
       animeTitle: animeTitle,
       animeCover: animeCover ?? media?.cover,
@@ -123,7 +130,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     if (episodes.isNotEmpty) {
       AppLogger.success('Using ${episodes.length} pre-provided episodes');
       state = state.copyWith(episodes: episodes, isLoading: false);
-      _syncJikanIfEnabled();
+      _syncMetadataIfEnabled();
       return episodes;
     }
 
@@ -159,7 +166,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
     AppLogger.success('Successfully loaded ${fetched.length} episodes');
     state = state.copyWith(episodes: fetched, isLoading: false);
-    _syncJikanIfEnabled();
+    _syncMetadataIfEnabled();
 
     return fetched;
   }
@@ -167,9 +174,15 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   Future<void> refreshEpisodes() async {
     final id = state.animeId;
     final title = state.animeTitle;
+    final mediaId = state.mediaId;
     if (id == null || title == null) return;
 
-    await fetchEpisodes(animeId: id, animeTitle: title, force: true);
+    await fetchEpisodes(
+      animeId: id,
+      animeTitle: title,
+      mediaId: mediaId,
+      force: true,
+    );
   }
 
   void reset() => state = const EpisodeListState();
@@ -177,7 +190,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   void attachMalId(int malId) {
     if (state.malId == malId) return;
     state = state.copyWith(malId: malId);
-    _syncJikanIfEnabled();
+    _syncMetadataIfEnabled();
   }
 
   // --- Internal Source Routing ---
@@ -312,22 +325,245 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     }
   }
 
-  // --- Jikan Metadata Syncing ---
+  // --- Metadata & Episode Name Syncing ---
 
-  void _syncJikanIfEnabled() {
+  static final Map<String, List<EpisodeDataModel>> _justAnimeTitlesCache = {};
+
+  void _syncMetadataIfEnabled() {
     if (state.episodes.isEmpty || state.animeTitle == null) {
       return;
     }
 
     state = state.copyWith(isJikanSyncing: true);
-    AppLogger.i('Initializing metadata and filler sync for: ${state.animeTitle}');
+    AppLogger.i('Initializing metadata and episode name sync for: ${state.animeTitle}');
 
     // unawaited ensures Riverpod doesn't block while fetching non-critical metadata
     unawaited(
-      _syncWithJikan().whenComplete(
+      _runMetadataSync().whenComplete(
         () => state = state.copyWith(isJikanSyncing: false),
       ),
     );
+  }
+
+  Future<void> _runMetadataSync() async {
+    // 1. Instant Filler Sync via AnimeFillerService (AnimeFillerList + local cache)
+    await _syncFillerInfo();
+
+    // 2. Fetch and enrich episode names & rich metadata from JustAnime
+    await _syncWithJustAnime();
+
+    // 3. Fallback / supplementary title and metadata sync via Jikan (MAL)
+    await _syncWithJikan();
+  }
+
+  Future<void> _syncFillerInfo() async {
+    try {
+      final currentTitle = state.animeTitle!;
+      final malId = state.malId;
+
+      final fillerInfo = await AnimeFillerService().getFillerInfo(
+        title: currentTitle,
+        malId: malId,
+      );
+
+      if ((fillerInfo.fillers.isNotEmpty || fillerInfo.mixed.isNotEmpty) &&
+          state.episodes.isNotEmpty) {
+        final updated = List<EpisodeDataModel>.of(state.episodes);
+        var fillerCount = 0;
+        for (var i = 0; i < updated.length; i++) {
+          final epNum = updated[i].number ?? (i + 1);
+          final isFiller =
+              fillerInfo.fillers.contains(epNum) ||
+              updated[i].isFiller == true;
+          final isMixed = fillerInfo.mixed.contains(epNum);
+          if (isFiller != (updated[i].isFiller ?? false) ||
+              isMixed != (updated[i].isMixed ?? false)) {
+            updated[i] = updated[i].copyWith(
+              isFiller: isFiller,
+              isMixed: isMixed,
+            );
+            if (isFiller || isMixed) fillerCount++;
+          }
+        }
+        if (fillerCount > 0) {
+          AppLogger.success(
+            'Highlighted $fillerCount filler/mixed episodes for "$currentTitle"',
+          );
+          state = state.copyWith(episodes: updated);
+        }
+      }
+    } catch (e) {
+      AppLogger.d('AnimeFillerService sync error: $e');
+    }
+  }
+
+  Future<void> _syncWithJustAnime() async {
+    if (state.episodes.isEmpty || state.animeTitle == null) return;
+
+    final currentTitle = state.animeTitle!;
+    final mediaId = state.mediaId;
+
+    try {
+      final registry = ref.read(animeSourceRegistryProvider);
+      final justAnime = registry.get('justanime') ?? JustAnimeProvider();
+
+      List<EpisodeDataModel>? justAnimeEps;
+
+      // 1. Check in-memory cache
+      final cacheKey = mediaId ?? currentTitle.toLowerCase().trim();
+      if (_justAnimeTitlesCache.containsKey(cacheKey)) {
+        justAnimeEps = _justAnimeTitlesCache[cacheKey];
+      }
+
+      // 2. Direct AniList ID lookup (JustAnime uses exact AniList IDs for all anime)
+      if (justAnimeEps == null && mediaId != null && mediaId.isNotEmpty) {
+        try {
+          AppLogger.d('Enriching episode names via JustAnime direct AniList ID: $mediaId');
+          final res = await justAnime
+              .getEpisodes(mediaId)
+              .timeout(const Duration(seconds: 15));
+          if (res.episodes != null && res.episodes!.isNotEmpty) {
+            justAnimeEps = res.episodes;
+            _justAnimeTitlesCache[mediaId] = res.episodes!;
+            _justAnimeTitlesCache[cacheKey] = res.episodes!;
+          }
+        } catch (e) {
+          AppLogger.d('JustAnime direct AniList ID fetch error: $e');
+        }
+      }
+
+      // 3. Fallback: Search JustAnime by cleaned title
+      if (justAnimeEps == null || justAnimeEps.isEmpty) {
+        try {
+          final cleanTitle = currentTitle
+              .replaceAll(
+                RegExp(
+                  r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)',
+                  caseSensitive: false,
+                ),
+                '',
+              )
+              .replaceAll(
+                RegExp(
+                  r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]',
+                  caseSensitive: false,
+                ),
+                '',
+              )
+              .replaceAll(
+                RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false),
+                '',
+              )
+              .replaceAll('-', ' ')
+              .replaceAll(':', ' ')
+              .replaceAll(RegExp(r'[^\w\s]'), ' ')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+
+          final searchTitle = cleanTitle.isNotEmpty ? cleanTitle : currentTitle;
+          AppLogger.d('Searching JustAnime for episode names: "$searchTitle"');
+
+          final searchPage = await justAnime
+              .getSearch(searchTitle, null, 1)
+              .timeout(const Duration(seconds: 10));
+          if (searchPage.results.isNotEmpty) {
+            final match = searchPage.results.firstWhereOrNull(
+                  (r) => r.id == mediaId || r.anilistId?.toString() == mediaId,
+                ) ??
+                searchPage.results.firstOrNull;
+
+            final matchId = match?.id;
+            if (matchId != null && matchId.isNotEmpty) {
+              final res = await justAnime
+                  .getEpisodes(matchId)
+                  .timeout(const Duration(seconds: 15));
+              if (res.episodes != null && res.episodes!.isNotEmpty) {
+                justAnimeEps = res.episodes;
+                _justAnimeTitlesCache[cacheKey] = res.episodes!;
+                if (mediaId != null) _justAnimeTitlesCache[mediaId] = res.episodes!;
+              }
+            }
+          }
+        } catch (e) {
+          AppLogger.d('JustAnime title search for episode names error: $e');
+        }
+      }
+
+      // 4. Apply JustAnime episode names and metadata
+      if (justAnimeEps != null && justAnimeEps.isNotEmpty) {
+        final justEpByNum = <int, EpisodeDataModel>{};
+        for (final ep in justAnimeEps) {
+          if (ep.number != null) {
+            justEpByNum[ep.number!] = ep;
+          }
+        }
+
+        final updated = List<EpisodeDataModel>.of(state.episodes);
+        int enrichedCount = 0;
+
+        for (var i = 0; i < updated.length; i++) {
+          final epNum = updated[i].number ?? (i + 1);
+          final justEp = justEpByNum[epNum];
+          if (justEp == null) continue;
+
+          var ep = updated[i];
+          bool modified = false;
+
+          // Title: enrich if current is generic or if JustAnime has a real title
+          final currentEpTitle = ep.title?.trim() ?? '';
+          final isCurrentGeneric = currentEpTitle.isEmpty ||
+              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
+                  .hasMatch(currentEpTitle);
+
+          final justTitle = justEp.title?.trim();
+          final isJustGeneric = justTitle == null ||
+              justTitle.isEmpty ||
+              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
+                  .hasMatch(justTitle);
+
+          if (!isJustGeneric && (isCurrentGeneric || currentEpTitle != justTitle)) {
+            ep = ep.copyWith(title: justTitle);
+            modified = true;
+            enrichedCount++;
+          }
+
+          // Thumbnail: if current is empty or missing, use JustAnime's HD TMDB thumbnail
+          if ((ep.thumbnail == null || ep.thumbnail!.isEmpty) &&
+              justEp.thumbnail != null &&
+              justEp.thumbnail!.isNotEmpty) {
+            ep = ep.copyWith(thumbnail: justEp.thumbnail);
+            modified = true;
+          }
+
+          // Description: if current is empty, use JustAnime's description
+          if ((ep.description == null || ep.description!.isEmpty) &&
+              justEp.description != null &&
+              justEp.description!.isNotEmpty) {
+            ep = ep.copyWith(description: justEp.description);
+            modified = true;
+          }
+
+          // Filler: if JustAnime marks it as filler
+          if (justEp.isFiller == true && ep.isFiller != true) {
+            ep = ep.copyWith(isFiller: true);
+            modified = true;
+          }
+
+          if (modified) {
+            updated[i] = ep;
+          }
+        }
+
+        if (enrichedCount > 0) {
+          AppLogger.success(
+            'Successfully enriched $enrichedCount episode names from JustAnime for "${state.animeTitle}"',
+          );
+          state = state.copyWith(episodes: updated);
+        }
+      }
+    } catch (e) {
+      AppLogger.w('JustAnime episode names sync error: $e');
+    }
   }
 
   Future<void> _syncWithJikan() async {
@@ -335,44 +571,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       final currentTitle = state.animeTitle!;
       int? malId = state.malId;
 
-      // 1. Instant Filler Sync via AnimeFillerService (AnimeFillerList + Jikan cache)
-      try {
-        final fillerInfo = await AnimeFillerService().getFillerInfo(
-          title: currentTitle,
-          malId: malId,
-        );
-
-        if ((fillerInfo.fillers.isNotEmpty || fillerInfo.mixed.isNotEmpty) &&
-            state.episodes.isNotEmpty) {
-          final updated = List<EpisodeDataModel>.of(state.episodes);
-          var fillerCount = 0;
-          for (var i = 0; i < updated.length; i++) {
-            final epNum = updated[i].number ?? (i + 1);
-            final isFiller =
-                fillerInfo.fillers.contains(epNum) ||
-                updated[i].isFiller == true;
-            final isMixed = fillerInfo.mixed.contains(epNum);
-            if (isFiller != (updated[i].isFiller ?? false) ||
-                isMixed != (updated[i].isMixed ?? false)) {
-              updated[i] = updated[i].copyWith(
-                isFiller: isFiller,
-                isMixed: isMixed,
-              );
-              if (isFiller || isMixed) fillerCount++;
-            }
-          }
-          if (fillerCount > 0) {
-            AppLogger.success(
-              'Highlighted $fillerCount filler/mixed episodes for "$currentTitle"',
-            );
-            state = state.copyWith(episodes: updated);
-          }
-        }
-      } catch (e) {
-        AppLogger.d('AnimeFillerService sync error: $e');
-      }
-
-      // 2. Title and metadata sync via Jikan (MAL)
+      // Title and metadata sync via Jikan (MAL) as fallback
       if (malId == null) {
         var matches = state.jikanMatches;
 

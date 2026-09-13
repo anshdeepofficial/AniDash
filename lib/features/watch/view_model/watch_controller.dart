@@ -140,6 +140,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         .fetchEpisodes(
           animeTitle: animeName,
           animeId: animeId,
+          mediaId: mediaId,
+          malId: malId,
           animeCover: animeCover,
           episodes: episodes,
           force: false,

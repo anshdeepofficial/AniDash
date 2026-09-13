@@ -324,6 +324,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             .fetchEpisodes(
               animeTitle: titleForSearch,
               animeId: state.animeIdForSource,
+              mediaId: widget.mediaId,
               force: false,
               malId: widget.malId,
               media: DMedia(
