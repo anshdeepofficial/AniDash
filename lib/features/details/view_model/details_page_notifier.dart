@@ -301,6 +301,45 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
   Future<List<UniversalCharacter>> _fetchFallbackCharacters(
     UniversalMedia media,
   ) async {
+    // 1. If media ID is an AniList ID, query AniList details for full character cast
+    final anilistId = int.tryParse(media.id);
+    if (anilistId != null) {
+      try {
+        final anilistMedia = await ref
+            .read(anilistServiceProvider)
+            .getAnimeDetails(anilistId)
+            .timeout(const Duration(seconds: 10));
+        if (anilistMedia?.characters.isNotEmpty ?? false) {
+          return anilistMedia!.characters;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Search AniList by title
+    final title =
+        media.title.english ?? media.title.romaji ?? media.title.userPreferred;
+    if (title.isNotEmpty) {
+      try {
+        final anilistSearch = await ref
+            .read(anilistServiceProvider)
+            .searchAnime(title)
+            .timeout(const Duration(seconds: 8));
+        if (anilistSearch.isNotEmpty) {
+          final matchedId = int.tryParse(anilistSearch.first.id);
+          if (matchedId != null) {
+            final details = await ref
+                .read(anilistServiceProvider)
+                .getAnimeDetails(matchedId)
+                .timeout(const Duration(seconds: 10));
+            if (details?.characters.isNotEmpty ?? false) {
+              return details!.characters;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback to Jikan using MAL ID
     final malId = int.tryParse(media.idMal ?? '');
     if (malId != null) {
       try {
@@ -311,8 +350,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       } catch (_) {}
     }
 
-    final title =
-        media.title.english ?? media.title.romaji ?? media.title.userPreferred;
+    // 4. Fallback to Jikan search by title
     if (title.isNotEmpty) {
       try {
         final matches = await JikanService().searchUniversal(title);

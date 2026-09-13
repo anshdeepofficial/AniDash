@@ -103,18 +103,6 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     _buildAniSkip(scheme),
-                    if (ref.watch(
-                      episodeDataProvider.select((s) => s.sources.isNotEmpty),
-                    )) ...[
-                      const SizedBox(width: 8),
-                      _FlatActionBtn(
-                        text: '+85s',
-                        icon: Icons.fast_forward_rounded,
-                        onTap: widget.onForwardPressed,
-                        color: Colors.white24,
-                        textColor: Colors.white,
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -301,21 +289,32 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
     double maxWidth,
   ) {
     final skips = ref.watch(aniSkipProvider);
-    if (skips.isEmpty || total <= 0) return [];
+    if (skips.isEmpty || total < 30000) return [];
 
     return skips.map((skip) {
       if (skip.interval == null) return const SizedBox.shrink();
-      final start = (skip.interval!.startTime * 1000).clamp(0, total);
-      final end = (skip.interval!.endTime * 1000).clamp(0, total);
-      if (end <= start) return const SizedBox.shrink();
+      final start = skip.interval!.startTime * 1000;
+      final end = skip.interval!.endTime * 1000;
+      final segLength = end - start;
+      if (start < 0 || end <= start || end > total + 3000) {
+        return const SizedBox.shrink();
+      }
+      // Ensure segment length is sensible (e.g. between 5s and 200s, max 35% of episode)
+      if (segLength < 5000 || segLength > 200000 || segLength > total * 0.35) {
+        return const SizedBox.shrink();
+      }
+
+      final clampedStart = start.clamp(0, total);
+      final clampedEnd = end.clamp(0, total);
+      if (clampedEnd <= clampedStart) return const SizedBox.shrink();
 
       final isOp =
           skip.skipType == SkipType.op ||
-          (skip.skipType == SkipType.mixed && start < total * 0.5);
+          (skip.skipType == SkipType.mixed && clampedStart < total * 0.5);
       final isEd =
           skip.skipType == SkipType.ed ||
-          (skip.skipType == SkipType.mixed && start >= total * 0.5) ||
-          (!isOp && start >= total * 0.6);
+          (skip.skipType == SkipType.mixed && clampedStart >= total * 0.5) ||
+          (!isOp && clampedStart >= total * 0.6);
 
       final highlightColor = Color.lerp(scheme.primary, Colors.black, 0.45)!;
 
@@ -471,11 +470,13 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
   Widget _buildAniSkip(ColorScheme scheme) {
     final skips = ref.watch(aniSkipProvider);
     final settings = ref.watch(playerSettingsProvider);
-    if (!settings.enableAniSkip || skips.isEmpty) {
+    if (!settings.enableAniSkip) {
       return const SizedBox.shrink();
     }
 
     final pos = ref.watch(playerStateProvider.select((p) => p.position));
+    final dur = ref.watch(playerStateProvider.select((p) => p.duration));
+
     final currentSkip = skips.firstWhere(
       (s) =>
           s.interval != null &&
@@ -490,19 +491,37 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
     );
 
     if (currentSkip.interval == null) {
-      if (settings.showManualSkip && pos.inSeconds < 480) {
+      if (settings.showManualSkip) {
         final skipSec = settings.manualSkipDuration;
-        return _FlatActionBtn(
-          text: 'Skip Op (+${skipSec}s)',
-          icon: Icons.fast_forward_rounded,
-          onTap: () {
-            final target = pos + Duration(seconds: skipSec);
-            ref.read(playerStateProvider.notifier).seek(target);
-            widget.onInteraction();
-          },
-          color: Color.lerp(scheme.primary, Colors.black, 0.45)!,
-          textColor: Colors.white,
-        );
+        // 1. Intro window: First 150 seconds (2.5 mins)
+        if (pos.inSeconds <= 150) {
+          return _FlatActionBtn(
+            text: 'Skip Intro (+${skipSec}s)',
+            icon: Icons.fast_forward_rounded,
+            onTap: () {
+              final target = pos + Duration(seconds: skipSec);
+              ref.read(playerStateProvider.notifier).seek(target);
+              widget.onInteraction();
+            },
+            color: Color.lerp(scheme.primary, Colors.black, 0.45)!,
+            textColor: Colors.white,
+          );
+        }
+        // 2. Outro window: Last 150 seconds of episode
+        else if (dur.inSeconds > 180 &&
+            pos >= dur - const Duration(seconds: 150)) {
+          return _FlatActionBtn(
+            text: 'Skip Outro (+${skipSec}s)',
+            icon: Icons.fast_forward_rounded,
+            onTap: () {
+              final target = pos + Duration(seconds: skipSec);
+              ref.read(playerStateProvider.notifier).seek(target);
+              widget.onInteraction();
+            },
+            color: Color.lerp(scheme.primary, Colors.black, 0.45)!,
+            textColor: Colors.white,
+          );
+        }
       }
       return const SizedBox.shrink();
     }

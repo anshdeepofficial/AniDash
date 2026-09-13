@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 
-class CharactersTab extends StatelessWidget {
+class CharactersTab extends StatefulWidget {
   final List<UniversalCharacter> characters;
   final bool isLoading;
   final VoidCallback? onRetry;
@@ -15,12 +15,45 @@ class CharactersTab extends StatelessWidget {
   });
 
   @override
+  State<CharactersTab> createState() => _CharactersTabState();
+}
+
+class _CharactersTabState extends State<CharactersTab> {
+  bool _autoRetried = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAutoRetry();
+  }
+
+  @override
+  void didUpdateWidget(covariant CharactersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _checkAutoRetry();
+  }
+
+  void _checkAutoRetry() {
+    if (!_autoRetried &&
+        widget.characters.isEmpty &&
+        !widget.isLoading &&
+        widget.onRetry != null) {
+      _autoRetried = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.characters.isEmpty && !widget.isLoading) {
+          widget.onRetry?.call();
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (characters.isEmpty) {
+    if (widget.characters.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -41,10 +74,10 @@ class CharactersTab extends StatelessWidget {
                 ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
-            if (onRetry != null) ...[
+            if (widget.onRetry != null) ...[
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: onRetry,
+                onPressed: widget.onRetry,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Retry'),
               ),
@@ -68,9 +101,9 @@ class CharactersTab extends StatelessWidget {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
-          itemCount: characters.length,
+          itemCount: widget.characters.length,
           itemBuilder: (context, index) {
-            final char = characters[index];
+            final char = widget.characters[index];
             return _CharacterCard(character: char);
           },
         );

@@ -350,6 +350,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       if (next != null) {
         _hasAutoSkippedIntro = false;
+        _lastAniSkipEpisode = null;
         _epNum = next;
         _pos = 0;
         _dur = 0;
@@ -413,7 +414,12 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     }
 
     final epNum = _epNum;
-    if (epNum == null || epNum == _lastAniSkipEpisode) return;
+    if (epNum == null) return;
+
+    final currentSkips = ref.read(aniSkipProvider);
+    final hasEd = currentSkips.any((s) => s.skipType == SkipType.ed);
+    // If we already fetched for this episode and have both OP & ED, skip re-fetch
+    if (epNum == _lastAniSkipEpisode && hasEd) return;
 
     _lastAniSkipEpisode = epNum;
     ref

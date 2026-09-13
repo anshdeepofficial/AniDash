@@ -119,26 +119,28 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Ultra-fast stream startup & low-data friendly configuration
+    // Ultra-fast stream startup, smooth buffering, and clean keyframe resume
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '33554432', // 32MB max buffer (Low data friendly)
-      'demuxer-max-back-bytes': '16777216', // 16MB back cache
-      'cache-secs': '30', // 30s stream cache
-      'demuxer-readahead-secs': '20', // 20s forward readahead for instant start
-      'cache-pause': 'no', // Play immediately without holding first frame hostage
-      'cache-pause-initial': 'no',
-      'cache-pause-wait': '0',
+      'demuxer-max-bytes': '67108864', // 64MB max buffer for smooth streaming
+      'demuxer-max-back-bytes': '33554432', // 32MB back cache
+      'cache-secs': '120', // 120s stream cache
+      'demuxer-readahead-secs': '100', // 100s forward readahead prevents stalls on slow networks
+      'cache-pause': 'yes', // Smoothly pause on mid-stream starvation to accumulate clean frames
+      'cache-pause-initial': 'no', // Play immediately on stream open without waiting
+      'cache-pause-wait': '2', // Wait 2s to accumulate clean keyframe packets during buffer stalls
       'demuxer-lavf-probesize': '1048576', // 1MB probe (cuts 5-10s off initial stream startup)
       'demuxer-lavf-analyzeduration': '1.5', // 1.5s max analyze duration
-      'demuxer-lavf-buffersize': '32768',
-      'demuxer-lavf-hacks': 'yes',
       'network-timeout': '10',
       'force-seekable': 'yes',
       'hr-seek': 'yes',
-      'hr-seek-framedrop': 'no',
+      'hr-seek-framedrop': 'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
+      'framedrop': 'vo', // Drop corrupted or late non-keyframes after buffer underruns
+      'correct-pts': 'yes',
+      'vd-lavc-show-all': 'no', // Never display corrupted/incomplete frames
+      'video-sync': 'audio',
       'hls-bitrate': 'auto',
     };
 
