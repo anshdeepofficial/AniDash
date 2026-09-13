@@ -364,14 +364,40 @@ class _AudioBadge extends StatelessWidget {
 }
 
 /// Info widget displaying anime statistics in a sleek horizontal row
-class AnimeInfoCard extends StatelessWidget {
+class AnimeInfoCard extends ConsumerWidget {
   final UniversalMedia anime;
   final VoidCallback onShare;
 
   const AnimeInfoCard({super.key, required this.anime, required this.onShare});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final loadedCount = ref.watch(
+      episodeListProvider.select((s) => s.episodes.length),
+    );
+    final nextEp = anime.nextAiringEpisode?.episode;
+    final bool hasValidTotal = anime.episodes != null && anime.episodes! > 0;
+    final int? airingReleased =
+        (nextEp != null && nextEp > 1) ? nextEp - 1 : null;
+    final isReleasing = anime.status?.toLowerCase() == 'releasing';
+
+    final int? resolvedEpCount = isReleasing
+        ? (airingReleased ??
+            (loadedCount > 0 ? loadedCount : null) ??
+            (hasValidTotal ? anime.episodes : null))
+        : ((hasValidTotal ? anime.episodes : null) ??
+            airingReleased ??
+            (loadedCount > 0 ? loadedCount : null));
+
+    final String epValue = resolvedEpCount != null
+        ? (isReleasing || !hasValidTotal
+            ? '$resolvedEpCount+'
+            : '$resolvedEpCount')
+        : (isReleasing ? 'Ongoing' : 'TBA');
+
+    final String epLabel =
+        (hasValidTotal && !isReleasing) ? 'Episodes' : 'Ongoing';
+
     final mainStudio = anime.studios.firstWhere(
       (s) => s.isMain,
       orElse:
@@ -396,19 +422,11 @@ class AnimeInfoCard extends StatelessWidget {
           label: anime.season ?? 'Year',
           color: Colors.blueAccent,
         ),
-      if (anime.episodes != null ||
-          (anime.nextAiringEpisode?.episode != null &&
-              anime.nextAiringEpisode!.episode! > 1) ||
-          anime.status?.toLowerCase() == 'releasing')
+      if (resolvedEpCount != null || isReleasing || hasValidTotal)
         _StatData(
           icon: Iconsax.layer,
-          value: anime.episodes != null
-              ? '${anime.episodes}'
-              : (anime.nextAiringEpisode?.episode != null &&
-                      anime.nextAiringEpisode!.episode! > 1
-                  ? '${anime.nextAiringEpisode!.episode! - 1}+'
-                  : 'Ongoing'),
-          label: anime.episodes != null ? 'Episodes' : 'Ongoing',
+          value: epValue,
+          label: epLabel,
           color: Colors.purpleAccent,
         ),
       if (anime.format != null)
@@ -952,13 +970,30 @@ class _AnimeTagsWidgetState extends State<AnimeTagsWidget> {
   }
 }
 
-class AnimeInformationGrid extends StatelessWidget {
+class AnimeInformationGrid extends ConsumerWidget {
   final UniversalMedia anime;
 
   const AnimeInformationGrid({super.key, required this.anime});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final loadedCount = ref.watch(
+      episodeListProvider.select((s) => s.episodes.length),
+    );
+    final nextEp = anime.nextAiringEpisode?.episode;
+    final bool hasValidTotal = anime.episodes != null && anime.episodes! > 0;
+    final int? airingReleased =
+        (nextEp != null && nextEp > 1) ? nextEp - 1 : null;
+    final isReleasing = anime.status?.toLowerCase() == 'releasing';
+
+    final int? resolvedEpCount = isReleasing
+        ? (airingReleased ??
+            (loadedCount > 0 ? loadedCount : null) ??
+            (hasValidTotal ? anime.episodes : null))
+        : ((hasValidTotal ? anime.episodes : null) ??
+            airingReleased ??
+            (loadedCount > 0 ? loadedCount : null));
+
     final items = [
       if (anime.title.english != null)
         _InfoItemData('English Title', anime.title.english!),
@@ -966,16 +1001,17 @@ class AnimeInformationGrid extends StatelessWidget {
         _InfoItemData('Native Title', anime.title.native!),
       if (anime.synonyms.isNotEmpty)
         _InfoItemData('Synonyms', anime.synonyms.take(2).join(', ')),
-      if (anime.episodes != null)
+      if (hasValidTotal && !isReleasing)
         _InfoItemData('Episodes', '${anime.episodes}')
-      else if (anime.nextAiringEpisode?.episode != null &&
-          anime.nextAiringEpisode!.episode! > 1)
+      else if (resolvedEpCount != null && resolvedEpCount > 0)
         _InfoItemData(
           'Episodes',
-          '${anime.nextAiringEpisode!.episode! - 1}+ (Ongoing)',
+          '$resolvedEpCount+ (Ongoing)',
         )
-      else if (anime.status?.toLowerCase() == 'releasing')
-        _InfoItemData('Episodes', 'Ongoing'),
+      else if (isReleasing)
+        _InfoItemData('Episodes', 'Ongoing')
+      else
+        _InfoItemData('Episodes', 'TBA'),
       if (anime.source != null)
         _InfoItemData('Source', _formatSource(anime.source!)),
       if (anime.startDate != null)

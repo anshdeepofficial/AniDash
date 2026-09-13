@@ -100,6 +100,24 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     ]);
   }
 
+  bool _isExiting = false;
+
+  void _handleBack() {
+    if (_isExiting) return;
+
+    if (_panelController.isCompleted || _panelController.value > 0) {
+      _panelController.reverse();
+      return;
+    }
+
+    _isExiting = true;
+    ref.read(playerStateProvider.notifier).pause();
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+    _resetSystemUI();
+  }
+
   Future<void> _resetSystemUI() async {
     try {
       await ScreenBrightness().resetApplicationScreenBrightness();
@@ -200,13 +218,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     });
 
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        ref.read(playerStateProvider.notifier).pause();
-        _resetSystemUI();
-        if (!didPop && context.mounted) {
-          Navigator.pop(context);
-        }
+        if (didPop) return;
+        _handleBack();
       },
       child: Scaffold(
         backgroundColor: Colors.black,

@@ -5,7 +5,6 @@ import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
@@ -88,10 +87,8 @@ class TopControls extends ConsumerWidget {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: _wrap(() async {
-                    await UIHelper.forcePortrait();
-                    await UIHelper.exitImmersiveMode();
-                    if (context.mounted) context.pop();
+                  onTap: _wrap(() {
+                    Navigator.of(context).maybePop();
                   }),
                   customBorder: const CircleBorder(),
                   child: const Padding(

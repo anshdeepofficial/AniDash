@@ -180,9 +180,9 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
           playerState.duration,
           force: true,
         );
+        if (context.mounted) Navigator.pop(context);
         await UIHelper.forcePortrait();
         await UIHelper.exitImmersiveMode();
-        if (context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
         backgroundColor: Colors.black,

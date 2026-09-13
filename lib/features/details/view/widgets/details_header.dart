@@ -296,13 +296,22 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
     final loadedEpCount =
         ref.watch(episodeListProvider.select((s) => s.episodes.length));
     final nextEp = widget.anime.nextAiringEpisode?.episode;
-    final int? resolvedEpCount = widget.anime.episodes ??
-        (nextEp != null && nextEp > 1 ? nextEp - 1 : null) ??
-        (loadedEpCount > 0 ? loadedEpCount : null);
-
+    final bool hasValidTotal =
+        widget.anime.episodes != null && widget.anime.episodes! > 0;
+    final int? airingReleased =
+        (nextEp != null && nextEp > 1) ? nextEp - 1 : null;
     final isReleasing = widget.anime.status?.toLowerCase() == 'releasing';
+
+    final int? resolvedEpCount = isReleasing
+        ? (airingReleased ??
+            (loadedEpCount > 0 ? loadedEpCount : null) ??
+            (hasValidTotal ? widget.anime.episodes : null))
+        : ((hasValidTotal ? widget.anime.episodes : null) ??
+            airingReleased ??
+            (loadedEpCount > 0 ? loadedEpCount : null));
+
     final String? episodesDisplay = resolvedEpCount != null
-        ? (isReleasing || widget.anime.episodes == null
+        ? (isReleasing || !hasValidTotal
             ? '$resolvedEpCount+ eps'
             : '$resolvedEpCount eps')
         : (isReleasing ? 'Ongoing' : null);
@@ -677,7 +686,12 @@ class TrackerStatusWidget extends ConsumerWidget {
       isActive = true;
       final statusText = _formatStatus(entry.status);
       final progressText = entry.progress > 0 ? ' ${entry.progress}' : '';
-      final totalEps = anime.episodes != null ? '/${anime.episodes}' : '';
+      final totalEps = (anime.episodes != null && anime.episodes! > 0)
+          ? '/${anime.episodes}'
+          : (anime.nextAiringEpisode?.episode != null &&
+                  anime.nextAiringEpisode!.episode! > 1
+              ? '/${anime.nextAiringEpisode!.episode! - 1}+'
+              : '');
       final displayProgress =
           entry.progress > 0 ? '$progressText$totalEps' : '';
 
