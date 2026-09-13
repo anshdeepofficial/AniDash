@@ -237,7 +237,10 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                       isSelected: episode.number == selectedEp,
                       download: download,
                       onTap: () {
-                        episodeNotifier.changeEpisode(episode.number);
+                        episodeNotifier.changeEpisode(
+                          episode.number,
+                          force: true,
+                        );
                         widget.panelAnimation.reverse();
                       },
                     );

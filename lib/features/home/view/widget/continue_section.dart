@@ -11,6 +11,8 @@ import 'package:ani_dash/helpers/anime_match_search.dart';
 import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 import 'package:ani_dash/features/downloads/view/local_player_screen.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
+import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
@@ -52,9 +54,7 @@ class ContinueSection extends ConsumerWidget {
             return true;
           }).toList()
           ..sort(
-            (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-              a.lastUpdated ?? DateTime(0),
-            ),
+            (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
           );
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
@@ -422,6 +422,48 @@ class ContinueSection extends ConsumerWidget {
                   onTap: () {
                     Navigator.pop(sheetContext);
                     context.push('/details', extra: entry.toUniversalMedia());
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Iconsax.document_download,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('Download this episode'),
+                  subtitle: Text('Episode ${currentEp?.episodeNumber ?? entry.currentEpisode}'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final targetEpNum =
+                        currentEp?.episodeNumber ?? entry.currentEpisode;
+                    final currentEpList = ref.read(episodeListProvider);
+                    if (currentEpList.animeId != entry.animeId ||
+                        currentEpList.episodes.isEmpty) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder:
+                            (ctx) => const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                      );
+                      await ref
+                          .read(episodeListProvider.notifier)
+                          .fetchEpisodes(
+                            animeTitle: entry.animeTitle,
+                            animeId: entry.animeId,
+                            animeCover: entry.animeCover,
+                            episodes: [],
+                            force: true,
+                            isAdult: isAdult || entry.isAdult,
+                          );
+                      if (context.mounted) {
+                        Navigator.of(context, rootNavigator: true).pop();
+                      }
+                    }
+                    if (!context.mounted) return;
+                    await ref
+                        .read(episodeDataProvider.notifier)
+                        .downloadEpisode(context, targetEpNum);
                   },
                 ),
               ],

@@ -271,7 +271,13 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   }
 
   @override
-  Future<void> updateCurrentEpisode(String animeId, int currentEpisode) async {
+  Future<void> updateCurrentEpisode(
+    String animeId,
+    int currentEpisode, {
+    String? animeTitle,
+    String? animeCover,
+    String? animeFormat,
+  }) async {
     final entry = getProgress(animeId);
     if (entry != null) {
       final updated = entry.copyWith(
@@ -279,6 +285,28 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         lastUpdated: DateTime.now(),
       );
       await saveProgress(updated);
+    } else if (animeTitle != null && animeTitle.isNotEmpty) {
+      final newEntry = AnimeWatchProgressEntry(
+        animeId: animeId,
+        animeTitle: animeTitle,
+        animeFormat: animeFormat,
+        animeCover: animeCover ?? '',
+        totalEpisodes: 0,
+        lastUpdated: DateTime.now(),
+        currentEpisode: currentEpisode,
+        episodesProgress: {
+          currentEpisode: EpisodeProgress(
+            episodeNumber: currentEpisode,
+            episodeTitle: 'Episode $currentEpisode',
+            episodeThumbnail: animeCover,
+            progressInSeconds: 0,
+            durationInSeconds: 1440,
+            isCompleted: false,
+            watchedAt: DateTime.now(),
+          ),
+        },
+      );
+      await saveProgress(newEntry);
     }
   }
 

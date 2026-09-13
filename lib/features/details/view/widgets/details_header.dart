@@ -18,6 +18,7 @@ import 'package:ani_dash/features/browse/model/search_filter.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/core/models/universal/universal_page_response.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
+import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 
 class DetailsHeader extends ConsumerStatefulWidget {
   final UniversalMedia anime;
@@ -292,6 +293,20 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final loadedEpCount =
+        ref.watch(episodeListProvider.select((s) => s.episodes.length));
+    final nextEp = widget.anime.nextAiringEpisode?.episode;
+    final int? resolvedEpCount = widget.anime.episodes ??
+        (nextEp != null && nextEp > 1 ? nextEp - 1 : null) ??
+        (loadedEpCount > 0 ? loadedEpCount : null);
+
+    final isReleasing = widget.anime.status?.toLowerCase() == 'releasing';
+    final String? episodesDisplay = resolvedEpCount != null
+        ? (isReleasing || widget.anime.episodes == null
+            ? '$resolvedEpCount+ eps'
+            : '$resolvedEpCount eps')
+        : (isReleasing ? 'Ongoing' : null);
+
     final highResBanner = _getHighResImageUrl(
       widget.anime.bannerImage != null && widget.anime.bannerImage!.isNotEmpty
           ? widget.anime.bannerImage!
@@ -448,9 +463,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                                 [
                                   widget.anime.seasonYear?.toString(),
                                   widget.anime.format,
-                                  widget.anime.episodes != null
-                                      ? '${widget.anime.episodes} eps'
-                                      : null,
+                                  episodesDisplay,
                                   widget.anime.status,
                                 ].whereType<String>().join(' • '),
                                 style: theme.textTheme.bodyMedium?.copyWith(

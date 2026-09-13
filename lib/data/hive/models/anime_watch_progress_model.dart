@@ -25,6 +25,15 @@ class AnimeWatchProgressEntry {
     this.isAdult = false,
   });
 
+  DateTime get latestWatchTime {
+    var latest = lastUpdated ?? DateTime(0);
+    for (final episode in episodesProgress.values) {
+      final watchedAt = episode.watchedAt;
+      if (watchedAt != null && watchedAt.isAfter(latest)) latest = watchedAt;
+    }
+    return latest;
+  }
+
   AnimeWatchProgressEntry copyWith({
     String? animeId,
     String? animeTitle,

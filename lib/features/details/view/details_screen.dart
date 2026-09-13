@@ -93,7 +93,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
               children: [
                 _KeepAliveWrapper(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 100),
+                    padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
                     child: DetailsContent(
                       anime: displayedAnime,
                       mediaId: id.toString(),

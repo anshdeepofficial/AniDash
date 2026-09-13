@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/models/anime/anime_model.dep.dart';
@@ -192,6 +193,8 @@ class JustAnimeProvider extends AnimeProvider {
     return BaseEpisodeModel(episodes: episodes, totalEpisodes: episodes.length);
   }
 
+  static final Map<String, ({DateTime time, BaseSourcesModel data})> _sourcesCache = {};
+
   @override
   Future<BaseSourcesModel> getSources(
     String animeId,
@@ -204,11 +207,18 @@ class JustAnimeProvider extends AnimeProvider {
     final requestedAudio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
     final audioOrder = [requestedAudio];
 
+    final cacheKey = '$animeId:$episode:$serverName:$requestedAudio';
+    final cached = _sourcesCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.time) < const Duration(minutes: 5)) {
+      return cached.data;
+    }
+
     Future<Map<String, dynamic>?> request(String path) async {
       try {
         final response = await UniversalHttpClient.instance
             .get(Uri.parse('$apiUrl$path'), headers: headers)
-            .timeout(const Duration(seconds: 7));
+            .timeout(const Duration(seconds: 4));
         if (response.statusCode < 200 || response.statusCode >= 300) {
           return null;
         }
@@ -220,37 +230,15 @@ class JustAnimeProvider extends AnimeProvider {
       }
     }
 
-    // Prioritize AnimeGG (direct MP4) which reliably returns HTTP 200 without CDN 403 errors,
-    // unless the user explicitly requested AniNeko.
-    final isExplicitAniNeko =
-        serverName?.toLowerCase().contains('anineko') == true;
-    final hlsEndpoints = [
-      for (final audio in audioOrder)
-        '/watch/$animeId/episode/$episode/anineko/$audio',
-    ];
-    final animeggEndpoint = '/watch/$animeId/episode/$episode/animegg';
-    final endpoints =
-        isExplicitAniNeko
-            ? [...hlsEndpoints, animeggEndpoint]
-            : [animeggEndpoint, ...hlsEndpoints];
-
-    // Fetch endpoints concurrently to drastically reduce initial stream startup time
-    final endpointResults = await Future.wait(
-      endpoints.map((ep) async {
-        final payload = await request(ep);
-        return (endpoint: ep, payload: payload);
-      }),
-    );
-
-    for (final item in endpointResults) {
-      final endpoint = item.endpoint;
-      final payload = item.payload;
-      if (payload == null) continue;
+    BaseSourcesModel? parseSource(
+      String endpoint,
+      Map<String, dynamic>? payload,
+    ) {
+      if (payload == null) return null;
       final endpointAudio = endpoint.contains('/anineko/dub') ? 'dub' : 'sub';
 
       if (endpoint.contains('/anineko/') && requestedAudio != endpointAudio) {
-        // Do not silently accept sub stream if user explicitly requested dub
-        continue;
+        return null;
       }
 
       final animeGGRaw =
@@ -260,16 +248,17 @@ class JustAnimeProvider extends AnimeProvider {
                   : (payload['sub'] ?? payload['dub']))
               : null;
 
-      if (endpoint.contains('animegg') && requestedAudio == 'dub' && payload['dub'] == null) {
-        // Requested DUB, but AnimeGG has no dub payload -> fall through to try other endpoints
-        continue;
+      if (endpoint.contains('animegg') &&
+          requestedAudio == 'dub' &&
+          payload['dub'] == null) {
+        return null;
       }
 
       final raw =
           endpoint.contains('animegg')
               ? animeGGRaw as Map<String, dynamic>?
               : payload;
-      if (raw == null) continue;
+      if (raw == null) return null;
       final actualAudio =
           endpoint.contains('animegg')
               ? (identical(animeGGRaw, payload['dub']) ? 'dub' : 'sub')
@@ -309,7 +298,7 @@ class JustAnimeProvider extends AnimeProvider {
               .where((source) => source.url?.isNotEmpty == true)
               .toList();
 
-      if (sources.isEmpty) continue;
+      if (sources.isEmpty) return null;
 
       final tracks =
           (raw['subtitles'] as List<dynamic>? ??
@@ -328,15 +317,83 @@ class JustAnimeProvider extends AnimeProvider {
               .where((track) => track.url?.isNotEmpty == true)
               .toList();
 
+      Intro? intro;
+      final rawIntro = raw['intro'] ?? payload['intro'];
+      if (rawIntro is Map) {
+        final start = (rawIntro['start'] as num?)?.toInt();
+        final end = (rawIntro['end'] as num?)?.toInt();
+        if (start != null && end != null && end > start) {
+          intro = Intro(start: start, end: end);
+        }
+      }
+
+      Intro? outro;
+      final rawOutro = raw['outro'] ?? payload['outro'];
+      if (rawOutro is Map) {
+        final start = (rawOutro['start'] as num?)?.toInt();
+        final end = (rawOutro['end'] as num?)?.toInt();
+        if (start != null && end != null && end > start) {
+          outro = Intro(start: start, end: end);
+        }
+      }
+
       return BaseSourcesModel(
         sources: sources,
         tracks: tracks,
         headers: commonHeaders,
-        intro: Intro(start: 0, end: 0),
-        outro: Intro(start: 0, end: 0),
+        intro: intro ?? Intro(start: 0, end: 0),
+        outro: outro ?? Intro(start: 0, end: 0),
       );
     }
-    throw Exception('No playable JustAnime source found for episode $episode');
+
+    final isExplicitAniNeko =
+        serverName?.toLowerCase().contains('anineko') == true;
+    final hlsEndpoints = [
+      for (final audio in audioOrder)
+        '/watch/$animeId/episode/$episode/anineko/$audio',
+    ];
+    final animeggEndpoint = '/watch/$animeId/episode/$episode/animegg';
+    final endpoints =
+        isExplicitAniNeko
+            ? [...hlsEndpoints, animeggEndpoint]
+            : [animeggEndpoint, ...hlsEndpoints];
+
+    final completer = Completer<BaseSourcesModel>();
+    var pending = endpoints.length;
+
+    for (final ep in endpoints) {
+      request(ep)
+          .then((payload) {
+            if (completer.isCompleted) return;
+            final model = parseSource(ep, payload);
+            if (model != null && !completer.isCompleted) {
+              _sourcesCache[cacheKey] = (time: DateTime.now(), data: model);
+              completer.complete(model);
+            } else {
+              pending--;
+              if (pending <= 0 && !completer.isCompleted) {
+                completer.completeError(
+                  Exception(
+                    'No playable JustAnime source found for episode $episode',
+                  ),
+                );
+              }
+            }
+          })
+          .catchError((_) {
+            if (completer.isCompleted) return;
+            pending--;
+            if (pending <= 0 && !completer.isCompleted) {
+              completer.completeError(
+                Exception(
+                  'No playable JustAnime source found for episode $episode',
+                ),
+              );
+            }
+          });
+    }
+
+    return await completer.future;
   }
 
   @override

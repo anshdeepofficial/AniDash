@@ -40,7 +40,7 @@ class SeekIndicatorOverlay extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${isForward ? '+' : '-'}${seconds}s',
+            '${isForward ? '+' : '-'}$seconds seconds',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,

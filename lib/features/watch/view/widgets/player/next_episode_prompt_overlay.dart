@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/next_episode_prompt_provider.dart';
+import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class NextEpisodePromptOverlay extends ConsumerWidget {
   const NextEpisodePromptOverlay({super.key});
@@ -13,6 +14,11 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isVisible = ref.watch(nextEpisodePromptProvider);
     if (!isVisible) return const SizedBox.shrink();
+
+    final stopAfter = ref.watch(
+      playerSettingsProvider.select((s) => s.stopAfterCurrentEpisode),
+    );
+    if (stopAfter) return const SizedBox.shrink();
 
     final currentEp = ref.watch(
       episodeDataProvider.select((s) => s.selectedEpisode),

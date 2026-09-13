@@ -113,16 +113,9 @@ class PlayerUIController extends _$PlayerUIController {
 
   void showSeekIndicator(bool forward, int amount) {
     _seekResetTimer?.cancel();
+    state = state.copyWith(isSeekForward: forward, seekAmount: amount);
 
-    // Accumulate if same direction, reset otherwise
-    int newAmount = amount;
-    if (state.seekAmount > 0 && state.isSeekForward == forward) {
-      newAmount = state.seekAmount + amount;
-    }
-
-    state = state.copyWith(isSeekForward: forward, seekAmount: newAmount);
-
-    _seekResetTimer = Timer(const Duration(seconds: 1), () {
+    _seekResetTimer = Timer(const Duration(milliseconds: 750), () {
       state = state.copyWith(seekAmount: 0);
     });
 

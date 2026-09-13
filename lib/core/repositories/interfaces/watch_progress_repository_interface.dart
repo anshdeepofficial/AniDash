@@ -8,7 +8,13 @@ abstract class WatchProgressRepositoryInterface {
     String animeId,
     EpisodeProgress episodeProgress,
   );
-  Future<void> updateCurrentEpisode(String animeId, int currentEpisode);
+  Future<void> updateCurrentEpisode(
+    String animeId,
+    int currentEpisode, {
+    String? animeTitle,
+    String? animeCover,
+    String? animeFormat,
+  });
   Future<void> markPreviousEpisodesWatched({
     required String animeId,
     required String animeTitle,

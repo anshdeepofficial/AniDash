@@ -405,18 +405,9 @@ final sortedWatchProgressProvider =
             .whereType<AnimeWatchProgressEntry>()
             .where((e) => !e.isAdult)
             .toList()
-          ..sort((a, b) => _latestWatchTime(b).compareTo(_latestWatchTime(a)));
+          ..sort((a, b) => b.latestWatchTime.compareTo(a.latestWatchTime));
       });
     });
-
-DateTime _latestWatchTime(AnimeWatchProgressEntry entry) {
-  var latest = entry.lastUpdated ?? DateTime(0);
-  for (final episode in entry.episodesProgress.values) {
-    final watchedAt = episode.watchedAt;
-    if (watchedAt != null && watchedAt.isAfter(latest)) latest = watchedAt;
-  }
-  return latest;
-}
 
 class _ContinueWatchingSection extends ConsumerWidget {
   const _ContinueWatchingSection();
@@ -469,10 +460,10 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   progressInSeconds: 0,
                   durationInSeconds: 1440,
                   isCompleted: false,
-                  watchedAt: DateTime.now(),
+                  watchedAt: DateTime.fromMillisecondsSinceEpoch(0),
                 ),
               },
-              lastUpdated: DateTime.now(),
+              lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
               currentEpisode: targetProgress,
               status: 'watching',
             );
@@ -480,9 +471,10 @@ class _ContinueWatchingSection extends ConsumerWidget {
         }
 
         final combinedList =
-            merged.values.toList()..sort(
-              (a, b) => _latestWatchTime(b).compareTo(_latestWatchTime(a)),
-            );
+            merged.values.toList()
+              ..sort(
+                (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
+              );
 
         if (combinedList.isEmpty) return const SizedBox.shrink();
         return ContinueSection(allProgress: combinedList.take(15).toList());
@@ -497,9 +489,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   .where((e) => !dismissedIds.contains(e.animeId))
                   .toList()
                 ..sort(
-                  (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-                    a.lastUpdated ?? DateTime(0),
-                  ),
+                  (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
                 );
         } catch (_) {}
         if (syncList.isNotEmpty) {
@@ -527,10 +517,11 @@ class _ContinueWatchingSection extends ConsumerWidget {
                       progressInSeconds: 0,
                       durationInSeconds: 1440,
                       isCompleted: false,
+                      watchedAt: DateTime.fromMillisecondsSinceEpoch(0),
                     ),
                   },
                   currentEpisode: ep,
-                  lastUpdated: DateTime.now(),
+                  lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
                   status: 'watching',
                 );
               }).toList();
@@ -548,9 +539,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   .where((e) => !dismissedIds.contains(e.animeId))
                   .toList()
                 ..sort(
-                  (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-                    a.lastUpdated ?? DateTime(0),
-                  ),
+                  (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
                 );
         } catch (_) {}
         if (syncList.isNotEmpty) {
@@ -578,10 +567,11 @@ class _ContinueWatchingSection extends ConsumerWidget {
                       progressInSeconds: 0,
                       durationInSeconds: 1440,
                       isCompleted: false,
+                      watchedAt: DateTime.fromMillisecondsSinceEpoch(0),
                     ),
                   },
                   currentEpisode: ep,
-                  lastUpdated: DateTime.now(),
+                  lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
                   status: 'watching',
                 );
               }).toList();

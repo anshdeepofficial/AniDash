@@ -29,6 +29,7 @@ import 'package:ani_dash/core/models/settings/experimental_model.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/next_episode_prompt_provider.dart';
 import 'package:ani_dash/core/utils/extractors.dart' as extractor;
 
 part 'episode_stream_provider.g.dart';
@@ -171,9 +172,30 @@ class EpisodeData extends _$EpisodeData {
     if (play) await _playCurrent(startAt ?? Duration.zero);
   }
 
-  Future<void> changeEpisode(int? ep, {Duration? startAt, int by = 0}) async {
-    final target = by != 0 ? (state.selectedEpisode ?? 1) + by : ep;
+  Future<void> changeEpisode(
+    int? ep, {
+    Duration? startAt,
+    int by = 0,
+    bool force = false,
+  }) async {
+    final currentEp = state.selectedEpisode ?? 1;
+    final target = by != 0 ? currentEp + by : ep;
     if (target == null || !_isValidEp(target)) return;
+
+    // VLC mode: Stop playback after current episode
+    if (!force &&
+        target > currentEp &&
+        ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
+      AppLogger.i(
+        'Stop After This Episode active: Halting changeEpisode to $target.',
+      );
+      ref.read(playerSettingsProvider.notifier).updateSettings(
+        (s) => s.copyWith(stopAfterCurrentEpisode: false),
+      );
+      ref.read(playerStateProvider.notifier).pause();
+      ref.read(nextEpisodePromptProvider.notifier).dismiss();
+      return;
+    }
 
     AppLogger.i('Changing to episode: $target');
     await loadEpisode(ep: target, play: true, startAt: startAt);

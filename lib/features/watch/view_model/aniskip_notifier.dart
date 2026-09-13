@@ -127,9 +127,22 @@ class AniSkipNotifier extends _$AniSkipNotifier {
           episodeNumber,
           episodeLength,
         );
-        state = results;
+        // Merge AniSkip results with any existing source fallback (e.g. outro from source)
+        final merged = List<AniSkipResultItem>.from(results);
+        for (final existing in state) {
+          final alreadyHasType = merged.any(
+            (m) =>
+                m.skipType == existing.skipType ||
+                (m.skipType == SkipType.mixed &&
+                    existing.skipType == SkipType.op),
+          );
+          if (!alreadyHasType) {
+            merged.add(existing);
+          }
+        }
+        state = merged;
         AppLogger.d(
-          'AniSkip: ${results.length} skip intervals found for ep $episodeNumber',
+          'AniSkip: ${merged.length} skip intervals active for ep $episodeNumber',
         );
       } else {
         AppLogger.w('Could not resolve MAL ID for $animeTitle ($mediaId)');
@@ -140,13 +153,20 @@ class AniSkipNotifier extends _$AniSkipNotifier {
   }
 
   void setFallbackFromSource({Intro? intro, Intro? outro}) {
-    if (state.isNotEmpty) return; // already has AniSkip data
-    final items = <AniSkipResultItem>[];
-    if (intro != null &&
+    final newItems = <AniSkipResultItem>[];
+    final hasOp = state.any(
+      (s) => s.skipType == SkipType.op || s.skipType == SkipType.mixed,
+    );
+    final hasEd = state.any(
+      (s) => s.skipType == SkipType.ed || s.skipType == SkipType.mixed,
+    );
+
+    if (!hasOp &&
+        intro != null &&
         intro.start != null &&
         intro.end != null &&
         intro.end! > intro.start!) {
-      items.add(
+      newItems.add(
         AniSkipResultItem(
           interval: AniSkipInterval(
             startTime: intro.start!.toDouble(),
@@ -158,11 +178,12 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         ),
       );
     }
-    if (outro != null &&
+    if (!hasEd &&
+        outro != null &&
         outro.start != null &&
         outro.end != null &&
         outro.end! > outro.start!) {
-      items.add(
+      newItems.add(
         AniSkipResultItem(
           interval: AniSkipInterval(
             startTime: outro.start!.toDouble(),
@@ -174,10 +195,10 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         ),
       );
     }
-    if (items.isNotEmpty) {
-      state = items;
+    if (newItems.isNotEmpty) {
+      state = [...state, ...newItems];
       AppLogger.d(
-        'AniSkip: Applied ${items.length} intro/outro from streaming source fallback',
+        'AniSkip: Applied ${newItems.length} intro/outro from streaming source fallback (total: ${state.length})',
       );
     }
   }

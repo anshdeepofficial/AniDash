@@ -30,6 +30,7 @@ import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/next_episode_prompt_overlay.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/floating_skip_button_overlay.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:window_manager/window_manager.dart';
@@ -70,7 +71,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   Timer? _tapSeekResetTimer;
   Timer? _tapSeekCommitTimer;
   Duration? _tapSeekTarget;
+  Duration? _tapSeekBasePosition;
   bool? _tapSeekForward;
+  int _accumulatedSeekSeconds = 0;
 
   bool _isDraggingSeek = false;
   Duration _dragStartPos = Duration.zero;
@@ -299,36 +302,52 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final settings = ref.read(playerSettingsProvider);
     final jump = settings.seekDuration;
     final player = ref.read(playerStateProvider);
-    final sameSequence = _tapSeekTarget != null && _tapSeekForward == forward;
-    final base = sameSequence ? _tapSeekTarget! : player.position;
-    final delta = Duration(seconds: forward ? jump : -jump);
-    var target = base + delta;
+    final sameSequence =
+        _tapSeekBasePosition != null && _tapSeekForward == forward;
+
+    if (sameSequence) {
+      _accumulatedSeekSeconds += jump;
+    } else {
+      _tapSeekBasePosition = player.position;
+      _accumulatedSeekSeconds = jump;
+      _tapSeekForward = forward;
+    }
+
+    final delta = Duration(
+      seconds: forward ? _accumulatedSeekSeconds : -_accumulatedSeekSeconds,
+    );
+    var target = _tapSeekBasePosition! + delta;
     if (target < Duration.zero) target = Duration.zero;
     if (player.duration > Duration.zero && target > player.duration) {
       target = player.duration;
     }
     _tapSeekTarget = target;
-    _tapSeekForward = forward;
 
-    // Fast-responsive seek commit: 180ms delay gives instant feedback while
-    // cleanly coalescing rapid multi-taps like VLC/YouTube
+    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s...)
+    ref
+        .read(playerUIControllerProvider.notifier)
+        .showSeekIndicator(forward, _accumulatedSeekSeconds);
+
+    // Debounce seek commit: 650ms after the LAST tap commits the final accumulated jump
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 180), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 650), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);
       }
+      _tapSeekTarget = null;
+      _tapSeekBasePosition = null;
+      _tapSeekForward = null;
+      _accumulatedSeekSeconds = 0;
     });
 
     _tapSeekResetTimer?.cancel();
     _tapSeekResetTimer = Timer(const Duration(milliseconds: 1000), () {
       _tapSeekTarget = null;
+      _tapSeekBasePosition = null;
       _tapSeekForward = null;
+      _accumulatedSeekSeconds = 0;
     });
-
-    ref
-        .read(playerUIControllerProvider.notifier)
-        .showSeekIndicator(forward, jump);
   }
 
   void _onLongPressStart() {
@@ -702,6 +721,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 bottom: uiState.isVisible ? 90 : 20,
                 child: const SubtitleOverlay(),
               ),
+
+              // Floating Skip Intro/Outro Button
+              const FloatingSkipButtonOverlay(),
 
               // Floating Next Episode Recommendation Prompt (at 95% progress)
               const NextEpisodePromptOverlay(),

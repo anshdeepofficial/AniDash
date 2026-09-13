@@ -41,6 +41,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _trackingTriggered = false;
   bool _hasAutoAdvanced = false;
   bool _hasAutoSkippedIntro = false;
+  bool _hasAutoSkippedOutro = false;
   bool _fromHentaiHub = false;
   bool _prefetchTriggered = false;
   bool _nextPromptTriggered = false;
@@ -169,7 +170,13 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     // Immediately update currentEpisode in repository so Continue Watching is updated on tap
     ref
         .read(watchProgressRepositoryProvider)
-        .updateCurrentEpisode(mediaId, initialEpisode);
+        .updateCurrentEpisode(
+          mediaId,
+          initialEpisode,
+          animeTitle: _animeName,
+          animeCover: _animeCover,
+          animeFormat: _animeFormat,
+        );
 
     Duration startAt = Duration.zero;
     final saved = ref
@@ -350,6 +357,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       if (next != null) {
         _hasAutoSkippedIntro = false;
+        _hasAutoSkippedOutro = false;
         _lastAniSkipEpisode = null;
         _epNum = next;
         _pos = 0;
@@ -436,13 +444,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     if (!ref.read(playerSettingsProvider).enableAutoSkip) return;
 
     final skips = ref.read(aniSkipProvider);
-    if (skips.isEmpty) return;
-
     for (final skip in skips) {
       if (skip.interval == null) continue;
       final isIntro =
-          skip.skipType == SkipType.op || skip.skipType == SkipType.mixed;
+          skip.skipType == SkipType.op ||
+          (skip.skipType == SkipType.mixed && skip.interval!.startTime < 700);
+      final isOutro =
+          skip.skipType == SkipType.ed ||
+          (skip.skipType == SkipType.mixed && skip.interval!.startTime >= 700);
+
       if (isIntro && _hasAutoSkippedIntro) continue;
+      if (isOutro && _hasAutoSkippedOutro) continue;
 
       final start = Duration(seconds: skip.interval!.startTime.toInt());
       final end = Duration(seconds: skip.interval!.endTime.toInt() + 1);
@@ -461,9 +473,20 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       if (validType && validTiming && position >= start && position < end) {
         if (isIntro) _hasAutoSkippedIntro = true;
+        if (isOutro) _hasAutoSkippedOutro = true;
         ref.read(playerStateProvider.notifier).seek(end);
         return;
       }
+    }
+
+    // Fallback auto-skip outro if no AniSkip ed was available and video is in the final 85 seconds
+    if (!_hasAutoSkippedOutro &&
+        _dur > 180 &&
+        position >= Duration(seconds: _dur - 85) &&
+        position < Duration(seconds: _dur - 5)) {
+      _hasAutoSkippedOutro = true;
+      ref.read(playerStateProvider.notifier).seek(Duration(seconds: _dur - 1));
+      return;
     }
   }
 }

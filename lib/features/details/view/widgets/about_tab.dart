@@ -50,19 +50,12 @@ class DetailsContent extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           AdditionalInfoWidget(anime: anime),
-          if (anime.relations.any((relation) {
-            final type = relation.relationType.toUpperCase();
-            return type.contains('PREQUEL') || type.contains('SEQUEL');
-          })) ...[
+          if (anime.relations.any((relation) => _isLegitimateWatchOrderRelation(anime, relation))) ...[
             const SizedBox(height: 24),
             HorizontalMediaSection<UniversalMediaRelation>(
               title: 'Watch Order',
               items:
-                  anime.relations.where((relation) {
-                      final type = relation.relationType.toUpperCase();
-                      return type.contains('PREQUEL') ||
-                          type.contains('SEQUEL');
-                    }).toList()
+                  anime.relations.where((relation) => _isLegitimateWatchOrderRelation(anime, relation)).toList()
                     ..sort(
                       (a, b) => (a.media.seasonYear ?? 9999).compareTo(
                         b.media.seasonYear ?? 9999,
@@ -118,10 +111,66 @@ class DetailsContent extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 80),
+          const SizedBox(height: 16),
         ],
       ),
     );
+  }
+
+  bool _isLegitimateWatchOrderRelation(
+    UniversalMedia anime,
+    UniversalMediaRelation relation,
+  ) {
+    final type = relation.relationType.toUpperCase();
+    if (!type.contains('PREQUEL') && !type.contains('SEQUEL')) return false;
+
+    // Check media format - must not be manga, novel, music, or one-shot
+    final format = relation.media.format?.toUpperCase() ?? '';
+    if (format == 'MANGA' ||
+        format == 'NOVEL' ||
+        format == 'ONE_SHOT' ||
+        format == 'MUSIC') {
+      return false;
+    }
+
+    // Check significant title overlap between base anime and relation
+    final baseTitles = [
+      anime.title.english,
+      anime.title.romaji,
+      anime.title.native,
+    ].whereType<String>().map((s) => s.toLowerCase()).toList();
+
+    final relTitles = [
+      relation.media.title.english,
+      relation.media.title.romaji,
+      relation.media.title.native,
+    ].whereType<String>().map((s) => s.toLowerCase()).toList();
+
+    if (baseTitles.isEmpty || relTitles.isEmpty) return true;
+
+    final stopWords = {
+      'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
+      'no', 'ni', 'wa', 'wo', 'ga', 'de', 'na', 'season', 'part', 'movie', 'tv',
+      'ova', 'ona', 'special', 'act', 'chapter', 'arc',
+    };
+
+    final baseTokens = baseTitles
+        .expand(
+          (t) => t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
+        )
+        .where((w) => w.length >= 2 && !stopWords.contains(w))
+        .toSet();
+
+    if (baseTokens.isEmpty) return true;
+
+    final relTokens = relTitles
+        .expand(
+          (t) => t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
+        )
+        .where((w) => w.length >= 2 && !stopWords.contains(w))
+        .toSet();
+
+    return baseTokens.intersection(relTokens).isNotEmpty;
   }
 
   String _formatRelationType(String type) {
@@ -347,11 +396,19 @@ class AnimeInfoCard extends StatelessWidget {
           label: anime.season ?? 'Year',
           color: Colors.blueAccent,
         ),
-      if (anime.episodes != null)
+      if (anime.episodes != null ||
+          (anime.nextAiringEpisode?.episode != null &&
+              anime.nextAiringEpisode!.episode! > 1) ||
+          anime.status?.toLowerCase() == 'releasing')
         _StatData(
           icon: Iconsax.layer,
-          value: '${anime.episodes}',
-          label: 'Episodes',
+          value: anime.episodes != null
+              ? '${anime.episodes}'
+              : (anime.nextAiringEpisode?.episode != null &&
+                      anime.nextAiringEpisode!.episode! > 1
+                  ? '${anime.nextAiringEpisode!.episode! - 1}+'
+                  : 'Ongoing'),
+          label: anime.episodes != null ? 'Episodes' : 'Ongoing',
           color: Colors.purpleAccent,
         ),
       if (anime.format != null)
@@ -783,52 +840,114 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class AnimeTagsWidget extends StatelessWidget {
+class AnimeTagsWidget extends StatefulWidget {
   final List<String> tags;
 
   const AnimeTagsWidget({super.key, required this.tags});
 
   @override
+  State<AnimeTagsWidget> createState() => _AnimeTagsWidgetState();
+}
+
+class _AnimeTagsWidgetState extends State<AnimeTagsWidget> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tags = widget.tags;
+    const initialLimit = 10;
+    final showToggle = tags.length > initialLimit;
+    final displayTags =
+        (_isExpanded || !showToggle) ? tags : tags.take(initialLimit).toList();
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children:
-          tags.map((tag) {
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  navigateToBrowse(context, filter: SearchFilter(tags: [tag]));
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+      children: [
+        ...displayTags.map((tag) {
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                navigateToBrowse(context, filter: SearchFilter(tags: [tag]));
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
                   ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.3,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                    ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.1),
                   ),
-                  child: Text(
-                    tag,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
+                ),
+                child: Text(
+                  tag,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-            );
-          }).toList(),
+            ),
+          );
+        }),
+        if (showToggle)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _isExpanded = !_isExpanded;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(
+                    alpha: _isExpanded ? 0.3 : 0.6,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isExpanded
+                          ? 'Show less'
+                          : '+${tags.length - initialLimit} more',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _isExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -847,12 +966,26 @@ class AnimeInformationGrid extends StatelessWidget {
         _InfoItemData('Native Title', anime.title.native!),
       if (anime.synonyms.isNotEmpty)
         _InfoItemData('Synonyms', anime.synonyms.take(2).join(', ')),
+      if (anime.episodes != null)
+        _InfoItemData('Episodes', '${anime.episodes}')
+      else if (anime.nextAiringEpisode?.episode != null &&
+          anime.nextAiringEpisode!.episode! > 1)
+        _InfoItemData(
+          'Episodes',
+          '${anime.nextAiringEpisode!.episode! - 1}+ (Ongoing)',
+        )
+      else if (anime.status?.toLowerCase() == 'releasing')
+        _InfoItemData('Episodes', 'Ongoing'),
       if (anime.source != null)
         _InfoItemData('Source', _formatSource(anime.source!)),
       if (anime.startDate != null)
         _InfoItemData(
           'Aired',
-          _formatDateRange(anime.startDate, anime.endDate),
+          _formatDateRange(
+            anime.startDate,
+            anime.endDate,
+            isOngoing: anime.status?.toLowerCase() == 'releasing',
+          ),
         ),
       if (anime.studios.isNotEmpty)
         _InfoItemData('Studios', anime.studios.map((s) => s.name).join(', ')),
@@ -910,7 +1043,11 @@ class AnimeInformationGrid extends StatelessWidget {
         .join(' ');
   }
 
-  String _formatDateRange(dynamic start, dynamic end) {
+  String _formatDateRange(
+    dynamic start,
+    dynamic end, {
+    bool isOngoing = false,
+  }) {
     String format(dynamic d) {
       if (d == null) return '?';
       if (d.year == null) return '?';
@@ -921,8 +1058,13 @@ class AnimeInformationGrid extends StatelessWidget {
     }
 
     final s = format(start);
-    if (end == null) return s;
+    if (end == null || end.year == null) {
+      return isOngoing ? '$s - Ongoing' : s;
+    }
     final e = format(end);
+    if (e == '?') {
+      return isOngoing ? '$s - Ongoing' : s;
+    }
     return '$s - $e';
   }
 }

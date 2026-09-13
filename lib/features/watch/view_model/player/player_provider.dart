@@ -131,9 +131,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'cache-pause': 'yes', // Smoothly pause on mid-stream starvation to accumulate clean frames
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
       'cache-pause-wait': '2', // Wait 2s to accumulate clean keyframe packets during buffer stalls
-      'demuxer-lavf-probesize': '1048576', // 1MB probe (cuts 5-10s off initial stream startup)
-      'demuxer-lavf-analyzeduration': '1.5', // 1.5s max analyze duration
-      'network-timeout': '10',
+      'demuxer-lavf-probesize': '524288', // 512KB probe (instant stream startup)
+      'demuxer-lavf-analyzeduration': '0.8', // 0.8s max analyze duration
+      'network-timeout': '8',
       'force-seekable': 'yes',
       'hr-seek': 'yes',
       'hr-seek-framedrop': 'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
