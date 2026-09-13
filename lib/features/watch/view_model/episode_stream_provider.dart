@@ -41,6 +41,18 @@ enum EpisodeStreamState {
   QUALITY_LOADING,
 }
 
+class _CachedSourceEntry {
+  final BaseSourcesModel data;
+  final DateTime timestamp;
+
+  _CachedSourceEntry(this.data) : timestamp = DateTime.now();
+
+  bool get isExpired =>
+      DateTime.now().difference(timestamp) > const Duration(minutes: 30);
+}
+
+final Map<String, _CachedSourceEntry> _sourceCache = {};
+
 @immutable
 class EpisodeDataState {
   final Map<String, String>? headers;
@@ -137,11 +149,14 @@ class EpisodeData extends _$EpisodeData {
     required int ep,
     bool play = true,
     Duration? startAt,
+    String? mediaId,
   }) async {
     if (!_isValidEp(ep)) {
       AppLogger.fail('Invalid episode requested: $ep');
       return;
     }
+
+    _player.setActiveSession(mediaId ?? _epList.animeId, ep);
 
     AppLogger.section('Loading Episode $ep');
     final preferDub = ref.read(playerSettingsProvider).preferDub;
@@ -1006,7 +1021,13 @@ class EpisodeData extends _$EpisodeData {
       final playbackUrl = allQualities[qIdx]['url'] as String;
 
       await _player
-          .open(playbackUrl, startAt, headers: streamHeaders)
+          .open(
+            playbackUrl,
+            startAt,
+            headers: streamHeaders,
+            mediaId: _epList.animeId,
+            episode: state.selectedEpisode,
+          )
           .timeout(const Duration(seconds: 15));
 
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
@@ -1062,6 +1083,23 @@ class EpisodeData extends _$EpisodeData {
   }) async {
     final preferDub = ref.read(playerSettingsProvider).preferDub;
     final isDubRequested = server?.isDub ?? preferDub;
+    final cacheKey =
+        '${_epList.animeId}_${ep.number}_${server?.id}_$isDubRequested';
+    final cached = _sourceCache[cacheKey];
+    if (cached != null && !cached.isExpired && cached.data.sources.isNotEmpty) {
+      AppLogger.success(
+        '⚡ Using cached source data for Episode ${ep.number} (${cached.data.sources.length} sources, 0ms latency)',
+      );
+      return cached.data;
+    }
+
+    BaseSourcesModel? saveAndReturn(BaseSourcesModel? model) {
+      if (model != null && model.sources.isNotEmpty) {
+        _sourceCache[cacheKey] = _CachedSourceEntry(model);
+      }
+      return model;
+    }
+
     AppLogger.d(
       'Fetching source data via ${server?.name ?? "Extension"} (${isDubRequested ? "DUB" : "SUB"})',
     );
@@ -1150,10 +1188,12 @@ class EpisodeData extends _$EpisodeData {
             }
           }
 
-          return BaseSourcesModel(
-            sources: sources,
-            headers: extractedHeaders,
-            tracks: allTracks,
+          return saveAndReturn(
+            BaseSourcesModel(
+              sources: sources,
+              headers: extractedHeaders,
+              tracks: allTracks,
+            ),
           );
         }
       } catch (err) {
@@ -1175,7 +1215,7 @@ class EpisodeData extends _$EpisodeData {
             .getSources(_epList.animeId ?? '', targetEpId, server?.id, category)
             .timeout(const Duration(seconds: 8));
         if (res.sources.isNotEmpty) {
-          return res;
+          return saveAndReturn(res);
         }
       } catch (e) {
         AppLogger.e('Native provider direct source fetch failed: $e');
@@ -1199,7 +1239,7 @@ class EpisodeData extends _$EpisodeData {
               AppLogger.success(
                 'Resolved stream on ${_provider!.providerName}',
               );
-              return res;
+              return saveAndReturn(res);
             }
           }
         } catch (e) {
@@ -1208,7 +1248,8 @@ class EpisodeData extends _$EpisodeData {
       }
     }
 
-    return _fetchFallbackNativeSourceData(ep, category);
+    final fallback = await _fetchFallbackNativeSourceData(ep, category);
+    return saveAndReturn(fallback);
   }
 
   Future<BaseSourcesModel?> _fetchFallbackNativeSourceData(

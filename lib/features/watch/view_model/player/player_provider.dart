@@ -86,7 +86,7 @@ class PlayerState {
   }
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 class PlayerStateNotifier extends _$PlayerStateNotifier {
   late final Player _player;
   late final VideoController videoController;
@@ -96,8 +96,28 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Duration? _pendingSeekTarget;
   Timer? _seekTimeout;
   Timer? _startupTimer;
+  String? _activeMediaId;
+  int? _activeEpisode;
 
   Player get player => _player;
+  String? get activeMediaId => _activeMediaId;
+  int? get activeEpisode => _activeEpisode;
+
+  void setActiveSession(String? mediaId, int? episode) {
+    _activeMediaId = mediaId;
+    _activeEpisode = episode;
+  }
+
+  bool isCurrentEpisodeLoaded({
+    required String? mediaId,
+    required int? episode,
+  }) {
+    if (mediaId == null || episode == null) return false;
+    return _activeMediaId == mediaId &&
+        _activeEpisode == episode &&
+        _lastUrl != null &&
+        _player.state.duration > Duration.zero;
+  }
 
   @override
   PlayerState build() {
@@ -262,7 +282,11 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     String url,
     Duration? startAt, {
     Map<String, String>? headers,
+    String? mediaId,
+    int? episode,
   }) async {
+    if (mediaId != null) _activeMediaId = mediaId;
+    if (episode != null) _activeEpisode = episode;
     final effectiveHeaders = <String, String>{
       'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -326,6 +350,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _pendingSeekTarget = null;
     _lastUrl = null;
     _lastHeaders = null;
+    _activeMediaId = null;
+    _activeEpisode = null;
     await _player.stop();
     state = PlayerState.initial();
   }

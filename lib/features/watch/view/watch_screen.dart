@@ -114,7 +114,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   @override
   void dispose() {
-    ref.read(playerStateProvider.notifier).stop();
+    ref.read(playerStateProvider.notifier).pause();
     _resetSystemUI();
     _panelController.dispose();
     super.dispose();
@@ -202,7 +202,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        ref.read(playerStateProvider.notifier).stop();
+        ref.read(playerStateProvider.notifier).pause();
         _resetSystemUI();
         if (!didPop && context.mounted) {
           Navigator.pop(context);

@@ -178,6 +178,45 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           animeFormat: _animeFormat,
         );
 
+    final playerNotifier = ref.read(playerStateProvider.notifier);
+    final isAlreadyLoaded = playerNotifier.isCurrentEpisodeLoaded(
+      mediaId: mediaId,
+      episode: initialEpisode,
+    );
+
+    if (isAlreadyLoaded) {
+      AppLogger.i(
+        '⚡ Instant-resuming active session for $mediaId Ep $initialEpisode (buffer & demuxer preserved)',
+      );
+      _isPlayerReady = true;
+      _pos = playerNotifier.player.state.position.inSeconds;
+      _dur = playerNotifier.player.state.duration.inSeconds;
+
+      // Restore saved playback speed if customized
+      final savedSpeed = ref.read(playerSettingsProvider).defaultPlaybackSpeed;
+      if (savedSpeed != 1.0) {
+        playerNotifier.setSpeed(savedSpeed);
+      }
+
+      final playerSettings = ref.read(playerSettingsProvider);
+      if (playerSettings.enableAniSkip) {
+        ref
+            .read(aniSkipProvider.notifier)
+            .fetchSkipTimes(
+              mediaId: mediaId,
+              animeTitle: _animeName ?? '',
+              episodeNumber: initialEpisode,
+              episodeLength: _dur,
+              malId: _malId,
+            );
+      }
+
+      await playerNotifier.play();
+      return;
+    }
+
+    playerNotifier.setActiveSession(mediaId, initialEpisode);
+
     Duration startAt = Duration.zero;
     final saved = ref
         .read(watchProgressRepositoryProvider)
@@ -213,7 +252,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
     await ref
         .read(episodeDataProvider.notifier)
-        .loadEpisode(ep: initialEpisode, startAt: startAt);
+        .loadEpisode(ep: initialEpisode, startAt: startAt, mediaId: mediaId);
   }
 
   void _attachPlaybackListeners(

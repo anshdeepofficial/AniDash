@@ -20,7 +20,7 @@ final class PlayerStateNotifierProvider
         argument: null,
         retry: null,
         name: r'playerStateProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
