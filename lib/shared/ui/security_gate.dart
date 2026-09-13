@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/shared/providers/settings/security_notifier.dart';
 import 'package:ani_dash/shared/ui/pin_lock_dialog.dart';
+import 'package:ani_dash/shared/ui/brand_logo.dart';
 
 class SecurityGate extends ConsumerStatefulWidget {
   final Widget child;
@@ -77,11 +78,7 @@ class _SecurityGateState extends ConsumerState<SecurityGate>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/icons/anidash_logo_light.png',
-                      width: 80,
-                      height: 80,
-                    ),
+                    const BrandLogo(size: 80),
                     const SizedBox(height: 16),
                     const Text(
                       'AniDash Protected',

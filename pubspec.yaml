@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.12.9+63
+version: 1.13.0+64
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -111,18 +111,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/icons/app_icon-modified-2.png
+    - assets/icons/anidash_logo.png
     - assets/icons/anidash_logo_dark.png
     - assets/icons/anidash_logo_light.png
 
 flutter_launcher_icons:
   android: true
-  image_path: "assets/icons/anidash_logo_light.png"
+  image_path: "assets/icons/anidash_logo.png"
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icons/anidash_logo_light.png"
   windows:
     generate: true
-    image_path: "assets/icons/anidash_logo_light.png"
+    image_path: "assets/icons/anidash_logo.png"
 
 inno_bundle:
   id: 0516d984-72bf-47d4-bfbc-b2b8fd563479

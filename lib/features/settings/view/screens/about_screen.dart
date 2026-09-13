@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ani_dash/shared/ui/brand_logo.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -46,13 +47,9 @@ class AboutScreen extends StatelessWidget {
                     color: colorScheme.surface.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: ClipRRect(
+                  child: BrandLogo(
+                    size: 120,
                     borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      'assets/icons/app_icon-modified-2.png',
-                      height: 120,
-                      width: 120,
-                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

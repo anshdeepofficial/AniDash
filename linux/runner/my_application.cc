@@ -21,11 +21,11 @@ static void my_application_activate(GApplication* application) {
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   if (g_file_test("assets", G_FILE_TEST_IS_DIR))
   {
-    gtk_window_set_icon_from_file(window, "assets/icons/app_icon-modified-2.png", NULL); // For debug mode
+    gtk_window_set_icon_from_file(window, "assets/icons/anidash_logo.png", NULL); // For debug mode
   }
   else
   {
-    gtk_window_set_icon_from_file(window, "data/flutter_assets/assets/icons/app_icon-modified-2.png", NULL); // For release mode
+    gtk_window_set_icon_from_file(window, "data/flutter_assets/assets/icons/anidash_logo.png", NULL); // For release mode
   }
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu

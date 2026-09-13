@@ -11,8 +11,7 @@ class BrandLogo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeSettingsProvider.select((s) => s.logoMode));
-    final isDark = Theme.of(context).brightness == Brightness.dark ||
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final useWhite =
         mode == 'white' ||
         (mode == 'dynamic' && isDark) ||

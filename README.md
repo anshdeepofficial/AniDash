@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/icons/app_icon-modified-2.png" alt="AniDash Logo" width="120" />
+<img src="assets/icons/anidash_logo.png" alt="AniDash Logo" width="180" />
 
 # AniDash
 

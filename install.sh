@@ -74,7 +74,7 @@ task_normalize() {
 
 task_ui() {
     sudo mkdir -p "/usr/share/icons/hicolor/256x256/apps"
-    sudo wget -qO "$SYS_ICON" "https://raw.githubusercontent.com/$REPO/main/assets/icons/app_icon-modified-2.png" || true
+    sudo wget -qO "$SYS_ICON" "https://raw.githubusercontent.com/$REPO/main/assets/icons/anidash_logo.png" || true
     sudo bash -c "cat <<EOF > $SYS_DESKTOP
 [Desktop Entry]
 Version=1.0
