@@ -69,15 +69,19 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     );
 
     ref.onDispose(() {
-      _isDisposed = true;
-      _completedSubscription?.cancel();
-      _playbackActionSubscription?.cancel();
-      NotificationService().hidePlaybackNotification();
+      cleanup();
       WidgetsBinding.instance.removeObserver(this);
-      AudioFocusService().abandonAudioFocus();
-      AudioFocusService().reset();
-      _triggerSave();
     });
+  }
+
+  void cleanup() {
+    _isDisposed = true;
+    _wasPlayingBeforeLock = false;
+    _completedSubscription?.cancel();
+    _playbackActionSubscription?.cancel();
+    NotificationService().hidePlaybackNotification();
+    AudioFocusService().reset();
+    _triggerSave();
   }
 
   @override
@@ -85,17 +89,24 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       final isPlaying = ref.read(playerStateProvider).isPlaying;
-      if (isPlaying) {
+      if (isPlaying && !_isDisposed) {
         _wasPlayingBeforeLock = true;
         // Pause safely before hardware rendering surface detaches to keep MPV memory cache intact
         ref.read(playerStateProvider.notifier).pause();
       }
       _triggerSave();
     } else if (state == AppLifecycleState.resumed) {
+      if (_isDisposed || !AudioFocusService().isSessionActive) {
+        _wasPlayingBeforeLock = false;
+        return;
+      }
       if (AudioFocusService().isPausedByInterruption) {
-        // App returned to foreground after call interruption
+        // App returned to foreground after call interruption while video was actively being watched
         AudioFocusService().requestAudioFocus().then((granted) {
-          if (granted && AudioFocusService().isPausedByInterruption) {
+          if (granted &&
+              !_isDisposed &&
+              AudioFocusService().isSessionActive &&
+              AudioFocusService().isPausedByInterruption) {
             AudioFocusService().isPausedByInterruption = false;
             ref.read(playerStateProvider.notifier).play();
           }
@@ -125,7 +136,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     int? malId,
     bool fromHentaiHub = false,
   }) async {
-    if (_isDisposed) return;
+    _isDisposed = false;
+    _wasPlayingBeforeLock = false;
 
     _mediaId = mediaId;
     _animeName = animeName;

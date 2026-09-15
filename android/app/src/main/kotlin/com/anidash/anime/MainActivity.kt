@@ -63,7 +63,6 @@ class MainActivity : FlutterFragmentActivity() {
                 .build()
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(playbackAttributes)
-                .setAcceptsDelayedFocusGain(true)
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
                 .build()
             audioFocusRequest = request
@@ -120,8 +119,8 @@ class MainActivity : FlutterFragmentActivity() {
                 if (orientation == ORIENTATION_UNKNOWN) return
                 val now = System.currentTimeMillis()
                 val candidate = when (orientation) {
-                    in 78..102 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                    in 258..282 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    in 50..130 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                    in 230..310 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                     else -> null
                 }
 
@@ -135,8 +134,8 @@ class MainActivity : FlutterFragmentActivity() {
                     return
                 }
                 if (requestedOrientation != candidate &&
-                    now - pendingLandscapeSince >= 840 &&
-                    now - lastOrientationChangeTime >= 1200) {
+                    now - pendingLandscapeSince >= 250 &&
+                    now - lastOrientationChangeTime >= 500) {
                     requestedOrientation = candidate
                     lastOrientationChangeTime = now
                     pendingLandscape = null

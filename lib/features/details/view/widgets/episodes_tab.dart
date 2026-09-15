@@ -229,21 +229,19 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder:
-          (c) => DraggableScrollableSheet(
-            initialChildSize: 0.65,
-            minChildSize: 0.4,
-            maxChildSize: 0.9,
-            expand: false,
-            builder:
-                (c, controller) => DownloadSourceSelector(
-                  animeTitle: animeTitle,
-                  animeCover: widget.mediaCover,
-                  episodeCount: selectedNums.length,
-                  scrollController: controller,
-                  isAdult: widget.fromHentaiHub,
-                  onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
+          (sheetContext) => ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+            ),
+            child: DownloadSourceSelector(
+              animeTitle: animeTitle,
+              animeCover: widget.mediaCover,
+              episodeCount: selectedNums.length,
+              isAdult: widget.fromHentaiHub,
+              onConfirmBatchDownload: (lang, quality, doNotAskAgain) async {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(

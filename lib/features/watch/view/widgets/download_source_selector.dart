@@ -19,7 +19,7 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
   final int episodeCount;
   final ServerData? server;
   final Future<BaseSourcesModel?> Function()? fetchSources;
-  final ScrollController scrollController;
+  final ScrollController? scrollController;
   final Future<void> Function(
     String language,
     String quality,
@@ -36,7 +36,7 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
     this.episodeCount = 1,
     this.server,
     this.fetchSources,
-    required this.scrollController,
+    this.scrollController,
     this.onConfirmBatchDownload,
     this.isAdult = false,
   });

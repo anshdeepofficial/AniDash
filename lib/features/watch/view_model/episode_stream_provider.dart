@@ -380,18 +380,32 @@ class EpisodeData extends _$EpisodeData {
 
       AppLogger.section('Initializing Download for Ep $epNum');
 
+      List<ServerData> servers = [];
       _showLoading(context);
-      final servers = await _getRawServers(ep);
+      try {
+        servers = await _getRawServers(ep).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => <ServerData>[],
+        );
+      } catch (e) {
+        AppLogger.w('Failed to get raw servers: $e');
+      } finally {
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+      }
+
       if (!context.mounted) return;
-      Navigator.pop(context);
 
       ServerData? selected;
       if (!_isNativeProvider && _exp.useExtensions) {
         selected = ServerData(name: 'Extension', id: 'ext', isDub: false);
       } else {
         if (servers.isEmpty) {
-          AppLogger.warning('No servers available for download');
-          return _showSnack(context, "No servers found");
+          servers = [
+            ServerData(name: 'Default (Sub)', id: 'default', isDub: false),
+            ServerData(name: 'Default (Dub)', id: 'default', isDub: true),
+          ];
         }
         selected =
             servers.length == 1
@@ -404,25 +418,28 @@ class EpisodeData extends _$EpisodeData {
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
+        useRootNavigator: true,
         backgroundColor: Colors.transparent,
         builder:
-            (c) => DraggableScrollableSheet(
-              initialChildSize: 0.65,
-              minChildSize: 0.4,
-              maxChildSize: 0.9,
-              expand: false,
-              builder:
-                  (c, controller) => DownloadSourceSelector(
-                    animeTitle: _epList.animeTitle ?? 'Unknown',
-                    animeCover: _epList.animeCover,
-                    episode: ep,
-                    episodeCount: 1,
-                    server: selected,
-                    fetchSources: () => _fetchSourceData(ep, server: selected),
-                    scrollController: controller,
-                  ),
+            (sheetContext) => ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+              ),
+              child: DownloadSourceSelector(
+                animeTitle: _epList.animeTitle ?? 'Unknown',
+                animeCover: _epList.animeCover,
+                episode: ep,
+                episodeCount: 1,
+                server: selected,
+                fetchSources: () => _fetchSourceData(ep, server: selected),
+              ),
             ),
       );
+    } catch (e, st) {
+      AppLogger.e('Download initialization failed', e, st);
+      if (context.mounted) {
+        _showSnack(context, "Download failed: $e");
+      }
     } finally {
       link.close();
     }
@@ -439,23 +456,30 @@ class EpisodeData extends _$EpisodeData {
 
     try {
       _showLoading(context);
+      BaseSourcesModel? data;
       ServerData? preferredServer;
-      if (_isNativeProvider) {
-        final servers = await _getRawServers(
-          ep,
-        ).timeout(const Duration(seconds: 12), onTimeout: () => <ServerData>[]);
-        preferredServer = servers.firstWhereOrNull(
-          (server) => language == 'dub' ? server.isDub : !server.isDub,
-        );
-        preferredServer ??= ServerData(
-          name: 'Default',
-          id: 'default',
-          isDub: language == 'dub',
-        );
+      try {
+        if (_isNativeProvider) {
+          final servers = await _getRawServers(
+            ep,
+          ).timeout(const Duration(seconds: 12), onTimeout: () => <ServerData>[]);
+          preferredServer = servers.firstWhereOrNull(
+            (server) => language == 'dub' ? server.isDub : !server.isDub,
+          );
+          preferredServer ??= ServerData(
+            name: 'Default',
+            id: 'default',
+            isDub: language == 'dub',
+          );
+        }
+        data = await _fetchSourceData(ep, server: preferredServer);
+      } finally {
+        if (context.mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
       }
-      final data = await _fetchSourceData(ep, server: preferredServer);
+
       if (!context.mounted) return;
-      Navigator.pop(context);
 
       if (data == null || data.sources.isEmpty) {
         return _showSnack(
@@ -1431,6 +1455,7 @@ class EpisodeData extends _$EpisodeData {
     return showModalBottomSheet<ServerData>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),

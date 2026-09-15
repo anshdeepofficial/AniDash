@@ -10,6 +10,7 @@ class AudioFocusService {
   static const MethodChannel _channel = MethodChannel('shonenx/audio_focus');
 
   bool isPausedByInterruption = false;
+  bool isSessionActive = false;
 
   Future<void> Function()? _onPauseRequested;
   Future<void> Function()? _onResumeRequested;
@@ -21,6 +22,8 @@ class AudioFocusService {
   }) {
     _onPauseRequested = onPauseRequested;
     _onResumeRequested = onResumeRequested;
+    isSessionActive = true;
+    isPausedByInterruption = false;
 
     if (!_isInitialized) {
       _isInitialized = true;
@@ -30,6 +33,11 @@ class AudioFocusService {
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
+    if (!isSessionActive) {
+      AppLogger.d('[AudioFocusService] Ignored focus event (${call.method}): session inactive');
+      return;
+    }
+
     switch (call.method) {
       case 'onAudioFocusLossTransient':
         AppLogger.w('[AudioFocusService] Transient focus loss (incoming call / alarm). Pausing video...');
@@ -41,7 +49,7 @@ class AudioFocusService {
 
       case 'onAudioFocusGain':
         AppLogger.success('[AudioFocusService] Audio focus regained.');
-        if (isPausedByInterruption) {
+        if (isSessionActive && isPausedByInterruption) {
           isPausedByInterruption = false;
           AppLogger.i('[AudioFocusService] Call ended. Auto-resuming video playback...');
           if (_onResumeRequested != null) {
@@ -64,6 +72,7 @@ class AudioFocusService {
   }
 
   Future<bool> requestAudioFocus() async {
+    if (!isSessionActive) return false;
     try {
       final res = await _channel.invokeMethod<bool>('requestAudioFocus');
       return res ?? false;
@@ -83,8 +92,10 @@ class AudioFocusService {
   }
 
   void reset() {
+    isSessionActive = false;
     isPausedByInterruption = false;
     _onPauseRequested = null;
     _onResumeRequested = null;
+    abandonAudioFocus();
   }
 }

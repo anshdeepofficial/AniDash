@@ -10,6 +10,7 @@ import 'package:ani_dash/features/downloads/model/download_status.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/shonenx_video_player.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
+import 'package:ani_dash/core/services/audio_focus_service.dart';
 
 class LocalPlayerScreen extends ConsumerStatefulWidget {
   final DownloadItem item;
@@ -158,6 +159,8 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
 
   @override
   void dispose() {
+    ref.read(playerStateProvider.notifier).pause();
+    AudioFocusService().reset();
     final state = ref.read(playerStateProvider);
     unawaited(_saveProgress(state.position, state.duration));
     UIHelper.forcePortrait();
@@ -180,6 +183,8 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
           playerState.duration,
           force: true,
         );
+        ref.read(playerStateProvider.notifier).pause();
+        AudioFocusService().reset();
         if (context.mounted) Navigator.pop(context);
         await UIHelper.forcePortrait();
         await UIHelper.exitImmersiveMode();

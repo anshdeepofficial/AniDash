@@ -112,6 +112,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
     _isExiting = true;
     ref.read(playerStateProvider.notifier).pause();
+    ref.read(watchControllerProvider.notifier).cleanup();
     if (context.mounted) {
       Navigator.of(context).pop();
     }
@@ -133,6 +134,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   @override
   void dispose() {
     ref.read(playerStateProvider.notifier).pause();
+    ref.read(watchControllerProvider.notifier).cleanup();
     _resetSystemUI();
     _panelController.dispose();
     super.dispose();
