@@ -6,14 +6,18 @@ import 'package:ani_dash/core/utils/app_logger.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
+  final prefs = await SharedPreferences.getInstance();
   if (response.actionId == 'update_remind_1h') {
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(
       'remind_update_after',
       DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
     );
+  } else if (response.actionId == 'update_skip_day') {
+    await prefs.setInt(
+      'remind_update_after',
+      DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+    );
   } else if (response.actionId == 'update_skip') {
-    final prefs = await SharedPreferences.getInstance();
     final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
     if (version.isNotEmpty) {
       await prefs.setString('skipped_update_version', version);
@@ -34,6 +38,10 @@ class NotificationService {
   final StreamController<String> playbackActionController =
       StreamController<String>.broadcast();
   Stream<String> get onPlaybackAction => playbackActionController.stream;
+
+  final StreamController<String> updateTapController =
+      StreamController<String>.broadcast();
+  Stream<String> get onUpdateTapped => updateTapController.stream;
 
   static const String _iconName = '@drawable/ic_notification';
   static const String _largeIconName = '@mipmap/ic_launcher';
@@ -63,18 +71,26 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        final prefs = await SharedPreferences.getInstance();
         if (response.actionId == 'update_remind_1h') {
-          final prefs = await SharedPreferences.getInstance();
           await prefs.setInt(
             'remind_update_after',
             DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
           );
+        } else if (response.actionId == 'update_skip_day') {
+          await prefs.setInt(
+            'remind_update_after',
+            DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+          );
         } else if (response.actionId == 'update_skip') {
-          final prefs = await SharedPreferences.getInstance();
           final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
           if (version.isNotEmpty) {
             await prefs.setString('skipped_update_version', version);
           }
+        } else if (response.payload?.startsWith('update:') == true && response.actionId == null) {
+          _instance.updateTapController.add(
+            response.payload!.replaceFirst('update:', '').trim(),
+          );
         } else if (response.actionId != null) {
           _instance.playbackActionController.add(response.actionId!);
         }
@@ -341,13 +357,19 @@ class NotificationService {
         actions: const <AndroidNotificationAction>[
           AndroidNotificationAction(
             'update_remind_1h',
-            'Remind in 1 hour',
+            'Remind in 1h',
+            cancelNotification: true,
+            showsUserInterface: false,
+          ),
+          AndroidNotificationAction(
+            'update_skip_day',
+            'Skip for today',
             cancelNotification: true,
             showsUserInterface: false,
           ),
           AndroidNotificationAction(
             'update_skip',
-            'Skip',
+            'Skip this update',
             cancelNotification: true,
             showsUserInterface: false,
           ),

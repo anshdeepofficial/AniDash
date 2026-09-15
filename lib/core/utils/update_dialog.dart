@@ -431,8 +431,8 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.snooze_rounded, size: 16),
-                            label: const Text('Remind in 1h'),
+                            icon: const Icon(Icons.snooze_rounded, size: 14),
+                            label: const Text('Remind 1h', style: TextStyle(fontSize: 12)),
                             onPressed: () async {
                               final prefs =
                                   await SharedPreferences.getInstance();
@@ -445,18 +445,42 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                               if (context.mounted) Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.close_rounded, size: 16),
-                            label: const Text('Skip'),
+                            icon: const Icon(Icons.today_rounded, size: 14),
+                            label: const Text('Skip today', style: TextStyle(fontSize: 12)),
+                            onPressed: () async {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.setInt(
+                                'remind_update_after',
+                                DateTime.now()
+                                    .add(const Duration(hours: 24))
+                                    .millisecondsSinceEpoch,
+                              );
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.close_rounded, size: 14),
+                            label: const Text('Skip update', style: TextStyle(fontSize: 12)),
                             onPressed: () async {
                               final prefs =
                                   await SharedPreferences.getInstance();
@@ -470,7 +494,7 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                               if (context.mounted) Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),

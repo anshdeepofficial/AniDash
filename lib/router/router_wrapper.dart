@@ -13,9 +13,12 @@ import 'package:ani_dash/features/loading/view_model/initialization_notifier.dar
 import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
 import 'package:ani_dash/features/manga/view/manga_screen.dart';
 import 'package:ani_dash/core/services/offline_sync_queue_service.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
+import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NavItem {
   final String path;
@@ -65,6 +68,8 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   bool _updateCheckInProgress = false;
   DateTime? _lastForegroundUpdateCheck;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _foregroundUpdateTimer;
+  StreamSubscription<String>? _updateTapSubscription;
 
   @override
   void initState() {
@@ -82,15 +87,24 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         OfflineSyncQueueService.flushQueue(ref);
       }
     });
+    _updateTapSubscription =
+        NotificationService().onUpdateTapped.listen((version) {
+      if (mounted) {
+        checkForUpdates(context, isManual: true);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openDownloadsOffline();
       _checkForScheduledUpdate();
+      _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);
     });
   }
 
   @override
   void dispose() {
+    _foregroundUpdateTimer?.cancel();
+    _updateTapSubscription?.cancel();
     _connectivitySubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
@@ -101,8 +115,21 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkForScheduledUpdate();
+      _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);
+    } else if (state == AppLifecycleState.paused) {
+      _foregroundUpdateTimer?.cancel();
     }
+  }
+
+  void _startPeriodicForegroundUpdateCheck() {
+    _foregroundUpdateTimer?.cancel();
+    final settings = ref.read(updateSettingsProvider);
+    if (!settings.autoCheckEnabled) return;
+    final minutes = settings.checkIntervalMinutes.clamp(1, 60);
+    _foregroundUpdateTimer = Timer.periodic(Duration(minutes: minutes), (_) {
+      _checkForScheduledUpdate();
+    });
   }
 
   Future<void> _checkForScheduledUpdate() async {
@@ -117,11 +144,28 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         now.difference(_lastForegroundUpdateCheck!).inMinutes < 1) {
       return;
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    final remindAfter = prefs.getInt('remind_update_after') ?? 0;
+    if (now.millisecondsSinceEpoch < remindAfter) return;
+
+    final skippedVersion = prefs.getString('skipped_update_version');
+
     _updateCheckInProgress = true;
     _lastForegroundUpdateCheck = now;
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) await checkForUpdates(context);
-    _updateCheckInProgress = false;
+    try {
+      final updateInfo = await UpdateService().checkForUpdate();
+      if (updateInfo != null && mounted) {
+        final latest = updateInfo.version.replaceFirst('v', '').trim();
+        if (skippedVersion == latest) return;
+
+        // Post to the notification bar with the action buttons!
+        await NotificationService().showUpdateAvailableNotification(latest);
+      }
+    } catch (_) {
+    } finally {
+      _updateCheckInProgress = false;
+    }
   }
 
   Future<void> _openDownloadsOffline() async {
@@ -156,6 +200,16 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(updateSettingsProvider, (previous, next) {
+      if (previous?.checkIntervalMinutes != next.checkIntervalMinutes ||
+          previous?.autoCheckEnabled != next.autoCheckEnabled ||
+          previous?.fullDay != next.fullDay ||
+          previous?.startHour != next.startHour ||
+          previous?.endHour != next.endHour) {
+        _startPeriodicForegroundUpdateCheck();
+      }
+    });
+
     final isWide = MediaQuery.sizeOf(context).width > 800;
 
     return PopScope(

@@ -40,7 +40,7 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
 
     final preferences = await SharedPreferences.getInstance();
 
-    // Check if user snoozed ("Remind in 1 hour")
+    // Check if user snoozed ("Remind in 1 hour" or "Skip for today")
     final remindAfter = preferences.getInt('remind_update_after') ?? 0;
     if (now.millisecondsSinceEpoch < remindAfter) return true;
 
@@ -55,23 +55,25 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     );
     if (response.statusCode != 200) return false;
     final release = jsonDecode(response.body) as Map<String, dynamic>;
-    final latest = (release['tag_name'] as String? ?? '').replaceFirst('v', '');
-    final current = (await PackageInfo.fromPlatform()).version;
+    final latest = (release['tag_name'] as String? ?? '').replaceFirst('v', '').trim();
+    String current;
+    try {
+      current = (await PackageInfo.fromPlatform()).version;
+    } catch (_) {
+      current = preferences.getString('app_version') ?? '1.0.0';
+    }
     if (!_newer(latest, current)) return true;
 
-    // Check if user clicked "Skip" for this release
+    // Check if user clicked "Skip this update" for this release
     final skippedVersion = preferences.getString('skipped_update_version');
     if (skippedVersion == latest) return true;
-
-    if (preferences.getString('last_notified_update') == latest && remindAfter == 0) {
-      return true;
-    }
 
     final notifications = NotificationService();
     await notifications.initialize();
     await notifications.showUpdateAvailableNotification(latest);
     await preferences.setString('last_notified_update', latest);
-    if (remindAfter != 0) {
+    await preferences.setInt('last_notified_update_time', now.millisecondsSinceEpoch);
+    if (remindAfter != 0 && now.millisecondsSinceEpoch >= remindAfter) {
       await preferences.remove('remind_update_after');
     }
     return true;
@@ -81,24 +83,49 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
 }
 
 bool _newer(String latest, String current) {
-  final left =
+  final cleanLatest =
       latest
+          .replaceAll(RegExp(r'^v'), '')
+          .split('+')
+          .first
           .split('-')
           .first
-          .split('.')
-          .map((e) => int.tryParse(e) ?? 0)
-          .toList();
-  final right =
+          .trim();
+  final cleanCurrent =
       current
+          .replaceAll(RegExp(r'^v'), '')
+          .split('+')
+          .first
           .split('-')
           .first
-          .split('.')
-          .map((e) => int.tryParse(e) ?? 0)
-          .toList();
+          .trim();
+
+  final left =
+      cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  final right =
+      cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  while (left.length < 3) {
+    left.add(0);
+  }
+  while (right.length < 3) {
+    right.add(0);
+  }
+
   for (var i = 0; i < 3; i++) {
-    final l = i < left.length ? left[i] : 0;
-    final r = i < right.length ? right[i] : 0;
-    if (l != r) return l > r;
+    if (left[i] > right[i]) return true;
+    if (left[i] < right[i]) return false;
+  }
+
+  int getBuild(String s) {
+    if (s.contains('+')) return int.tryParse(s.split('+').last) ?? 0;
+    if (s.contains('-')) return int.tryParse(s.split('-').last) ?? 0;
+    return 0;
+  }
+
+  final lBuild = getBuild(latest);
+  final cBuild = getBuild(current);
+  if (lBuild > 0 && cBuild > 0) {
+    return lBuild > cBuild;
   }
   return false;
 }

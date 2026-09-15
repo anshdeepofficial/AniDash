@@ -66,15 +66,38 @@ class UpdateService {
   }
 
   bool _isNewerVersion(String current, String latest) {
-    final currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final cleanCurrent = current.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
+    final cleanLatest = latest.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
+
+    final currentParts = cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final latestParts = cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+
+    while (currentParts.length < 3) {
+      currentParts.add(0);
+    }
+    while (latestParts.length < 3) {
+      latestParts.add(0);
+    }
 
     for (int i = 0; i < 3; i++) {
-      final c = i < currentParts.length ? currentParts[i] : 0;
-      final l = i < latestParts.length ? latestParts[i] : 0;
+      final c = currentParts[i];
+      final l = latestParts[i];
       if (l > c) return true;
       if (l < c) return false;
     }
+
+    int getBuild(String s) {
+      if (s.contains('+')) return int.tryParse(s.split('+').last) ?? 0;
+      if (s.contains('-')) return int.tryParse(s.split('-').last) ?? 0;
+      return 0;
+    }
+
+    final lBuild = getBuild(latest);
+    final cBuild = getBuild(current);
+    if (lBuild > 0 && cBuild > 0) {
+      return lBuild > cBuild;
+    }
+
     return false;
   }
 

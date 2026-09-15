@@ -31,6 +31,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'package:ani_dash/background_handler.dart';
 
+import 'package:package_info_plus/package_info_plus.dart';
 import 'main.dart';
 
 class AppInitializer {
@@ -69,6 +70,10 @@ class AppInitializer {
       sharedPrefs = await SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(),
       );
+      try {
+        final info = await PackageInfo.fromPlatform();
+        await sharedPrefs.setString('app_version', info.version);
+      } catch (_) {}
       AppLogger.success('Shared Preferences initialized');
     } catch (e, st) {
       AppLogger.fail('Shared Preferences initialization failed');
