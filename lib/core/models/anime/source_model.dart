@@ -68,8 +68,10 @@ class Intro {
   Intro({this.start, this.end});
 
   Intro.fromJson(Map<String, dynamic> json) {
-    start = json['start'];
-    end = json['end'];
+    start = (json['start'] as num?)?.toInt() ??
+        int.tryParse(json['start']?.toString() ?? '');
+    end = (json['end'] as num?)?.toInt() ??
+        int.tryParse(json['end']?.toString() ?? '');
   }
 }
 

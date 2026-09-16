@@ -115,7 +115,7 @@ class PlayerUIController extends _$PlayerUIController {
     _seekResetTimer?.cancel();
     state = state.copyWith(isSeekForward: forward, seekAmount: amount);
 
-    _seekResetTimer = Timer(const Duration(milliseconds: 750), () {
+    _seekResetTimer = Timer(const Duration(milliseconds: 1100), () {
       state = state.copyWith(seekAmount: 0);
     });
 

@@ -83,21 +83,20 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
 
     final forward = isRight;
     final isConsecutive = _lastTapTime != null &&
-        now.difference(_lastTapTime!).inMilliseconds < 750 &&
+        now.difference(_lastTapTime!).inMilliseconds < 1200 &&
         _lastTapForward == forward;
 
-    _lastTapTime = now;
-    _lastTapForward = forward;
-
     if (isConsecutive) {
-      // 2nd, 3rd, 4th, 5th tap: Cancel single-tap, accumulate seek!
+      // 2nd, 3rd, 4th, 5th, 6th tap: Cancel pending single-tap and accumulate seek!
       _singleTapTimer?.cancel();
       _singleTapTimer = null;
+      _lastTapTime = now;
+      _lastTapForward = forward;
 
       widget.onDoubleTap(forward);
 
       _multiTapResetTimer?.cancel();
-      _multiTapResetTimer = Timer(const Duration(milliseconds: 750), () {
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 1200), () {
         _resetTapState();
       });
     } else {
@@ -106,7 +105,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       _lastTapTime = now;
       _lastTapForward = forward;
 
-      _singleTapTimer = Timer(const Duration(milliseconds: 230), () {
+      _singleTapTimer = Timer(const Duration(milliseconds: 220), () {
         _resetTapState();
         widget.onTap();
       });

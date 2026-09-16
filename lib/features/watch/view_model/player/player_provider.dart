@@ -148,14 +148,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'demuxer-max-back-bytes': '33554432', // 32MB back cache
       'cache-secs': '120', // 120s stream cache
       'demuxer-readahead-secs': '100', // 100s forward readahead prevents stalls on slow networks
-      'cache-pause': 'yes', // Smoothly pause on mid-stream starvation to accumulate clean frames
+      'cache-pause': 'no', // Play immediately on seek without artificial pause
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'cache-pause-wait': '2', // Wait 2s to accumulate clean keyframe packets during buffer stalls
+      'cache-pause-wait': '0', // No seek delay
       'demuxer-lavf-probesize': '524288', // 512KB probe (instant stream startup)
       'demuxer-lavf-analyzeduration': '0.8', // 0.8s max analyze duration
       'network-timeout': '8',
       'force-seekable': 'yes',
-      'hr-seek': 'yes',
+      'hr-seek': 'default', // Smooth responsive seek: fast keyframe seek over network, exact if in cache
       'hr-seek-framedrop': 'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
       'framedrop': 'vo', // Drop corrupted or late non-keyframes after buffer underruns
       'correct-pts': 'yes',
@@ -357,23 +357,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   Future<void> seek(Duration pos) async {
-    final needsNetwork = pos > state.buffer + const Duration(seconds: 1);
     _pendingSeekTarget = pos;
-    state = state.copyWith(
-      position: pos,
-      isSeeking: needsNetwork,
-    );
-    if (needsNetwork) {
-      _seekTimeout?.cancel();
-      _seekTimeout = Timer(const Duration(seconds: 8), () {
-        _pendingSeekTarget = null;
-        state = state.copyWith(isSeeking: false);
-      });
-    }
+    state = state.copyWith(position: pos);
     try {
       await _player.seek(pos);
-    } finally {
-      if (!needsNetwork) state = state.copyWith(isSeeking: false);
+    } catch (e) {
+      AppLogger.w('Player seek error: $e');
     }
   }
 

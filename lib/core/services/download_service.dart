@@ -8,6 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:path/path.dart' as p;
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/downloads/model/download_item.dart';
@@ -213,7 +214,11 @@ Future<void> _downloadWorker(_TaskConfig task) async {
     if (msg == 'cancel') isCancelled = true;
   });
 
-  final client = http.Client();
+  final ioClient = HttpClient()
+    ..maxConnectionsPerHost = 32
+    ..connectionTimeout = const Duration(seconds: 15)
+    ..idleTimeout = const Duration(seconds: 30);
+  final client = IOClient(ioClient);
   final item = task.item;
   final isM3U8 = item.isM3U8;
 
@@ -382,7 +387,7 @@ Future<DownloadItem> _processM3U8(
 
   // HLS segments are small. Keep enough requests in flight to saturate fast
   // Wi-Fi while capping concurrency to avoid provider throttling.
-  const workerCount = 8;
+  const workerCount = 16;
   int completed = 0;
   int downloadedBytesTotal = 0;
   DateTime lastLog = DateTime.now();
@@ -589,11 +594,11 @@ Future<Uint8List?> _fetch(String url, Map headers, http.Client client) async {
     try {
       final res = await client
           .get(Uri.parse(url), headers: headers.cast())
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) return res.bodyBytes;
     } catch (_) {}
     if (i < 4) {
-      await Future.delayed(Duration(milliseconds: 400 * (i + 1)));
+      await Future.delayed(Duration(milliseconds: 250 * (i + 1)));
     }
   }
   return null;

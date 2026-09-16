@@ -490,6 +490,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           animeTitle: animeName,
           episodeNumber: epNum,
           episodeLength: duration.inSeconds,
+          malId: _malId,
         );
   }
 
@@ -530,16 +531,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         ref.read(playerStateProvider.notifier).seek(end);
         return;
       }
-    }
-
-    // Fallback auto-skip outro if no AniSkip ed was available and video is in the final 85 seconds
-    if (!_hasAutoSkippedOutro &&
-        _dur > 180 &&
-        position >= Duration(seconds: _dur - 85) &&
-        position < Duration(seconds: _dur - 5)) {
-      _hasAutoSkippedOutro = true;
-      ref.read(playerStateProvider.notifier).seek(Duration(seconds: _dur - 1));
-      return;
     }
   }
 }

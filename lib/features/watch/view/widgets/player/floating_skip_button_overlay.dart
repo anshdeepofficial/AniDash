@@ -106,30 +106,6 @@ class _FloatingSkipButtonOverlayState
           ref.read(playerUIControllerProvider.notifier).restartHideTimer();
         };
       }
-    } else if (settings.showManualSkip) {
-      final skipSec = settings.manualSkipDuration;
-      // 1. Intro window: First 90 seconds (standard anime OP length)
-      if (pos.inSeconds <= 90 && !_introDismissed) {
-        label = 'Skip Intro (+${skipSec}s)';
-        onSkip = () {
-          setState(() => _introDismissed = true);
-          final target = pos + Duration(seconds: skipSec);
-          ref.read(playerStateProvider.notifier).seek(target);
-          ref.read(playerUIControllerProvider.notifier).restartHideTimer();
-        };
-      }
-      // 2. Outro window: Last 85 seconds of episode (standard anime ED window)
-      else if (dur.inSeconds > 180 &&
-          pos >= dur - const Duration(seconds: 85) &&
-          !_outroDismissed) {
-        label = 'Skip Outro (+${skipSec}s)';
-        onSkip = () {
-          setState(() => _outroDismissed = true);
-          final target = pos + Duration(seconds: skipSec);
-          ref.read(playerStateProvider.notifier).seek(target);
-          ref.read(playerUIControllerProvider.notifier).restartHideTimer();
-        };
-      }
     }
 
     if (label == null || onSkip == null) {

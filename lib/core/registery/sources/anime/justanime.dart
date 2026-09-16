@@ -341,8 +341,8 @@ class JustAnimeProvider extends AnimeProvider {
         sources: sources,
         tracks: tracks,
         headers: commonHeaders,
-        intro: intro ?? Intro(start: 0, end: 0),
-        outro: outro ?? Intro(start: 0, end: 0),
+        intro: intro,
+        outro: outro,
       );
     }
 

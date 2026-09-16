@@ -29,7 +29,7 @@ class AniSkipNotifier extends _$AniSkipNotifier {
     required int episodeLength,
     int? malId,
   }) async {
-    state = [];
+    final existingItems = List<AniSkipResultItem>.from(state);
 
     try {
       final cacheKey = animeTitle.trim().toLowerCase();
@@ -127,9 +127,9 @@ class AniSkipNotifier extends _$AniSkipNotifier {
           episodeNumber,
           episodeLength,
         );
-        // Merge AniSkip results with any existing source fallback (e.g. outro from source)
+        // Merge AniSkip results with any existing source fallback (e.g. intro/outro from source)
         final merged = List<AniSkipResultItem>.from(results);
-        for (final existing in state) {
+        for (final existing in existingItems) {
           final alreadyHasType = merged.any(
             (m) =>
                 m.skipType == existing.skipType ||

@@ -323,26 +323,23 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     }
     _tapSeekTarget = target;
 
-    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s...)
+    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s, 50s...)
     ref
         .read(playerUIControllerProvider.notifier)
         .showSeekIndicator(forward, _accumulatedSeekSeconds);
 
-    // Debounce seek commit: 650ms after the LAST tap commits the final accumulated jump
+    // Fast seek commit: 260ms after the LAST tap commits the final accumulated jump
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 650), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 260), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);
       }
-      _tapSeekTarget = null;
-      _tapSeekBasePosition = null;
-      _tapSeekForward = null;
-      _accumulatedSeekSeconds = 0;
     });
 
+    // Reset sequence only after 1200ms of inactivity
     _tapSeekResetTimer?.cancel();
-    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1000), () {
+    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1200), () {
       _tapSeekTarget = null;
       _tapSeekBasePosition = null;
       _tapSeekForward = null;
