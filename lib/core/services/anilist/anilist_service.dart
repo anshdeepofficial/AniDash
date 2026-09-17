@@ -147,7 +147,8 @@ class AnilistService implements AnimeRepository, TrackerService {
   }) async {
     try {
       final auth = _getAuthContext();
-      if (auth == null || !_validStatuses.contains(status)) {
+      final normalizedStatus = status.toUpperCase();
+      if (auth == null || !_validStatuses.contains(normalizedStatus)) {
         return UniversalPageResponse(
           pageInfo: UniversalPageInfo(
             total: 0,
@@ -168,7 +169,7 @@ class AnilistService implements AnimeRepository, TrackerService {
           'perPage': perPage,
           'userId': auth.userId,
           'type': type,
-          'status': status,
+          'status': normalizedStatus,
         },
         operationName: 'GetUserAnimeList',
       );

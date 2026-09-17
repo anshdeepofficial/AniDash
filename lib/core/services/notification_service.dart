@@ -44,10 +44,10 @@ class NotificationService {
   Stream<String> get onUpdateTapped => updateTapController.stream;
 
   static const String _iconName = '@drawable/ic_notification';
-  static const String _largeIconName = '@mipmap/ic_launcher';
+  static const String _largeIconName = '@drawable/ic_notification_large';
   static const Color _brandColor = Color(0xFF4CAF50);
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool isBackground = false}) async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings(_iconName);
 
@@ -100,11 +100,13 @@ class NotificationService {
     );
 
     await _createNotificationChannels();
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.requestNotificationsPermission();
+    if (!isBackground) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestNotificationsPermission();
+    }
   }
 
   Future<void> _createNotificationChannels() async {
@@ -353,6 +355,11 @@ class NotificationService {
         priority: Priority.high,
         icon: _iconName,
         largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
+        styleInformation: const BigTextStyleInformation(
+          'A new version has been released on GitHub. Tap to update or snooze.',
+          contentTitle: 'AniDash Update Available',
+          summaryText: 'New version available',
+        ),
         color: _brandColor,
         actions: const <AndroidNotificationAction>[
           AndroidNotificationAction(

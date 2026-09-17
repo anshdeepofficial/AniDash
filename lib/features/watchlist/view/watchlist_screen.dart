@@ -10,6 +10,7 @@ import 'package:ani_dash/features/watchlist/view/widget/watchlist_states_widgets
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/features/watchlist/view_model/library_tabs_notifier.dart';
 import 'package:ani_dash/helpers/navigation.dart';
+import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
@@ -57,13 +58,42 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
   @override
   void initState() {
     super.initState();
+    _init();
   }
 
-  void _syncController(List<String> statuses) {
-    if (_controller != null && listEquals(_statuses, statuses)) return;
+  Future<void> _init() async {
+    final repo = ref.read(animeRepositoryProvider);
+    final baseStatuses = await repo.getSupportedStatuses();
+    final allStatuses = [...baseStatuses, 'favorites'];
+
+    await ref
+        .read(libraryTabsProvider.notifier)
+        .setAvailableStatuses(allStatuses);
+
+    final visible = ref.read(libraryTabsProvider).visibleStatuses;
+    _statuses = visible.isNotEmpty ? visible : List<String>.from(allStatuses);
+
+    _controller = TabController(length: _statuses.length, vsync: this)
+      ..addListener(() {
+        if (_controller != null && _controller!.index != _index) {
+          // Clear selection when changing tabs
+          ref.read(watchlistSelectionProvider.notifier).clear();
+          _index = _controller!.index;
+          _fetch(_index);
+        }
+      });
+
+    if (mounted) {
+      setState(() {});
+      _fetch(0);
+    }
+  }
+
+  void _applyVisibleStatuses(List<String> visible) {
+    if (visible.isEmpty || listEquals(_statuses, visible)) return;
     final prevIndex = _index;
     _controller?.dispose();
-    _statuses = List<String>.from(statuses);
+    _statuses = List<String>.from(visible);
     final newIndex = prevIndex >= _statuses.length
         ? (_statuses.length - 1).clamp(0, _statuses.length - 1)
         : prevIndex;
@@ -80,6 +110,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
           _fetch(_index);
         }
       });
+    setState(() {});
     _fetch(_index);
   }
 
@@ -166,10 +197,12 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
 
   @override
   Widget build(BuildContext context) {
-    final visibleStatuses = ref.watch(libraryTabsProvider).visibleStatuses;
-    if (_controller == null || !listEquals(_statuses, visibleStatuses)) {
-      _syncController(visibleStatuses);
-    }
+    ref.listen<LibraryTabsState>(libraryTabsProvider, (prev, next) {
+      if (prev != null &&
+          !listEquals(prev.visibleStatuses, next.visibleStatuses)) {
+        _applyVisibleStatuses(next.visibleStatuses);
+      }
+    });
 
     if (_controller == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -235,7 +268,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
   void _showCustomizeTabsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -246,8 +281,12 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
             final tabsState = ref.watch(libraryTabsProvider);
             final notifier = ref.read(libraryTabsProvider.notifier);
             final theme = Theme.of(context);
+            final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-            return SafeArea(
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.75,
+              ),
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -290,9 +329,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Flexible(
+                    Expanded(
                       child: ReorderableListView.builder(
-                        shrinkWrap: true,
+                        padding: EdgeInsets.only(bottom: bottomPadding + 32),
                         itemCount: tabsState.allTabs.length,
                         onReorder: (oldIdx, newIdx) =>
                             notifier.reorder(oldIdx, newIdx),

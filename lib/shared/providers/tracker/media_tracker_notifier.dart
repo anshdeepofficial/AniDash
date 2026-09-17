@@ -110,10 +110,33 @@ class MediaTracker extends _$MediaTracker {
 
           try {
             UniversalMediaListEntry? entry;
+            final auth = ref.read(authProvider);
             if (binding.type == TrackerType.anilist) {
-              entry = await ref.read(anilistServiceProvider).getAnimeEntry(id);
+              final anilist = ref.read(anilistServiceProvider);
+              entry = await anilist.getAnimeEntry(id);
+              if (entry == null && auth.isAniListAuthenticated) {
+                try {
+                  entry = await anilist.updateUserAnimeList(
+                    mediaId: id,
+                    status: 'CURRENT',
+                  );
+                } catch (e) {
+                  AppLogger.e('Auto-track CURRENT failed for AniList $id', e);
+                }
+              }
             } else if (binding.type == TrackerType.mal) {
-              entry = await ref.read(malServiceProvider).getAnimeEntry(id);
+              final mal = ref.read(malServiceProvider);
+              entry = await mal.getAnimeEntry(id);
+              if (entry == null && auth.isMalAuthenticated) {
+                try {
+                  entry = await mal.updateUserAnimeList(
+                    mediaId: id,
+                    status: 'CURRENT',
+                  );
+                } catch (e) {
+                  AppLogger.e('Auto-track CURRENT failed for MAL $id', e);
+                }
+              }
             }
             if (entry != null) entries[binding.type] = entry;
           } catch (e) {
@@ -232,15 +255,17 @@ class MediaTracker extends _$MediaTracker {
               isPrivate: isPrivate,
             )
             .then((value) {
-              state.entries[binding.type] = state.entries[binding.type]!
-                  .copyWith(
-                    status: status,
-                    progress: progress,
-                    score: score,
-                    repeat: repeat,
-                    notes: notes,
-                    isPrivate: isPrivate,
-                  );
+              final current = state.entries[binding.type];
+              if (current != null) {
+                state.entries[binding.type] = current.copyWith(
+                  status: status,
+                  progress: progress,
+                  score: score,
+                  repeat: repeat,
+                  notes: notes,
+                  isPrivate: isPrivate,
+                );
+              }
             })
             .catchError((e) {
               AppLogger.e(
@@ -290,12 +315,64 @@ class MediaTracker extends _$MediaTracker {
           progress: progress,
           score: score,
         );
+      } else {
+        final id = int.tryParse(binding.remoteId!);
+        if (id != null) {
+          if (type == TrackerType.anilist) {
+            final fetched = await ref.read(anilistServiceProvider).getAnimeEntry(id);
+            if (fetched != null) updatedEntries[type] = fetched;
+          } else if (type == TrackerType.mal) {
+            final fetched = await ref.read(malServiceProvider).getAnimeEntry(id);
+            if (fetched != null) updatedEntries[type] = fetched;
+          }
+        }
       }
 
       state = currentState.copyWith(isLoading: false, entries: updatedEntries);
     } catch (e) {
       state = currentState.copyWith(isLoading: false);
       throw Exception('Failed to sync ${type.name}: $e');
+    }
+  }
+
+  Future<void> trackAsCurrent(TrackerType type) async {
+    final currentState = state;
+    state = currentState.copyWith(isLoading: true);
+    try {
+      var binding = currentState.bindings.firstWhereOrNull((b) => b.type == type);
+      if (binding == null) {
+        final id = int.tryParse(mediaId);
+        if (id != null) {
+          await addTrackerBinding(type, mediaId);
+          return;
+        }
+      } else if (binding.remoteId != null) {
+        final id = int.tryParse(binding.remoteId!);
+        if (id != null) {
+          UniversalMediaListEntry? newEntry;
+          if (type == TrackerType.anilist) {
+            newEntry = await ref.read(anilistServiceProvider).updateUserAnimeList(
+              mediaId: id,
+              status: 'CURRENT',
+            );
+          } else if (type == TrackerType.mal) {
+            newEntry = await ref.read(malServiceProvider).updateUserAnimeList(
+              mediaId: id,
+              status: 'CURRENT',
+            );
+          }
+          final updatedEntries = Map<TrackerType, UniversalMediaListEntry>.from(state.entries);
+          if (newEntry != null) {
+            updatedEntries[type] = newEntry;
+          }
+          state = state.copyWith(isLoading: false, entries: updatedEntries);
+          return;
+        }
+      }
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      AppLogger.e('Failed to track as current', e);
     }
   }
 

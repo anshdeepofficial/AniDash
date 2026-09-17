@@ -161,6 +161,11 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
         // Post to the notification bar with the action buttons!
         await NotificationService().showUpdateAvailableNotification(latest);
+
+        // Also trigger the in-app update dialog so the user sees it immediately
+        if (mounted) {
+          checkForUpdates(context, isManual: false);
+        }
       }
     } catch (_) {
     } finally {

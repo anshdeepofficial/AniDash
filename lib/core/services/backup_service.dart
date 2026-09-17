@@ -102,7 +102,7 @@ class BackupService {
           await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'AniDash Backup'));
         }
       } else {
-        final result = await FilePicker.platform.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Save Backup',
           fileName: fileName,
           type: FileType.custom,
@@ -123,7 +123,7 @@ class BackupService {
 
   Future<void> importData() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );

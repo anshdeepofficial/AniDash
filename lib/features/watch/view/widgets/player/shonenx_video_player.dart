@@ -328,9 +328,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         .read(playerUIControllerProvider.notifier)
         .showSeekIndicator(forward, _accumulatedSeekSeconds);
 
-    // Fast seek commit: 260ms after the LAST tap commits the final accumulated jump
+    // Smooth seek commit: 380ms after the LAST tap commits the final accumulated jump
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 260), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 380), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);
@@ -478,7 +478,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   Future<void> _pickLocalSubtitle() async {
     final notifier = ref.read(episodeDataProvider.notifier);
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['srt', 'vtt', 'ass', 'ssa'],
       );

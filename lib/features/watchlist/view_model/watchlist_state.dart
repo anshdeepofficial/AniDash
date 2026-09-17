@@ -19,8 +19,15 @@ class WatchListState {
     this.isLocal = false,
   });
 
-  List<UniversalMediaListEntry> listFor(String status) =>
-      lists[status] ?? const [];
+  List<UniversalMediaListEntry> listFor(String status) {
+    if (lists.containsKey(status)) return lists[status]!;
+    for (final entry in lists.entries) {
+      if (entry.key.toLowerCase() == status.toLowerCase()) {
+        return entry.value;
+      }
+    }
+    return const [];
+  }
 
   bool isFavorite(String id) => favorites.any((m) => m.id == id);
 

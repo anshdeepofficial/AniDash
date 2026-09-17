@@ -192,16 +192,49 @@ class _TrackerListItem extends ConsumerWidget {
                       children: [
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            title.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
+                          child: InkWell(
+                            onTap: () {
+                              if (entry == null) {
+                                ref
+                                    .read(mediaTrackerProvider(anime.id).notifier)
+                                    .trackAsCurrent(type);
+                              } else {
+                                updateStatus();
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    title.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  if (entry == null)
+                                    Text(
+                                      'Tap to add to Watching (Current)',
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.more_vert),
+                          tooltip: 'Change / Rebind Anime',
                           onPressed: () => editBinding(),
                         ),
                       ],
@@ -225,6 +258,38 @@ class _TrackerListItem extends ConsumerWidget {
             ),
           ],
         ),
+        if (isBound && entry == null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Track this anime on ${type.name.toUpperCase()}',
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    ref
+                        .read(mediaTrackerProvider(anime.id).notifier)
+                        .trackAsCurrent(type);
+                  },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add to Watching'),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (isBound && entry != null) ...[
           const SizedBox(height: 12),
           Container(

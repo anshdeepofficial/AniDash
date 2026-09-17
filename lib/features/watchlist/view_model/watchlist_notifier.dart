@@ -239,12 +239,15 @@ class WatchlistNotifier extends Notifier<WatchListState> {
         return TrackStatus.completed;
       case 'on_hold':
       case 'onhold':
+      case 'paused':
         return TrackStatus.onHold;
       case 'dropped':
         return TrackStatus.dropped;
       case 'plan_to_watch':
       case 'planning':
         return TrackStatus.planToWatch;
+      case 'repeating':
+        return TrackStatus.watching;
       default:
         return null;
     }

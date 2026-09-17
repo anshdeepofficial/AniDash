@@ -14,7 +14,7 @@ import 'package:workmanager/workmanager.dart';
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     if (task == updateCheckTask) {
-      return _checkForAppUpdate(inputData);
+      return await _checkForAppUpdate(inputData);
     }
     if (task == "sync_tracking_task") {
       return await SyncTrackingTask.performSync(inputData);
@@ -69,7 +69,7 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     if (skippedVersion == latest) return true;
 
     final notifications = NotificationService();
-    await notifications.initialize();
+    await notifications.initialize(isBackground: true);
     await notifications.showUpdateAvailableNotification(latest);
     await preferences.setString('last_notified_update', latest);
     await preferences.setInt('last_notified_update_time', now.millisecondsSinceEpoch);

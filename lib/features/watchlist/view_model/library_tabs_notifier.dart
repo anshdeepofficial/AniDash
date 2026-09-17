@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,49 +37,64 @@ class LibraryTabsState {
   List<String> get visibleStatuses {
     final visible =
         allTabs.where((t) => t.isVisible).map((t) => t.status).toList();
-    if (visible.isEmpty) {
-      return ['current'];
+    if (visible.isEmpty && allTabs.isNotEmpty) {
+      return [allTabs.first.status];
     }
     return visible;
   }
 }
 
-const List<LibraryTabConfig> defaultLibraryTabs = [
-  LibraryTabConfig(status: 'current', isVisible: true),
-  LibraryTabConfig(status: 'completed', isVisible: true),
-  LibraryTabConfig(status: 'paused', isVisible: true),
-  LibraryTabConfig(status: 'dropped', isVisible: true),
-  LibraryTabConfig(status: 'planning', isVisible: true),
-  LibraryTabConfig(status: 'favorites', isVisible: true),
-];
-
 class LibraryTabsNotifier extends Notifier<LibraryTabsState> {
-  static const _prefKey = 'library_custom_tabs_config_v1';
+  static const _prefOrderKey = 'library_custom_tabs_order_v2';
+  static const _prefHiddenKey = 'library_custom_tabs_hidden_v2';
+
+  List<String> _availableStatuses = [];
 
   @override
   LibraryTabsState build() {
-    _loadFromPrefs();
-    return const LibraryTabsState(allTabs: defaultLibraryTabs);
+    return const LibraryTabsState(allTabs: []);
   }
 
-  Future<void> _loadFromPrefs() async {
+  Future<void> setAvailableStatuses(List<String> statuses) async {
+    if (statuses.isEmpty) return;
+    _availableStatuses = List<String>.from(statuses);
+    await _applyConfiguration();
+  }
+
+  Future<void> _applyConfiguration() async {
+    if (_availableStatuses.isEmpty) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_prefKey);
-      if (jsonStr != null) {
-        final List<dynamic> list = jsonDecode(jsonStr);
-        final loadedTabs =
-            list.map((e) => LibraryTabConfig.fromJson(e as Map<String, dynamic>)).toList();
-        final existingStatuses = loadedTabs.map((e) => e.status).toSet();
-        for (final def in defaultLibraryTabs) {
-          if (!existingStatuses.contains(def.status)) {
-            loadedTabs.add(def);
-          }
-        }
-        state = LibraryTabsState(allTabs: loadedTabs);
+      final savedOrder = prefs.getStringList(_prefOrderKey) ?? [];
+      final hiddenList = prefs.getStringList(_prefHiddenKey) ?? [];
+      final hiddenSet = hiddenList.map((s) => s.toLowerCase()).toSet();
+
+      // Sort _availableStatuses according to savedOrder
+      final sorted = List<String>.from(_availableStatuses);
+      if (savedOrder.isNotEmpty) {
+        sorted.sort((a, b) {
+          final aIdx = savedOrder.indexOf(a.toLowerCase());
+          final bIdx = savedOrder.indexOf(b.toLowerCase());
+          if (aIdx == -1 && bIdx == -1) return 0;
+          if (aIdx == -1) return 1;
+          if (bIdx == -1) return -1;
+          return aIdx.compareTo(bIdx);
+        });
       }
+
+      final tabs = sorted.map((s) {
+        final isVis = !hiddenSet.contains(s.toLowerCase());
+        return LibraryTabConfig(status: s, isVisible: isVis);
+      }).toList();
+
+      state = LibraryTabsState(allTabs: tabs);
     } catch (_) {
-      state = const LibraryTabsState(allTabs: defaultLibraryTabs);
+      state = LibraryTabsState(
+        allTabs: _availableStatuses
+            .map((s) => LibraryTabConfig(status: s, isVisible: true))
+            .toList(),
+      );
     }
   }
 
@@ -95,7 +109,7 @@ class LibraryTabsNotifier extends Notifier<LibraryTabsState> {
 
   Future<void> toggleVisibility(String status) async {
     final list = state.allTabs.map((tab) {
-      if (tab.status == status) {
+      if (tab.status.toLowerCase() == status.toLowerCase()) {
         final visibleCount = state.allTabs.where((t) => t.isVisible).length;
         if (tab.isVisible && visibleCount <= 1) return tab;
         return tab.copyWith(isVisible: !tab.isVisible);
@@ -107,15 +121,30 @@ class LibraryTabsNotifier extends Notifier<LibraryTabsState> {
   }
 
   Future<void> resetToDefault() async {
-    state = const LibraryTabsState(allTabs: defaultLibraryTabs);
-    await _saveToPrefs();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefOrderKey);
+      await prefs.remove(_prefHiddenKey);
+    } catch (_) {}
+
+    state = LibraryTabsState(
+      allTabs: _availableStatuses
+          .map((s) => LibraryTabConfig(status: s, isVisible: true))
+          .toList(),
+    );
   }
 
   Future<void> _saveToPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = jsonEncode(state.allTabs.map((e) => e.toJson()).toList());
-      await prefs.setString(_prefKey, jsonStr);
+      final order = state.allTabs.map((t) => t.status.toLowerCase()).toList();
+      final hidden = state.allTabs
+          .where((t) => !t.isVisible)
+          .map((t) => t.status.toLowerCase())
+          .toList();
+
+      await prefs.setStringList(_prefOrderKey, order);
+      await prefs.setStringList(_prefHiddenKey, hidden);
     } catch (_) {}
   }
 }

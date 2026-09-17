@@ -55,7 +55,7 @@ class DownloadSettingsScreen extends ConsumerWidget {
                       settings.customDownloadPath ?? 'Tap to select...',
                   onTap: () async {
                     String? selectedDirectory =
-                        await FilePicker.platform.getDirectoryPath();
+                        await FilePicker.getDirectoryPath();
                     if (selectedDirectory != null) {
                       try {
                         final dir = Directory(selectedDirectory);

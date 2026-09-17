@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.13.3+67
+version: 1.13.4+68
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -17,22 +17,23 @@ dependencies:
   cached_network_image: ^3.4.1
   carousel_slider: ^5.1.1
   collection: ^1.19.1
-  connectivity_plus: ^6.1.5
+  connectivity_plus: ^7.3.1
+  cupertino_icons: ^1.0.8
 
   commentum_client:
     git:
       url: https://github.com/commentum/commentum_flutter.git
-      ref: main
+      ref: b06012da07b50260ba512edf8878184712c21361
       path: ./
 
   dartotsu_extension_bridge:
     path: packages/dartotsu_extension_bridge
 
-  device_info_plus: ^11.2.1
+  device_info_plus: ^12.4.0
   dynamic_color: 1.7.0
   crypto: ^3.0.6
   encrypt: ^5.0.3
-  file_picker: ^10.2.0
+  file_picker: ^11.0.3
   flex_color_picker: any
   flex_color_scheme: any
 
@@ -41,25 +42,21 @@ dependencies:
 
   flutter_highlight: ^0.7.0
   flutter_local_notifications: any
-  flutter_markdown: ^0.7.7+1
+  flutter_markdown_plus: ^1.0.7
   flutter_riverpod: ^3.0.1
 
-  flutter_secure_storage:
-    git:
-      url: https://github.com/juliansteenbakker/flutter_secure_storage.git
-      ref: d33eba29e85271367b15ab77a99b32175bf9a4ff
-      path: flutter_secure_storage
-  flutter_volume_controller: ^1.3.4
-  flutter_web_auth_2: ^4.1.0
+  flutter_secure_storage: ^10.3.4
+  flutter_volume_controller: ^2.0.1
+  flutter_web_auth_2: ^5.1.0
   local_auth: ^2.3.0
 
   go_router: any
-  google_fonts: ^6.2.1
-  graphql: ^5.2.3
+  google_fonts: ^6.3.2
+  graphql: ^5.2.4
   highlight: ^0.7.0
   hive_ce: ^2.16.0
   hive_ce_flutter: ^2.1.0
-  html: ^0.15.5
+  html: ^0.15.7
   http: ^1.4.0
   http_interceptor: ^2.0.0
   iconsax: ^0.0.8
@@ -76,19 +73,19 @@ dependencies:
   media_kit_video: any
   media_kit_libs_video: any
 
-  package_info_plus: ^8.3.0
+  package_info_plus: ^9.0.1
   path: ^1.9.0
   path_provider: ^2.1.5
   permission_handler: ^12.0.0+1
   pseudom: ^1.0.1
   rename: ^3.0.2
   riverpod_annotation: ^3.0.1
-  screen_brightness: ^2.1.7
+  screen_brightness: ^2.1.11
   screenshot: ^3.0.0
-  share_plus: ^11.0.0
+  share_plus: ^12.0.2
   shared_preferences: any
   url_launcher: ^6.3.1
-  window_manager: ^0.5.0
+  window_manager: ^0.5.2
   workmanager: any
   xpath_selector_html_parser: ^3.0.1
   get: ^4.7.2
