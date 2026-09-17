@@ -7,12 +7,14 @@ class DefaultCard extends StatelessWidget {
   final UniversalMedia? anime;
   final String tag;
   final bool isHovered;
+  final int? progress;
 
   const DefaultCard({
     super.key,
     required this.anime,
     required this.tag,
     required this.isHovered,
+    this.progress,
   });
 
   @override
@@ -71,7 +73,10 @@ class DefaultCard extends StatelessWidget {
                   children: [
                     AnimeTitle(anime: anime, maxLines: 2),
                     const SizedBox(height: 4),
-                    Opacity(opacity: 0.9, child: EpisodesInfo(anime: anime)),
+                    Opacity(
+                      opacity: 0.9,
+                      child: EpisodesInfo(anime: anime, progress: progress),
+                    ),
                   ],
                 ),
               ],

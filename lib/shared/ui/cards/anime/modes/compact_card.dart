@@ -7,12 +7,14 @@ class CompactCard extends StatelessWidget {
   final UniversalMedia? anime;
   final String tag;
   final bool isHovered;
+  final int? progress;
 
   const CompactCard({
     super.key,
     required this.anime,
     required this.tag,
     required this.isHovered,
+    this.progress,
   });
 
   @override
@@ -77,27 +79,37 @@ class CompactCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AnimeTitle(anime: anime, maxLines: 2, minimal: true),
-                if (anime?.episodes != null) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.movie_creation_outlined,
-                        size: 10,
-                        color: Colors.white70,
+                Builder(
+                  builder: (context) {
+                    final epText = formatEpisodeText(
+                      anime: anime,
+                      progress: progress,
+                      compact: true,
+                    );
+                    if (epText == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.movie_creation_outlined,
+                            size: 10,
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            epText,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${anime!.episodes} EP',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    );
+                  },
+                ),
               ],
             ),
           ),

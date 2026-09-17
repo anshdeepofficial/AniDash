@@ -110,12 +110,14 @@ enum AnimeCardMode {
     required UniversalMedia? anime,
     required String tag,
     required bool isHovered,
+    int? progress,
   }) {
     return switch (this) {
       AnimeCardMode.defaults => DefaultCard(
         anime: anime,
         tag: tag,
         isHovered: isHovered,
+        progress: progress,
       ),
       AnimeCardMode.minimal => MinimalCard(
         anime: anime,
@@ -126,6 +128,7 @@ enum AnimeCardMode {
         anime: anime,
         tag: tag,
         isHovered: isHovered,
+        progress: progress,
       ),
       AnimeCardMode.coverOnly => CoverOnlyCard(
         anime: anime,
@@ -136,6 +139,7 @@ enum AnimeCardMode {
         anime: anime,
         tag: tag,
         isHovered: isHovered,
+        progress: progress,
       ),
       AnimeCardMode.neon => NeonCard(
         anime: anime,
@@ -151,6 +155,7 @@ enum AnimeCardMode {
         anime: anime,
         tag: tag,
         isHovered: isHovered,
+        progress: progress,
       ),
       AnimeCardMode.polaroid => PolaroidCard(
         anime: anime,

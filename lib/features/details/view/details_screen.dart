@@ -175,11 +175,10 @@ class _WatchFabState extends ConsumerState<_WatchFab> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final progress = ref.watch(
-      watchProgressRepositoryProvider.select(
-        (repo) => repo.getProgress(widget.anime.id.toString()),
-      ),
-    );
+    final animeIdStr = widget.anime.id.toString();
+    final progress =
+        ref.watch(animeWatchProgressProvider(animeIdStr)).asData?.value ??
+        ref.read(watchProgressRepositoryProvider).getProgress(animeIdStr);
 
     return FloatingActionButton.extended(
       heroTag: 'watch_btn',

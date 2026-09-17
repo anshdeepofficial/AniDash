@@ -6,12 +6,14 @@ class ClassicCard extends StatelessWidget {
   final UniversalMedia? anime;
   final String tag;
   final bool isHovered;
+  final int? progress;
 
   const ClassicCard({
     super.key,
     required this.anime,
     required this.tag,
     required this.isHovered,
+    this.progress,
   });
 
   @override
@@ -64,14 +66,23 @@ class ClassicCard extends StatelessWidget {
                     true, // Use minimal style (dark text on light bg / light on dark)
               ),
               const SizedBox(height: 4),
-              if (anime?.episodes != null)
-                Text(
-                  '${anime!.episodes} Episodes',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
-                ),
+              Builder(
+                builder: (context) {
+                  final epText = formatEpisodeText(
+                    anime: anime,
+                    progress: progress,
+                    compact: false,
+                  );
+                  if (epText == null) return const SizedBox.shrink();
+                  return Text(
+                    epText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),

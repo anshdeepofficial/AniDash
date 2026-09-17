@@ -144,20 +144,26 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '67108864', // 64MB max buffer for smooth streaming
-      'demuxer-max-back-bytes': '33554432', // 32MB back cache
-      'cache-secs': '120', // 120s stream cache
-      'demuxer-readahead-secs': '100', // 100s forward readahead prevents stalls on slow networks
-      'cache-pause': 'no', // Play immediately on seek without artificial pause
+      'demuxer-max-bytes': '104857600', // 100MB buffer for reliable offline/travel playback
+      'demuxer-max-back-bytes': '52428800', // 50MB back cache for instant rewinds
+      'cache-secs': '180', // 180s stream cache
+      'demuxer-readahead-secs': '120', // 120s forward readahead prevents stalls during signal drops
+      'cache-pause': 'yes', // Gracefully pause on buffer starvation to keep audio/video in sync
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'cache-pause-wait': '0', // No seek delay
+      'cache-pause-wait': '1', // Resume as soon as 1 second of clean packets arrive
+      'stream-lavf-o':
+          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular tower handovers
+      'network-timeout':
+          '15', // 15s timeout prevents premature disconnects in weak signal areas
       'demuxer-lavf-probesize': '524288', // 512KB probe (instant stream startup)
       'demuxer-lavf-analyzeduration': '0.8', // 0.8s max analyze duration
-      'network-timeout': '8',
       'force-seekable': 'yes',
-      'hr-seek': 'default', // Smooth responsive seek: fast keyframe seek over network, exact if in cache
-      'hr-seek-framedrop': 'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
-      'framedrop': 'vo', // Drop corrupted or late non-keyframes after buffer underruns
+      'hr-seek':
+          'default', // Fast, responsive seek: precise if in cache, instant keyframe if over network
+      'hr-seek-framedrop':
+          'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
+      'framedrop':
+          'vo', // Drop corrupted or late non-keyframes after buffer underruns
       'correct-pts': 'yes',
       'vd-lavc-show-all': 'no', // Never display corrupted/incomplete frames
       'video-sync': 'audio',

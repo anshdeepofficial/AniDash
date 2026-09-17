@@ -164,6 +164,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     await repo.saveProgress(updatedEntry);
 
+    if (watched && _selectedEpisodes.isNotEmpty) {
+      final maxEp = _selectedEpisodes.reduce((a, b) => a > b ? a : b);
+      ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
+            mediaId: widget.mediaId,
+            episodeNum: maxEp,
+          );
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -381,6 +389,31 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final totalEpisodes = episodes.length;
 
+    EpisodeDataModel? continueEpisode;
+    EpisodeProgress? continueEpProgress;
+    final watchProgress =
+        ref.watch(animeWatchProgressProvider(widget.mediaId)).asData?.value ??
+        ref.read(watchProgressRepositoryProvider).getProgress(widget.mediaId);
+
+    if (episodes.isNotEmpty && watchProgress != null) {
+      final currentEpNum = watchProgress.currentEpisode;
+      final currentProgress = watchProgress.episodesProgress[currentEpNum];
+      if (currentProgress != null &&
+          !currentProgress.isCompleted &&
+          (currentProgress.progressInSeconds ?? 0) > 0) {
+        continueEpisode =
+            episodes.firstWhereOrNull((e) => e.number == currentEpNum);
+        continueEpProgress = currentProgress;
+      } else {
+        final nextEpNum = currentEpNum + 1;
+        continueEpisode =
+            episodes.firstWhereOrNull((e) => e.number == nextEpNum) ??
+            episodes.firstWhereOrNull((e) => e.number == currentEpNum);
+        continueEpProgress =
+            watchProgress.episodesProgress[continueEpisode?.number];
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: () async => await notifier.refresh(),
       child: CustomScrollView(
@@ -441,6 +474,17 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               ),
             ),
           ),
+
+          if (continueEpisode != null && !loading && episodes.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _buildContinueWatchingBanner(
+                context,
+                continueEpisode,
+                continueEpProgress,
+                episodes,
+                state.animeIdForSource ?? '',
+              ),
+            ),
 
           if (state.isSearchingMatch)
             const SliverFillRemaining(
@@ -1661,6 +1705,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       animeFormat: widget.mediaFormat,
                       upToEpisodeNumber: epNum,
                     );
+                    ref
+                        .read(watchSyncProvider.notifier)
+                        .handleTrackingUpdate(
+                          mediaId: widget.mediaId,
+                          episodeNum: epNum,
+                        );
                     if (sheetContext.mounted) {
                       Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1707,6 +1757,178 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
         );
       },
     );
+  }
+
+  Widget _buildContinueWatchingBanner(
+    BuildContext context,
+    EpisodeDataModel ep,
+    EpisodeProgress? progress,
+    List<EpisodeDataModel> allEpisodes,
+    String animeIdForSource,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final epNum = ep.number ?? 1;
+    final watchedSeconds = progress?.progressInSeconds ?? 0;
+    final totalSeconds = progress?.durationInSeconds ?? 0;
+    final inProgress = progress != null &&
+        !progress.isCompleted &&
+        watchedSeconds > 0 &&
+        totalSeconds > 0;
+    final progressFraction = inProgress
+        ? (watchedSeconds / totalSeconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    final resumeText = inProgress
+        ? 'Resume at ${_formatDuration(watchedSeconds)}'
+        : (progress?.isCompleted == true ? 'Completed' : 'Next to play');
+
+    final thumbUrl =
+        ep.thumbnail?.isNotEmpty == true ? ep.thumbnail! : widget.mediaCover;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Material(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _navigateToWatch(ep, allEpisodes, animeIdForSource),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 105,
+                    height: 64,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: thumbUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: colorScheme.surfaceContainer,
+                            child: Icon(
+                              Icons.movie_outlined,
+                              color: theme.hintColor,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          color: Colors.black38,
+                          child: const Center(
+                            child: Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                        if (inProgress)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: LinearProgressIndicator(
+                              value: progressFraction,
+                              minHeight: 3.5,
+                              backgroundColor: Colors.black54,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              inProgress ? 'CONTINUE' : 'NEXT UP',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 9.5,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'EP $epNum',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        ep.title?.isNotEmpty == true
+                            ? ep.title!
+                            : 'Episode $epNum',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        resumeText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  onPressed:
+                      () => _navigateToWatch(ep, allEpisodes, animeIdForSource),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 

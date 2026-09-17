@@ -3,16 +3,66 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 
+String? formatEpisodeText({
+  required UniversalMedia? anime,
+  int? progress,
+  bool compact = false,
+  bool uppercase = false,
+}) {
+  final totalEpisodes = anime?.episodes;
+  final hasTotal = totalEpisodes != null && totalEpisodes > 0;
+  final currentProgress = progress;
+
+  if (currentProgress != null && currentProgress > 0) {
+    if (hasTotal) {
+      return compact
+          ? 'EP $currentProgress/$totalEpisodes'
+          : 'EP $currentProgress / $totalEpisodes';
+    } else {
+      return 'EP $currentProgress';
+    }
+  } else if (hasTotal) {
+    if (compact) {
+      return uppercase ? '$totalEpisodes EPS' : '${totalEpisodes}ep';
+    } else {
+      return '$totalEpisodes Episodes';
+    }
+  } else {
+    final nextEp = anime?.nextAiringEpisode?.episode;
+    if (nextEp != null && nextEp > 1) {
+      final releasedEp = nextEp - 1;
+      if (compact) {
+        return uppercase ? '$releasedEp+ EPS' : '$releasedEp+ ep';
+      } else {
+        return '$releasedEp+ Episodes';
+      }
+    }
+  }
+  return null;
+}
+
 class EpisodesInfo extends StatelessWidget {
   final UniversalMedia? anime;
   final bool compact;
+  final int? progress;
 
-  const EpisodesInfo({super.key, required this.anime, this.compact = false});
+  const EpisodesInfo({
+    super.key,
+    required this.anime,
+    this.compact = false,
+    this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (anime?.episodes == null || anime!.episodes == 0) {
+    final text = formatEpisodeText(
+      anime: anime,
+      progress: progress,
+      compact: compact,
+    );
+
+    if (text == null) {
       return const SizedBox.shrink();
     }
 
@@ -25,7 +75,7 @@ class EpisodesInfo extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          compact ? '${anime!.episodes}ep' : '${anime!.episodes} episodes',
+          text,
           style: theme.textTheme.labelSmall?.copyWith(
             color: Colors.white.withValues(alpha: 0.9),
             fontWeight: FontWeight.w500,

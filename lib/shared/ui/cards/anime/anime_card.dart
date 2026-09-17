@@ -7,12 +7,14 @@ class AnimeCard extends StatefulWidget {
   final UniversalMedia anime;
   final String tag;
   final AnimeCardMode mode;
+  final int? progress;
 
   const AnimeCard({
     super.key,
     required this.anime,
     required this.tag,
     required this.mode,
+    this.progress,
   });
 
   @override
@@ -65,6 +67,7 @@ class _AnimeCardState extends State<AnimeCard> {
                     ),
                     tag: widget.tag,
                     isHovered: _isHovered,
+                    progress: widget.progress,
                   ),
                   if (widget.anime.isMature)
                     Positioned(

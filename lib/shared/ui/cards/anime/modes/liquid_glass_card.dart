@@ -9,12 +9,14 @@ class LiquidGlassCard extends StatelessWidget {
   final UniversalMedia? anime;
   final String tag;
   final bool isHovered;
+  final int? progress;
 
   const LiquidGlassCard({
     super.key,
     required this.anime,
     required this.tag,
     required this.isHovered,
+    this.progress,
   });
 
   @override
@@ -124,25 +126,35 @@ class LiquidGlassCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          if (anime?.episodes != null)
-                            AniDashGlassShard.network(
-                              width: w,
-                              height: h,
-                              alignment: Alignment.bottomLeft,
-                              offset: const Offset(50, -60),
-                              isDark: isDark,
-                              isHovered: isHovered,
-                              imageUrl: imageUrl,
-                              borderRadius: 10,
-                              child: Text(
-                                '${anime!.episodes} EPS',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
+                          Builder(
+                            builder: (context) {
+                              final epText = formatEpisodeText(
+                                anime: anime,
+                                progress: progress,
+                                compact: true,
+                                uppercase: true,
+                              );
+                              if (epText == null) return const SizedBox.shrink();
+                              return AniDashGlassShard.network(
+                                width: w,
+                                height: h,
+                                alignment: Alignment.bottomLeft,
+                                offset: const Offset(50, -60),
+                                isDark: isDark,
+                                isHovered: isHovered,
+                                imageUrl: imageUrl,
+                                borderRadius: 10,
+                                child: Text(
+                                  epText,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,13 +8,14 @@ import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/ui/shonenx_gridview.dart';
 import 'package:ani_dash/features/watchlist/view/widget/watchlist_states_widgets.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
+import 'package:ani_dash/features/watchlist/view_model/library_tabs_notifier.dart';
 import 'package:ani_dash/helpers/navigation.dart';
-import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/repositories/local_media_repository.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 
 class WatchlistSelectionNotifier extends Notifier<Set<String>> {
   @override
@@ -55,26 +57,30 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
   @override
   void initState() {
     super.initState();
-    _init();
   }
 
-  Future<void> _init() async {
-    final repo = ref.read(animeRepositoryProvider);
-    final statuses = await repo.getSupportedStatuses();
-    _statuses = [...statuses, 'favorites'];
-
-    _controller = TabController(length: _statuses.length, vsync: this)
-      ..addListener(() {
-        if (_controller!.index != _index) {
+  void _syncController(List<String> statuses) {
+    if (_controller != null && listEquals(_statuses, statuses)) return;
+    final prevIndex = _index;
+    _controller?.dispose();
+    _statuses = List<String>.from(statuses);
+    final newIndex = prevIndex >= _statuses.length
+        ? (_statuses.length - 1).clamp(0, _statuses.length - 1)
+        : prevIndex;
+    _index = newIndex;
+    _controller = TabController(
+      length: _statuses.length,
+      initialIndex: newIndex,
+      vsync: this,
+    )..addListener(() {
+        if (_controller != null && _controller!.index != _index) {
           // Clear selection when changing tabs
           ref.read(watchlistSelectionProvider.notifier).clear();
           _index = _controller!.index;
           _fetch(_index);
         }
       });
-
-    setState(() {});
-    _fetch(0);
+    _fetch(_index);
   }
 
   Future<void> _fetch(int i, {bool force = false, int page = 1}) async {
@@ -160,6 +166,11 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
 
   @override
   Widget build(BuildContext context) {
+    final visibleStatuses = ref.watch(libraryTabsProvider).visibleStatuses;
+    if (_controller == null || !listEquals(_statuses, visibleStatuses)) {
+      _syncController(visibleStatuses);
+    }
+
     if (_controller == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -189,11 +200,19 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
               onPressed: _deleteSelected,
               icon: const Icon(Iconsax.trash, color: Colors.red),
             )
-          else if (auth.isAniListAuthenticated)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: _ModeSwitch(isLocal: isLocal),
+          else ...[
+            if (auth.isAniListAuthenticated)
+              Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: _ModeSwitch(isLocal: isLocal),
+              ),
+            IconButton(
+              onPressed: () => _showCustomizeTabsSheet(context),
+              icon: const Icon(Icons.tune_rounded),
+              tooltip: 'Customize Tabs',
             ),
+            const SizedBox(width: 8),
+          ],
         ],
         bottom: TabBar(
           controller: _controller,
@@ -213,6 +232,163 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
     );
   }
 
+  void _showCustomizeTabsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final tabsState = ref.watch(libraryTabsProvider);
+            final notifier = ref.read(libraryTabsProvider.notifier);
+            final theme = Theme.of(context);
+
+            return SafeArea(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Customize Library Tabs',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => notifier.resetToDefault(),
+                          icon: const Icon(Icons.restore, size: 18),
+                          label: const Text('Reset'),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Drag to reorder tabs or toggle switches to show/hide them.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ReorderableListView.builder(
+                        shrinkWrap: true,
+                        itemCount: tabsState.allTabs.length,
+                        onReorder: (oldIdx, newIdx) =>
+                            notifier.reorder(oldIdx, newIdx),
+                        itemBuilder: (context, index) {
+                          final tab = tabsState.allTabs[index];
+                          final label = _label(tab.status);
+                          final visibleCount = tabsState.allTabs
+                              .where((t) => t.isVisible)
+                              .length;
+                          final canHide = !tab.isVisible || visibleCount > 1;
+
+                          return Container(
+                            key: ValueKey(tab.status),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              leading: Icon(
+                                _tabIcon(tab.status),
+                                color: tab.isVisible
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.5),
+                              ),
+                              title: Text(
+                                label,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: tab.isVisible
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.5),
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Switch(
+                                    value: tab.isVisible,
+                                    onChanged: canHide
+                                        ? (_) => notifier
+                                            .toggleVisibility(tab.status)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  IconData _tabIcon(String s) {
+    switch (s.toLowerCase()) {
+      case 'watching':
+      case 'current':
+        return Iconsax.play_circle;
+      case 'completed':
+        return Iconsax.tick_circle;
+      case 'on_hold':
+      case 'onhold':
+      case 'paused':
+        return Iconsax.pause_circle;
+      case 'dropped':
+        return Iconsax.close_circle;
+      case 'plan_to_watch':
+      case 'planning':
+        return Iconsax.calendar;
+      case 'favorites':
+        return Iconsax.heart;
+      default:
+        return Iconsax.folder;
+    }
+  }
+
   String _label(String s) {
     switch (s.toLowerCase()) {
       case 'watching':
@@ -222,6 +398,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
         return 'Completed';
       case 'on_hold':
       case 'onhold':
+      case 'paused':
         return 'On Hold';
       case 'dropped':
         return 'Dropped';
@@ -231,7 +408,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
       case 'favorites':
         return 'Favorites';
       default:
-        return s[0].toUpperCase() + s.substring(1).toLowerCase();
+        return s.isNotEmpty
+            ? s[0].toUpperCase() + s.substring(1).toLowerCase()
+            : s;
     }
   }
 }
@@ -319,9 +498,10 @@ class _WatchlistTabView extends ConsumerWidget {
     final selectedIds = ref.watch(watchlistSelectionProvider);
     final isSelectionMode = selectedIds.isNotEmpty;
 
+    final entries = status == 'favorites' ? null : state.listFor(status);
     final media = status == 'favorites'
         ? state.favorites
-        : state.listFor(status).map((e) => e.media).toList();
+        : entries!.map((e) => e.media).toList();
 
     final isLoading = state.loadingStatuses.contains(status);
 
@@ -368,6 +548,14 @@ class _WatchlistTabView extends ConsumerWidget {
             final anime = media[index];
             final tag = 'watchlist-$status-${anime.id}';
             final isSelected = selectedIds.contains(anime.id);
+            final entry = (entries != null && index < entries.length)
+                ? entries[index]
+                : null;
+            final progress = entry?.progress ??
+                ref
+                    .read(watchProgressRepositoryProvider)
+                    .getProgress(anime.id.toString())
+                    ?.currentEpisode;
 
             return GestureDetector(
               onLongPress: () {
@@ -384,7 +572,12 @@ class _WatchlistTabView extends ConsumerWidget {
               },
               child: Stack(
                 children: [
-                  AnimeCard(anime: anime, tag: tag, mode: mode),
+                  AnimeCard(
+                    anime: anime,
+                    tag: tag,
+                    mode: mode,
+                    progress: progress,
+                  ),
                   if (isSelected)
                     Positioned.fill(
                       child: Container(
