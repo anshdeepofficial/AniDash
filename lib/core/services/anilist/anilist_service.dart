@@ -55,6 +55,7 @@ class AnilistService implements AnimeRepository, TrackerService {
     Map<String, dynamic>? variables,
     bool isMutation = false,
     String operationName = 'GraphQL',
+    FetchPolicy? fetchPolicy,
   }) async {
     try {
       AppLogger.i('[AniList] $operationName starting...');
@@ -75,7 +76,7 @@ class AnilistService implements AnimeRepository, TrackerService {
                 QueryOptions(
                   document: document,
                   variables: variables ?? const {},
-                  fetchPolicy: FetchPolicy.cacheFirst,
+                  fetchPolicy: fetchPolicy ?? FetchPolicy.networkOnly,
                 ),
               );
 
@@ -751,18 +752,19 @@ class AnilistService implements AnimeRepository, TrackerService {
       if (auth == null) return false;
 
       final entry = await getAnimeEntry(mediaId);
-      if (entry == null) return false;
+      final entryId = entry?.id ?? mediaId;
 
       final data = await _executeGraphQLOperation<Map<String, dynamic>>(
         accessToken: auth.accessToken,
         query: AnilistQueries.deleteMediaListEntryMutation,
-        variables: {'id': entry.id},
+        variables: {'id': entryId},
         isMutation: true,
         operationName: 'DeleteMediaListEntry',
       );
 
       return data?['DeleteMediaListEntry']?['deleted'] ?? false;
     } catch (e) {
+      AppLogger.e('Failed to delete AniList entry: $e');
       return false;
     }
   }

@@ -55,6 +55,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   var _hasMore = true;
   var _isSearchFocused = false;
   var _isExploreLoading = true;
+  var _isSearchSubmitted = false;
 
   @override
   void initState() {
@@ -62,6 +63,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     _animationController.forward();
     _searchHistory = sharedPrefs.getStringList(_historyKey) ?? [];
     if (widget.keyword?.isNotEmpty == true || !_currentFilter.isEmpty) {
+      _isSearchSubmitted = true;
       _search();
     } else {
       _fetchExploreData();
@@ -73,11 +75,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     super.didUpdateWidget(oldWidget);
     if (widget.keyword != oldWidget.keyword) {
       _searchController.text = widget.keyword ?? '';
+      _isSearchSubmitted = widget.keyword?.isNotEmpty == true;
       _search();
     }
     if (widget.initialFilter != oldWidget.initialFilter) {
       setState(() {
         _currentFilter = widget.initialFilter ?? const SearchFilter();
+        _isSearchSubmitted = !_currentFilter.isEmpty;
       });
       _search();
     }
@@ -209,15 +213,32 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   }
 
   void _onSearchChanged(String query) {
-    setState(() {});
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _search();
-    });
+    if (query.isEmpty && _currentFilter.isEmpty) {
+      setState(() {
+        _isSearchSubmitted = false;
+        _results.clear();
+      });
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _submitSearch() async {
+    FocusScope.of(context).unfocus();
     final query = _searchController.text.trim();
+    if (query.isEmpty && _currentFilter.isEmpty) {
+      setState(() {
+        _isSearchSubmitted = false;
+        _isSearchFocused = false;
+        _results.clear();
+      });
+      return;
+    }
+    setState(() {
+      _isSearchSubmitted = true;
+      _isSearchFocused = false;
+    });
     if (query.isNotEmpty) {
       _searchHistory =
           [
@@ -234,8 +255,6 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   void _selectSuggestion(String value) {
     _searchController.text = value;
     _searchController.selection = TextSelection.collapsed(offset: value.length);
-    FocusScope.of(context).unfocus();
-    setState(() => _isSearchFocused = false);
     _submitSearch();
   }
 
@@ -286,6 +305,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     if (result != null) {
       setState(() {
         _currentFilter = result;
+        if (!_currentFilter.isEmpty || _searchController.text.isNotEmpty) {
+          _isSearchSubmitted = true;
+        }
       });
 
       if (_searchController.text.isEmpty && !_currentFilter.isEmpty) {
@@ -332,7 +354,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
               children: [
                 Positioned.fill(
                   child:
-                      _searchController.text.isEmpty && _currentFilter.isEmpty
+                      (!_isSearchSubmitted && _currentFilter.isEmpty)
                           ? _ExploreView(
                             trending: _trending,
                             popular: _popular,
@@ -541,6 +563,7 @@ class _SearchBar extends StatelessWidget {
         onFocusChange: onFocusChange,
         child: TextField(
           controller: controller,
+          textInputAction: TextInputAction.search,
           onSubmitted: (_) => onSearch(),
           onChanged: onSearchChanged,
           decoration: InputDecoration(
@@ -550,14 +573,17 @@ class _SearchBar extends StatelessWidget {
                 context,
               ).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
-            prefixIcon: Icon(
-              Iconsax.search_normal,
-              color:
-                  isSearchFocused
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+            prefixIcon: IconButton(
+              icon: Icon(
+                Iconsax.search_normal,
+                color:
+                    isSearchFocused
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              onPressed: onSearch,
             ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,

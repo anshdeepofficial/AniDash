@@ -110,33 +110,12 @@ class MediaTracker extends _$MediaTracker {
 
           try {
             UniversalMediaListEntry? entry;
-            final auth = ref.read(authProvider);
             if (binding.type == TrackerType.anilist) {
               final anilist = ref.read(anilistServiceProvider);
               entry = await anilist.getAnimeEntry(id);
-              if (entry == null && auth.isAniListAuthenticated) {
-                try {
-                  entry = await anilist.updateUserAnimeList(
-                    mediaId: id,
-                    status: 'CURRENT',
-                  );
-                } catch (e) {
-                  AppLogger.e('Auto-track CURRENT failed for AniList $id', e);
-                }
-              }
             } else if (binding.type == TrackerType.mal) {
               final mal = ref.read(malServiceProvider);
               entry = await mal.getAnimeEntry(id);
-              if (entry == null && auth.isMalAuthenticated) {
-                try {
-                  entry = await mal.updateUserAnimeList(
-                    mediaId: id,
-                    status: 'CURRENT',
-                  );
-                } catch (e) {
-                  AppLogger.e('Auto-track CURRENT failed for MAL $id', e);
-                }
-              }
             }
             if (entry != null) entries[binding.type] = entry;
           } catch (e) {
@@ -176,17 +155,9 @@ class MediaTracker extends _$MediaTracker {
           if (type == TrackerType.anilist) {
             final anilist = ref.read(anilistServiceProvider);
             newEntry = await anilist.getAnimeEntry(id);
-            newEntry ??= await anilist.updateUserAnimeList(
-              mediaId: id,
-              status: 'CURRENT',
-            );
           } else if (type == TrackerType.mal) {
             final mal = ref.read(malServiceProvider);
             newEntry = await mal.getAnimeEntry(id);
-            newEntry ??= await mal.updateUserAnimeList(
-              mediaId: id,
-              status: 'CURRENT',
-            );
           }
         } catch (e) {
           AppLogger.e(
@@ -340,34 +311,38 @@ class MediaTracker extends _$MediaTracker {
     state = currentState.copyWith(isLoading: true);
     try {
       var binding = currentState.bindings.firstWhereOrNull((b) => b.type == type);
-      if (binding == null) {
-        final id = int.tryParse(mediaId);
-        if (id != null) {
-          await addTrackerBinding(type, mediaId);
-          return;
+      final targetRemoteId = binding?.remoteId ?? mediaId;
+      final id = int.tryParse(targetRemoteId);
+      if (id != null) {
+        if (binding == null) {
+          await _repo.addBinding(mediaId, type, targetRemoteId);
         }
-      } else if (binding.remoteId != null) {
-        final id = int.tryParse(binding.remoteId!);
-        if (id != null) {
-          UniversalMediaListEntry? newEntry;
-          if (type == TrackerType.anilist) {
-            newEntry = await ref.read(anilistServiceProvider).updateUserAnimeList(
-              mediaId: id,
-              status: 'CURRENT',
-            );
-          } else if (type == TrackerType.mal) {
-            newEntry = await ref.read(malServiceProvider).updateUserAnimeList(
-              mediaId: id,
-              status: 'CURRENT',
-            );
-          }
-          final updatedEntries = Map<TrackerType, UniversalMediaListEntry>.from(state.entries);
-          if (newEntry != null) {
-            updatedEntries[type] = newEntry;
-          }
-          state = state.copyWith(isLoading: false, entries: updatedEntries);
-          return;
+        UniversalMediaListEntry? newEntry;
+        if (type == TrackerType.anilist) {
+          newEntry = await ref.read(anilistServiceProvider).updateUserAnimeList(
+            mediaId: id,
+            status: 'CURRENT',
+          );
+        } else if (type == TrackerType.mal) {
+          newEntry = await ref.read(malServiceProvider).updateUserAnimeList(
+            mediaId: id,
+            status: 'CURRENT',
+          );
         }
+        final updatedBindings = List<TrackerBinding>.from(currentState.bindings);
+        if (binding == null) {
+          updatedBindings.add(TrackerBinding(type: type, remoteId: targetRemoteId));
+        }
+        final updatedEntries = Map<TrackerType, UniversalMediaListEntry>.from(state.entries);
+        if (newEntry != null) {
+          updatedEntries[type] = newEntry;
+        }
+        state = state.copyWith(
+          isLoading: false,
+          bindings: updatedBindings,
+          entries: updatedEntries,
+        );
+        return;
       }
       state = state.copyWith(isLoading: false);
     } catch (e) {

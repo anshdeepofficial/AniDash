@@ -14,6 +14,8 @@ import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
+import 'package:ani_dash/shared/providers/mal_service_provider.dart';
+import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/repositories/local_media_repository.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
@@ -163,32 +165,55 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
     final isLocal = ref.read(watchlistProvider).isLocal;
 
     try {
-      int successCount = 0;
-      for (final idStr in selectedIds) {
-        final id = int.tryParse(idStr);
-        if (id == null) continue;
-
-        if (!isLocal && auth.isAniListAuthenticated) {
-          final success = await ref
-              .read(anilistServiceProvider)
-              .deleteUserAnimeList(id);
-          if (success) successCount++;
-        } else if (isLocal) {
-          await ref.read(localMediaRepoProvider).deleteEntry(idStr);
-          successCount++;
-        }
-      }
-
-      if (successCount > 0) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Deleted $successCount items')),
-          );
-        }
-      }
-
+      final toDelete = List<String>.from(selectedIds);
+      // Immediately remove from Watchlist UI state so it disappears instantly
+      ref.read(watchlistProvider.notifier).removeEntries(toDelete);
       ref.read(watchlistSelectionProvider.notifier).clear();
-      // Refresh current list
+
+      int successCount = 0;
+      for (final idStr in toDelete) {
+        final id = int.tryParse(idStr);
+
+        // Delete from remote tracker if authenticated
+        if (!isLocal && id != null) {
+          try {
+            if (auth.isAniListAuthenticated) {
+              await ref.read(anilistServiceProvider).deleteUserAnimeList(id);
+            } else if (auth.isMalAuthenticated) {
+              await ref.read(malServiceProvider).deleteUserAnimeList(id);
+            }
+          } catch (e) {
+            AppLogger.e('Remote delete failed for $idStr: $e');
+          }
+        }
+
+        // Delete from local media repository
+        try {
+          await ref.read(localMediaRepoProvider).deleteEntry(idStr);
+        } catch (_) {}
+
+        // Delete from watch progress repository
+        try {
+          await ref.read(watchProgressRepositoryProvider).deleteProgress(idStr);
+        } catch (_) {}
+
+        // Dismiss from Continue Watching on Home Screen
+        try {
+          await ref
+              .read(continueWatchingDismissedProvider.notifier)
+              .commitDismiss(idStr, ref);
+        } catch (_) {}
+
+        successCount++;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Deleted $successCount items')),
+        );
+      }
+
+      // Refresh current list with fresh network fetch
       _fetch(_index, force: true);
     } catch (e) {
       AppLogger.e('Failed to delete items: $e');

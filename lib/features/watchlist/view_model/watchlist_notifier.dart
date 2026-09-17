@@ -92,6 +92,24 @@ class WatchlistNotifier extends Notifier<WatchListState> {
     await _localRepo.toggleFavorite(anime);
   }
 
+  void removeEntries(List<String> animeIds) {
+    final idsSet = animeIds.toSet();
+    final updatedLists = <String, List<UniversalMediaListEntry>>{};
+    for (final entry in state.lists.entries) {
+      updatedLists[entry.key] = entry.value
+          .where((item) => !idsSet.contains(item.media.id))
+          .toList();
+    }
+    final updatedFavorites = state.favorites
+        .where((item) => !idsSet.contains(item.id))
+        .toList();
+
+    state = state.copyWith(
+      lists: updatedLists,
+      favorites: updatedFavorites,
+    );
+  }
+
   Future<WatchListState> fetchListForStatus(
     String status, {
     bool force = false,

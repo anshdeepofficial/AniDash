@@ -127,6 +127,50 @@ class MyAnimeListService implements AnimeRepository, TrackerService {
     }
   }
 
+  Future<bool> _delete(
+    String url, {
+    String operationName = 'DELETE',
+  }) async {
+    try {
+      final token = _getAccessToken();
+      if (token == null) throw TrackerException('User not authenticated');
+      final endpoint = Uri.parse(url).pathSegments.last;
+      AppLogger.i('[MAL] $operationName $endpoint');
+
+      final res = await UniversalHttpClient.instance.delete(
+        Uri.parse(url),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode == 401) {
+        AppLogger.i('[MAL] Token expired, refreshing for $operationName...');
+        final refreshed = await _onTokenRefreshCallback();
+        if (refreshed) {
+          return _delete(url, operationName: operationName);
+        } else {
+          throw TrackerException(
+            'Authentication failed: Refresh token expired.',
+          );
+        }
+      }
+
+      if (res.statusCode == 200 || res.statusCode == 404) {
+        AppLogger.success('[MAL] $operationName $endpoint ✓');
+        return true;
+      }
+
+      throw TrackerException('$operationName request failed: ${res.body}');
+    } catch (e, st) {
+      AppLogger.e('[MAL] $operationName error', e, st);
+      return false;
+    }
+  }
+
+  Future<bool> deleteUserAnimeList(int mediaId) async {
+    final url = 'https://api.myanimelist.net/v2/anime/$mediaId/my_list_status';
+    return await _delete(url, operationName: 'DeleteUserAnimeList');
+  }
+
   // ---------------------- USER PROFILE ----------------------
   Future<Map<String, dynamic>> getUserProfile() async {
     return await _get(
