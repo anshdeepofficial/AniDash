@@ -162,7 +162,15 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           currentEpisode: _selectedEpisodes.reduce((a, b) => a > b ? a : b),
         );
 
-    await repo.saveProgress(updatedEntry);
+    final maxEp = _selectedEpisodes.reduce((a, b) => a > b ? a : b);
+    final isAllWatched = updatedEntry.totalEpisodes > 0 &&
+        maxEp >= updatedEntry.totalEpisodes &&
+        watched;
+    final finalUpdatedEntry = updatedEntry.copyWith(
+      status: isAllWatched ? 'completed' : (watched ? 'watching' : updatedEntry.status),
+    );
+
+    await repo.saveProgress(finalUpdatedEntry);
 
     if (watched && _selectedEpisodes.isNotEmpty) {
       final maxEp = _selectedEpisodes.reduce((a, b) => a > b ? a : b);

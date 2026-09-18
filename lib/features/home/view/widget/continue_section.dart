@@ -33,24 +33,9 @@ class ContinueSection extends ConsumerWidget {
             : List<AnimeWatchProgressEntry>.from(allProgress);
     final validEntries =
         scopedEntries.where((entry) {
+            if (!entry.hasAnyWatchProgress) return false;
             if (dismissedIds.contains(entry.animeId)) return false;
-            if (entry.status.toLowerCase() == 'completed') return false;
-            if (entry.totalEpisodes > 0) {
-              if (entry.currentEpisode > entry.totalEpisodes) return false;
-              final finalEpisode = entry.episodesProgress[entry.totalEpisodes];
-              if (finalEpisode?.isCompleted == true) return false;
-              final duration = finalEpisode?.durationInSeconds ?? 0;
-              final progress = finalEpisode?.progressInSeconds ?? 0;
-              if (duration > 0 && progress / duration >= 0.90) return false;
-
-              if (entry.currentEpisode == entry.totalEpisodes) {
-                final currEp = entry.episodesProgress[entry.currentEpisode];
-                if (currEp?.isCompleted == true) return false;
-                final curDur = currEp?.durationInSeconds ?? 0;
-                final curProg = currEp?.progressInSeconds ?? 0;
-                if (curDur > 0 && curProg / curDur >= 0.90) return false;
-              }
-            }
+            if (entry.isCompletedOrFinished) return false;
             return true;
           }).toList()
           ..sort(
@@ -76,9 +61,10 @@ class ContinueSection extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text("Continue", style: theme.textTheme.titleLarge),
+              child: Text("Continue Watching", style: theme.textTheme.titleLarge),
             ),
             IconButton(
+              tooltip: 'View all continue watching',
               onPressed: () => context.push('/settings/watch-history'),
               icon: const Icon(Iconsax.arrow_right_3, size: 20),
               visualDensity: VisualDensity.compact,

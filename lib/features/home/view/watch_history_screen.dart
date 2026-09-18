@@ -25,7 +25,7 @@ class WatchHistoryScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: const Text(
-          'Watch History',
+          'Continue Watching',
           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22),
         ),
         centerTitle: false,
@@ -33,7 +33,7 @@ class WatchHistoryScreen extends ConsumerWidget {
       body: Column(
         children: [
           _SearchBar(
-            hint: "Search history...",
+            hint: "Search continue watching...",
             onChanged: notifier.setSearchQuery,
           ),
           Expanded(
@@ -41,7 +41,7 @@ class WatchHistoryScreen extends ConsumerWidget {
                 ? Center(
                     child: Text(
                       state.searchQuery.isEmpty
-                          ? "No history yet"
+                          ? "No anime in continue watching"
                           : "No matches found",
                     ),
                   )
@@ -305,14 +305,29 @@ class _DetailHeader extends StatelessWidget {
   }
 }
 
-class _HistoryTile extends StatelessWidget {
+class _HistoryTile extends ConsumerWidget {
   final AnimeWatchProgressEntry entry;
   final VoidCallback onDelete;
   const _HistoryTile({required this.entry, required this.onDelete});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final currentEp = entry.episodesProgress[entry.currentEpisode];
+    final isCurrentCompleted = currentEp?.isCompleted == true ||
+        ((currentEp?.durationInSeconds ?? 0) > 0 &&
+            ((currentEp?.progressInSeconds ?? 0) /
+                    currentEp!.durationInSeconds!) >=
+                0.90);
+    final baseEp = entry.currentEpisode > 0 ? entry.currentEpisode : 1;
+    final nextEpNum = isCurrentCompleted &&
+            (entry.totalEpisodes == 0 || baseEp < entry.totalEpisodes)
+        ? baseEp + 1
+        : baseEp;
+    final epText = entry.totalEpisodes > 0
+        ? "Episode $nextEpNum of ${entry.totalEpisodes}"
+        : "Episode $nextEpNum";
+
     return Dismissible(
       key: ValueKey(entry.animeId),
       direction: DismissDirection.endToStart,
@@ -330,9 +345,9 @@ class _HistoryTile extends StatelessWidget {
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              title: const Text("Delete History"),
+              title: const Text("Remove from Continue Watching"),
               content: const Text(
-                "Are you sure you want to delete this anime from your history?",
+                "Are you sure you want to remove this anime from Continue Watching?",
               ),
               actions: <Widget>[
                 TextButton(
@@ -341,7 +356,7 @@ class _HistoryTile extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text("Delete"),
+                  child: const Text("Remove"),
                 ),
               ],
             );
@@ -371,10 +386,40 @@ class _HistoryTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
         subtitle: Text(
-          "Ep ${entry.currentEpisode} • ${DateFormat.MMMd().format(entry.lastUpdated ?? DateTime.now())}",
+          "$epText • ${DateFormat.MMMd().format(entry.latestWatchTime)}",
           style: const TextStyle(fontSize: 12),
         ),
-        trailing: const Icon(Iconsax.arrow_right_3, size: 14),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Iconsax.play5, size: 22),
+              color: theme.colorScheme.primary,
+              tooltip: 'Play Episode $nextEpNum',
+              onPressed: () {
+                providerAnimeMatchSearch(
+                  context: context,
+                  ref: ref,
+                  animeMedia: UniversalMedia(
+                    id: entry.animeId,
+                    title: UniversalTitle(
+                      english: entry.animeTitle,
+                      romaji: entry.animeTitle,
+                      native: entry.animeTitle,
+                    ),
+                    coverImage: UniversalCoverImage(large: entry.animeCover),
+                    isAdult: entry.isAdult,
+                  ),
+                  startAt: nextEpNum,
+                  withAnimeMatch: true,
+                  directAutoMatch: true,
+                  fromHentaiHub: entry.isAdult,
+                );
+              },
+            ),
+            const Icon(Iconsax.arrow_right_3, size: 14),
+          ],
+        ),
       ),
     );
   }

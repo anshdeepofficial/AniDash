@@ -79,13 +79,19 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         entry = entry.copyWith(isAdult: true);
       }
 
+      final isCompleted = dur > 0 ? (pos / dur >= 0.90) : false;
+      final isAnimeFinished = totalEps > 0 && epNum >= totalEps && isCompleted;
+      if (isAnimeFinished) {
+        entry = entry.copyWith(status: 'completed');
+      }
+
       final progress = EpisodeProgress(
         episodeNumber: epNum,
         episodeTitle: epTitle ?? 'Episode $epNum',
         episodeThumbnail: currentThumb,
         progressInSeconds: pos,
         durationInSeconds: dur,
-        isCompleted: dur > 0 ? (pos / dur >= 0.90) : false,
+        isCompleted: isCompleted,
         watchedAt: DateTime.now(),
       );
 

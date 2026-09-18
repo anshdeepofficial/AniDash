@@ -261,10 +261,20 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       episodeThumbnail: episodeProgress.episodeThumbnail ?? existingThumb,
     );
 
+    final isEpCompleted = episodeProgress.isCompleted ||
+        ((episodeProgress.durationInSeconds ?? 0) > 0 &&
+            (episodeProgress.progressInSeconds ?? 0) /
+                    episodeProgress.durationInSeconds! >=
+                0.90);
+    final isAllWatched = entry.totalEpisodes > 0 &&
+        episodeProgress.episodeNumber >= entry.totalEpisodes &&
+        isEpCompleted;
+
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
       lastUpdated: DateTime.now(),
       currentEpisode: episodeProgress.episodeNumber,
+      status: isAllWatched ? 'completed' : entry.status,
     );
 
     await saveProgress(updatedEntry);
@@ -345,10 +355,14 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       );
     }
 
+    final isAllWatched =
+        entry.totalEpisodes > 0 && upToEpisodeNumber >= entry.totalEpisodes;
+
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
       lastUpdated: DateTime.now(),
       currentEpisode: upToEpisodeNumber,
+      status: isAllWatched ? 'completed' : entry.status,
       animeTitle: animeTitle.isNotEmpty ? animeTitle : entry.animeTitle,
       animeCover: animeCover.isNotEmpty ? animeCover : entry.animeCover,
     );

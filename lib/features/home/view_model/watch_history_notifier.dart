@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
+import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 
 part 'watch_history_notifier.g.dart';
 
@@ -39,6 +40,12 @@ class WatchHistoryNotifier extends _$WatchHistoryNotifier {
       }
     });
 
+    ref.listen(continueWatchingDismissedProvider, (prev, next) {
+      final history =
+          ref.read(watchProgressRepositoryProvider).getAllProgress();
+      state = state.copyWith(history: _processHistory(history));
+    });
+
     final history = ref.read(watchProgressRepositoryProvider).getAllProgress();
     return WatchHistoryState(history: _processHistory(history));
   }
@@ -50,12 +57,16 @@ class WatchHistoryNotifier extends _$WatchHistoryNotifier {
   List<AnimeWatchProgressEntry> _processHistory(
     List<AnimeWatchProgressEntry> list,
   ) {
+    final dismissedIds = ref.read(continueWatchingDismissedProvider);
     final copy = List<AnimeWatchProgressEntry>.from(list);
-    copy.removeWhere((e) => e.episodesProgress.isEmpty);
+    copy.removeWhere((e) {
+      if (!e.hasAnyWatchProgress) return true;
+      if (dismissedIds.contains(e.animeId)) return true;
+      if (e.isCompletedOrFinished) return true;
+      return false;
+    });
     copy.sort(
-      (a, b) => (b.lastUpdated ?? DateTime(0)).compareTo(
-        a.lastUpdated ?? DateTime(0),
-      ),
+      (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
     );
     return copy;
   }
@@ -65,6 +76,7 @@ class WatchHistoryNotifier extends _$WatchHistoryNotifier {
   }
 
   Future<void> deleteProgress(String animeId) async {
+    ref.read(continueWatchingDismissedProvider.notifier).stageDismiss(animeId);
     await ref.read(watchProgressRepositoryProvider).deleteProgress(animeId);
   }
 }

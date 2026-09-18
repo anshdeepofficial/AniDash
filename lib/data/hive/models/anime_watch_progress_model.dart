@@ -34,6 +34,66 @@ class AnimeWatchProgressEntry {
     return latest;
   }
 
+  bool get hasAnyWatchProgress {
+    if (episodesProgress.isEmpty) return false;
+    return episodesProgress.values.any(
+      (ep) =>
+          ep.isCompleted ||
+          (ep.progressInSeconds != null && ep.progressInSeconds! > 0),
+    );
+  }
+
+  bool get isCompletedOrFinished {
+    if (status.toLowerCase() == 'completed') return true;
+
+    if (totalEpisodes > 0) {
+      if (currentEpisode > totalEpisodes) return true;
+
+      final finalEp = episodesProgress[totalEpisodes];
+      if (finalEp?.isCompleted == true) return true;
+      final finalDur = finalEp?.durationInSeconds ?? 0;
+      final finalProg = finalEp?.progressInSeconds ?? 0;
+      if (finalDur > 0 && finalProg / finalDur >= 0.90) return true;
+
+      if (currentEpisode == totalEpisodes) {
+        final curEp = episodesProgress[currentEpisode];
+        if (curEp?.isCompleted == true) return true;
+        final curDur = curEp?.durationInSeconds ?? 0;
+        final curProg = curEp?.progressInSeconds ?? 0;
+        if (curDur > 0 && curProg / curDur >= 0.90) return true;
+      }
+
+      bool allCompleted = true;
+      for (int i = 1; i <= totalEpisodes; i++) {
+        final ep = episodesProgress[i];
+        if (ep == null) {
+          allCompleted = false;
+          break;
+        }
+        final dur = ep.durationInSeconds ?? 0;
+        final prog = ep.progressInSeconds ?? 0;
+        final finished = ep.isCompleted || (dur > 0 && prog / dur >= 0.90);
+        if (!finished) {
+          allCompleted = false;
+          break;
+        }
+      }
+      if (allCompleted) return true;
+    } else if (episodesProgress.isNotEmpty) {
+      final highestEp = episodesProgress.keys.reduce((a, b) => a > b ? a : b);
+      final ep = episodesProgress[highestEp];
+      if (ep != null) {
+        final dur = ep.durationInSeconds ?? 0;
+        final prog = ep.progressInSeconds ?? 0;
+        final isFinished = ep.isCompleted || (dur > 0 && prog / dur >= 0.90);
+        if (isFinished && status.toLowerCase() == 'completed') {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   AnimeWatchProgressEntry copyWith({
     String? animeId,
     String? animeTitle,
