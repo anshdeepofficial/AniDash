@@ -129,8 +129,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
-      24 * 1024 * 1024,
-      64 * 1024 * 1024,
+      128 * 1024 * 1024,
+      512 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -140,24 +140,24 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Ultra-fast stream startup, smooth buffering, and clean keyframe resume
+    // High-speed 5G/Wi-Fi streaming, 100s+ readahead, no-stutter buffering, and crystal clear 1080p
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '104857600', // 100MB buffer for reliable offline/travel playback
-      'demuxer-max-back-bytes': '52428800', // 50MB back cache for instant rewinds
-      'cache-secs': '180', // 180s stream cache
-      'demuxer-readahead-secs': '60', // 60s forward readahead prevents stalls without RAM exhaustion
-      'cache-pause': 'yes', // Gracefully pause on buffer starvation to keep audio/video in sync
+      'demuxer-max-bytes': '268435456', // 256MB buffer for uninterrupted high-bitrate streaming
+      'demuxer-max-back-bytes': '67108864', // 64MB back cache for instant rewinds
+      'cache-secs': '300', // 300s (5-minute) stream cache window
+      'demuxer-readahead-secs': '120', // Buffer 100+ seconds ahead to prevent any rebuffering pauses
+      'cache-pause': 'no', // Never freeze/pause playback on buffer jitter - continuous smooth playback
+      'cache-pause-wait': '0', // No delay pause
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'cache-pause-wait': '1.5', // Buffer 1.5s before resuming to prevent rebuffering loops
       'stream-lavf-o':
-          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular tower handovers
+          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular/Wi-Fi switches
       'network-timeout':
-          '15', // 15s timeout prevents premature disconnects in weak signal areas
+          '20', // 20s network timeout prevents premature drops
       'demuxer-lavf-probesize': '1048576', // 1MB probe for reliable HLS parsing
-      'demuxer-lavf-buffersize': '1048576', // 1MB demuxer buffer
+      'demuxer-lavf-buffersize': '4194304', // 4MB demuxer socket buffer for high throughput on 5G/Wi-Fi
       'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration
       'force-seekable': 'yes',
       'hr-seek':

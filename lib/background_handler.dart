@@ -40,10 +40,6 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
 
     final preferences = await SharedPreferences.getInstance();
 
-    // Check if user snoozed ("Remind in 1 hour" or "Skip for today")
-    final remindAfter = preferences.getInt('remind_update_after') ?? 0;
-    if (now.millisecondsSinceEpoch < remindAfter) return true;
-
     final response = await http.get(
       Uri.parse(
         'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
@@ -63,6 +59,11 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
       current = preferences.getString('app_version') ?? '1.0.0';
     }
     if (!_newer(latest, current)) return true;
+
+    // Check if user snoozed this specific release ("Remind in 1 hour" or "Skip for today")
+    final remindAfter = preferences.getInt('remind_update_after') ?? 0;
+    final remindVersion = preferences.getString('remind_update_version');
+    if (remindVersion == latest && now.millisecondsSinceEpoch < remindAfter) return true;
 
     // Check if user clicked "Skip this update" for this release
     final skippedVersion = preferences.getString('skipped_update_version');

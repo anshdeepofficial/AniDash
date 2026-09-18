@@ -1,14 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ani_dash/shared/ui/brand_logo.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/loading/view_model/initialization_notifier.dart';
-import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
-import 'package:ani_dash/shared/providers/update_provider.dart';
-import 'package:ani_dash/core/utils/updater.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
 
@@ -51,11 +47,6 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(initializationProvider.notifier).initialize();
       UpdateScheduler.apply(ref.read(updateSettingsProvider));
-
-      if (!kDebugMode && ref.read(automaticUpdatesProvider)) {
-        final useTest = ref.read(experimentalProvider).useTestReleases;
-        checkForUpdates(context, useTestReleases: useTest);
-      }
     });
   }
 

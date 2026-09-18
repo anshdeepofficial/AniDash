@@ -19,8 +19,10 @@ class UpdateScheduler {
 
   static Future<void> apply(UpdateSettingsModel settings) async {
     if (!Platform.isAndroid) return;
-    await Workmanager().cancelByUniqueName(updateCheckTask);
-    if (!settings.autoCheckEnabled) return;
+    if (!settings.autoCheckEnabled) {
+      await Workmanager().cancelByUniqueName(updateCheckTask);
+      return;
+    }
 
     final now = DateTime.now();
     final insideWindow = isInsideWindow(settings, now);
@@ -37,7 +39,7 @@ class UpdateScheduler {
       updateCheckTask,
       frequency: Duration(minutes: settings.checkIntervalMinutes.clamp(15, 60)),
       initialDelay: firstRun.difference(now),
-      existingWorkPolicy: ExistingWorkPolicy.replace,
+      existingWorkPolicy: ExistingWorkPolicy.update,
       constraints: Constraints(networkType: NetworkType.connected),
       inputData: {
         'startHour': settings.startHour,

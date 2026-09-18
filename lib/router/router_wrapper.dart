@@ -17,6 +17,8 @@ import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
 import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -90,12 +92,14 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     _updateTapSubscription =
         NotificationService().onUpdateTapped.listen((version) {
       if (mounted) {
-        checkForUpdates(context, isManual: true);
+        _checkForScheduledUpdate(isAppOpen: true, force: true);
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openDownloadsOffline();
-      _checkForScheduledUpdate();
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _checkForScheduledUpdate(isAppOpen: true);
+      });
       _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);
     });
@@ -114,7 +118,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkForScheduledUpdate();
+      _checkForScheduledUpdate(isAppOpen: true);
       _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);
     } else if (state == AppLifecycleState.paused) {
@@ -132,23 +136,24 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     });
   }
 
-  Future<void> _checkForScheduledUpdate() async {
+  Future<void> _checkForScheduledUpdate({
+    bool isAppOpen = false,
+    bool force = false,
+  }) async {
     if (_updateCheckInProgress || !mounted) return;
     final settings = ref.read(updateSettingsProvider);
-    if (!settings.autoCheckEnabled) return;
-    if (!settings.fullDay && !UpdateScheduler.isInsideWindow(settings)) {
+    if (!settings.autoCheckEnabled && !force) return;
+    if (!isAppOpen && !settings.fullDay && !UpdateScheduler.isInsideWindow(settings)) {
       return;
     }
     final now = DateTime.now();
-    if (_lastForegroundUpdateCheck != null &&
+    if (!force &&
+        _lastForegroundUpdateCheck != null &&
         now.difference(_lastForegroundUpdateCheck!).inMinutes < 1) {
       return;
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final remindAfter = prefs.getInt('remind_update_after') ?? 0;
-    if (now.millisecondsSinceEpoch < remindAfter) return;
-
     final skippedVersion = prefs.getString('skipped_update_version');
 
     _updateCheckInProgress = true;
@@ -157,17 +162,32 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       final updateInfo = await UpdateService().checkForUpdate();
       if (updateInfo != null && mounted) {
         final latest = updateInfo.version.replaceFirst('v', '').trim();
-        if (skippedVersion == latest) return;
+        if (!force && skippedVersion == latest) return;
+
+        final remindAfter = prefs.getInt('remind_update_after') ?? 0;
+        final remindVersion = prefs.getString('remind_update_version');
+        final isSnoozedForThisVersion =
+            remindVersion == latest && now.millisecondsSinceEpoch < remindAfter;
 
         // Post to the notification bar with the action buttons!
         await NotificationService().showUpdateAvailableNotification(latest);
 
-        // Also trigger the in-app update dialog so the user sees it immediately
-        if (mounted) {
-          checkForUpdates(context, isManual: false);
+        // Also trigger the in-app update dialog so the user sees it immediately on screen
+        if (force || !isSnoozedForThisVersion) {
+          final packageInfo = await PackageInfo.fromPlatform();
+          if (!mounted) return;
+          showUpdateBottomSheet(
+            context,
+            updateInfo.version,
+            packageInfo.version,
+            UpdateType.stable,
+            releaseNotes: updateInfo.releaseNotes,
+            apkDownloadUrl: updateInfo.downloadUrl,
+          );
         }
       }
-    } catch (_) {
+    } catch (e) {
+      AppLogger.w('Update check encountered error: $e');
     } finally {
       _updateCheckInProgress = false;
     }

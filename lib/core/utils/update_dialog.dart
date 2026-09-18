@@ -442,6 +442,10 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                                     .add(const Duration(hours: 1))
                                     .millisecondsSinceEpoch,
                               );
+                              await prefs.setString(
+                                'remind_update_version',
+                                widget.latestVersion.replaceAll('v', '').trim(),
+                              );
                               if (context.mounted) Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
@@ -465,6 +469,10 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
                                 DateTime.now()
                                     .add(const Duration(hours: 24))
                                     .millisecondsSinceEpoch,
+                              );
+                              await prefs.setString(
+                                'remind_update_version',
+                                widget.latestVersion.replaceAll('v', '').trim(),
                               );
                               if (context.mounted) Navigator.pop(context);
                             },
