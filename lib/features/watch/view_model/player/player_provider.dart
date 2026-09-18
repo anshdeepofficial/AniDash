@@ -142,21 +142,22 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     // Ultra-fast stream startup, smooth buffering, and clean keyframe resume
     final fastProperties = <String, String>{
-      'hwdec': 'mediacodec-copy,auto-safe',
+      'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': '104857600', // 100MB buffer for reliable offline/travel playback
       'demuxer-max-back-bytes': '52428800', // 50MB back cache for instant rewinds
       'cache-secs': '180', // 180s stream cache
-      'demuxer-readahead-secs': '120', // 120s forward readahead prevents stalls during signal drops
+      'demuxer-readahead-secs': '60', // 60s forward readahead prevents stalls without RAM exhaustion
       'cache-pause': 'yes', // Gracefully pause on buffer starvation to keep audio/video in sync
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'cache-pause-wait': '2.5', // Buffer 2.5s before resuming to prevent rapid rebuffering loops
+      'cache-pause-wait': '1.5', // Buffer 1.5s before resuming to prevent rebuffering loops
       'stream-lavf-o':
           'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular tower handovers
       'network-timeout':
           '15', // 15s timeout prevents premature disconnects in weak signal areas
       'demuxer-lavf-probesize': '1048576', // 1MB probe for reliable HLS parsing
+      'demuxer-lavf-buffersize': '1048576', // 1MB demuxer buffer
       'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration
       'force-seekable': 'yes',
       'hr-seek':
@@ -167,8 +168,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           'no', // Never drop video frames into a black screen while audio plays
       'correct-pts': 'yes',
       'vd-lavc-show-all': 'no',
+      'vd-lavc-dr': 'no', // Disable direct rendering to prevent memory corruption on Android
+      'vd-lavc-fast': 'yes', // Fast decoding optimizations
       'video-sync': 'audio',
-      'hls-bitrate': 'auto',
+      'hls-bitrate': 'max', // Force highest quality HLS stream variant (prevents pixelated low-bitrate stream)
     };
 
     final platform = _player.platform as dynamic;

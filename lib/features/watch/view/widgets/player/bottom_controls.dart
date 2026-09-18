@@ -128,22 +128,46 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                 isAccent: true,
                                 scheme: scheme,
                               ),
-                              _FlatTextBtn(
-                                text: ref.watch(
-                                  episodeDataProvider.select((s) {
-                                    final server = s.selectedServer;
-                                    if (server == null) return 'SERVER';
-                                    final name =
-                                        server.name ?? server.id ?? 'SERVER';
-                                    return name
-                                        .replaceAll(RegExp(r'\(.*?\)'), '')
-                                        .trim()
-                                        .toUpperCase();
-                                  }),
-                                ),
-                                onTap: widget.onServerPressed,
-                                isAccent: false,
-                                scheme: scheme,
+                              Builder(
+                                builder: (context) {
+                                  final servers = ref.watch(
+                                    episodeDataProvider.select((s) => s.servers),
+                                  );
+                                  final currentServer = ref.watch(
+                                    episodeDataProvider.select(
+                                      (s) => s.selectedServer,
+                                    ),
+                                  );
+                                  final validServers = servers.where((s) {
+                                    final id = s.id?.toLowerCase() ?? '';
+                                    final name = s.name?.toLowerCase() ?? '';
+                                    return id != 'ext' &&
+                                        name != 'extension' &&
+                                        id != 'default' &&
+                                        name != 'default';
+                                  }).toList();
+
+                                  if (validServers.length <= 1) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final serverName = currentServer?.name ?? currentServer?.id ?? 'SERVER';
+                                  if (serverName.toLowerCase() == 'extension' || serverName.toLowerCase() == 'default') {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  final cleanName = serverName
+                                      .replaceAll(RegExp(r'\(.*?\)'), '')
+                                      .trim()
+                                      .toUpperCase();
+
+                                  return _FlatTextBtn(
+                                    text: cleanName.isEmpty ? 'SERVER' : cleanName,
+                                    onTap: widget.onServerPressed,
+                                    isAccent: false,
+                                    scheme: scheme,
+                                  );
+                                },
                               ),
                             ],
                             if (!widget.isLocal)
@@ -324,18 +348,6 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
         start: clampedStart,
         end: clampedEnd,
         label: isOp ? 'INTRO' : (isEd ? 'OUTRO' : 'SKIP'),
-      ));
-    }
-
-    // Only synthesize an outro highlight if no skip data at all is available
-    final hasEd = highlightSegments.any((s) => s.label == 'OUTRO');
-    if (!hasEd && skips.isEmpty && total > 180000) {
-      final outroMs = 85000.0;
-      final s = (total - outroMs).clamp(0.0, total);
-      highlightSegments.add((
-        start: s,
-        end: total,
-        label: 'OUTRO',
       ));
     }
 

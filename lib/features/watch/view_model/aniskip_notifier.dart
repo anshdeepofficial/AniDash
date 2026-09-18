@@ -43,8 +43,52 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         }
       }
 
-      // 3. Query AniList directly by numeric ID (fast GraphQL, ~200ms)
+      // 2. Authoritative check: Query JustAnime Core API for exact intro/outro timestamps
       final anilistId = int.tryParse(mediaId);
+      if (anilistId != null && _sourceSkips.isEmpty) {
+        try {
+          final res = await UniversalHttpClient.instance
+              .get(
+                Uri.parse('https://core.justanime.to/api/watch/$anilistId/episode/$episodeNumber/megaplay'),
+                headers: {
+                  'Origin': 'https://justanime.to',
+                  'Referer': 'https://justanime.to/',
+                },
+              )
+              .timeout(const Duration(seconds: 4));
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            final decoded = json.decode(res.body);
+            if (decoded is Map) {
+              final rawIntro = decoded['intro'];
+              final rawOutro = decoded['outro'];
+              Intro? intro;
+              Intro? outro;
+              if (rawIntro is Map) {
+                final s = (rawIntro['start'] as num?)?.toInt();
+                final e = (rawIntro['end'] as num?)?.toInt();
+                if (s != null && e != null && e > s) {
+                  intro = Intro(start: s, end: e);
+                }
+              }
+              if (rawOutro is Map) {
+                final s = (rawOutro['start'] as num?)?.toInt();
+                final e = (rawOutro['end'] as num?)?.toInt();
+                if (s != null && e != null && e > s) {
+                  outro = Intro(start: s, end: e);
+                }
+              }
+              if (intro != null || outro != null) {
+                setFallbackFromSource(intro: intro, outro: outro);
+                AppLogger.d('JustAnime Core API provided exact intro ($intro) and outro ($outro) for Ep $episodeNumber');
+              }
+            }
+          }
+        } catch (e) {
+          AppLogger.d('JustAnime Core API fast intro/outro check skipped: $e');
+        }
+      }
+
+      // 3. Query AniList directly by numeric ID (fast GraphQL, ~200ms)
       if (malId == null && anilistId != null) {
         try {
           final res = await UniversalHttpClient.instance.post(

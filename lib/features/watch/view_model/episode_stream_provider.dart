@@ -23,6 +23,7 @@ import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view/widgets/download_source_selector.dart';
+import 'package:ani_dash/core/registery/sources/anime/justanime.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/shared/providers/settings/download_settings_notifier.dart';
 import 'package:ani_dash/core/models/settings/experimental_model.dart';
@@ -140,6 +141,19 @@ class EpisodeData extends _$EpisodeData {
     final key = ref.read(selectedProviderKeyProvider);
     if (key == null || key.isEmpty) return false;
     return ref.read(animeSourceRegistryProvider).has(key);
+  }
+
+  AnimeProvider? get _effectiveProvider {
+    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
+    final registry = ref.read(animeSourceRegistryProvider);
+    final currentKey = ref.read(selectedProviderKeyProvider)?.toLowerCase();
+    if (_provider?.providerName == 'justanime' ||
+        activeExt.contains('justanime') ||
+        currentKey == 'justanime' ||
+        (!_isNativeProvider && activeExt.isEmpty)) {
+      return registry.get('justanime') ?? JustAnimeProvider();
+    }
+    return _provider;
   }
 
   @override
@@ -398,22 +412,15 @@ class EpisodeData extends _$EpisodeData {
       if (!context.mounted) return;
 
       ServerData? selected;
-      if (!_isNativeProvider && _exp.useExtensions) {
-        selected = ServerData(name: 'Extension', id: 'ext', isDub: false);
-      } else {
-        if (servers.isEmpty) {
-          servers = [
-            ServerData(name: 'Default (Sub)', id: 'default', isDub: false),
-            ServerData(name: 'Default (Dub)', id: 'default', isDub: true),
-          ];
-        }
+      if (servers.isNotEmpty) {
         selected =
             servers.length == 1
                 ? servers.first
                 : await _showServerSheet(context, servers);
+        if (selected == null || !context.mounted) return;
       }
 
-      if (selected == null || !context.mounted) return;
+      if (!context.mounted) return;
 
       await showModalBottomSheet(
         context: context,
@@ -755,15 +762,21 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<List<ServerData>> _getRawServers(EpisodeDataModel ep) async {
-    if (!_isNativeProvider && _exp.useExtensions) {
-      // Extensions extract their streams directly from the episode URL and
-      // do not use native-provider server identifiers.
-      return [ServerData(name: 'Extension', id: 'ext', isDub: false)];
+    final provider = _effectiveProvider;
+    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
+    final isJustAnime = provider?.providerName == 'justanime' || activeExt.contains('justanime');
+
+    if (!_isNativeProvider && _exp.useExtensions && !isJustAnime) {
+      return [];
     }
 
-    return (await _provider?.getSupportedServers(
+    final effectiveId = (int.tryParse(_epList.animeId ?? '') != null)
+        ? _epList.animeId
+        : (_epList.mediaId ?? _epList.animeId);
+
+    return (await provider?.getSupportedServers(
           metadata: {
-            'id': _epList.animeId,
+            'id': effectiveId,
             'epNumber': ep.number,
             'epId': ep.id,
           },
@@ -787,10 +800,8 @@ class EpisodeData extends _$EpisodeData {
 
       var list = await _getRawServers(ep).timeout(const Duration(seconds: 15));
       if (list.isEmpty) {
-        list = [
-          ServerData(name: "Default", id: "default", isDub: false),
-          ServerData(name: "Default", id: "default", isDub: true),
-        ];
+        state = state.copyWith(servers: [], selectedServer: null);
+        return;
       } else {
         final hasDub = list.any((s) => s.isDub);
         final hasSub = list.any((s) => !s.isDub);
@@ -1125,8 +1136,35 @@ class EpisodeData extends _$EpisodeData {
     }
 
     AppLogger.d(
-      'Fetching source data via ${server?.name ?? "Extension"} (${isDubRequested ? "DUB" : "SUB"})',
+      'Fetching source data via ${server?.name ?? "Default"} (${isDubRequested ? "DUB" : "SUB"})',
     );
+
+    final provider = _effectiveProvider;
+    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
+    final isJustAnime = provider?.providerName == 'justanime' || activeExt.contains('justanime');
+
+    final effectiveAnimeId = (int.tryParse(_epList.animeId ?? '') != null)
+        ? _epList.animeId!
+        : (_epList.mediaId ?? _epList.animeId ?? '');
+
+    // If JustAnime is active or available, fetch directly with full multi-server & exact intro/outro support!
+    if (isJustAnime && provider != null && effectiveAnimeId.isNotEmpty) {
+      try {
+        final category = isDubRequested ? 'dub' : 'sub';
+        final targetEpId = (ep.id != null && ep.id!.isNotEmpty)
+            ? ep.id!
+            : (ep.number?.toString() ?? '1');
+        final res = await provider
+            .getSources(effectiveAnimeId, targetEpId, server?.id, category)
+            .timeout(const Duration(seconds: 8));
+        if (res.sources.isNotEmpty) {
+          return saveAndReturn(res);
+        }
+      } catch (e) {
+        AppLogger.w('JustAnime direct source fetch failed: $e');
+      }
+    }
+
     final epTargetUrl =
         (ep.url != null && ep.url!.isNotEmpty) ? ep.url : (ep.id ?? '');
     if (!_isNativeProvider &&
