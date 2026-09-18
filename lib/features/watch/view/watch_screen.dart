@@ -23,6 +23,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String animeCover;
   final int episode;
   final int? malId;
+  final int? startAtPosition;
   final List<EpisodeDataModel>? episodes;
 
   const WatchScreen({
@@ -34,6 +35,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.animeId,
     this.episode = 1,
     this.malId,
+    this.startAtPosition,
     this.episodes = const [],
     this.fromHentaiHub = false,
   });
@@ -79,6 +81,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             animeCover: widget.animeCover,
             fromHentaiHub: widget.fromHentaiHub,
             malId: widget.malId,
+            startAtPosition: widget.startAtPosition,
           );
       ref
           .read(watchControllerProvider.notifier)
@@ -94,6 +97,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   Future<void> _setupSystemUI() async {
     UIHelper.setWatchInitialLockMode();
+    UIHelper.enableVolumeInterception();
     await Future.wait([
       UIHelper.enableImmersiveMode(),
       UIHelper.forceLandscape(),

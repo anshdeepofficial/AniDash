@@ -8,6 +8,9 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/features/home/view_model/watch_history_notifier.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
+import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:go_router/go_router.dart';
 
 class WatchHistoryScreen extends ConsumerWidget {
@@ -371,6 +374,131 @@ class _HistoryTile extends ConsumerWidget {
             builder: (_) => AnimeHistoryDetailScreen(animeId: entry.animeId),
           ),
         ),
+        onLongPress: () {
+          showModalBottomSheet(
+            context: context,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (sheetContext) {
+              final ep = entry.episodesProgress[nextEpNum];
+              final totalDur = (ep?.durationInSeconds != null && ep!.durationInSeconds! > 0)
+                  ? Duration(seconds: ep.durationInSeconds!)
+                  : Duration.zero;
+              final currentPos = (ep?.progressInSeconds != null && ep!.progressInSeconds! > 0)
+                  ? Duration(seconds: ep.progressInSeconds!)
+                  : Duration.zero;
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: theme.dividerColor.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        entry.animeTitle,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Episode $nextEpNum',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const Divider(height: 24),
+                      ListTile(
+                        leading: const Icon(Iconsax.timer_1, color: Colors.cyanAccent),
+                        title: const Text('Jump to Time'),
+                        subtitle: Text('Start Episode $nextEpNum from a specific timestamp'),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          showDialog(
+                            context: context,
+                            builder: (dialogCtx) => JumpToTimeDialog(
+                              currentPosition: currentPos,
+                              totalDuration: totalDur,
+                              title: 'Jump to Time (Ep $nextEpNum)',
+                              actionLabel: 'Play',
+                              onJump: (targetDuration) async {
+                                await providerAnimeMatchSearch(
+                                  context: context,
+                                  ref: ref,
+                                  animeMedia: UniversalMedia(
+                                    id: entry.animeId,
+                                    title: UniversalTitle(
+                                      english: entry.animeTitle,
+                                      romaji: entry.animeTitle,
+                                      native: entry.animeTitle,
+                                    ),
+                                    coverImage: UniversalCoverImage(large: entry.animeCover),
+                                    isAdult: entry.isAdult,
+                                  ),
+                                  startAt: nextEpNum,
+                                  startAtPosition: targetDuration.inSeconds,
+                                  withAnimeMatch: true,
+                                  directAutoMatch: true,
+                                  fromHentaiHub: entry.isAdult,
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
+                        title: Text('Mark Episode $nextEpNum as Watched'),
+                        subtitle: const Text('Marks this episode complete and updates progress'),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          final dur = totalDur.inSeconds > 0 ? totalDur.inSeconds : 1440;
+                          ref.read(watchProgressRepositoryProvider).updateEpisodeProgress(
+                            entry.animeId,
+                            EpisodeProgress(
+                              episodeNumber: nextEpNum,
+                              episodeTitle: ep?.episodeTitle.isNotEmpty == true
+                                  ? ep!.episodeTitle
+                                  : 'Episode $nextEpNum',
+                              episodeThumbnail: ep?.episodeThumbnail ?? entry.animeCover,
+                              progressInSeconds: dur,
+                              durationInSeconds: dur,
+                              isCompleted: true,
+                              watchedAt: DateTime.now(),
+                            ),
+                          );
+                          ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
+                            mediaId: entry.animeId,
+                            episodeNum: nextEpNum,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Marked Episode $nextEpNum as watched'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: CachedNetworkImage(

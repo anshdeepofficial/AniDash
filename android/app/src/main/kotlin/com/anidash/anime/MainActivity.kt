@@ -25,6 +25,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var landscapeListener: OrientationEventListener? = null
     private var volumeChannel: MethodChannel? = null
     private var interceptVolumeKeys = false
+    private var shouldInterceptVolumeKeys = false
     private var isScreenshotPrivacyEnabled = false
     private var displayListener: DisplayManager.DisplayListener? = null
     private var audioFocusChannel: MethodChannel? = null
@@ -226,10 +227,12 @@ class MainActivity : FlutterFragmentActivity() {
                 setMethodCallHandler { call, result ->
                     when (call.method) {
                         "enableIntercept" -> {
+                            shouldInterceptVolumeKeys = true
                             interceptVolumeKeys = true
                             result.success(null)
                         }
                         "disableIntercept" -> {
+                            shouldInterceptVolumeKeys = false
                             interceptVolumeKeys = false
                             result.success(null)
                         }
@@ -400,6 +403,13 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (shouldInterceptVolumeKeys) {
+            interceptVolumeKeys = true
+        }
+    }
+
     override fun onPause() {
         interceptVolumeKeys = false
         try {
@@ -408,6 +418,31 @@ class MainActivity : FlutterFragmentActivity() {
             window.attributes = lp
         } catch (_: Exception) {}
         super.onPause()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (interceptVolumeKeys) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    volumeChannel?.invokeMethod("volumeUp", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    volumeChannel?.invokeMethod("volumeDown", null)
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (interceptVolumeKeys) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

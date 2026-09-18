@@ -20,6 +20,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
   required UniversalMedia animeMedia,
   bool withAnimeMatch = true,
   int? startAt,
+  int? startAtPosition,
   bool showSnackbar = false,
   bool directAutoMatch = false,
   bool fromHentaiHub = false,
@@ -44,6 +45,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
           animeCover: restoredAnime.poster ?? '',
           episodes: const [],
           currentEpisode: startAt ?? 1,
+          startAtPosition: startAtPosition,
           fromHentaiHub: fromHentaiHub || animeMedia.isAdult,
         );
       }
@@ -77,6 +79,7 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
               '',
           episodes: const [],
           currentEpisode: startAt ?? 1,
+          startAtPosition: startAtPosition,
           fromHentaiHub: fromHentaiHub || animeMedia.isAdult,
         );
       }

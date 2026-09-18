@@ -44,8 +44,10 @@ class AniSkipNotifier extends _$AniSkipNotifier {
       }
 
       // 2. Authoritative check: Query JustAnime Core API for exact intro/outro timestamps
-      final anilistId = int.tryParse(mediaId);
-      if (anilistId != null && _sourceSkips.isEmpty) {
+      final anilistId = int.tryParse(mediaId) ??
+          int.tryParse(ref.read(episodeListProvider).animeId ?? '') ??
+          int.tryParse(ref.read(episodeListProvider).mediaId ?? '');
+      if (anilistId != null) {
         try {
           final res = await UniversalHttpClient.instance
               .get(
@@ -53,14 +55,17 @@ class AniSkipNotifier extends _$AniSkipNotifier {
                 headers: {
                   'Origin': 'https://justanime.to',
                   'Referer': 'https://justanime.to/',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 },
               )
               .timeout(const Duration(seconds: 4));
           if (res.statusCode >= 200 && res.statusCode < 300) {
             final decoded = json.decode(res.body);
             if (decoded is Map) {
-              final rawIntro = decoded['intro'];
-              final rawOutro = decoded['outro'];
+              final subMap = decoded['sub'] as Map?;
+              final dubMap = decoded['dub'] as Map?;
+              final rawIntro = decoded['intro'] ?? subMap?['intro'] ?? dubMap?['intro'];
+              final rawOutro = decoded['outro'] ?? subMap?['outro'] ?? dubMap?['outro'];
               Intro? intro;
               Intro? outro;
               if (rawIntro is Map) {

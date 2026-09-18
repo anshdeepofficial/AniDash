@@ -14,8 +14,13 @@ import 'package:ani_dash/core/services/audio_focus_service.dart';
 
 class LocalPlayerScreen extends ConsumerStatefulWidget {
   final DownloadItem item;
+  final Duration? initialPosition;
 
-  const LocalPlayerScreen({super.key, required this.item});
+  const LocalPlayerScreen({
+    super.key,
+    required this.item,
+    this.initialPosition,
+  });
 
   @override
   ConsumerState<LocalPlayerScreen> createState() => _LocalPlayerScreenState();
@@ -30,7 +35,8 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
     super.initState();
     final entry = _matchingEntry();
     final saved = entry?.episodesProgress[widget.item.episodeNumber];
-    _startAt = Duration(seconds: saved?.progressInSeconds ?? 0);
+    _startAt = widget.initialPosition ??
+        Duration(seconds: saved?.progressInSeconds ?? 0);
     UIHelper.enableImmersiveMode();
     UIHelper.forceLandscape();
   }

@@ -342,7 +342,12 @@ class JustAnimeProvider extends AnimeProvider {
               .toList();
 
       Intro? intro;
-      final rawIntro = raw['intro'] ?? payload['intro'];
+      final subPayload = payload['sub'] as Map<String, dynamic>?;
+      final dubPayload = payload['dub'] as Map<String, dynamic>?;
+      final rawIntro = raw['intro'] ??
+          payload['intro'] ??
+          subPayload?['intro'] ??
+          dubPayload?['intro'];
       if (rawIntro is Map) {
         final start = (rawIntro['start'] as num?)?.toInt();
         final end = (rawIntro['end'] as num?)?.toInt();
@@ -352,7 +357,10 @@ class JustAnimeProvider extends AnimeProvider {
       }
 
       Intro? outro;
-      final rawOutro = raw['outro'] ?? payload['outro'];
+      final rawOutro = raw['outro'] ??
+          payload['outro'] ??
+          subPayload?['outro'] ??
+          dubPayload?['outro'];
       if (rawOutro is Map) {
         final start = (rawOutro['start'] as num?)?.toInt();
         final end = (rawOutro['end'] as num?)?.toInt();

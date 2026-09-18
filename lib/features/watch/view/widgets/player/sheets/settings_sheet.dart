@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class SettingsSheetContent extends ConsumerWidget {
@@ -262,6 +263,33 @@ class SettingsSheetContent extends ConsumerWidget {
                       builder: (ctx) => const FitDialog(),
                     ),
               ),
+              ListTile(
+                leading: const Icon(Iconsax.timer_1),
+                title: const Text("Jump to Time"),
+                subtitle: const Text("Seek to a specific time (VLC style)"),
+                trailing: Text(
+                  _formatDuration(
+                    ref.watch(playerStateProvider.select((p) => p.position)),
+                  ),
+                ),
+                onTap: () {
+                  final player = ref.read(playerStateProvider);
+                  _showDialog(
+                    context,
+                    builder: (ctx) => JumpToTimeDialog(
+                      currentPosition: player.position,
+                      totalDuration: player.duration,
+                      title: 'Jump to Time',
+                      actionLabel: 'Jump',
+                      onJump: (targetDuration) {
+                        ref
+                            .read(playerStateProvider.notifier)
+                            .seek(targetDuration);
+                      },
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -388,4 +416,14 @@ String _fitModeToString(BoxFit fit) {
     default:
       return 'Fit';
   }
+}
+
+String _formatDuration(Duration d) {
+  final hours = d.inHours;
+  final minutes = d.inMinutes.remainder(60);
+  final seconds = d.inSeconds.remainder(60);
+  if (hours > 0) {
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }

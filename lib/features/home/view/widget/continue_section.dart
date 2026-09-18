@@ -13,6 +13,9 @@ import 'package:ani_dash/features/downloads/view/local_player_screen.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
+import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
 
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
@@ -382,6 +385,130 @@ class ContinueSection extends ConsumerWidget {
                     ),
                   ),
                 const Divider(height: 24),
+                ListTile(
+                  leading: const Icon(
+                    Iconsax.timer_1,
+                    color: Colors.cyanAccent,
+                  ),
+                  title: const Text('Jump to Time'),
+                  subtitle: Text(
+                    'Start Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} from a specific timestamp',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    final targetEpNum = currentEp?.episodeNumber ??
+                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
+                    final totalDur = (currentEp?.durationInSeconds != null &&
+                            currentEp!.durationInSeconds! > 0)
+                        ? Duration(seconds: currentEp.durationInSeconds!)
+                        : Duration.zero;
+                    final currentPos = (currentEp?.progressInSeconds != null &&
+                            currentEp!.progressInSeconds! > 0)
+                        ? Duration(seconds: currentEp.progressInSeconds!)
+                        : Duration.zero;
+
+                    showDialog(
+                      context: context,
+                      builder: (dialogCtx) => JumpToTimeDialog(
+                        currentPosition: currentPos,
+                        totalDuration: totalDur,
+                        title: 'Jump to Time (Ep $targetEpNum)',
+                        actionLabel: 'Play',
+                        onJump: (targetDuration) async {
+                          final localDownload = await ref
+                              .read(downloadsProvider.notifier)
+                              .findDownloadedEpisode(
+                                animeTitle: entry.animeTitle,
+                                episodeNumber: targetEpNum,
+                              );
+                          if (localDownload != null && context.mounted) {
+                            await Navigator.of(context, rootNavigator: true).push(
+                              MaterialPageRoute(
+                                builder: (_) => LocalPlayerScreen(
+                                  item: localDownload,
+                                  initialPosition: targetDuration,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          if (!context.mounted) return;
+                          await providerAnimeMatchSearch(
+                            context: context,
+                            ref: ref,
+                            animeMedia: UniversalMedia(
+                              id: entry.animeId,
+                              title: UniversalTitle(
+                                romaji: entry.animeTitle,
+                                english: entry.animeTitle,
+                                native: entry.animeTitle,
+                              ),
+                              coverImage: UniversalCoverImage(
+                                large: entry.animeCover,
+                                medium: entry.animeCover,
+                              ),
+                              isAdult: isAdult || entry.isAdult,
+                            ),
+                            startAt: targetEpNum,
+                            startAtPosition: targetDuration.inSeconds,
+                            withAnimeMatch: true,
+                            directAutoMatch: true,
+                            fromHentaiHub: isAdult || entry.isAdult,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Colors.green,
+                  ),
+                  title: Text(
+                    'Mark Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} as Watched',
+                  ),
+                  subtitle: const Text(
+                    'Marks this episode complete and updates progress',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    final targetEpNum = currentEp?.episodeNumber ??
+                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
+                    final duration = (currentEp?.durationInSeconds != null &&
+                            currentEp!.durationInSeconds! > 0)
+                        ? currentEp.durationInSeconds!
+                        : 1440;
+                    final repo = ref.read(watchProgressRepositoryProvider);
+                    repo.updateEpisodeProgress(
+                      entry.animeId,
+                      EpisodeProgress(
+                        episodeNumber: targetEpNum,
+                        episodeTitle: currentEp?.episodeTitle.isNotEmpty == true
+                            ? currentEp!.episodeTitle
+                            : 'Episode $targetEpNum',
+                        episodeThumbnail:
+                            currentEp?.episodeThumbnail ?? entry.animeCover,
+                        progressInSeconds: duration,
+                        durationInSeconds: duration,
+                        isCompleted: true,
+                        watchedAt: DateTime.now(),
+                      ),
+                    );
+                    ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
+                      mediaId: entry.animeId,
+                      episodeNum: targetEpNum,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Marked Episode $targetEpNum as watched',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
                 ListTile(
                   leading: Icon(
                     Iconsax.close_circle,

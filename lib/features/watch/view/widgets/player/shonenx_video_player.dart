@@ -91,20 +91,14 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         onVolumeUp: () => _handleHardwareVolumeKey(true),
         onVolumeDown: () => _handleHardwareVolumeKey(false),
       );
+      FlutterVolumeController.getVolume().then((v) {
+        if (mounted && v != null) {
+          ref.read(playerUIControllerProvider.notifier).setVolume(v);
+        }
+      });
       FlutterVolumeController.addListener((volume) {
-        if (!mounted) return;
+        if (!mounted || _isChangingVolume) return;
         ref.read(playerUIControllerProvider.notifier).setVolume(volume);
-        setState(() {
-          _isChangingVolume = true;
-        });
-        _volumeOverlayTimer?.cancel();
-        _volumeOverlayTimer = Timer(const Duration(milliseconds: 1500), () {
-          if (mounted) {
-            setState(() {
-              _isChangingVolume = false;
-            });
-          }
-        });
       });
     }
     // Restart auto-hide timer on init
@@ -160,6 +154,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     controller.setVolume(newV);
 
     if (newV > 1.0) {
+      FlutterVolumeController.setVolume(1.0);
       final gain = (newV * 100);
       ref
           .read(playerStateProvider.notifier)
@@ -167,11 +162,12 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
           .player
           .setVolume(gain);
     } else {
+      FlutterVolumeController.setVolume(newV.clamp(0.0, 1.0));
       ref
           .read(playerStateProvider.notifier)
           .videoController
           .player
-          .setVolume(100.0);
+          .setVolume(newV * 100);
     }
 
     _volumeOverlayTimer?.cancel();

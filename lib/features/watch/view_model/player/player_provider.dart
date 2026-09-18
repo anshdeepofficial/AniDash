@@ -140,7 +140,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // High-speed 5G/Wi-Fi streaming, 100s+ readahead, no-stutter buffering, and crystal clear 1080p
+    // Ultra-responsive startup, 100s+ forward buffer, and smooth continuous 1080p playback
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
@@ -152,13 +152,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'cache-pause': 'no', // Never freeze/pause playback on buffer jitter - continuous smooth playback
       'cache-pause-wait': '0', // No delay pause
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
+      'initial-audio-sync': 'no', // Render initial video frames immediately on startup
       'stream-lavf-o':
           'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular/Wi-Fi switches
       'network-timeout':
           '20', // 20s network timeout prevents premature drops
-      'demuxer-lavf-probesize': '1048576', // 1MB probe for reliable HLS parsing
-      'demuxer-lavf-buffersize': '4194304', // 4MB demuxer socket buffer for high throughput on 5G/Wi-Fi
-      'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration
+      'demuxer-lavf-probesize': '524288', // 512KB probe for rapid startup even on low-speed internet
+      'demuxer-lavf-buffersize': '4194304', // 4MB demuxer socket buffer for high throughput
+      'demuxer-lavf-analyzeduration': '0.5', // 0.5s analyze duration for instant stream start
       'force-seekable': 'yes',
       'hr-seek':
           'default', // Fast, responsive seek: precise if in cache, instant keyframe if over network

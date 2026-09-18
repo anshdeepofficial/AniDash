@@ -134,6 +134,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     required String? animeFormat,
     required String animeCover,
     int? malId,
+    int? startAtPosition,
     bool fromHentaiHub = false,
   }) async {
     _isDisposed = false;
@@ -171,11 +172,15 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       },
     );
 
-    await _initEpisode(mediaId, initialEpisode);
+    await _initEpisode(mediaId, initialEpisode, startAtPosition: startAtPosition);
     _attachPlaybackListeners(mediaId, animeName, episodes);
   }
 
-  Future<void> _initEpisode(String? mediaId, int initialEpisode) async {
+  Future<void> _initEpisode(
+    String? mediaId,
+    int initialEpisode, {
+    int? startAtPosition,
+  }) async {
     if (mediaId == null) return;
 
     _isPlayerReady = false;
@@ -206,6 +211,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _pos = playerNotifier.player.state.position.inSeconds;
       _dur = playerNotifier.player.state.duration.inSeconds;
 
+      // If a custom jump position was requested, seek to it immediately
+      if (startAtPosition != null && startAtPosition > 0) {
+        playerNotifier.seek(Duration(seconds: startAtPosition));
+      }
+
       // Restore saved playback speed if customized
       final savedSpeed = ref.read(playerSettingsProvider).defaultPlaybackSpeed;
       if (savedSpeed != 1.0) {
@@ -232,16 +242,23 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     playerNotifier.setActiveSession(mediaId, initialEpisode);
 
     Duration startAt = Duration.zero;
-    final saved = ref
-        .read(watchProgressRepositoryProvider)
-        .getEpisodeProgress(mediaId, initialEpisode);
-    final savedSeconds = saved?.progressInSeconds ?? 0;
-    final savedDuration = saved?.durationInSeconds ?? 0;
-    if (savedSeconds > 0 &&
-        !((saved?.isCompleted ?? false) ||
-            (savedDuration > 0 && savedSeconds >= savedDuration - 10))) {
-      startAt = Duration(seconds: savedSeconds);
-      AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
+    if (startAtPosition != null && startAtPosition > 0) {
+      startAt = Duration(seconds: startAtPosition);
+      AppLogger.i(
+        '⚡ Jumping directly to timestamp ${startAt.inSeconds}s for episode $initialEpisode',
+      );
+    } else {
+      final saved = ref
+          .read(watchProgressRepositoryProvider)
+          .getEpisodeProgress(mediaId, initialEpisode);
+      final savedSeconds = saved?.progressInSeconds ?? 0;
+      final savedDuration = saved?.durationInSeconds ?? 0;
+      if (savedSeconds > 0 &&
+          !((saved?.isCompleted ?? false) ||
+              (savedDuration > 0 && savedSeconds >= savedDuration - 10))) {
+        startAt = Duration(seconds: savedSeconds);
+        AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
+      }
     }
 
     // Restore saved playback speed if customized
@@ -409,6 +426,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       }
 
       if (next != null) {
+        ref.read(aniSkipProvider.notifier).clear();
         _hasAutoSkippedIntro = false;
         _hasAutoSkippedOutro = false;
         _lastAniSkipEpisode = null;
