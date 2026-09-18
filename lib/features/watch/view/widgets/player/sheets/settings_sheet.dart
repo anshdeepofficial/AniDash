@@ -109,7 +109,9 @@ class SettingsSheetContent extends ConsumerWidget {
                 leading: const Icon(Icons.dns_rounded),
                 title: const Text("Server"),
                 trailing: Text(
-                  streamData.selectedServer?.id?.toUpperCase() ?? 'Auto',
+                  streamData.selectedServer?.name ??
+                      streamData.selectedServer?.id?.toUpperCase() ??
+                      'Auto',
                 ),
                 onTap:
                     streamData.servers.isEmpty
@@ -127,10 +129,9 @@ class SettingsSheetContent extends ConsumerWidget {
                                             .map(
                                               (server) => ListTile(
                                                 title: Text(
-                                                  (server.id ??
-                                                          server.name ??
-                                                          'Server')
-                                                      .toUpperCase(),
+                                                  server.name ??
+                                                      (server.id ?? 'Server')
+                                                          .toUpperCase(),
                                                 ),
                                                 subtitle: Text(
                                                   server.isDub ? 'DUB' : 'SUB',

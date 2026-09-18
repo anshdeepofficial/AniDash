@@ -882,21 +882,21 @@ class EpisodeData extends _$EpisodeData {
         final category = state.selectedServer?.isDub == true ? 'dub' : 'sub';
         BaseSourcesModel? fallback;
 
-        // JustAnime's HLS host can return a valid playlist while never
-        // delivering playable frames on a device. Retry its independent MP4
-        // server before changing the user's selected provider.
+        // Try alternate JustAnime server if primary stalled
         if (_isNativeProvider && _provider?.providerName == 'justanime') {
+          final altServer =
+              state.selectedServer?.id == 'megaplay' ? 'zokoanime' : 'megaplay';
           try {
             fallback = await _provider!
                 .getSources(
                   _epList.animeId ?? '',
                   epModel.id ?? epNum.toString(),
-                  'animegg',
+                  altServer,
                   category,
                 )
                 .timeout(const Duration(seconds: 8));
           } catch (e) {
-            AppLogger.w('JustAnime MP4 recovery failed: $e');
+            AppLogger.w('JustAnime alternate server recovery failed: $e');
           }
         }
 

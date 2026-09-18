@@ -205,7 +205,6 @@ class JustAnimeProvider extends AnimeProvider {
     final rawEp = episodeId.split('+').last.replaceAll(RegExp(r'[^0-9]'), '');
     final episode = int.tryParse(rawEp) ?? int.tryParse(episodeId) ?? 1;
     final requestedAudio = category?.toLowerCase() == 'dub' ? 'dub' : 'sub';
-    final audioOrder = [requestedAudio];
 
     final cacheKey = '$animeId:$episode:$serverName:$requestedAudio';
     final cached = _sourcesCache[cacheKey];
@@ -235,44 +234,69 @@ class JustAnimeProvider extends AnimeProvider {
       Map<String, dynamic>? payload,
     ) {
       if (payload == null) return null;
-      final endpointAudio = endpoint.contains('/anineko/dub') ? 'dub' : 'sub';
 
-      if (endpoint.contains('/anineko/') && requestedAudio != endpointAudio) {
-        return null;
+      Map<String, dynamic>? raw;
+      String actualAudio = requestedAudio;
+
+      if (payload.containsKey('sub') || payload.containsKey('dub')) {
+        if (requestedAudio == 'dub') {
+          raw = payload['dub'] as Map<String, dynamic>?;
+          if (raw != null) {
+            actualAudio = 'dub';
+          } else {
+            return null;
+          }
+        } else {
+          raw = (payload['sub'] ?? payload['hsub']) as Map<String, dynamic>?;
+          if (raw != null) {
+            actualAudio = 'sub';
+          } else {
+            return null;
+          }
+        }
+      } else {
+        final endpointAudio = endpoint.contains('/dub') ? 'dub' : 'sub';
+        if (endpoint.contains('/anineko/') && requestedAudio != endpointAudio) {
+          return null;
+        }
+        raw = payload;
+        actualAudio = endpointAudio;
       }
 
-      final animeGGRaw =
-          endpoint.contains('animegg')
-              ? (requestedAudio == 'dub'
-                  ? payload['dub']
-                  : (payload['sub'] ?? payload['dub']))
-              : null;
+      final serverReferer =
+          endpoint.contains('megaplay')
+              ? 'https://megaplay.buzz/'
+              : endpoint.contains('zoko')
+              ? 'https://zokoanime.video/'
+              : endpoint.contains('animegg')
+              ? 'https://www.animegg.org/'
+              : 'https://justanime.to/';
 
-      if (endpoint.contains('animegg') &&
-          requestedAudio == 'dub' &&
-          payload['dub'] == null) {
-        return null;
+      final commonHeaders = {
+        'User-Agent': _userAgent,
+        'Referer': serverReferer,
+        'Origin': serverReferer.replaceAll(RegExp(r'/+$'), ''),
+        ...Map<String, String>.from(
+          (raw['headers'] as Map?)?.map(
+                (key, value) => MapEntry(key.toString(), value.toString()),
+              ) ??
+              (payload['headers'] as Map?)?.map(
+                (key, value) => MapEntry(key.toString(), value.toString()),
+              ) ??
+              const {},
+        ),
+      };
+
+      String serverLabel = 'Momo';
+      if (endpoint.contains('megaplay')) {
+        serverLabel = 'Momo';
+      } else if (endpoint.contains('zokoanime')) {
+        serverLabel = 'Zoko';
+      } else if (endpoint.contains('anineko')) {
+        serverLabel = 'Neko';
+      } else if (endpoint.contains('animegg')) {
+        serverLabel = 'Gigi';
       }
-
-      final raw =
-          endpoint.contains('animegg')
-              ? animeGGRaw as Map<String, dynamic>?
-              : payload;
-      if (raw == null) return null;
-      final actualAudio =
-          endpoint.contains('animegg')
-              ? (identical(animeGGRaw, payload['dub']) ? 'dub' : 'sub')
-              : endpointAudio;
-
-      final commonHeaders = Map<String, String>.from(
-        (raw['headers'] as Map?)?.map(
-              (key, value) => MapEntry(key.toString(), value.toString()),
-            ) ??
-            (payload['headers'] as Map?)?.map(
-              (key, value) => MapEntry(key.toString(), value.toString()),
-            ) ??
-            const {},
-      );
 
       final sources =
           (raw['sources'] as List<dynamic>? ?? const [])
@@ -291,7 +315,7 @@ class JustAnimeProvider extends AnimeProvider {
                   quality: item['quality']?.toString() ?? 'Auto',
                   isM3U8: item['isM3U8'] == true || urlStr.contains('.m3u8'),
                   isDub: actualAudio == 'dub',
-                  type: endpoint.contains('animegg') ? 'AnimeGG' : 'AniNeko',
+                  type: serverLabel,
                   headers: sourceHeaders,
                 );
               })
@@ -346,17 +370,30 @@ class JustAnimeProvider extends AnimeProvider {
       );
     }
 
-    final isExplicitAniNeko =
-        serverName?.toLowerCase().contains('anineko') == true;
-    final hlsEndpoints = [
-      for (final audio in audioOrder)
-        '/watch/$animeId/episode/$episode/anineko/$audio',
+    final sName = serverName?.toLowerCase() ?? '';
+    final endpoints = <String>[];
+    if (sName.contains('megaplay') || sName.contains('momo')) {
+      endpoints.add('/watch/$animeId/episode/$episode/megaplay');
+    } else if (sName.contains('zoko')) {
+      endpoints.add('/watch/$animeId/episode/$episode/zokoanime');
+    } else if (sName.contains('neko') || sName.contains('anineko')) {
+      endpoints.add('/watch/$animeId/episode/$episode/anineko/$requestedAudio');
+    } else if (sName.contains('gigi') || sName.contains('animegg')) {
+      endpoints.add('/watch/$animeId/episode/$episode/animegg');
+    }
+
+    // Default priority order: Momo (Megaplay) > Zoko (ZokoAnime) > Neko (AniNeko) > Gigi (AnimeGG)
+    final priorityEndpoints = [
+      '/watch/$animeId/episode/$episode/megaplay',
+      '/watch/$animeId/episode/$episode/zokoanime',
+      '/watch/$animeId/episode/$episode/anineko/$requestedAudio',
+      '/watch/$animeId/episode/$episode/animegg',
     ];
-    final animeggEndpoint = '/watch/$animeId/episode/$episode/animegg';
-    final endpoints =
-        isExplicitAniNeko
-            ? [...hlsEndpoints, animeggEndpoint]
-            : [animeggEndpoint, ...hlsEndpoints];
+    for (final ep in priorityEndpoints) {
+      if (!endpoints.contains(ep)) {
+        endpoints.add(ep);
+      }
+    }
 
     final completer = Completer<BaseSourcesModel>();
     var pending = endpoints.length;
@@ -399,13 +436,17 @@ class JustAnimeProvider extends AnimeProvider {
   @override
   Future<BaseServerModel> getSupportedServers({dynamic metadata}) async {
     final subServers = [
-      ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: false),
-      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: false),
+      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: false),
+      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: false),
+      ServerData(name: "Neko (HLS)", id: "anineko", isDub: false),
+      ServerData(name: "Gigi (MP4)", id: "animegg", isDub: false),
     ];
 
     final dubServers = [
-      ServerData(name: "AnimeGG (MP4)", id: "animegg", isDub: true),
-      ServerData(name: "AniNeko (HLS)", id: "anineko", isDub: true),
+      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: true),
+      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: true),
+      ServerData(name: "Neko (HLS)", id: "anineko", isDub: true),
+      ServerData(name: "Gigi (MP4)", id: "animegg", isDub: true),
     ];
 
     return BaseServerModel(sub: subServers, dub: dubServers);

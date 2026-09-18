@@ -454,7 +454,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
             data.servers
                 .map(
                   (e) =>
-                      '${(e.id ?? 'Server').toUpperCase()}${e.name?.isNotEmpty == true && e.name != e.id ? ' (${e.name})' : ''} [${e.isDub ? 'DUB' : 'SUB'}]',
+                      '${e.name ?? (e.id ?? 'Server').toUpperCase()} [${e.isDub ? 'DUB' : 'SUB'}]',
                 )
                 .toList(),
         selectedIndex: selectedIdx != -1 ? selectedIdx : 0,

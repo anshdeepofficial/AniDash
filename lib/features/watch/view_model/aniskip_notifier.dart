@@ -29,8 +29,6 @@ class AniSkipNotifier extends _$AniSkipNotifier {
     required int episodeLength,
     int? malId,
   }) async {
-    final existingItems = List<AniSkipResultItem>.from(state);
-
     try {
       final cacheKey = animeTitle.trim().toLowerCase();
 
@@ -127,22 +125,10 @@ class AniSkipNotifier extends _$AniSkipNotifier {
           episodeNumber,
           episodeLength,
         );
-        // Merge AniSkip results with any existing source fallback (e.g. intro/outro from source)
-        final merged = List<AniSkipResultItem>.from(results);
-        for (final existing in existingItems) {
-          final alreadyHasType = merged.any(
-            (m) =>
-                m.skipType == existing.skipType ||
-                (m.skipType == SkipType.mixed &&
-                    existing.skipType == SkipType.op),
-          );
-          if (!alreadyHasType) {
-            merged.add(existing);
-          }
-        }
-        state = merged;
+        // Merge AniSkip results: Stream source intro/outro always takes absolute priority!
+        state = _mergeWithSourcePriority(results);
         AppLogger.d(
-          'AniSkip: ${merged.length} skip intervals active for ep $episodeNumber',
+          'AniSkip: ${state.length} skip intervals active for ep $episodeNumber',
         );
       } else {
         AppLogger.w('Could not resolve MAL ID for $animeTitle ($mediaId)');
@@ -152,21 +138,35 @@ class AniSkipNotifier extends _$AniSkipNotifier {
     }
   }
 
-  void setFallbackFromSource({Intro? intro, Intro? outro}) {
-    final newItems = <AniSkipResultItem>[];
-    final hasOp = state.any(
-      (s) => s.skipType == SkipType.op || s.skipType == SkipType.mixed,
-    );
-    final hasEd = state.any(
-      (s) => s.skipType == SkipType.ed || s.skipType == SkipType.mixed,
-    );
+  List<AniSkipResultItem> _sourceSkips = [];
 
-    if (!hasOp &&
-        intro != null &&
+  List<AniSkipResultItem> _mergeWithSourcePriority(
+    List<AniSkipResultItem> communitySkips,
+  ) {
+    // Start with sourceSkips as the ground truth
+    final list = List<AniSkipResultItem>.from(_sourceSkips);
+    for (final comm in communitySkips) {
+      final hasType = list.any(
+        (s) =>
+            s.skipType == comm.skipType ||
+            (s.skipType == SkipType.op && comm.skipType == SkipType.mixed) ||
+            (s.skipType == SkipType.mixed && comm.skipType == SkipType.op),
+      );
+      if (!hasType) {
+        list.add(comm);
+      }
+    }
+    return list;
+  }
+
+  void setFallbackFromSource({Intro? intro, Intro? outro}) {
+    final newSourceItems = <AniSkipResultItem>[];
+
+    if (intro != null &&
         intro.start != null &&
         intro.end != null &&
         intro.end! > intro.start!) {
-      newItems.add(
+      newSourceItems.add(
         AniSkipResultItem(
           interval: AniSkipInterval(
             startTime: intro.start!.toDouble(),
@@ -178,12 +178,11 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         ),
       );
     }
-    if (!hasEd &&
-        outro != null &&
+    if (outro != null &&
         outro.start != null &&
         outro.end != null &&
         outro.end! > outro.start!) {
-      newItems.add(
+      newSourceItems.add(
         AniSkipResultItem(
           interval: AniSkipInterval(
             startTime: outro.start!.toDouble(),
@@ -195,15 +194,19 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         ),
       );
     }
-    if (newItems.isNotEmpty) {
-      state = [...state, ...newItems];
+
+    if (newSourceItems.isNotEmpty) {
+      _sourceSkips = newSourceItems;
+      // Overwrite/merge existing state so source intro/outro takes immediate precedence
+      state = _mergeWithSourcePriority(state);
       AppLogger.d(
-        'AniSkip: Applied ${newItems.length} intro/outro from streaming source fallback (total: ${state.length})',
+        'AniSkip: Applied ${newSourceItems.length} authoritative intro/outro from stream source (total: ${state.length})',
       );
     }
   }
 
   void clear() {
+    _sourceSkips = [];
     state = [];
   }
 }

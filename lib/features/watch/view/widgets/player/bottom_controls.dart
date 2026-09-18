@@ -110,7 +110,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (!widget.isLocal)
+                            if (!widget.isLocal) ...[
                               _FlatTextBtn(
                                 text: ref.watch(
                                   episodeDataProvider.select(
@@ -128,6 +128,24 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                 isAccent: true,
                                 scheme: scheme,
                               ),
+                              _FlatTextBtn(
+                                text: ref.watch(
+                                  episodeDataProvider.select((s) {
+                                    final server = s.selectedServer;
+                                    if (server == null) return 'SERVER';
+                                    final name =
+                                        server.name ?? server.id ?? 'SERVER';
+                                    return name
+                                        .replaceAll(RegExp(r'\(.*?\)'), '')
+                                        .trim()
+                                        .toUpperCase();
+                                  }),
+                                ),
+                                onTap: widget.onServerPressed,
+                                isAccent: false,
+                                scheme: scheme,
+                              ),
+                            ],
                             if (!widget.isLocal)
                               _ToolbarIcon(
                                 icon: Icons.subtitles_rounded,
@@ -309,10 +327,9 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       ));
     }
 
-    // If no OUTRO highlight was present from AniSkip, but episode is >= 3 minutes,
-    // show the standard 85-second OUTRO highlight on the scrubber line!
+    // Only synthesize an outro highlight if no skip data at all is available
     final hasEd = highlightSegments.any((s) => s.label == 'OUTRO');
-    if (!hasEd && total > 180000) {
+    if (!hasEd && skips.isEmpty && total > 180000) {
       final outroMs = 85000.0;
       final s = (total - outroMs).clamp(0.0, total);
       highlightSegments.add((

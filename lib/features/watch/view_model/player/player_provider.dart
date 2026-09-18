@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -141,7 +142,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     // Ultra-fast stream startup, smooth buffering, and clean keyframe resume
     final fastProperties = <String, String>{
-      'hwdec': 'auto-safe',
+      'hwdec': 'mediacodec-copy,auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': '104857600', // 100MB buffer for reliable offline/travel playback
@@ -150,22 +151,22 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'demuxer-readahead-secs': '120', // 120s forward readahead prevents stalls during signal drops
       'cache-pause': 'yes', // Gracefully pause on buffer starvation to keep audio/video in sync
       'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'cache-pause-wait': '1', // Resume as soon as 1 second of clean packets arrive
+      'cache-pause-wait': '2.5', // Buffer 2.5s before resuming to prevent rapid rebuffering loops
       'stream-lavf-o':
           'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular tower handovers
       'network-timeout':
           '15', // 15s timeout prevents premature disconnects in weak signal areas
-      'demuxer-lavf-probesize': '524288', // 512KB probe (instant stream startup)
-      'demuxer-lavf-analyzeduration': '0.8', // 0.8s max analyze duration
+      'demuxer-lavf-probesize': '1048576', // 1MB probe for reliable HLS parsing
+      'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration
       'force-seekable': 'yes',
       'hr-seek':
           'default', // Fast, responsive seek: precise if in cache, instant keyframe if over network
       'hr-seek-framedrop':
-          'yes', // Drop incomplete reference frames during resume/seek to prevent pixelation/macroblocking
+          'no', // Never drop video frames into black screen during seeks
       'framedrop':
-          'vo', // Drop corrupted or late non-keyframes after buffer underruns
+          'no', // Never drop video frames into a black screen while audio plays
       'correct-pts': 'yes',
-      'vd-lavc-show-all': 'no', // Never display corrupted/incomplete frames
+      'vd-lavc-show-all': 'no',
       'video-sync': 'audio',
       'hls-bitrate': 'auto',
     };
@@ -323,13 +324,25 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     });
     try {
       final platform = _player.platform as dynamic;
-      await platform.setProperty('user-agent', effectiveHeaders['User-Agent']!);
-      await platform.setProperty('referrer', effectiveHeaders['Referer'] ?? '');
+      final ua = effectiveHeaders.entries
+              .firstWhereOrNull(
+                (entry) => entry.key.toLowerCase() == 'user-agent',
+              )
+              ?.value ??
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      final ref = effectiveHeaders.entries
+              .firstWhereOrNull((entry) => entry.key.toLowerCase() == 'referer')
+              ?.value ??
+          '';
+      await platform.setProperty('user-agent', ua);
+      await platform.setProperty('referrer', ref);
       final forwardedHeaders = effectiveHeaders.entries
           .where((entry) => entry.key.toLowerCase() != 'user-agent')
           .map((entry) => '${entry.key}: ${entry.value}')
           .join(',');
-      await platform.setProperty('http-header-fields', forwardedHeaders);
+      if (forwardedHeaders.isNotEmpty) {
+        await platform.setProperty('http-header-fields', forwardedHeaders);
+      }
     } catch (_) {}
     await _player.open(
       Media(url, httpHeaders: effectiveHeaders, start: startAt),
