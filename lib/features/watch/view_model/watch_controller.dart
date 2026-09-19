@@ -342,7 +342,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
             return;
           }
           if (_isPlayerReady &&
-              _dur > 30 &&
+              _dur > 60 &&
               _pos >= _dur - 2 &&
               !_hasAutoAdvanced &&
               !_isDisposed) {
@@ -370,7 +370,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       }
 
       _checkAutoSkip(next.position);
-      if (_dur > 30 && _pos >= _dur - 1) triggerAutoAdvance();
+      if (_dur > 120 && _pos >= _dur - 1) triggerAutoAdvance();
 
       // Flow optimizations: 85% pre-fetch & 95% next episode prompt
       if (_dur > 60) {

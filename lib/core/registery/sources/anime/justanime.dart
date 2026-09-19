@@ -380,22 +380,22 @@ class JustAnimeProvider extends AnimeProvider {
 
     final sName = serverName?.toLowerCase() ?? '';
     final endpoints = <String>[];
-    if (sName.contains('megaplay') || sName.contains('momo')) {
-      endpoints.add('/watch/$animeId/episode/$episode/megaplay');
-    } else if (sName.contains('zoko')) {
+    if (sName.contains('zoko')) {
       endpoints.add('/watch/$animeId/episode/$episode/zokoanime');
+    } else if (sName.contains('megaplay') || sName.contains('momo')) {
+      endpoints.add('/watch/$animeId/episode/$episode/megaplay');
     } else if (sName.contains('neko') || sName.contains('anineko')) {
       endpoints.add('/watch/$animeId/episode/$episode/anineko/$requestedAudio');
     } else if (sName.contains('gigi') || sName.contains('animegg')) {
       endpoints.add('/watch/$animeId/episode/$episode/animegg');
     }
 
-    // Default priority order: Momo (Megaplay) > Zoko (ZokoAnime) > Neko (AniNeko) > Gigi (AnimeGG)
+    // Default priority order: Zoko (ZokoAnime / 1embed.buzz) > Momo (Megaplay) > Gigi (AnimeGG) > Neko (AniNeko)
     final priorityEndpoints = [
-      '/watch/$animeId/episode/$episode/megaplay',
       '/watch/$animeId/episode/$episode/zokoanime',
-      '/watch/$animeId/episode/$episode/anineko/$requestedAudio',
+      '/watch/$animeId/episode/$episode/megaplay',
       '/watch/$animeId/episode/$episode/animegg',
+      '/watch/$animeId/episode/$episode/anineko/$requestedAudio',
     ];
     for (final ep in priorityEndpoints) {
       if (!endpoints.contains(ep)) {
@@ -403,56 +403,34 @@ class JustAnimeProvider extends AnimeProvider {
       }
     }
 
-    final completer = Completer<BaseSourcesModel>();
-    var pending = endpoints.length;
-
     for (final ep in endpoints) {
-      request(ep)
-          .then((payload) {
-            if (completer.isCompleted) return;
-            final model = parseSource(ep, payload);
-            if (model != null && !completer.isCompleted) {
-              _sourcesCache[cacheKey] = (time: DateTime.now(), data: model);
-              completer.complete(model);
-            } else {
-              pending--;
-              if (pending <= 0 && !completer.isCompleted) {
-                completer.completeError(
-                  Exception(
-                    'No playable JustAnime source found for episode $episode',
-                  ),
-                );
-              }
-            }
-          })
-          .catchError((_) {
-            if (completer.isCompleted) return;
-            pending--;
-            if (pending <= 0 && !completer.isCompleted) {
-              completer.completeError(
-                Exception(
-                  'No playable JustAnime source found for episode $episode',
-                ),
-              );
-            }
-          });
+      try {
+        final payload = await request(ep).timeout(const Duration(seconds: 6));
+        final model = parseSource(ep, payload);
+        if (model != null && model.sources.isNotEmpty) {
+          _sourcesCache[cacheKey] = (time: DateTime.now(), data: model);
+          return model;
+        }
+      } catch (_) {
+        // Fallback to next endpoint in priority list
+      }
     }
 
-    return await completer.future;
+    throw Exception('No playable JustAnime source found for episode $episode');
   }
 
   @override
   Future<BaseServerModel> getSupportedServers({dynamic metadata}) async {
     final subServers = [
-      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: false),
       ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: false),
+      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: false),
       ServerData(name: "Neko (HLS)", id: "anineko", isDub: false),
       ServerData(name: "Gigi (MP4)", id: "animegg", isDub: false),
     ];
 
     final dubServers = [
-      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: true),
       ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: true),
+      ServerData(name: "Momo (HLS)", id: "megaplay", isDub: true),
       ServerData(name: "Neko (HLS)", id: "anineko", isDub: true),
       ServerData(name: "Gigi (MP4)", id: "animegg", isDub: true),
     ];

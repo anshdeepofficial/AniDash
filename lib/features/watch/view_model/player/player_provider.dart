@@ -129,8 +129,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
+      32 * 1024 * 1024,
       128 * 1024 * 1024,
-      512 * 1024 * 1024,
+    );
+    final backBufferBytes = (effectiveBufferBytes ~/ 4).clamp(
+      8 * 1024 * 1024,
+      32 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -140,39 +144,35 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Ultra-responsive startup, 100s+ forward buffer, and smooth continuous 1080p playback
+    // Highly optimized, rock-solid buffering for smooth continuous playback on any connection
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
-      'demuxer-max-bytes': '268435456', // 256MB buffer for uninterrupted high-bitrate streaming
-      'demuxer-max-back-bytes': '67108864', // 64MB back cache for instant rewinds
-      'cache-secs': '300', // 300s (5-minute) stream cache window
-      'demuxer-readahead-secs': '120', // Buffer 100+ seconds ahead to prevent any rebuffering pauses
-      'cache-pause': 'no', // Never freeze/pause playback on buffer jitter - continuous smooth playback
-      'cache-pause-wait': '0', // No delay pause
-      'cache-pause-initial': 'no', // Play immediately on stream open without waiting
-      'initial-audio-sync': 'no', // Render initial video frames immediately on startup
+      'demuxer-max-bytes': effectiveBufferBytes.toString(),
+      'demuxer-max-back-bytes': backBufferBytes.toString(),
+      'cache-secs': '180', // 180s forward cache window
+      'demuxer-readahead-secs': '60', // 60s continuous forward readahead
+      'cache-pause': 'yes', // Gracefully pause on buffer underrun to keep audio/video in sync
+      'cache-pause-wait': '2', // Buffer 2 seconds before resuming, preventing rapid stutter loops
+      'cache-pause-initial': 'yes', // Ensure 2s healthy initial buffer before playing frame 0
       'stream-lavf-o':
           'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular/Wi-Fi switches
       'network-timeout':
           '20', // 20s network timeout prevents premature drops
-      'demuxer-lavf-probesize': '524288', // 512KB probe for rapid startup even on low-speed internet
-      'demuxer-lavf-buffersize': '4194304', // 4MB demuxer socket buffer for high throughput
-      'demuxer-lavf-analyzeduration': '0.5', // 0.5s analyze duration for instant stream start
+      'demuxer-lavf-probesize': '2097152', // 2MB probe for reliable HLS & multi-track detection
+      'demuxer-lavf-buffersize': '2097152', // 2MB socket buffer for smooth throughput
+      'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration for accurate timestamps
       'force-seekable': 'yes',
       'hr-seek':
-          'default', // Fast, responsive seek: precise if in cache, instant keyframe if over network
-      'hr-seek-framedrop':
-          'no', // Never drop video frames into black screen during seeks
-      'framedrop':
-          'no', // Never drop video frames into a black screen while audio plays
+          'default', // Precise seek if in cache, instant keyframe if over network
       'correct-pts': 'yes',
       'vd-lavc-show-all': 'no',
-      'vd-lavc-dr': 'no', // Disable direct rendering to prevent memory corruption on Android
+      'vd-lavc-dr': 'no', // Safe rendering on Android
       'vd-lavc-fast': 'yes', // Fast decoding optimizations
       'video-sync': 'audio',
-      'hls-bitrate': 'max', // Force highest quality HLS stream variant (prevents pixelated low-bitrate stream)
+      // hls-bitrate omitted: enables mpv adaptive bitrate (ABR) streaming.
+      // Automatically scales up to 1080p on fast Wi-Fi and smoothly adapts without freezing on mobile data.
     };
 
     final platform = _player.platform as dynamic;
@@ -341,7 +341,11 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       await platform.setProperty('user-agent', ua);
       await platform.setProperty('referrer', ref);
       final forwardedHeaders = effectiveHeaders.entries
-          .where((entry) => entry.key.toLowerCase() != 'user-agent')
+          .where(
+            (entry) =>
+                entry.key.toLowerCase() != 'user-agent' &&
+                entry.key.toLowerCase() != 'referer',
+          )
           .map((entry) => '${entry.key}: ${entry.value}')
           .join(',');
       if (forwardedHeaders.isNotEmpty) {
