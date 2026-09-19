@@ -72,6 +72,31 @@ class MangaSpotlight extends StatelessWidget {
                         useOldImageOnUrlChange: true,
                       ),
                     ),
+                    if (anime!.isMature)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade900,
+                            border: const Border(
+                              right: BorderSide(color: Colors.white, width: 2),
+                              bottom: BorderSide(color: Colors.white, width: 2),
+                            ),
+                          ),
+                          child: const Text(
+                            '18+',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ),
+                      ),
                     if (anime!.averageScore != null)
                       Positioned(
                         top: 0,

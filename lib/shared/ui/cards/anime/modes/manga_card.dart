@@ -92,6 +92,35 @@ class MangaCard extends StatelessWidget {
                     ),
                   ),
 
+                  // 18+ Badge (Comic Style)
+                  if (anime?.isMature == true)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade900,
+                          border: const Border(
+                            right: BorderSide(color: Colors.white, width: 2),
+                            bottom: BorderSide(color: Colors.white, width: 2),
+                          ),
+                        ),
+                        child: const Text(
+                          '18+',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            fontFamily: 'Roboto',
+                          ),
+                        ),
+                      ),
+                    ),
+
                   // Rating Badge (Comic Style)
                   if (anime?.averageScore != null)
                     Positioned(

@@ -1,12 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
-
-
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dart';
+import 'package:ani_dash/features/manga/utils/manga_helpers.dart';
 import 'manga_reader_screen.dart';
 
-class MangaDetailsScreen extends StatefulWidget {
+class MangaDetailsScreen extends ConsumerStatefulWidget {
   final DMedia manga;
   final Source mangaSource;
 
@@ -17,10 +18,10 @@ class MangaDetailsScreen extends StatefulWidget {
   });
 
   @override
-  State<MangaDetailsScreen> createState() => _MangaDetailsScreenState();
+  ConsumerState<MangaDetailsScreen> createState() => _MangaDetailsScreenState();
 }
 
-class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
+class _MangaDetailsScreenState extends ConsumerState<MangaDetailsScreen> {
   DMedia? _detailedManga;
   bool _isLoading = true;
   String? _error;
@@ -41,7 +42,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
     try {
       final details = await widget.mangaSource.methods
           .getDetail(widget.manga)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 20));
 
       if (mounted) {
         setState(() {
@@ -66,11 +67,23 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
     final colorScheme = theme.colorScheme;
     final manga = _detailedManga ?? widget.manga;
     final chapters = manga.episodes ?? [];
-    final displayedChapters = _isReversed ? chapters.reversed.toList() : chapters;
+    final displayedChapters =
+        _isReversed ? chapters.reversed.toList() : chapters;
+    final isAdult = isMangaAdult(manga, source: widget.mangaSource);
+
+    final progressList = ref.watch(mangaReadingProgressProvider);
+    final mangaKey = manga.url ?? manga.title ?? '';
+    final currentProgress = progressList
+        .where((p) => p.mangaUrl == mangaKey || p.mangaTitle == manga.title)
+        .firstOrNull;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(manga.title ?? 'Manga Details'),
+        title: Text(
+          manga.title ?? 'Manga Details',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Iconsax.refresh),
@@ -92,20 +105,31 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: CachedNetworkImage(
-                                imageUrl: manga.cover ?? '',
-                                width: 110,
-                                height: 160,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => Container(
-                                  width: 110,
-                                  height: 160,
-                                  color: colorScheme.surfaceContainerHighest,
-                                  child: const Icon(Iconsax.book, size: 40),
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CachedNetworkImage(
+                                    imageUrl: manga.cover ?? '',
+                                    width: 110,
+                                    height: 160,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Container(
+                                      width: 110,
+                                      height: 160,
+                                      color:
+                                          colorScheme.surfaceContainerHighest,
+                                      child: const Icon(Iconsax.book, size: 40),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                if (isAdult)
+                                  Positioned(
+                                    top: 6,
+                                    left: 6,
+                                    child: build18PlusBadge(fontSize: 9),
+                                  ),
+                              ],
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -114,7 +138,8 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                 children: [
                                   Text(
                                     manga.title ?? 'Untitled',
-                                    style: theme.textTheme.titleMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                                     maxLines: 3,
@@ -124,30 +149,46 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                     const SizedBox(height: 6),
                                     Text(
                                       'Author: ${manga.author}',
-                                      style: theme.textTheme.bodySmall?.copyWith(
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
                                   const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      widget.mangaSource.name ?? 'Manga Source',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme.primaryContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          widget.mangaSource.name ??
+                                              'Manga Source',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color:
+                                                colorScheme.onPrimaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (isAdult) build18PlusBadge(fontSize: 9),
+                                    ],
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     '${chapters.length} Chapters',
-                                    style: theme.textTheme.labelMedium?.copyWith(
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -156,12 +197,58 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                             ),
                           ],
                         ),
+
+                        // Resume Reading Button if progress exists
+                        if (currentProgress != null &&
+                            chapters.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                // Find the chapter matching progress
+                                final targetChapter = chapters.firstWhere(
+                                  (ch) =>
+                                      (ch.url != null &&
+                                          ch.url == currentProgress.chapterUrl) ||
+                                      ch.name == currentProgress.chapterTitle ||
+                                      ch.episodeNumber ==
+                                          currentProgress.chapterNumber,
+                                  orElse: () => chapters.first,
+                                );
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MangaReaderScreen(
+                                      chapter: targetChapter,
+                                      mangaTitle: manga.title ?? 'Manga',
+                                      mangaSource: widget.mangaSource,
+                                      manga: manga,
+                                      mangaCover: manga.cover,
+                                      initialPage: currentProgress.pageIndex,
+                                      isAdult: isAdult,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Iconsax.book_1),
+                              label: Text(
+                                'Resume ${currentProgress.chapterTitle} (Page ${currentProgress.pageIndex}/${currentProgress.totalPages})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+
                         if (manga.description?.isNotEmpty == true) ...[
                           const SizedBox(height: 16),
                           Text(
                             manga.description!,
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurface.withValues(alpha: 0.8),
+                              color:
+                                  colorScheme.onSurface.withValues(alpha: 0.8),
                               height: 1.4,
                             ),
                             maxLines: 4,
@@ -181,11 +268,16 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                             ),
                             IconButton(
                               icon: Icon(
-                                _isReversed ? Iconsax.arrow_up_3 : Iconsax.arrow_down_1,
+                                _isReversed
+                                    ? Iconsax.arrow_up_3
+                                    : Iconsax.arrow_down_1,
                                 size: 20,
                               ),
-                              tooltip: _isReversed ? 'Show First to Last' : 'Show Last to First',
-                              onPressed: () => setState(() => _isReversed = !_isReversed),
+                              tooltip: _isReversed
+                                  ? 'Show First to Last'
+                                  : 'Show Last to First',
+                              onPressed: () =>
+                                  setState(() => _isReversed = !_isReversed),
                             ),
                           ],
                         ),
@@ -208,28 +300,44 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final chapter = displayedChapters[index];
+                        final isRead = currentProgress != null &&
+                            (currentProgress.chapterUrl == chapter.url ||
+                                currentProgress.chapterTitle == chapter.name);
+
                         return ListTile(
                           leading: Container(
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              color: isRead
+                                  ? Colors.green.withValues(alpha: 0.15)
+                                  : colorScheme.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              child: isRead
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Colors.green,
+                                      size: 18,
+                                    )
+                                  : Text(
+                                      '${index + 1}',
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                             ),
                           ),
                           title: Text(
                             chapter.name ?? 'Chapter ${index + 1}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight:
+                                  isRead ? FontWeight.bold : FontWeight.w600,
+                              color: isRead ? colorScheme.primary : null,
+                            ),
                           ),
                           subtitle: chapter.dateUpload?.isNotEmpty == true
                               ? Text(chapter.dateUpload!)
@@ -243,6 +351,9 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                                   chapter: chapter,
                                   mangaTitle: manga.title ?? 'Manga',
                                   mangaSource: widget.mangaSource,
+                                  manga: manga,
+                                  mangaCover: manga.cover,
+                                  isAdult: isAdult,
                                 ),
                               ),
                             );
