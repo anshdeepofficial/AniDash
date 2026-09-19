@@ -25,6 +25,6 @@ class UpdateSettingsNotifier extends Notifier<UpdateSettingsModel> {
   ) {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, state.toJson());
-    UpdateScheduler.apply(state);
+    UpdateScheduler.apply(state, forceReplace: true);
   }
 }

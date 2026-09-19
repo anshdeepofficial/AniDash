@@ -80,13 +80,11 @@ Future<void> checkForUpdates(
 
     if (!isManual && !debugMode) {
       final preferences = await SharedPreferences.getInstance();
-      final skipped = preferences.getString('skipped_update_version');
       final cleanLatest = tagName.replaceAll(RegExp(r'^v'), '').trim();
-      if (skipped != null && (tagName.contains(skipped) || cleanLatest == skipped)) {
-        return;
-      }
       final remindAfter = preferences.getInt('remind_update_after') ?? 0;
-      if (DateTime.now().millisecondsSinceEpoch < remindAfter) {
+      final remindVersion = preferences.getString('remind_update_version');
+      if (remindVersion == cleanLatest &&
+          DateTime.now().millisecondsSinceEpoch < remindAfter) {
         return;
       }
     }

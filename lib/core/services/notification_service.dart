@@ -7,20 +7,22 @@ import 'package:ani_dash/core/utils/app_logger.dart';
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
   final prefs = await SharedPreferences.getInstance();
+  final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
   if (response.actionId == 'update_remind_1h') {
     await prefs.setInt(
       'remind_update_after',
       DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
     );
+    if (version.isNotEmpty) {
+      await prefs.setString('remind_update_version', version);
+    }
   } else if (response.actionId == 'update_skip_day') {
     await prefs.setInt(
       'remind_update_after',
       DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
     );
-  } else if (response.actionId == 'update_skip') {
-    final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
     if (version.isNotEmpty) {
-      await prefs.setString('skipped_update_version', version);
+      await prefs.setString('remind_update_version', version);
     }
   }
 }
@@ -72,25 +74,26 @@ class NotificationService {
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final prefs = await SharedPreferences.getInstance();
+        final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
         if (response.actionId == 'update_remind_1h') {
           await prefs.setInt(
             'remind_update_after',
             DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
           );
+          if (version.isNotEmpty) {
+            await prefs.setString('remind_update_version', version);
+          }
         } else if (response.actionId == 'update_skip_day') {
           await prefs.setInt(
             'remind_update_after',
             DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
           );
-        } else if (response.actionId == 'update_skip') {
-          final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
           if (version.isNotEmpty) {
-            await prefs.setString('skipped_update_version', version);
+            await prefs.setString('remind_update_version', version);
           }
-        } else if (response.payload?.startsWith('update:') == true && response.actionId == null) {
-          _instance.updateTapController.add(
-            response.payload!.replaceFirst('update:', '').trim(),
-          );
+        } else if (response.actionId == 'update_now' ||
+            (response.payload?.startsWith('update:') == true && response.actionId == null)) {
+          _instance.updateTapController.add(version);
         } else if (response.actionId != null) {
           _instance.playbackActionController.add(response.actionId!);
         }
@@ -162,6 +165,8 @@ class NotificationService {
       'App Updates',
       description: 'Notifications when a new AniDash version is available',
       importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
     );
 
     const AndroidNotificationChannel playbackChannel =
@@ -353,6 +358,8 @@ class NotificationService {
             'Notifications when a new AniDash version is available',
         importance: Importance.high,
         priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
         icon: _iconName,
         largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
         styleInformation: const BigTextStyleInformation(
@@ -363,6 +370,12 @@ class NotificationService {
         color: _brandColor,
         actions: const <AndroidNotificationAction>[
           AndroidNotificationAction(
+            'update_now',
+            'Update Now',
+            cancelNotification: true,
+            showsUserInterface: true,
+          ),
+          AndroidNotificationAction(
             'update_remind_1h',
             'Remind in 1h',
             cancelNotification: true,
@@ -371,12 +384,6 @@ class NotificationService {
           AndroidNotificationAction(
             'update_skip_day',
             'Skip for today',
-            cancelNotification: true,
-            showsUserInterface: false,
-          ),
-          AndroidNotificationAction(
-            'update_skip',
-            'Skip this update',
             cancelNotification: true,
             showsUserInterface: false,
           ),

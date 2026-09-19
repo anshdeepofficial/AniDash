@@ -20,6 +20,7 @@ import 'package:ani_dash/core/utils/updater.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
+import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NavItem {
@@ -72,6 +73,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _foregroundUpdateTimer;
   StreamSubscription<String>? _updateTapSubscription;
+  ProviderSubscription? _updateSettingsSub;
 
   @override
   void initState() {
@@ -95,8 +97,14 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         _checkForScheduledUpdate(isAppOpen: true, force: true);
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _updateSettingsSub = ref.listenManual(updateSettingsProvider, (prev, next) {
+      _startPeriodicForegroundUpdateCheck();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _openDownloadsOffline();
+      try {
+        await ref.read(permissionsProvider.notifier).requestNotificationPermission();
+      } catch (_) {}
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) _checkForScheduledUpdate(isAppOpen: true);
       });
@@ -108,6 +116,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   @override
   void dispose() {
     _foregroundUpdateTimer?.cancel();
+    _updateSettingsSub?.close();
     _updateTapSubscription?.cancel();
     _connectivitySubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -143,9 +152,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     if (_updateCheckInProgress || !mounted) return;
     final settings = ref.read(updateSettingsProvider);
     if (!settings.autoCheckEnabled && !force) return;
-    if (!isAppOpen && !settings.fullDay && !UpdateScheduler.isInsideWindow(settings)) {
+
+    // Strict window check: if not in 24-hour mode, only check within user's custom window
+    if (!force && !UpdateScheduler.isInsideWindow(settings)) {
       return;
     }
+
     final now = DateTime.now();
     if (!force &&
         !isAppOpen &&
@@ -155,7 +167,6 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final skippedVersion = prefs.getString('skipped_update_version');
 
     _updateCheckInProgress = true;
     _lastForegroundUpdateCheck = now;
@@ -163,12 +174,22 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       final updateInfo = await UpdateService().checkForUpdate();
       if (updateInfo != null && mounted) {
         final latest = updateInfo.version.replaceFirst('v', '').trim();
-        if (!force && skippedVersion == latest) return;
 
+        // Check if user snoozed ("Remind in 1 hour" or "Skip for today")
         final remindAfter = prefs.getInt('remind_update_after') ?? 0;
         final remindVersion = prefs.getString('remind_update_version');
-        final isSnoozedForThisVersion =
-            remindVersion == latest && now.millisecondsSinceEpoch < remindAfter;
+        final isSnoozed = !force &&
+            remindVersion == latest &&
+            now.millisecondsSinceEpoch < remindAfter;
+
+        if (isSnoozed) {
+          return;
+        }
+
+        if (remindAfter != 0 && now.millisecondsSinceEpoch >= remindAfter) {
+          await prefs.remove('remind_update_after');
+          await prefs.remove('remind_update_version');
+        }
 
         // Post to the notification bar with the action buttons in safe try-catch
         try {
@@ -178,18 +199,16 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         }
 
         // Also trigger the in-app update dialog so the user sees it immediately on screen
-        if (force || isAppOpen || !isSnoozedForThisVersion) {
-          final packageInfo = await PackageInfo.fromPlatform();
-          if (!mounted) return;
-          showUpdateBottomSheet(
-            context,
-            updateInfo.version,
-            packageInfo.version,
-            UpdateType.stable,
-            releaseNotes: updateInfo.releaseNotes,
-            apkDownloadUrl: updateInfo.downloadUrl,
-          );
-        }
+        final packageInfo = await PackageInfo.fromPlatform();
+        if (!mounted) return;
+        showUpdateBottomSheet(
+          context,
+          updateInfo.version,
+          packageInfo.version,
+          UpdateType.stable,
+          releaseNotes: updateInfo.releaseNotes,
+          apkDownloadUrl: updateInfo.downloadUrl,
+        );
       }
     } catch (e) {
       AppLogger.w('Update check encountered error: $e');

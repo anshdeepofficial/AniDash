@@ -5,6 +5,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
+import 'package:ani_dash/core/models/settings/update_settings_model.dart';
+import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/tasks/news_task.dart';
 import 'package:ani_dash/core/tasks/episode_release_task.dart';
 import 'package:ani_dash/core/tasks/sync_tracking_task.dart';
@@ -27,18 +29,24 @@ void callbackDispatcher() {
 Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
   try {
     final now = DateTime.now();
-    final fullDay = inputData?['fullDay'] as bool? ?? true;
-    if (!fullDay) {
-      final start = inputData?['startHour'] as int? ?? 20;
-      final end = inputData?['endHour'] as int? ?? 6;
-      final insideWindow =
-          start <= end
-              ? now.hour >= start && now.hour < end
-              : now.hour >= start || now.hour < end;
-      if (!insideWindow) return true;
-    }
-
     final preferences = await SharedPreferences.getInstance();
+
+    // Check user settings from SharedPreferences
+    final jsonString = preferences.getString('update_settings_data');
+    final settings = jsonString != null
+        ? UpdateSettingsModel.fromJson(jsonString)
+        : UpdateSettingsModel(
+            fullDay: inputData?['fullDay'] as bool? ?? true,
+            startHour: inputData?['startHour'] as int? ?? 20,
+            endHour: inputData?['endHour'] as int? ?? 6,
+          );
+
+    if (!settings.autoCheckEnabled) return true;
+
+    // Strict window check: only check if 24h mode is ON or current time is inside custom window
+    if (!UpdateScheduler.isInsideWindow(settings, now)) {
+      return true;
+    }
 
     final response = await http.get(
       Uri.parse(
@@ -50,11 +58,17 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
       },
     ).timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) return false;
+
     final release = jsonDecode(response.body) as Map<String, dynamic>;
     final latest = (release['tag_name'] as String? ?? '').replaceFirst('v', '').trim();
+    if (latest.isEmpty) return true;
+
     String current;
     try {
-      current = (await PackageInfo.fromPlatform()).version;
+      final info = await PackageInfo.fromPlatform();
+      current = info.buildNumber.isNotEmpty
+          ? '${info.version}+${info.buildNumber}'
+          : info.version;
     } catch (_) {
       current = preferences.getString('app_version') ?? '1.0.0';
     }
@@ -63,11 +77,9 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     // Check if user snoozed this specific release ("Remind in 1 hour" or "Skip for today")
     final remindAfter = preferences.getInt('remind_update_after') ?? 0;
     final remindVersion = preferences.getString('remind_update_version');
-    if (remindVersion == latest && now.millisecondsSinceEpoch < remindAfter) return true;
-
-    // Check if user clicked "Skip this update" for this release
-    final skippedVersion = preferences.getString('skipped_update_version');
-    if (skippedVersion == latest) return true;
+    if (remindVersion == latest && now.millisecondsSinceEpoch < remindAfter) {
+      return true;
+    }
 
     final notifications = NotificationService();
     await notifications.initialize(isBackground: true);
@@ -76,9 +88,11 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     await preferences.setInt('last_notified_update_time', now.millisecondsSinceEpoch);
     if (remindAfter != 0 && now.millisecondsSinceEpoch >= remindAfter) {
       await preferences.remove('remind_update_after');
+      await preferences.remove('remind_update_version');
     }
     return true;
-  } catch (_) {
+  } catch (e, st) {
+    AppLogger.e('Background update check failed: $e', e, st);
     return false;
   }
 }

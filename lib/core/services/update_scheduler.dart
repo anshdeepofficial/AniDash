@@ -17,7 +17,10 @@ class UpdateScheduler {
         : now.hour >= settings.startHour || now.hour < settings.endHour;
   }
 
-  static Future<void> apply(UpdateSettingsModel settings) async {
+  static Future<void> apply(
+    UpdateSettingsModel settings, {
+    bool forceReplace = false,
+  }) async {
     if (!Platform.isAndroid) return;
     if (!settings.autoCheckEnabled) {
       await Workmanager().cancelByUniqueName(updateCheckTask);
@@ -26,20 +29,23 @@ class UpdateScheduler {
 
     final now = DateTime.now();
     final insideWindow = isInsideWindow(settings, now);
-    var firstRun =
-        insideWindow
-            ? now.add(const Duration(minutes: 1))
-            : DateTime(now.year, now.month, now.day, settings.startHour);
-    if (!insideWindow && !firstRun.isAfter(now)) {
-      firstRun = firstRun.add(const Duration(days: 1));
+    Duration initialDelay = Duration.zero;
+
+    if (!insideWindow) {
+      DateTime nextRun = DateTime(now.year, now.month, now.day, settings.startHour);
+      if (nextRun.isBefore(now)) {
+        nextRun = nextRun.add(const Duration(days: 1));
+      }
+      initialDelay = nextRun.difference(now);
     }
 
     await Workmanager().registerPeriodicTask(
       updateCheckTask,
       updateCheckTask,
       frequency: Duration(minutes: settings.checkIntervalMinutes.clamp(15, 60)),
-      initialDelay: firstRun.difference(now),
-      existingWorkPolicy: ExistingWorkPolicy.replace,
+      initialDelay: initialDelay,
+      existingWorkPolicy:
+          forceReplace ? ExistingWorkPolicy.replace : ExistingWorkPolicy.keep,
       constraints: Constraints(networkType: NetworkType.connected),
       inputData: {
         'startHour': settings.startHour,

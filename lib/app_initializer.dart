@@ -84,7 +84,12 @@ class AppInitializer {
       );
       try {
         final info = await PackageInfo.fromPlatform();
-        await sharedPrefs.setString('app_version', info.version);
+        final fullVersion = info.buildNumber.isNotEmpty
+            ? '${info.version}+${info.buildNumber}'
+            : info.version;
+        await sharedPrefs.setString('app_version', fullVersion);
+        final diskPrefs = await SharedPreferences.getInstance();
+        await diskPrefs.setString('app_version', fullVersion);
       } catch (_) {}
       AppLogger.success('Shared Preferences initialized');
     } catch (e, st) {

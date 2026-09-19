@@ -6,8 +6,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
+import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:ani_dash/core/models/settings/update_settings_model.dart';
 import 'package:ani_dash/core/services/update_service.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 
 class UpdateScreen extends ConsumerStatefulWidget {
@@ -36,6 +38,10 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
     });
 
     if (updateInfo != null) {
+      try {
+        await NotificationService().showUpdateAvailableNotification(updateInfo.version);
+      } catch (_) {}
+      if (!mounted) return;
       showUpdateBottomSheet(
         context,
         updateInfo.version,
@@ -58,6 +64,8 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(updateSettingsProvider);
     final notifier = ref.read(updateSettingsProvider.notifier);
+    final permissionsState = ref.watch(permissionsProvider);
+    final permissionsNotifier = ref.read(permissionsProvider.notifier);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -72,6 +80,46 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         children: [
+          if (!permissionsState.notification) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12, top: 4),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Iconsax.warning_2, color: Colors.amber, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Notification Permission Needed',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Allow notifications so AniDash can alert you when new updates are released.',
+                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      await permissionsNotifier.requestNotificationPermission();
+                    },
+                    child: const Text('Allow'),
+                  ),
+                ],
+              ),
+            ),
+          ],
           SettingsSection(
             title: 'Version & Updates',
             titleColor: colorScheme.primary,
@@ -117,7 +165,10 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                 title: 'Auto-Check for Updates',
                 description: 'Periodically check GitHub releases for updates',
                 value: settings.autoCheckEnabled,
-                onChanged: (value) {
+                onChanged: (value) async {
+                  if (value && !permissionsState.notification) {
+                    await permissionsNotifier.requestNotificationPermission();
+                  }
                   notifier.updateSettings(
                     (state) => state.copyWith(autoCheckEnabled: value),
                   );
@@ -174,6 +225,39 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   hour: settings.endHour,
                   is24HourMode: settings.fullDay,
                   onTap: () => _pickEndHour(context, settings, notifier),
+                ),
+                NormalSettingsItem(
+                  icon: Icon(Iconsax.notification_bing, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Send Test Notification',
+                  description: 'Test notification sound, vibration, and actions',
+                  trailingWidgets: [
+                    FilledButton.tonal(
+                      onPressed: () async {
+                        await NotificationService().showUpdateAvailableNotification('9.9.9 (Test)');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Test notification sent! Check your notification bar.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Test'),
+                    ),
+                  ],
+                  onTap: () async {
+                    await NotificationService().showUpdateAvailableNotification('9.9.9 (Test)');
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Test notification sent! Check your notification bar.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
                 ),
               ],
             ],
