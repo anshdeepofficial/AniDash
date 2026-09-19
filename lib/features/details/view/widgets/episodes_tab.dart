@@ -73,6 +73,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
+  bool _isSelecting = false;
 
   @override
   void initState() {
@@ -93,13 +94,19 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   }
 
   Set<int> get _selectedEpisodes => _selectionNotifier.value;
-  bool get _isSelectionMode => _selectedEpisodes.isNotEmpty;
+  bool get _isSelectionMode => _isSelecting || _selectedEpisodes.isNotEmpty;
 
-  void _enterSelectionMode(int epNum) {
-    _selectionNotifier.value = {..._selectionNotifier.value, epNum};
+  void _enterSelectionMode([int? epNum]) {
+    _isSelecting = true;
+    if (epNum != null) {
+      _selectionNotifier.value = {..._selectionNotifier.value, epNum};
+    } else {
+      if (mounted) setState(() {});
+    }
   }
 
   void _toggleSelection(int epNum) {
+    _isSelecting = true;
     final s = _selectionNotifier.value;
     _selectionNotifier.value =
         s.contains(epNum)
@@ -108,7 +115,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   }
 
   void _exitSelectionMode() {
+    _isSelecting = false;
     _selectionNotifier.value = {};
+    if (mounted) setState(() {});
   }
 
   void _toggleSelectAll(List<EpisodeDataModel> visibleEpisodes) {
@@ -395,6 +404,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       }
     }
 
+    if (ref.watch(playerSettingsProvider).skipFillerEpisodes) {
+      visibleEpisodes =
+          visibleEpisodes.where((e) => e.isFiller != true).toList();
+    }
+
     final totalEpisodes = episodes.length;
 
     EpisodeDataModel? continueEpisode;
@@ -583,47 +597,66 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                     ),
                                     const Spacer(),
                                     IconButton(
-                                      icon: const Icon(
-                                        Icons.check_circle_outline,
+                                      icon: Icon(
+                                        visibleEpisodes.isNotEmpty &&
+                                                _selectedEpisodes.length >=
+                                                    visibleEpisodes.length
+                                            ? Icons.select_all_rounded
+                                            : Icons.checklist_rtl_rounded,
                                       ),
-                                      tooltip: 'Mark as Watched',
+                                      tooltip:
+                                          visibleEpisodes.isNotEmpty &&
+                                                  _selectedEpisodes.length >=
+                                                      visibleEpisodes.length
+                                              ? 'Deselect All'
+                                              : 'Select All',
                                       color: theme.colorScheme.primary,
                                       onPressed:
-                                          _selectedEpisodes.isEmpty
-                                              ? null
-                                              : () => _markSelectedAsWatched(
-                                                watched: true,
-                                              ),
+                                          () => _toggleSelectAll(
+                                            visibleEpisodes,
+                                          ),
                                     ),
                                     PopupMenuButton<String>(
                                       icon: const Icon(Icons.more_vert),
                                       tooltip: 'More actions',
                                       onSelected: (val) {
-                                        if (val == 'unwatch') {
+                                        if (val == 'watch') {
+                                          _markSelectedAsWatched(
+                                            watched: true,
+                                          );
+                                        } else if (val == 'unwatch') {
                                           _markSelectedAsWatched(
                                             watched: false,
                                           );
-                                        } else if (val == 'select_all') {
-                                          _toggleSelectAll(visibleEpisodes);
                                         }
                                       },
                                       itemBuilder:
                                           (context) => [
-                                            PopupMenuItem(
-                                              value: 'select_all',
-                                              child: Text(
-                                                _selectedEpisodes.length >=
-                                                            visibleEpisodes
-                                                                .length &&
-                                                        visibleEpisodes
-                                                            .isNotEmpty
-                                                    ? 'Deselect All'
-                                                    : 'Select All',
+                                            const PopupMenuItem(
+                                              value: 'watch',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.check_circle_outline,
+                                                    size: 18,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text('Mark as Watched'),
+                                                ],
                                               ),
                                             ),
                                             const PopupMenuItem(
                                               value: 'unwatch',
-                                              child: Text('Mark as Unwatched'),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.remove_done_rounded,
+                                                    size: 18,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text('Mark as Unwatched'),
+                                                ],
+                                              ),
                                             ),
                                           ],
                                     ),
@@ -770,11 +803,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                                           icon: const Icon(Icons.checklist_rounded),
                                           tooltip: 'Select Episodes',
                                           onPressed: () {
-                                            final firstEp =
-                                                visibleEpisodes.firstOrNull?.number;
-                                            if (firstEp != null) {
-                                              _enterSelectionMode(firstEp);
-                                            }
+                                            _enterSelectionMode();
                                           },
                                         ),
                                         // View Mode Toggle
@@ -1919,11 +1948,21 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 IconButton.filledTonal(
                   onPressed:
                       () => _navigateToWatch(ep, allEpisodes, animeIdForSource),
                   icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'Options',
+                  onPressed:
+                      () => _showEpisodeMenu(
+                        context,
+                        ep,
+                        progress?.isCompleted == true,
+                      ),
                 ),
               ],
             ),

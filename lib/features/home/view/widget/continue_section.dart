@@ -385,10 +385,73 @@ class ContinueSection extends ConsumerWidget {
                     ),
                   ),
                 const Divider(height: 24),
+                // 1. View Anime Details
+                ListTile(
+                  leading: Icon(
+                    Iconsax.info_circle,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('View Anime Details'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.push('/details', extra: entry.toUniversalMedia());
+                  },
+                ),
+                // 2. Mark as Watched
                 ListTile(
                   leading: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Colors.green,
+                  ),
+                  title: Text(
+                    'Mark Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} as Watched',
+                  ),
+                  subtitle: const Text(
+                    'Marks this episode complete and updates progress',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    final targetEpNum = currentEp?.episodeNumber ??
+                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
+                    final duration = (currentEp?.durationInSeconds != null &&
+                            currentEp!.durationInSeconds! > 0)
+                        ? currentEp.durationInSeconds!
+                        : 1440;
+                    final repo = ref.read(watchProgressRepositoryProvider);
+                    repo.updateEpisodeProgress(
+                      entry.animeId,
+                      EpisodeProgress(
+                        episodeNumber: targetEpNum,
+                        episodeTitle: currentEp?.episodeTitle.isNotEmpty == true
+                            ? currentEp!.episodeTitle
+                            : 'Episode $targetEpNum',
+                        episodeThumbnail:
+                            currentEp?.episodeThumbnail ?? entry.animeCover,
+                        progressInSeconds: duration,
+                        durationInSeconds: duration,
+                        isCompleted: true,
+                        watchedAt: DateTime.now(),
+                      ),
+                    );
+                    ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
+                      mediaId: entry.animeId,
+                      episodeNum: targetEpNum,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Marked Episode $targetEpNum as watched',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+                // 3. Jump to Time
+                ListTile(
+                  leading: Icon(
                     Iconsax.timer_1,
-                    color: Colors.cyanAccent,
+                    color: theme.colorScheme.primary,
                   ),
                   title: const Text('Jump to Time'),
                   subtitle: Text(
@@ -460,83 +523,7 @@ class ContinueSection extends ConsumerWidget {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: Colors.green,
-                  ),
-                  title: Text(
-                    'Mark Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} as Watched',
-                  ),
-                  subtitle: const Text(
-                    'Marks this episode complete and updates progress',
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    final targetEpNum = currentEp?.episodeNumber ??
-                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
-                    final duration = (currentEp?.durationInSeconds != null &&
-                            currentEp!.durationInSeconds! > 0)
-                        ? currentEp.durationInSeconds!
-                        : 1440;
-                    final repo = ref.read(watchProgressRepositoryProvider);
-                    repo.updateEpisodeProgress(
-                      entry.animeId,
-                      EpisodeProgress(
-                        episodeNumber: targetEpNum,
-                        episodeTitle: currentEp?.episodeTitle.isNotEmpty == true
-                            ? currentEp!.episodeTitle
-                            : 'Episode $targetEpNum',
-                        episodeThumbnail:
-                            currentEp?.episodeThumbnail ?? entry.animeCover,
-                        progressInSeconds: duration,
-                        durationInSeconds: duration,
-                        isCompleted: true,
-                        watchedAt: DateTime.now(),
-                      ),
-                    );
-                    ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
-                      mediaId: entry.animeId,
-                      episodeNum: targetEpNum,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Marked Episode $targetEpNum as watched',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    Iconsax.close_circle,
-                    color: theme.colorScheme.error,
-                  ),
-                  title: const Text('Remove from Continue Watching'),
-                  subtitle: const Text('Clears your watch progress'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    showContinueWatchingUndoSnackBar(
-                      context: context,
-                      ref: ref,
-                      animeId: entry.animeId,
-                      animeTitle: entry.animeTitle,
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    Iconsax.info_circle,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text('View Anime Details'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    context.push('/details', extra: entry.toUniversalMedia());
-                  },
-                ),
+                // 4. Download this episode
                 ListTile(
                   leading: Icon(
                     Iconsax.document_download,
@@ -578,6 +565,24 @@ class ContinueSection extends ConsumerWidget {
                     await ref
                         .read(episodeDataProvider.notifier)
                         .downloadEpisode(context, targetEpNum);
+                  },
+                ),
+                // 5. Remove from Continue Watching
+                ListTile(
+                  leading: Icon(
+                    Iconsax.close_circle,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: const Text('Remove from Continue Watching'),
+                  subtitle: const Text('Clears your watch progress'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    showContinueWatchingUndoSnackBar(
+                      context: context,
+                      ref: ref,
+                      animeId: entry.animeId,
+                      animeTitle: entry.animeTitle,
+                    );
                   },
                 ),
               ],

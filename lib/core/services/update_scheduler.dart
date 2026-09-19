@@ -39,7 +39,7 @@ class UpdateScheduler {
       updateCheckTask,
       frequency: Duration(minutes: settings.checkIntervalMinutes.clamp(15, 60)),
       initialDelay: firstRun.difference(now),
-      existingWorkPolicy: ExistingWorkPolicy.update,
+      existingWorkPolicy: ExistingWorkPolicy.replace,
       constraints: Constraints(networkType: NetworkType.connected),
       inputData: {
         'startHour': settings.startHour,

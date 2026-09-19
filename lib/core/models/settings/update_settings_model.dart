@@ -13,7 +13,7 @@ class UpdateSettingsModel {
     this.checkIntervalMinutes = 15,
     this.startHour = 20,
     this.endHour = 6,
-    this.fullDay = false,
+    this.fullDay = true,
     this.skippedVersion,
   });
 
@@ -52,7 +52,7 @@ class UpdateSettingsModel {
       checkIntervalMinutes: map['checkIntervalMinutes']?.toInt() ?? 15,
       startHour: map['startHour']?.toInt() ?? 20,
       endHour: map['endHour']?.toInt() ?? 6,
-      fullDay: map['fullDay'] ?? false,
+      fullDay: map['fullDay'] ?? true,
       skippedVersion: map['skippedVersion'],
     );
   }

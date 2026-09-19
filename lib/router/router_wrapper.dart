@@ -132,7 +132,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     if (!settings.autoCheckEnabled) return;
     final minutes = settings.checkIntervalMinutes.clamp(1, 60);
     _foregroundUpdateTimer = Timer.periodic(Duration(minutes: minutes), (_) {
-      _checkForScheduledUpdate();
+      _checkForScheduledUpdate(isAppOpen: true);
     });
   }
 
@@ -148,6 +148,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     }
     final now = DateTime.now();
     if (!force &&
+        !isAppOpen &&
         _lastForegroundUpdateCheck != null &&
         now.difference(_lastForegroundUpdateCheck!).inMinutes < 1) {
       return;
@@ -169,11 +170,15 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         final isSnoozedForThisVersion =
             remindVersion == latest && now.millisecondsSinceEpoch < remindAfter;
 
-        // Post to the notification bar with the action buttons!
-        await NotificationService().showUpdateAvailableNotification(latest);
+        // Post to the notification bar with the action buttons in safe try-catch
+        try {
+          await NotificationService().showUpdateAvailableNotification(latest);
+        } catch (notifErr) {
+          AppLogger.w('Notification post encountered non-fatal error: $notifErr');
+        }
 
         // Also trigger the in-app update dialog so the user sees it immediately on screen
-        if (force || !isSnoozedForThisVersion) {
+        if (force || isAppOpen || !isSnoozedForThisVersion) {
           final packageInfo = await PackageInfo.fromPlatform();
           if (!mounted) return;
           showUpdateBottomSheet(

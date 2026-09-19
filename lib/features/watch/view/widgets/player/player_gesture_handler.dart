@@ -47,6 +47,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
   Timer? _multiTapResetTimer;
   bool? _lastTapForward;
   DateTime? _lastTapTime;
+  bool _isSeekingSequence = false;
 
   @override
   void dispose() {
@@ -62,6 +63,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
     _multiTapResetTimer = null;
     _lastTapForward = null;
     _lastTapTime = null;
+    _isSeekingSequence = false;
   }
 
   void _handleTapUp(TapUpDetails details) {
@@ -82,32 +84,52 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
     }
 
     final forward = isRight;
+
+    // If an active multi-tap seek sequence is already underway on the same side:
+    // Every additional tap (3rd, 4th, 5th...) immediately accumulates seek!
+    if (_isSeekingSequence && _lastTapForward == forward) {
+      _lastTapTime = now;
+      widget.onDoubleTap(forward);
+
+      _multiTapResetTimer?.cancel();
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 850), () {
+        _resetTapState();
+      });
+      return;
+    }
+
+    // Check if this tap qualifies as Tap 2 (double tap) on the same side
     final isConsecutive = _lastTapTime != null &&
-        now.difference(_lastTapTime!).inMilliseconds < 800 &&
+        now.difference(_lastTapTime!).inMilliseconds < 500 &&
         _lastTapForward == forward;
 
     if (isConsecutive) {
-      // 2nd, 3rd, 4th, 5th, 6th tap: Cancel pending single-tap and accumulate seek!
+      // Tap 2: Cancel pending single-tap and activate multi-tap seeking sequence!
       _singleTapTimer?.cancel();
       _singleTapTimer = null;
+      _isSeekingSequence = true;
       _lastTapTime = now;
       _lastTapForward = forward;
 
       widget.onDoubleTap(forward);
 
       _multiTapResetTimer?.cancel();
-      _multiTapResetTimer = Timer(const Duration(milliseconds: 800), () {
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 850), () {
         _resetTapState();
       });
     } else {
-      // 1st tap on left or right: wait briefly to distinguish single tap vs multi-tap
+      // Tap 1: Wait briefly to disambiguate single tap vs start of double tap
       _resetTapState();
       _lastTapTime = now;
       _lastTapForward = forward;
 
-      _singleTapTimer = Timer(const Duration(milliseconds: 320), () {
-        _resetTapState();
-        widget.onTap();
+      _singleTapTimer = Timer(const Duration(milliseconds: 280), () {
+        _singleTapTimer = null;
+        if (!_isSeekingSequence) {
+          _lastTapTime = null;
+          _lastTapForward = null;
+          widget.onTap();
+        }
       });
     }
   }
@@ -144,17 +166,31 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       onLongPressMoveUpdate: _onLongPressUpdate,
       onLongPressEnd: _onLongPressEnd,
       onVerticalDragStart: (details) {
+        if (_isSeekingSequence) return;
         _resetTapState();
         widget.onVerticalDragStart?.call(details);
       },
-      onVerticalDragUpdate: widget.onVerticalDragUpdate,
-      onVerticalDragEnd: widget.onVerticalDragEnd,
+      onVerticalDragUpdate: (details) {
+        if (_isSeekingSequence) return;
+        widget.onVerticalDragUpdate?.call(details);
+      },
+      onVerticalDragEnd: (details) {
+        if (_isSeekingSequence) return;
+        widget.onVerticalDragEnd?.call(details);
+      },
       onHorizontalDragStart: (details) {
+        if (_isSeekingSequence) return;
         _resetTapState();
         widget.onHorizontalDragStart?.call(details);
       },
-      onHorizontalDragUpdate: widget.onHorizontalDragUpdate,
-      onHorizontalDragEnd: widget.onHorizontalDragEnd,
+      onHorizontalDragUpdate: (details) {
+        if (_isSeekingSequence) return;
+        widget.onHorizontalDragUpdate?.call(details);
+      },
+      onHorizontalDragEnd: (details) {
+        if (_isSeekingSequence) return;
+        widget.onHorizontalDragEnd?.call(details);
+      },
       onLongPressUp: () {
         if (_isLongPressing) _onLongPressEnd(const LongPressEndDetails());
       },

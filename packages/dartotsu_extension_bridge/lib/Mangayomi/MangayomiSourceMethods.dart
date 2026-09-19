@@ -22,6 +22,8 @@ import 'MangayomiExtensionManager.dart';
 import 'Models/Source.dart';
 import 'extension_preferences_providers.dart';
 import 'get_source_preference.dart';
+import 'package:isar_community/isar.dart';
+import '../extension_bridge.dart';
 import 'lib.dart';
 
 class MangayomiSourceMethods implements SourceMethods {
@@ -38,18 +40,50 @@ class MangayomiSourceMethods implements SourceMethods {
         ? manager.installedAnimeExtensions
         : manager.installedNovelExtensions;
 
-    debugPrint('[EXT_DEBUG] _ensureSource: Looking for sourceId="${source.id}" itemType=${source.itemType} (index=${source.itemType?.index})');
-    debugPrint('[EXT_DEBUG] _ensureSource: Available ${sources.value.length} sources: ${sources.value.map((s) => '"${s.sourceId}" (name=${s.name})').join(', ')}');
-
-    final mSource = sources.value.firstWhereOrNull(
-      (s) => s.sourceId == source.id,
+    MSource? mSource = sources.value.firstWhereOrNull(
+      (s) =>
+          s.sourceId == source.id ||
+          s.id.toString() == source.id ||
+          (source.name != null &&
+              source.name!.isNotEmpty &&
+              s.name?.toLowerCase() == source.name!.toLowerCase()),
     );
 
     if (mSource == null) {
-      debugPrint('[EXT_DEBUG] _ensureSource: FAILED - Source not found! sourceCode null check: ${sources.value.map((s) => '${s.sourceId}: hasCode=${s.sourceCode?.isNotEmpty}').join(', ')}');
+      final allInstalled = [
+        ...manager.installedMangaExtensions.value,
+        ...manager.installedAnimeExtensions.value,
+        ...manager.installedNovelExtensions.value,
+      ];
+      mSource = allInstalled.firstWhereOrNull(
+        (s) =>
+            s.sourceId == source.id ||
+            s.id.toString() == source.id ||
+            (source.name != null &&
+                source.name!.isNotEmpty &&
+                s.name?.toLowerCase() == source.name!.toLowerCase()),
+      );
+    }
+
+    if (mSource == null) {
+      try {
+        mSource = isar.mSources
+            .filter()
+            .sourceIdEqualTo(source.id)
+            .or()
+            .nameEqualTo(source.name)
+            .findFirstSync();
+      } catch (e) {
+        debugPrint('[EXT_DEBUG] _ensureSource: Isar fallback query error: $e');
+      }
+    }
+
+    if (mSource == null) {
+      debugPrint(
+        '[EXT_DEBUG] _ensureSource: FAILED - Source not found for id="${source.id}", name="${source.name}"',
+      );
       throw Exception('Source is not initialized');
     }
-    debugPrint('[EXT_DEBUG] _ensureSource: Found source "${mSource.name}" with sourceCode length=${mSource.sourceCode?.length ?? 0}');
     return fn(mSource);
   }
 

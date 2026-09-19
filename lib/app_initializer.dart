@@ -32,6 +32,8 @@ import 'package:workmanager/workmanager.dart';
 import 'package:ani_dash/background_handler.dart';
 
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:ani_dash/core/services/update_scheduler.dart';
+import 'package:ani_dash/core/models/settings/update_settings_model.dart';
 import 'main.dart';
 
 class AppInitializer {
@@ -60,6 +62,16 @@ class AppInitializer {
     } catch (e, st) {
       AppLogger.fail('Notification service initialization failed');
       AppLogger.e('Notification Service Error', e, st);
+    }
+    try {
+      final jsonString = sharedPrefs.getString('update_settings_data');
+      final settings = jsonString != null
+          ? UpdateSettingsModel.fromJson(jsonString)
+          : const UpdateSettingsModel(fullDay: true);
+      await UpdateScheduler.apply(settings);
+      AppLogger.success('Update scheduler registered at startup');
+    } catch (e) {
+      AppLogger.w('Update scheduler startup registration failed: $e');
     }
     AppLogger.section('Initialization Complete');
   }

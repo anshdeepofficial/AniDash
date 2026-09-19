@@ -62,8 +62,12 @@ class EpisodeBannerItem extends StatelessWidget {
                 color:
                     isSelected
                         ? accentPink
+                        : isWatched
+                        ? theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.15,
+                        )
                         : theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.25,
+                          alpha: 0.45,
                         ),
                 width: isSelected ? 2.0 : 1.0,
               ),
@@ -104,18 +108,25 @@ class EpisodeBannerItem extends StatelessWidget {
                               : _buildFallbackImage(theme)),
                 ),
 
-                // Dark Tint / Gradient Overlay
+                // Dark Tint / Gradient Overlay (Watched: darker contrast, Unwatched: lighter)
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.88),
-                          Colors.black.withValues(alpha: 0.75),
-                          Colors.black.withValues(alpha: 0.82),
-                        ],
+                        colors:
+                            isWatched
+                                ? [
+                                  Colors.black.withValues(alpha: 0.94),
+                                  Colors.black.withValues(alpha: 0.88),
+                                  Colors.black.withValues(alpha: 0.92),
+                                ]
+                                : [
+                                  Colors.black.withValues(alpha: 0.65),
+                                  Colors.black.withValues(alpha: 0.45),
+                                  Colors.black.withValues(alpha: 0.55),
+                                ],
                       ),
                     ),
                   ),
@@ -141,14 +152,26 @@ class EpisodeBannerItem extends StatelessWidget {
                             ),
                           ),
 
-                        // Pink Circular Play Button
+                        // Play or Watched Circular Button
                         Container(
                           width: 38,
                           height: 38,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: accentPink,
-                            boxShadow: [
+                            color:
+                                isWatched
+                                    ? Colors.green.withValues(alpha: 0.2)
+                                    : accentPink,
+                            border:
+                                isWatched
+                                    ? Border.all(
+                                      color: Colors.greenAccent.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                      width: 1.5,
+                                    )
+                                    : null,
+                            boxShadow: const [
                               BoxShadow(
                                 color: Colors.black45,
                                 blurRadius: 4,
@@ -156,10 +179,15 @@ class EpisodeBannerItem extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 24,
+                          child: Icon(
+                            isWatched
+                                ? Icons.check_rounded
+                                : Icons.play_arrow_rounded,
+                            color:
+                                isWatched
+                                    ? Colors.greenAccent
+                                    : Colors.white,
+                            size: isWatched ? 22 : 24,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -174,8 +202,11 @@ class EpisodeBannerItem extends StatelessWidget {
                                 children: [
                                   Text(
                                     'EPISODE $episodeNumber',
-                                    style: const TextStyle(
-                                      color: accentPink,
+                                    style: TextStyle(
+                                      color:
+                                          isWatched
+                                              ? Colors.white60
+                                              : accentPink,
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.6,
@@ -183,10 +214,41 @@ class EpisodeBannerItem extends StatelessWidget {
                                   ),
                                   if (isWatched) ...[
                                     const SizedBox(width: 6),
-                                    const Icon(
-                                      Icons.check_circle_rounded,
-                                      color: Colors.greenAccent,
-                                      size: 13,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: Colors.greenAccent.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            color: Colors.greenAccent,
+                                            size: 11,
+                                          ),
+                                          SizedBox(width: 3),
+                                          Text(
+                                            'WATCHED',
+                                            style: TextStyle(
+                                              color: Colors.greenAccent,
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                   if (episode.isMixed == true) ...[
@@ -237,10 +299,16 @@ class EpisodeBannerItem extends StatelessWidget {
                                 episode.title ?? 'Episode $episodeNumber',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color:
+                                      isWatched
+                                          ? Colors.white60
+                                          : Colors.white,
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight:
+                                      isWatched
+                                          ? FontWeight.w500
+                                          : FontWeight.w600,
                                 ),
                               ),
                               if (download != null) ...[

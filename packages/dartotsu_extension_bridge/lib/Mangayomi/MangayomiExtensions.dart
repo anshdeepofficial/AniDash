@@ -92,13 +92,6 @@ class MangayomiExtensions extends Extension {
       final availableManga = getAvailableRx(ItemType.manga).value;
       const targetManga = ['mangadex'];
 
-      for (final source in List<Source>.from(
-        getInstalledRx(ItemType.manga).value,
-      )) {
-        if (source.name?.toLowerCase() != 'mangadex') {
-          await uninstallSource(source);
-        }
-      }
 
       for (final target in targetManga) {
         if (!installedManga.contains(target)) {

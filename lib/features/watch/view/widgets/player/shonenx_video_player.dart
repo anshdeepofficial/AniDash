@@ -324,9 +324,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         .read(playerUIControllerProvider.notifier)
         .showSeekIndicator(forward, _accumulatedSeekSeconds);
 
-    // Smooth seek commit: 380ms after the LAST tap commits the final accumulated jump
+    // Smooth seek commit: 550ms after the LAST tap commits the final accumulated jump
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 380), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 550), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);

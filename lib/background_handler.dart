@@ -45,10 +45,10 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
         'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
       ),
       headers: const {
-        'Accept': 'application/vnd.github+json',
+        'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'AniDash',
       },
-    );
+    ).timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) return false;
     final release = jsonDecode(response.body) as Map<String, dynamic>;
     final latest = (release['tag_name'] as String? ?? '').replaceFirst('v', '').trim();
