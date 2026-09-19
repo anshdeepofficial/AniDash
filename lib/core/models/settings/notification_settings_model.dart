@@ -16,7 +16,7 @@ class NotificationSettingsModel {
     this.enableSubReleases = true,
     this.enableContinueWatching = true,
     this.enableDownloads = true,
-    this.soundId = 'anidash_biwa',
+    this.soundId = 'anime_nezuko',
   });
 
   NotificationSoundItem get soundItem {
@@ -68,7 +68,7 @@ class NotificationSettingsModel {
       enableSubReleases: json['enableSubReleases'] as bool? ?? true,
       enableContinueWatching: json['enableContinueWatching'] as bool? ?? true,
       enableDownloads: json['enableDownloads'] as bool? ?? true,
-      soundId: json['soundId'] as String? ?? 'anidash_biwa',
+      soundId: json['soundId'] as String? ?? 'anime_nezuko',
     );
   }
 }

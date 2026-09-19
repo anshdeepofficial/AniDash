@@ -53,7 +53,7 @@ class NotificationService {
   Future<NotificationSoundItem> _getActiveSound() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final soundId = prefs.getString('notification_sound_id') ?? 'anidash_biwa';
+      final soundId = prefs.getString('notification_sound_id') ?? 'anime_nezuko';
       return kNotificationSounds.firstWhere(
         (s) => s.id == soundId,
         orElse: () => kNotificationSounds.first,
@@ -132,11 +132,11 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
 
-    String activeSoundId = soundId ?? 'anidash_biwa';
+    String activeSoundId = soundId ?? 'anime_nezuko';
     if (soundId == null) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        activeSoundId = prefs.getString('notification_sound_id') ?? 'anidash_biwa';
+        activeSoundId = prefs.getString('notification_sound_id') ?? 'anime_nezuko';
       } catch (_) {}
     }
 

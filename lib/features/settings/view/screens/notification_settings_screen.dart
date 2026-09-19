@@ -61,7 +61,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 accent: colorScheme.primary,
                 title: 'Notification Sound',
                 description:
-                    '${settings.soundItem.name} — ${settings.soundItem.description}',
+                    '[${settings.soundItem.anime}] ${settings.soundItem.name} — ${settings.soundItem.description}',
                 onTap: () => context.push('/settings/notifications/sound'),
               ),
             ],

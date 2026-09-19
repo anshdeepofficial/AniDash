@@ -66,26 +66,61 @@ class _NotificationSoundScreenState
 
   IconData _getIconForSound(String id) {
     switch (id) {
-      case 'anidash_biwa':
+      case 'anime_nezuko':
+        return Icons.favorite_rounded;
+      case 'anime_biwa':
         return Icons.temple_buddhist_rounded;
-      case 'anidash_chime':
-        return Iconsax.notification;
-      case 'anidash_katana':
+      case 'anime_shinobu':
+        return Icons.flutter_dash_rounded;
+      case 'anime_tanjiro':
+        return Icons.local_fire_department_rounded;
+      case 'anime_gojo':
+        return Icons.visibility_rounded;
+      case 'anime_sukuna':
+        return Icons.whatshot_rounded;
+      case 'anime_denden_mushi':
+        return Icons.phone_in_talk_rounded;
+      case 'anime_luffy_gear5':
+        return Icons.sentiment_very_satisfied_rounded;
+      case 'anime_bankai':
         return Icons.flash_on_rounded;
-      case 'anidash_levelup':
-        return Icons.keyboard_double_arrow_up_rounded;
-      case 'anidash_radar':
-        return Icons.radar_rounded;
-      case 'anidash_sparkle':
-        return Icons.auto_awesome_rounded;
-      case 'anidash_jutsu':
-        return Icons.front_hand_rounded;
-      case 'anidash_teleport':
+      case 'anime_naruto_jutsu':
+        return Icons.wb_sunny_rounded;
+      case 'anime_ultra_instinct':
+        return Icons.bolt_rounded;
+      case 'anime_dbz_teleport':
         return Icons.blur_on_rounded;
-      case 'anidash_taiko':
-        return Icons.album_rounded;
+      case 'anime_kono_dio_da':
+      case 'anime_za_warudo':
+        return Icons.hourglass_bottom_rounded;
+      case 'anime_megumin':
+        return Icons.emergency_share_rounded;
       default:
         return Icons.settings_suggest_rounded;
+    }
+  }
+
+  Color _getBadgeColor(String anime) {
+    switch (anime) {
+      case 'Demon Slayer':
+        return const Color(0xFFE53935); // Crimson Red
+      case 'Jujutsu Kaisen':
+        return const Color(0xFF8E24AA); // Purple
+      case 'One Piece':
+        return const Color(0xFFFFB300); // Strawhat Gold
+      case 'Bleach':
+        return const Color(0xFF00ACC1); // Spiritual Cyan
+      case 'Naruto':
+        return const Color(0xFFFF6F00); // Naruto Orange
+      case 'Dragon Ball Super':
+      case 'Dragon Ball Z':
+        return const Color(0xFF3949AB); // Ki Blue
+      case "JoJo's Bizarre Adventure":
+        return const Color(0xFFD81B60); // JoJo Magenta
+      case 'KonoSuba':
+        return const Color(0xFFE91E63); // Explosion Crimson
+      default:
+        return Colors.grey;
     }
   }
 
@@ -101,7 +136,7 @@ class _NotificationSoundScreenState
           onPressed: () => context.pop(),
           icon: const Icon(Iconsax.arrow_left_2),
         ),
-        title: const Text('Notification Sound'),
+        title: const Text('Anime Notification Sounds'),
         forceMaterialTransparency: true,
         actions: [
           IconButton(
@@ -109,7 +144,8 @@ class _NotificationSoundScreenState
             onPressed: () async {
               await NotificationService().showTestNotification(
                 title: 'AniDash Notification Test',
-                body: 'Testing notification ringtone: ${settings.soundItem.name}',
+                body:
+                    'Playing anime tone: [${settings.soundItem.anime}] ${settings.soundItem.name}',
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -134,6 +170,7 @@ class _NotificationSoundScreenState
           final sound = kNotificationSounds[index];
           final isSelected = sound.id == settings.soundId;
           final isPlaying = _currentlyPlayingId == sound.id;
+          final badgeColor = _getBadgeColor(sound.anime);
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -195,7 +232,7 @@ class _NotificationSoundScreenState
                                     ),
                                   ),
                                 ),
-                                if (sound.id == 'anidash_biwa') ...[
+                                if (!sound.isDefault) ...[
                                   const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
@@ -203,23 +240,21 @@ class _NotificationSoundScreenState
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.redAccent.withValues(
-                                        alpha: 0.2,
-                                      ),
+                                      color: badgeColor.withValues(alpha: 0.18),
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: Colors.redAccent.withValues(
+                                        color: badgeColor.withValues(
                                           alpha: 0.6,
                                         ),
                                         width: 0.8,
                                       ),
                                     ),
-                                    child: const Text(
-                                      'Demon Slayer',
+                                    child: Text(
+                                      sound.anime,
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.redAccent,
+                                        color: badgeColor,
                                       ),
                                     ),
                                   ),
@@ -297,18 +332,20 @@ class _NotificationSoundScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Selected Tone',
+                      'Active Tone',
                       style: TextStyle(
                         fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     Text(
-                      settings.soundItem.name,
+                      '${settings.soundItem.name} (${settings.soundItem.anime})',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -317,7 +354,8 @@ class _NotificationSoundScreenState
                 onPressed: () async {
                   await NotificationService().showTestNotification(
                     title: 'AniDash Notification Test',
-                    body: 'Playing tone: ${settings.soundItem.name}',
+                    body:
+                        'Playing [${settings.soundItem.anime}] ${settings.soundItem.name}',
                   );
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
