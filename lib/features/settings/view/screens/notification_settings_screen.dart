@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
@@ -23,10 +24,49 @@ class NotificationSettingsScreen extends ConsumerWidget {
         ),
         title: const Text('Notifications'),
         forceMaterialTransparency: true,
+        actions: [
+          IconButton(
+            tooltip: 'Send Test Notification',
+            onPressed: () async {
+              await NotificationService().showTestNotification(
+                title: 'AniDash Notification Test',
+                body: 'Testing tone: "${settings.soundItem.name}"',
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Sent test notification with "${settings.soundItem.name}"!',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.notifications_active_outlined),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         children: [
+          SettingsSection(
+            title: 'Sound & Ringtone',
+            titleColor: colorScheme.primary,
+            onTap: () {},
+            children: [
+              NormalSettingsItem(
+                icon: Icon(Icons.music_note_rounded, color: colorScheme.primary),
+                accent: colorScheme.primary,
+                title: 'Notification Sound',
+                description:
+                    '${settings.soundItem.name} — ${settings.soundItem.description}',
+                onTap: () => context.push('/settings/notifications/sound'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           SettingsSection(
             title: 'Anime News',
             titleColor: colorScheme.primary,
@@ -36,7 +76,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 icon: Icon(Iconsax.document_text, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'News Notifications',
-                description: 'Get notified about the latest anime news and announcements',
+                description:
+                    'Get notified about the latest anime news and announcements',
                 value: settings.enableNews,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableNews: val),
@@ -54,7 +95,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 icon: Icon(Iconsax.video_play, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'New Episode Alerts',
-                description: 'Notify when new episodes of your watching anime are available',
+                description:
+                    'Notify when new episodes of your watching anime are available',
                 value: settings.enableEpisodeReleases,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableEpisodeReleases: val),
@@ -64,7 +106,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 icon: Icon(Iconsax.translate, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'Dub Releases',
-                description: 'Receive notifications when English/Hindi dubs release',
+                description:
+                    'Receive notifications when English/Hindi dubs release',
                 value: settings.enableDubReleases,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableDubReleases: val),
@@ -74,7 +117,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 icon: Icon(Icons.subtitles_rounded, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'Sub Releases',
-                description: 'Receive notifications when Japanese sub releases',
+                description:
+                    'Receive notifications when Japanese sub releases',
                 value: settings.enableSubReleases,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableSubReleases: val),
@@ -92,17 +136,22 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 icon: Icon(Iconsax.clock, color: colorScheme.primary),
                 accent: colorScheme.primary,
                 title: 'Continue Watching Reminders',
-                description: 'Reminds you: "You stopped here, watch more!" for paused shows',
+                description:
+                    'Reminds you: "You stopped here, watch more!" for paused shows',
                 value: settings.enableContinueWatching,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableContinueWatching: val),
                 ),
               ),
               ToggleableSettingsItem(
-                icon: Icon(Iconsax.document_download, color: colorScheme.primary),
+                icon: Icon(
+                  Iconsax.document_download,
+                  color: colorScheme.primary,
+                ),
                 accent: colorScheme.primary,
                 title: 'Download Notifications',
-                description: 'Show live download progress and completion notifications',
+                description:
+                    'Show live download progress and completion notifications',
                 value: settings.enableDownloads,
                 onChanged: (val) => notifier.updateSettings(
                   (s) => s.copyWith(enableDownloads: val),

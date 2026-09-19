@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.14.3+77
+version: 1.14.4+78
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -111,6 +111,7 @@ flutter:
     - assets/icons/anidash_logo.png
     - assets/icons/anidash_logo_dark.png
     - assets/icons/anidash_logo_light.png
+    - assets/sounds/
 
 flutter_launcher_icons:
   android: true

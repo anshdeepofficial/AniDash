@@ -11,6 +11,7 @@ import 'package:ani_dash/core/models/settings/update_settings_model.dart';
 import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
+import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
 
 class UpdateScreen extends ConsumerStatefulWidget {
   const UpdateScreen({super.key});
@@ -225,6 +226,14 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   hour: settings.endHour,
                   is24HourMode: settings.fullDay,
                   onTap: () => _pickEndHour(context, settings, notifier),
+                ),
+                NormalSettingsItem(
+                  icon: Icon(Icons.music_note_rounded, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Notification Tone',
+                  description:
+                      '${ref.watch(notificationSettingsProvider).soundItem.name} — tap to change ringtone',
+                  onTap: () => context.push('/settings/notifications/sound'),
                 ),
                 NormalSettingsItem(
                   icon: Icon(Iconsax.notification_bing, color: colorScheme.primary),

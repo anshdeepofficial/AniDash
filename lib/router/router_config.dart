@@ -38,6 +38,7 @@ import 'package:ani_dash/features/debug/view/debug_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/permissions_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/notification_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/notification_sound_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/security_settings_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
@@ -256,6 +257,12 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'notifications',
           contentBuilder: (_, _) => const NotificationSettingsScreen(),
+          routes: [
+            AnimatedGoRoute(
+              path: 'sound',
+              contentBuilder: (_, _) => const NotificationSoundScreen(),
+            ),
+          ],
         ),
         AnimatedGoRoute(
           path: 'watch-history',
