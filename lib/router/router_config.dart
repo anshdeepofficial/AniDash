@@ -201,6 +201,7 @@ final routerConfig = GoRouter(
             malId: int.tryParse(state.uri.queryParameters['malId'] ?? ''),
             startAtPosition:
                 int.tryParse(state.uri.queryParameters['startAtPosition'] ?? ''),
+            forceRefetch: state.uri.queryParameters['forceRefetch'] == 'true',
             episodes: (state.extra is List<EpisodeDataModel>)
                 ? state.extra as List<EpisodeDataModel>
                 : ((state.extra is List)

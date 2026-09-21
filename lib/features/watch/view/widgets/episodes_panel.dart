@@ -8,6 +8,8 @@ import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart'
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
+import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
+import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:collection/collection.dart';
 
 class EpisodesPanel extends ConsumerStatefulWidget {
@@ -243,6 +245,130 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                         );
                         widget.panelAnimation.reverse();
                       },
+                      onLongPress: () {
+                        final epNum = episode.number ?? 1;
+                        showModalBottomSheet(
+                          context: context,
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (sheetContext) {
+                            return SafeArea(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 12.0,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Center(
+                                      child: Container(
+                                        width: 36,
+                                        height: 4,
+                                        margin:
+                                            const EdgeInsets.only(bottom: 12),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              Colors.grey.withValues(alpha: 0.4),
+                                          borderRadius:
+                                              BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      episode.title ?? 'Episode $epNum',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const Divider(height: 20),
+                                    ListTile(
+                                      leading: Icon(
+                                        isCompleted
+                                            ? Icons.remove_red_eye_outlined
+                                            : Icons.check_circle_outline_rounded,
+                                        color: isCompleted
+                                            ? Colors.orange
+                                            : Colors.green,
+                                      ),
+                                      title: Text(
+                                        isCompleted
+                                            ? 'Mark as Unwatched'
+                                            : 'Mark as Watched',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(sheetContext);
+                                        final newWatched = !isCompleted;
+                                        final repo = ref.read(
+                                          watchProgressRepositoryProvider,
+                                        );
+                                        repo.updateEpisodeProgress(
+                                          widget.mediaId,
+                                          EpisodeProgress(
+                                            episodeNumber: epNum,
+                                            episodeTitle:
+                                                episode.title ?? 'Episode $epNum',
+                                            episodeThumbnail: episode.thumbnail,
+                                            progressInSeconds:
+                                                newWatched ? 1440 : 0,
+                                            durationInSeconds: 1440,
+                                            isCompleted: newWatched,
+                                            watchedAt: DateTime.now(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(
+                                        Icons.refresh_rounded,
+                                        color: Colors.cyanAccent,
+                                      ),
+                                      title: const Text(
+                                        'Refetch Episode',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: const Text(
+                                        'Stop playback, clear cached stream, and fetch fresh source',
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(sheetContext);
+                                        widget.panelAnimation.reverse();
+                                        ref
+                                            .read(playerStateProvider.notifier)
+                                            .stop();
+                                        episodeNotifier.clearEpisodeCache(
+                                          mediaId: widget.mediaId,
+                                          episodeNumber: epNum,
+                                        );
+                                        episodeNotifier.loadEpisode(
+                                          ep: epNum,
+                                          play: true,
+                                          mediaId: widget.mediaId,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     );
                   },
                 ),
@@ -265,6 +391,7 @@ class EpisodeTile extends StatelessWidget {
   final bool isSelected;
   final DownloadItem? download;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const EpisodeTile({
     super.key,
@@ -277,6 +404,7 @@ class EpisodeTile extends StatelessWidget {
     required this.isSelected,
     this.download,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -304,6 +432,7 @@ class EpisodeTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 2),

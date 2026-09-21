@@ -7,6 +7,7 @@ import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
+import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
@@ -1702,6 +1703,48 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         ),
                         behavior: SnackBarBehavior.floating,
                       ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.cyanAccent,
+                  ),
+                  title: const Text(
+                    'Refetch Episode',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Stop playback, clear cached stream, and fetch fresh source',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    // 1. Stop current player playback
+                    ref.read(playerStateProvider.notifier).stop();
+                    // 2. Clear cache for this episode and anime
+                    ref.read(episodeDataProvider.notifier).clearEpisodeCache(
+                          mediaId: widget.mediaId,
+                          episodeNumber: epNum,
+                        );
+                    // 3. Navigate to watch screen with forceRefetch: true
+                    final allEpisodes = ref.read(episodeListProvider).episodes;
+                    final state = ref.read(detailsPageProvider(widget.mediaId));
+                    final animeIdForSource = state.animeIdForSource ?? '';
+                    navigateToWatch(
+                      mediaId: widget.mediaId,
+                      animeId: animeIdForSource,
+                      animeName: (widget.mediaTitle.english ??
+                          widget.mediaTitle.romaji ??
+                          widget.mediaTitle.native)!,
+                      animeFormat: widget.mediaFormat,
+                      animeCover: widget.mediaCover,
+                      context: context,
+                      episodes: allEpisodes.isNotEmpty ? allEpisodes : [episode],
+                      currentEpisode: epNum,
+                      malId: widget.malId,
+                      fromHentaiHub: widget.fromHentaiHub,
+                      forceRefetch: true,
                     );
                   },
                 ),

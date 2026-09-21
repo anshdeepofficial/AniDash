@@ -195,6 +195,18 @@ class JustAnimeProvider extends AnimeProvider {
 
   static final Map<String, ({DateTime time, BaseSourcesModel data})> _sourcesCache = {};
 
+  static void clearCache({String? animeId, int? episode}) {
+    if (animeId == null) {
+      _sourcesCache.clear();
+      return;
+    }
+    if (episode == null) {
+      _sourcesCache.removeWhere((k, _) => k.startsWith('$animeId:'));
+    } else {
+      _sourcesCache.removeWhere((k, _) => k.startsWith('$animeId:$episode:'));
+    }
+  }
+
   @override
   Future<BaseSourcesModel> getSources(
     String animeId,

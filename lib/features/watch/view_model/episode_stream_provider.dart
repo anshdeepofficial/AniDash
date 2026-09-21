@@ -230,6 +230,26 @@ class EpisodeData extends _$EpisodeData {
     await loadEpisode(ep: target, play: true, startAt: startAt);
   }
 
+  void clearEpisodeCache({String? mediaId, int? episodeNumber}) {
+    final targetMediaId = mediaId ?? _epList.animeId ?? _epList.mediaId;
+    if (targetMediaId == null && episodeNumber == null) {
+      _sourceCache.clear();
+    } else if (targetMediaId != null && episodeNumber != null) {
+      _sourceCache.removeWhere(
+        (k, _) => k.startsWith('${targetMediaId}_$episodeNumber'),
+      );
+    } else if (targetMediaId != null) {
+      _sourceCache.removeWhere((k, _) => k.startsWith('${targetMediaId}_'));
+    }
+    _prefetchedEpNum = null;
+    _prefetchedSourceData = null;
+    JustAnimeProvider.clearCache(
+      animeId: targetMediaId,
+      episode: episodeNumber,
+    );
+    AppLogger.i('Cleared episode stream cache for $targetMediaId Ep $episodeNumber');
+  }
+
   int? _prefetchedEpNum;
   BaseSourcesModel? _prefetchedSourceData;
   bool _isPrefetching = false;

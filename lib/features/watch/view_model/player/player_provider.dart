@@ -117,6 +117,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     return _activeMediaId == mediaId &&
         _activeEpisode == episode &&
         _lastUrl != null &&
+        state.playbackError == null &&
+        !_player.state.completed &&
         _player.state.duration > Duration.zero;
   }
 

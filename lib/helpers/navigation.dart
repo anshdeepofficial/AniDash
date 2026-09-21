@@ -40,6 +40,7 @@ void navigateToWatch({
   int? startAtPosition,
   int? malId,
   bool fromHentaiHub = false,
+  bool forceRefetch = false,
 }) {
   final queryParams = <String, String>{
     'animeName': animeName,
@@ -62,6 +63,10 @@ void navigateToWatch({
 
   if (startAtPosition != null) {
     queryParams['startAtPosition'] = startAtPosition.toString();
+  }
+
+  if (forceRefetch) {
+    queryParams['forceRefetch'] = 'true';
   }
 
   final uri = Uri(path: '/watch/$mediaId', queryParameters: queryParams);

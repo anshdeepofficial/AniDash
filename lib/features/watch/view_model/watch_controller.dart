@@ -46,6 +46,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _prefetchTriggered = false;
   bool _nextPromptTriggered = false;
   bool _wasPlayingBeforeLock = false;
+  bool _isAppInBackground = false;
+  int _savedPosBeforeLock = 0;
 
   @override
   void build() {
@@ -77,6 +79,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   void cleanup() {
     _isDisposed = true;
     _wasPlayingBeforeLock = false;
+    _isAppInBackground = false;
     _completedSubscription?.cancel();
     _playbackActionSubscription?.cancel();
     NotificationService().hidePlaybackNotification();
@@ -87,19 +90,45 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _isAppInBackground = true;
+      _savedPosBeforeLock = _pos;
       final isPlaying = ref.read(playerStateProvider).isPlaying;
       if (isPlaying && !_isDisposed) {
         _wasPlayingBeforeLock = true;
         // Pause safely before hardware rendering surface detaches to keep MPV memory cache intact
         ref.read(playerStateProvider.notifier).pause();
       }
-      _triggerSave();
+      if (_savedPosBeforeLock > 0) {
+        _triggerSave(targetPos: _savedPosBeforeLock);
+      }
     } else if (state == AppLifecycleState.resumed) {
       if (_isDisposed || !AudioFocusService().isSessionActive) {
         _wasPlayingBeforeLock = false;
+        _isAppInBackground = false;
         return;
       }
+
+      // If Next Episode prompt was mistakenly triggered while backgrounded, dismiss it
+      ref.read(nextEpisodePromptProvider.notifier).dismiss();
+
+      // Check if position was corrupted to EOF or 0 by hardware surface detachment in background
+      final currentPos = ref.read(playerStateProvider).position.inSeconds;
+      if (_savedPosBeforeLock > 0 &&
+          (_savedPosBeforeLock < _dur - 15) &&
+          (currentPos >= _dur - 2 || currentPos == 0)) {
+        AppLogger.i(
+          'Restoring position after app resume: $_savedPosBeforeLock s (was corrupted to $currentPos s)',
+        );
+        ref
+            .read(playerStateProvider.notifier)
+            .seek(Duration(seconds: _savedPosBeforeLock));
+        _pos = _savedPosBeforeLock;
+      }
+
+      _isAppInBackground = false;
+
       if (AudioFocusService().isPausedByInterruption) {
         // App returned to foreground after call interruption while video was actively being watched
         AudioFocusService().requestAudioFocus().then((granted) {
@@ -136,6 +165,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     int? malId,
     int? startAtPosition,
     bool fromHentaiHub = false,
+    bool forceRefetch = false,
   }) async {
     _isDisposed = false;
     _wasPlayingBeforeLock = false;
@@ -172,7 +202,12 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       },
     );
 
-    await _initEpisode(mediaId, initialEpisode, startAtPosition: startAtPosition);
+    await _initEpisode(
+      mediaId,
+      initialEpisode,
+      startAtPosition: startAtPosition,
+      forceRefetch: forceRefetch,
+    );
     _attachPlaybackListeners(mediaId, animeName, episodes);
   }
 
@@ -180,6 +215,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     String? mediaId,
     int initialEpisode, {
     int? startAtPosition,
+    bool forceRefetch = false,
   }) async {
     if (mediaId == null) return;
 
@@ -198,10 +234,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         );
 
     final playerNotifier = ref.read(playerStateProvider.notifier);
-    final isAlreadyLoaded = playerNotifier.isCurrentEpisodeLoaded(
-      mediaId: mediaId,
-      episode: initialEpisode,
-    );
+    final isAlreadyLoaded = !forceRefetch &&
+        playerNotifier.isCurrentEpisodeLoaded(
+          mediaId: mediaId,
+          episode: initialEpisode,
+        );
 
     if (isAlreadyLoaded) {
       AppLogger.i(
@@ -341,6 +378,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
             _hasAutoAdvanced = false;
             return;
           }
+          if (_isAppInBackground) {
+            // Screen off / app in background caused surface loss or pause; ignore false EOF
+            return;
+          }
           if (_isPlayerReady &&
               _dur > 60 &&
               _pos >= _dur - 2 &&
@@ -351,7 +392,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         });
 
     ref.listen(playerStateProvider, (prev, next) {
-      if (_isDisposed) return;
+      if (_isDisposed || _isAppInBackground) return;
 
       _pos = next.position.inSeconds;
       _dur = next.duration.inSeconds;
@@ -458,8 +499,13 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _triggerSave({bool takeScreenshot = false}) async {
+  Future<void> _triggerSave({
+    bool takeScreenshot = false,
+    int? targetPos,
+  }) async {
     if (_mediaId == null || _epNum == null) return;
+
+    final savePos = targetPos ?? _pos;
 
     final newThumb = await ref
         .read(watchProgressProvider.notifier)
@@ -472,7 +518,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           epNum: _epNum!,
           epTitle: _epTitle,
           epThumb: _epThumb,
-          pos: _pos,
+          pos: savePos,
           dur: _dur,
           takeScreenshot: takeScreenshot,
           isAdult: _fromHentaiHub,

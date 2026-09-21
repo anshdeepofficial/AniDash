@@ -38,9 +38,11 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.startAtPosition,
     this.episodes = const [],
     this.fromHentaiHub = false,
+    this.forceRefetch = false,
   });
 
   final bool fromHentaiHub;
+  final bool forceRefetch;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -82,6 +84,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
             fromHentaiHub: widget.fromHentaiHub,
             malId: widget.malId,
             startAtPosition: widget.startAtPosition,
+            forceRefetch: widget.forceRefetch,
           );
       ref
           .read(watchControllerProvider.notifier)
