@@ -20,7 +20,7 @@
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:label="AniDash (Beta)"
+        android:label="AniDash"
         android:name="${applicationName}"
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
