@@ -41,6 +41,7 @@ class SettingsSheetContent extends ConsumerWidget {
             : 'Auto';
 
     final isDub = streamData.selectedServer?.isDub == true;
+    final isHindi = playerSettings.preferredAudioLanguage == 'hindi';
 
     return SafeArea(
       child: Padding(
@@ -224,14 +225,15 @@ class SettingsSheetContent extends ConsumerWidget {
                     );
                   },
                 ),
-              ListTile(
-                leading: const Icon(Icons.dns_rounded),
-                title: const Text("Server"),
-                trailing: Text(
-                  streamData.selectedServer?.name ??
-                      streamData.selectedServer?.id?.toUpperCase() ??
-                      'Auto',
-                ),
+              if (!isHindi)
+                ListTile(
+                  leading: const Icon(Icons.dns_rounded),
+                  title: const Text("Server"),
+                  trailing: Text(
+                    streamData.selectedServer?.name ??
+                        streamData.selectedServer?.id?.toUpperCase() ??
+                        'Auto',
+                  ),
                 onTap:
                     streamData.servers.isEmpty
                         ? null

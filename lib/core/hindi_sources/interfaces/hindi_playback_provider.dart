@@ -1,12 +1,16 @@
 import 'package:ani_dash/core/models/anime/source_model.dart';
+import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 
 abstract class HindiPlaybackProvider {
   String get id;
   String get name;
   String get baseUrl;
+  List<String> get mirrors => const [];
   bool get supportsStreaming => true;
   bool get supportsDownloads => false;
   bool get supportsMultiAudio => true;
+
+  void configure(HindiSourceModel model) {}
 
   Future<bool> healthCheck();
 
@@ -27,6 +31,9 @@ abstract class HindiPlaybackProvider {
     required int episodeNumber,
     String? animeTitle,
   });
+
+  /// Resolves total number of available episodes for this anime on provider.
+  Future<int?> getEpisodeCount(String providerAnimeId) async => null;
 
   /// Resolves direct download link for an episode (if supported).
   Future<String?> resolveDownload({

@@ -280,6 +280,34 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
         AppLogger.w('Player stream warning/error: $error');
       }),
     );
+
+    _subs.add(
+      stream.tracks.listen((tracks) async {
+        final audioLang = ref.read(playerSettingsProvider).preferredAudioLanguage;
+        if (audioLang == 'hindi' && tracks.audio.isNotEmpty) {
+          final hindiTrack = tracks.audio.firstWhereOrNull((t) {
+            final lang = (t.language ?? '').toLowerCase();
+            final title = (t.title ?? '').toLowerCase();
+            return lang == 'hi' ||
+                   lang == 'hin' ||
+                   lang.contains('hindi') ||
+                   title.contains('hindi') ||
+                   title.contains('hin');
+          });
+
+          if (hindiTrack != null && _player.state.track.audio != hindiTrack) {
+            AppLogger.success(
+              '[Player] Explicitly selected Hindi audio track: ${hindiTrack.title ?? hindiTrack.language ?? hindiTrack.id}',
+            );
+            await _player.setAudioTrack(hindiTrack);
+          } else if (tracks.audio.length > 1 && hindiTrack == null) {
+            AppLogger.w(
+              '[Player] Multi-audio stream has ${tracks.audio.length} tracks, but none match Hindi language metadata',
+            );
+          }
+        }
+      }),
+    );
   }
 
   void _dispose() {

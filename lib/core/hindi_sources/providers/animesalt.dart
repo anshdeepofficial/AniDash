@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/hindi_sources/interfaces/hindi_playback_provider.dart';
+import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
 class AnimeSaltProvider implements HindiPlaybackProvider {
@@ -12,8 +14,23 @@ class AnimeSaltProvider implements HindiPlaybackProvider {
   @override
   String get name => 'AnimeSalt';
 
+  static const String _defaultBaseUrl = 'https://animesalt.ac';
+  static const List<String> _defaultMirrors = [
+    'https://animesalt.ac',
+    'https://animesalt.to',
+    'https://animesalt.me',
+    'https://animesalt.ro',
+  ];
+
+  String _baseUrl = _defaultBaseUrl;
+  List<String> _mirrors = _defaultMirrors;
+  String? _workingMirror;
+
   @override
-  String get baseUrl => 'https://animesalt.cc';
+  String get baseUrl => _workingMirror ?? _baseUrl;
+
+  @override
+  List<String> get mirrors => _mirrors;
 
   @override
   bool get supportsStreaming => true;
@@ -24,33 +41,58 @@ class AnimeSaltProvider implements HindiPlaybackProvider {
   @override
   bool get supportsMultiAudio => true;
 
-  static const String _userAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  static const String _ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-  Map<String, String> get _defaultHeaders => {
-        'User-Agent': _userAgent,
-        'Referer': '$baseUrl/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      };
+  @override
+  void configure(HindiSourceModel model) {
+    if (model.baseUrl.isNotEmpty) _baseUrl = model.baseUrl;
+    if (model.mirrors.isNotEmpty) _mirrors = model.mirrors;
+  }
+
+  /// Picks first reachable mirror with real homepage content (>800 chars, status < 500).
+  /// Caches working mirror for the current app session.
+  Future<String> _pickMain() async {
+    if (_workingMirror != null) return _workingMirror!;
+    final candidateMirrors = [_baseUrl, ..._mirrors.where((m) => m != _baseUrl)];
+
+    for (final mirror in candidateMirrors) {
+      try {
+        final res = await http.get(
+          Uri.parse('$mirror/'),
+          headers: {'User-Agent': _ua},
+        ).timeout(const Duration(seconds: 6));
+        if (res.statusCode < 500 && res.body.length > 500) {
+          _workingMirror = mirror;
+          AppLogger.i('[AnimeSalt] Selected healthy mirror: $mirror');
+          return mirror;
+        }
+      } catch (_) {}
+    }
+    _workingMirror = _baseUrl;
+    return _baseUrl;
+  }
 
   @override
   Future<bool> healthCheck() async {
     try {
-      final res = await http
-          .get(Uri.parse('$baseUrl/'), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 5));
-      return res.statusCode >= 200 && res.statusCode < 400;
+      final main = await _pickMain();
+      final res = await http.get(
+        Uri.parse('$main/'),
+        headers: {'User-Agent': _ua},
+      ).timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
     } catch (_) {
       return false;
     }
   }
 
-  String _cleanSearchTitle(String title) {
-    var clean = title.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
-    clean = clean.replaceAll(RegExp(r'\[[^\]]*\]'), '').trim();
-    clean = clean.replaceAll(RegExp(r'[^\w\s]'), ' ').trim();
-    return clean.replaceAll(RegExp(r'\s+'), ' ');
+  String _cleanTitle(String raw) {
+    return raw
+        .replaceAll(RegExp(r'^\s*(?:download|watch)\s+', caseSensitive: false), '')
+        .replaceAll(RegExp(r'^\s*animesalt\s*[|\-–:]\s*', caseSensitive: false), '')
+        .trim();
   }
 
   @override
@@ -61,58 +103,117 @@ class AnimeSaltProvider implements HindiPlaybackProvider {
     int? malId,
     int? year,
   }) async {
-    final searchTerms = <String>[];
-    final cleanTitle = _cleanSearchTitle(title);
-    searchTerms.add(cleanTitle);
-    if (romajiTitle != null && romajiTitle.isNotEmpty) {
-      final cleanRomaji = _cleanSearchTitle(romajiTitle);
-      if (!searchTerms.contains(cleanRomaji)) searchTerms.add(cleanRomaji);
-    }
+    final main = await _pickMain();
+    final cleanQ = title
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleanQ.isEmpty) return null;
 
-    for (final term in searchTerms) {
-      try {
-        AppLogger.d('[Hindi] AnimeSalt searching for: $term');
-        final searchUrl = Uri.parse('$baseUrl/search').replace(
-          queryParameters: {'keyword': term},
-        );
+    final url = '$main/filter?keyword=${Uri.encodeComponent(cleanQ)}';
+    AppLogger.d('[AnimeSalt] Searching: $url');
 
-        final res = await http
-            .get(searchUrl, headers: _defaultHeaders)
-            .timeout(const Duration(seconds: 8));
+    try {
+      final res = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': _ua, 'Referer': '$main/'},
+      ).timeout(const Duration(seconds: 10));
 
-        if (res.statusCode == 200) {
-          final doc = html_parser.parse(res.body);
-          // Look for anime cards/links in search results
-          final links = doc.querySelectorAll('a[href*="/anime/"], a[href*="/watch/"]');
-          for (final a in links) {
-            final linkTitle = a.text.trim().toLowerCase();
-            final href = a.attributes['href'];
-            if (href != null && href.isNotEmpty) {
-              if (linkTitle.contains(term.toLowerCase()) ||
-                  term.toLowerCase().contains(linkTitle) ||
-                  links.length == 1) {
-                final fullPath = href.startsWith('http') ? href : '$baseUrl$href';
-                AppLogger.success('[Hindi] AnimeSalt matched anime: $fullPath');
-                return fullPath;
-              }
-            }
-          }
+      if (res.statusCode != 200 || res.body.isEmpty) return null;
+      final doc = html_parser.parse(res.body);
+      final links = doc.querySelectorAll('a[href*="/watch/"]');
 
-          // Fallback: Check first card result
-          if (links.isNotEmpty) {
-            final firstHref = links.first.attributes['href'];
-            if (firstHref != null && firstHref.isNotEmpty) {
-              final fullPath = firstHref.startsWith('http') ? firstHref : '$baseUrl$firstHref';
-              AppLogger.i('[Hindi] AnimeSalt using first search match: $fullPath');
-              return fullPath;
-            }
-          }
+      final candidates = <Map<String, String>>[];
+      for (final link in links) {
+        var href = link.attributes['href'];
+        if (href == null || href.isEmpty) continue;
+        if (!href.startsWith('http')) {
+          href = '$main$href';
         }
-      } catch (e) {
-        AppLogger.w('[Hindi] AnimeSalt search error for $term: $e');
+        final cleanHref = href.replaceAll(RegExp(r'/ep-\d+/?$'), '');
+        final title = link.attributes['title'] ?? link.text.trim();
+        final cTitle = _cleanTitle(title);
+
+        if (cTitle.isNotEmpty && !candidates.any((c) => c['url'] == cleanHref)) {
+          candidates.add({'title': cTitle, 'url': cleanHref});
+        }
       }
+
+      if (candidates.isEmpty) return null;
+
+      // Exact or best token match
+      final normalizedTarget = title.toLowerCase();
+      final targetTokens = normalizedTarget.split(' ').where((t) => t.length > 2).toSet();
+
+      Map<String, String>? bestMatch;
+      int bestScore = -1;
+
+      for (final c in candidates) {
+        final cTitleNorm = c['title']!.toLowerCase();
+        if (cTitleNorm == normalizedTarget) {
+          bestMatch = c;
+          break;
+        }
+        final cTokens = cTitleNorm.split(' ').where((t) => t.length > 2).toSet();
+        final common = targetTokens.intersection(cTokens).length;
+        if (common > bestScore) {
+          bestScore = common;
+          bestMatch = c;
+        }
+      }
+
+      return bestMatch?['url'];
+    } catch (e) {
+      AppLogger.w('[AnimeSalt] Search failed: $e');
+      return null;
     }
-    return null;
+  }
+
+  @override
+  Future<int?> getEpisodeCount(String providerAnimeId) async {
+    try {
+      final main = await _pickMain();
+      final pageUrl = providerAnimeId.startsWith('http')
+          ? providerAnimeId
+          : '$main$providerAnimeId';
+
+      final res = await http.get(
+        Uri.parse(pageUrl),
+        headers: {'User-Agent': _ua, 'Referer': '$main/'},
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode != 200) return null;
+      final html = res.body;
+
+      final dataIdMatch = RegExp(
+        r'id=["\x27]wrapper["\x27][^>]*data-id=["\x27]?(\d+)["\x27]?|data-id=["\x27]?(\d+)["\x27]?[^>]*id=["\x27]wrapper["\x27]',
+        caseSensitive: false,
+      ).firstMatch(html);
+      final animeId = dataIdMatch?.group(1) ?? dataIdMatch?.group(2);
+      if (animeId != null) {
+        final listRes = await http.get(
+          Uri.parse('$main/ajax/episode/list/$animeId'),
+          headers: {'User-Agent': _ua, 'X-Requested-With': 'XMLHttpRequest', 'Referer': pageUrl},
+        ).timeout(const Duration(seconds: 6));
+        if (listRes.statusCode == 200) {
+          try {
+            final data = jsonDecode(listRes.body);
+            final ajaxHtml = data['html']?.toString() ?? '';
+            final numMatches = RegExp(r'data-number=["\x27](\d+)["\x27]').allMatches(ajaxHtml);
+            int maxEp = 0;
+            for (final m in numMatches) {
+              final ep = int.tryParse(m.group(1) ?? '') ?? 0;
+              if (ep > maxEp) maxEp = ep;
+            }
+            if (maxEp > 0) return maxEp;
+          } catch (_) {}
+        }
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -121,107 +222,147 @@ class AnimeSaltProvider implements HindiPlaybackProvider {
     required int episodeNumber,
     String? animeTitle,
   }) async {
-    try {
-      AppLogger.d(
-        '[Hindi] AnimeSalt resolving $animeTitle Ep $episodeNumber from $providerAnimeId',
-      );
+    final main = await _pickMain();
+    final pageUrl = providerAnimeId.startsWith('http')
+        ? providerAnimeId
+        : '$main$providerAnimeId';
 
-      // Construct target episode page URL
-      String targetUrl = providerAnimeId;
-      if (!targetUrl.contains('episode-') && !targetUrl.contains('ep-')) {
-        final uri = Uri.parse(providerAnimeId);
-        final segments = List<String>.from(uri.pathSegments);
-        if (segments.isNotEmpty && segments.last.isEmpty) segments.removeLast();
-        if (segments.isNotEmpty) {
-          final slug = segments.last;
-          targetUrl = '$baseUrl/watch/$slug/episode-$episodeNumber';
+    AppLogger.d('[AnimeSalt] Resolving Ep $episodeNumber on $pageUrl');
+
+    try {
+      final res = await http.get(
+        Uri.parse(pageUrl),
+        headers: {'User-Agent': _ua, 'Referer': '$main/'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode != 200) return null;
+      final html = res.body;
+
+      String? targetEpisodePageUrl;
+
+      // Check inline episodes: /episode/[slug]-(\d+)x(\d+)
+      final re = RegExp(r'<a[^>]+href=["\x27]([^"\x27]+/episode/[a-z0-9-]+-(\d+)x(\d+)/?)["\x27]', caseSensitive: false);
+      final matches = re.allMatches(html);
+
+      for (final m in matches) {
+        final ep = int.tryParse(m.group(3) ?? '') ?? 0;
+        if (ep == episodeNumber) {
+          targetEpisodePageUrl = m.group(1);
+          break;
         }
       }
 
-      var res = await http
-          .get(Uri.parse(targetUrl), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 10));
+      // If not inline and page has data-post and seasons, try admin-ajax
+      if (targetEpisodePageUrl == null) {
+        final postIdMatch = RegExp(r'data-post=["\x27](\d+)["\x27]').firstMatch(html);
+        final seasonMatches = RegExp(r'data-season=["\x27](\d+)["\x27]').allMatches(html);
+        final postId = postIdMatch?.group(1);
 
-      if (res.statusCode != 200 && targetUrl != providerAnimeId) {
-        // Fallback to providerAnimeId directly
-        res = await http
-            .get(Uri.parse(providerAnimeId), headers: _defaultHeaders)
-            .timeout(const Duration(seconds: 10));
+        if (postId != null && seasonMatches.isNotEmpty) {
+          for (final sm in seasonMatches) {
+            final sNum = sm.group(1);
+            if (sNum == null) continue;
+            try {
+              final ajaxRes = await http.post(
+                Uri.parse('$main/wp-admin/admin-ajax.php'),
+                headers: {
+                  'User-Agent': _ua,
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'Referer': pageUrl,
+                },
+                body: 'action=action_select_season&season=$sNum&post=$postId',
+              ).timeout(const Duration(seconds: 6));
+
+              if (ajaxRes.statusCode == 200) {
+                final ajaxMatches = re.allMatches(ajaxRes.body);
+                for (final am in ajaxMatches) {
+                  final ep = int.tryParse(am.group(3) ?? '') ?? 0;
+                  if (ep == episodeNumber) {
+                    targetEpisodePageUrl = am.group(1);
+                    break;
+                  }
+                }
+              }
+              if (targetEpisodePageUrl != null) break;
+            } catch (_) {}
+          }
+        }
       }
 
-      if (res.statusCode != 200) {
-        AppLogger.w('[Hindi] AnimeSalt episode page returned ${res.statusCode}');
+      if (targetEpisodePageUrl == null) {
+        AppLogger.w('[AnimeSalt] Episode $episodeNumber link not found');
         return null;
       }
 
-      final body = res.body;
+      // Fetch episode page to extract player embed
+      final epRes = await http.get(
+        Uri.parse(targetEpisodePageUrl),
+        headers: {'User-Agent': _ua, 'Referer': pageUrl},
+      ).timeout(const Duration(seconds: 10));
 
-      // 1. Look for direct m3u8 in page scripts or iframes
-      final m3u8Match = RegExp(r'''(?:file|source|src)\s*:\s*["']([^"']+\.m3u8[^"']*)["']''', caseSensitive: false)
-          .firstMatch(body);
+      if (epRes.statusCode != 200) return null;
+      final epHtml = epRes.body;
 
-      String? streamUrl = m3u8Match?.group(1);
+      // Match player embed: https?://as-cdn*.top/video/[a-f0-9]+
+      final embedMatch = RegExp(
+        r'https?://(?:[a-z0-9.-]*cdn\d*\.top)/video/([a-f0-9]+)',
+        caseSensitive: false,
+      ).firstMatch(epHtml);
 
-      // 2. Look for iframe player src
-      if (streamUrl == null) {
-        final iframeMatch = RegExp(r'''<iframe[^>]+src=["']([^"']+)["']''', caseSensitive: false)
-            .firstMatch(body);
-        if (iframeMatch != null) {
-          final iframeSrc = iframeMatch.group(1)!;
-          final resolvedIframe = iframeSrc.startsWith('http')
-              ? iframeSrc
-              : (iframeSrc.startsWith('//') ? 'https:$iframeSrc' : '$baseUrl$iframeSrc');
-
-          try {
-            final iframeRes = await http
-                .get(Uri.parse(resolvedIframe), headers: {
-                  ..._defaultHeaders,
-                  'Referer': targetUrl,
-                })
-                .timeout(const Duration(seconds: 6));
-            if (iframeRes.statusCode == 200) {
-              final iframeM3u8 = RegExp(r'''["']([^"']+\.m3u8[^"']*)["']''')
-                  .firstMatch(iframeRes.body);
-              streamUrl = iframeM3u8?.group(1);
-            }
-          } catch (_) {}
-        }
+      if (embedMatch == null) {
+        AppLogger.w('[AnimeSalt] No as-cdn embed found on $targetEpisodePageUrl');
+        return null;
       }
 
-      // 3. Look for direct mp4 links
-      if (streamUrl == null) {
-        final mp4Match = RegExp(r'''["']([^"']+\.mp4[^"']*)["']''', caseSensitive: false)
-            .firstMatch(body);
-        streamUrl = mp4Match?.group(1);
+      final fullEmbedUrl = embedMatch.group(0)!;
+      final hex = embedMatch.group(1)!;
+      final host = Uri.parse(fullEmbedUrl).origin;
+
+      // Request signed master.m3u8 via getVideo API
+      final videoRes = await http.post(
+        Uri.parse('$host/player/index.php?data=$hex&do=getVideo'),
+        headers: {
+          'User-Agent': _ua,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Referer': fullEmbedUrl,
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (videoRes.statusCode != 200 || videoRes.body.isEmpty) {
+        AppLogger.w('[AnimeSalt] getVideo returned ${videoRes.statusCode}');
+        return null;
       }
 
-      if (streamUrl != null && streamUrl.isNotEmpty) {
-        final isM3U8 = streamUrl.contains('.m3u8');
-        final sources = [
+      final dynamic data = jsonDecode(videoRes.body);
+      final masterUrl = data['videoSource'] ?? data['securedLink'];
+      if (masterUrl == null || masterUrl.toString().isEmpty) {
+        AppLogger.w('[AnimeSalt] getVideo response has no videoSource');
+        return null;
+      }
+
+      final streamUrl = masterUrl.toString();
+      final isHls = streamUrl.contains('.m3u8');
+
+      AppLogger.success('[AnimeSalt] Playable stream resolved: $streamUrl');
+
+      return BaseSourcesModel(
+        sources: [
           Source(
             url: streamUrl,
-            quality: 'Hindi (Multi-Audio)',
-            isM3U8: isM3U8,
-            isDub: false,
-            headers: {
-              'User-Agent': _userAgent,
-              'Referer': targetUrl,
-            },
+            quality: 'auto (multi-audio)',
+            isM3U8: isHls,
           ),
-        ];
-
-        AppLogger.success(
-          '[Hindi] AnimeSalt successfully resolved stream for Ep $episodeNumber',
-        );
-        return BaseSourcesModel(
-          sources: sources,
-          headers: {'User-Agent': _userAgent, 'Referer': targetUrl},
-        );
-      }
+        ],
+        headers: {
+          'User-Agent': _ua,
+          'Referer': '$host/',
+        },
+      );
     } catch (e) {
-      AppLogger.w('[Hindi] AnimeSalt resolveEpisode error: $e');
+      AppLogger.e('[AnimeSalt] Episode resolution error: $e');
+      return null;
     }
-    return null;
   }
 
   @override
@@ -230,10 +371,10 @@ class AnimeSaltProvider implements HindiPlaybackProvider {
     required int episodeNumber,
     String? quality,
   }) async {
-    final streamData = await resolveEpisode(
+    final stream = await resolveEpisode(
       providerAnimeId: providerAnimeId,
       episodeNumber: episodeNumber,
     );
-    return streamData?.sources.firstOrNull?.url;
+    return stream?.sources.firstOrNull?.url;
   }
 }

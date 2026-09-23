@@ -291,8 +291,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       final savedSeconds = saved?.progressInSeconds ?? 0;
       final savedDuration = saved?.durationInSeconds ?? 0;
       if (savedSeconds > 0 &&
-          !((saved?.isCompleted ?? false) ||
-              (savedDuration > 0 && savedSeconds >= savedDuration - 10))) {
+          !(savedDuration > 0 && savedSeconds >= savedDuration - 20)) {
         startAt = Duration(seconds: savedSeconds);
         AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
       }

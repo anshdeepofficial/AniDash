@@ -11,7 +11,13 @@
       "supportsStreaming": true,
       "supportsDownloads": true,
       "supportsMultiAudio": true,
-      "baseUrl": "https://animesalt.cc"
+      "baseUrl": "https://animesalt.ac",
+      "mirrors": [
+        "https://animesalt.ac",
+        "https://animesalt.to",
+        "https://animesalt.me",
+        "https://animesalt.ro"
+      ]
     },
     {
       "id": "animixstream",
@@ -23,7 +29,10 @@
       "supportsStreaming": true,
       "supportsDownloads": false,
       "supportsMultiAudio": true,
-      "baseUrl": "https://animixstream.com"
+      "baseUrl": "https://animixstream.com",
+      "mirrors": [
+        "https://animixstream.com"
+      ]
     },
     {
       "id": "animedrive",
@@ -35,7 +44,10 @@
       "supportsStreaming": true,
       "supportsDownloads": true,
       "supportsMultiAudio": true,
-      "baseUrl": "https://animedrive.top"
+      "baseUrl": "https://animedrive.in",
+      "mirrors": [
+        "https://animedrive.in"
+      ]
     },
     {
       "id": "animelok",
@@ -47,7 +59,10 @@
       "supportsStreaming": true,
       "supportsDownloads": false,
       "supportsMultiAudio": false,
-      "baseUrl": "https://animelok.org"
+      "baseUrl": "https://animelok.online",
+      "mirrors": [
+        "https://animelok.online"
+      ]
     }
   ]
 }

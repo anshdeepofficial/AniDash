@@ -830,6 +830,12 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<void> _fetchServers(int epNum) async {
+    final isHindiActive =
+        ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi';
+    if (isHindiActive) {
+      return;
+    }
+
     state = state.copyWith(
       addState: EpisodeStreamState.SERVER_LOADING,
       clearError: true,

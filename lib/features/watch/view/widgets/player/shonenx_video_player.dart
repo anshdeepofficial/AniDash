@@ -13,7 +13,7 @@ import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/controls_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/player_gesture_handler.dart';
-import 'package:ani_dash/features/watch/view/widgets/player/seek_indicator.dart';
+
 import 'package:ani_dash/features/watch/view/widgets/player/sheets/generic_selection_sheet.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/sheets/settings_sheet.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/sheets/subtitle_selection_sheet.dart';
@@ -26,7 +26,6 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_ui_controller.dart';
-import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/next_episode_prompt_overlay.dart';
@@ -68,11 +67,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
-  Timer? _tapSeekResetTimer;
-  Timer? _tapSeekCommitTimer;
-  Duration? _tapSeekTarget;
-  Duration? _tapSeekBasePosition;
-  int _accumulatedSeekSeconds = 0;
+
 
   bool _isDraggingSeek = false;
   Duration _dragStartPos = Duration.zero;
@@ -119,8 +114,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   void dispose() {
     _focusNode.dispose();
     _volumeOverlayTimer?.cancel();
-    _tapSeekResetTimer?.cancel();
-    _tapSeekCommitTimer?.cancel();
+
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
       UIHelper.removeVolumeKeyHandler();
@@ -291,58 +285,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
   }
 
-  void _onDoubleTap(bool forward) {
-    if (ref.read(playerUIControllerProvider).isLocked) return;
 
-    final settings = ref.read(playerSettingsProvider);
-    final jump = settings.seekDuration;
-    final player = ref.read(playerStateProvider);
-
-    // If an active sequence is underway, accumulate onto existing net offset
-    if (_tapSeekBasePosition != null) {
-      if (forward) {
-        _accumulatedSeekSeconds += jump;
-      } else {
-        _accumulatedSeekSeconds -= jump;
-      }
-    } else {
-      // First tap in sequence: capture base position from player
-      _tapSeekBasePosition = player.position;
-      _accumulatedSeekSeconds = forward ? jump : -jump;
-    }
-
-    final isForward = _accumulatedSeekSeconds >= 0;
-    final displaySeconds = _accumulatedSeekSeconds.abs();
-
-    var target = _tapSeekBasePosition! + Duration(seconds: _accumulatedSeekSeconds);
-    if (target < Duration.zero) target = Duration.zero;
-    if (player.duration > Duration.zero && target > player.duration) {
-      target = player.duration;
-    }
-    _tapSeekTarget = target;
-
-    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s, 50s, 60s...)
-    ref
-        .read(playerUIControllerProvider.notifier)
-        .showSeekIndicator(isForward, displaySeconds == 0 ? jump : displaySeconds);
-
-    // Smooth seek commit: 600ms after the LAST tap commits the final accumulated jump
-    _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 600), () {
-      final pending = _tapSeekTarget;
-      if (pending != null && mounted) {
-        ref.read(playerStateProvider.notifier).seek(pending);
-      }
-    });
-
-    // Reset sequence only after 1400ms of inactivity
-    _tapSeekResetTimer?.cancel();
-    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1400), () {
-      _tapSeekTarget = null;
-      _tapSeekBasePosition = null;
-      _accumulatedSeekSeconds = 0;
-    });
-  }
 
   void _onLongPressStart() {
     if (ref.read(playerUIControllerProvider).isLocked) return;
@@ -576,7 +519,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                     widget.onPanelCloseRequest?.call();
                     uiController.toggleVisibility();
                   },
-                  onDoubleTap: _onDoubleTap,
+
                   onLongPressStart: _onLongPressStart,
                   onLongPressUpdate: _onLongPressUpdate,
                   onLongPressEnd: _onLongPressEnd,
@@ -668,20 +611,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                   isForward: _isDragSeekForward,
                 ),
 
-              // Seek Indicator (Dynamic)
-              if (uiState.seekAmount != 0)
-                Positioned.fill(
-                  child: Align(
-                    alignment:
-                        uiState.isSeekForward
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                    child: SeekIndicatorOverlay(
-                      isForward: uiState.isSeekForward,
-                      seconds: uiState.seekAmount.abs(),
-                    ),
-                  ),
-                ),
+
 
               // Speed Indicator
               if (_isSpeeding) SpeedIndicatorOverlay(currentSpeed: _lastSpeed),

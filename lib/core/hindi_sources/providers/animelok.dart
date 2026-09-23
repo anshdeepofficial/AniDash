@@ -1,19 +1,29 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:html/parser.dart' as html_parser;
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/hindi_sources/interfaces/hindi_playback_provider.dart';
+import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
+/// Experimental sandbox provider for AnimeLok.
+/// Disabled by default due to Cloudflare WAF on upstream video CDN (hawk.24stream.xyz).
 class AnimeLokProvider implements HindiPlaybackProvider {
   @override
   String get id => 'animelok';
 
   @override
-  String get name => 'AnimeLok (Experimental)';
+  String get name => 'AnimeLok';
+
+  static const String _defaultBaseUrl = 'https://animelok.online';
+  String _baseUrl = _defaultBaseUrl;
+  List<String> _mirrors = const [_defaultBaseUrl];
 
   @override
-  String get baseUrl => 'https://animelok.org';
+  String get baseUrl => _baseUrl;
+
+  @override
+  List<String> get mirrors => _mirrors;
 
   @override
   bool get supportsStreaming => true;
@@ -24,32 +34,27 @@ class AnimeLokProvider implements HindiPlaybackProvider {
   @override
   bool get supportsMultiAudio => false;
 
-  static const String _userAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  static const String _ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-  Map<String, String> get _defaultHeaders => {
-        'User-Agent': _userAgent,
-        'Referer': '$baseUrl/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      };
+  @override
+  void configure(HindiSourceModel model) {
+    if (model.baseUrl.isNotEmpty) _baseUrl = model.baseUrl;
+    if (model.mirrors.isNotEmpty) _mirrors = model.mirrors;
+  }
 
   @override
   Future<bool> healthCheck() async {
     try {
-      final res = await http
-          .get(Uri.parse('$baseUrl/'), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 4));
-      return res.statusCode >= 200 && res.statusCode < 400;
+      final res = await http.get(
+        Uri.parse('$_baseUrl/'),
+        headers: {'User-Agent': _ua},
+      ).timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
     } catch (_) {
       return false;
     }
-  }
-
-  String _cleanSearchTitle(String title) {
-    var clean = title.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
-    clean = clean.replaceAll(RegExp(r'\[[^\]]*\]'), '').trim();
-    clean = clean.replaceAll(RegExp(r'[^\w\s]'), ' ').trim();
-    return clean.replaceAll(RegExp(r'\s+'), ' ');
   }
 
   @override
@@ -60,47 +65,30 @@ class AnimeLokProvider implements HindiPlaybackProvider {
     int? malId,
     int? year,
   }) async {
-    final searchTerms = <String>[];
-    final cleanTitle = _cleanSearchTitle(title);
-    searchTerms.add(cleanTitle);
-    if (romajiTitle != null && romajiTitle.isNotEmpty) {
-      final cleanRomaji = _cleanSearchTitle(romajiTitle);
-      if (!searchTerms.contains(cleanRomaji)) searchTerms.add(cleanRomaji);
+    if (anilistId != null) {
+      return anilistId.toString();
     }
 
-    for (final term in searchTerms) {
-      try {
-        AppLogger.d('[Hindi] AnimeLok searching: $term');
-        final searchUrl = Uri.parse('$baseUrl/?s=${Uri.encodeComponent(term)}');
-        final res = await http
-            .get(searchUrl, headers: _defaultHeaders)
-            .timeout(const Duration(seconds: 6));
+    try {
+      final res = await http.get(
+        Uri.parse('$_baseUrl/search?keyword=${Uri.encodeComponent(title)}'),
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/', 'RSC': '1'},
+      ).timeout(const Duration(seconds: 8));
 
-        if (res.statusCode == 200) {
-          final doc = html_parser.parse(res.body);
-          final links = doc.querySelectorAll('a[href*="/series/"], a[href*="/anime/"]');
-          for (final a in links) {
-            final linkTitle = a.text.trim().toLowerCase();
-            final href = a.attributes['href'];
-            if (href != null && href.isNotEmpty) {
-              if (linkTitle.contains(term.toLowerCase()) ||
-                  term.toLowerCase().contains(linkTitle) ||
-                  links.length == 1) {
-                AppLogger.success('[Hindi] AnimeLok matched anime: $href');
-                return href;
-              }
-            }
-          }
-          if (links.isNotEmpty) {
-            final firstHref = links.first.attributes['href'];
-            if (firstHref != null && firstHref.isNotEmpty) return firstHref;
-          }
-        }
-      } catch (e) {
-        AppLogger.w('[Hindi] AnimeLok search error for $term: $e');
-      }
+      if (res.statusCode != 200) return null;
+      final body = res.body;
+
+      // Extract slug from {"slug":"<name>-<anilistId>"}
+      final m = RegExp(r'\{"slug":"[a-z0-9-]+-(\d+)"\}').firstMatch(body);
+      return m?.group(1);
+    } catch (_) {
+      return null;
     }
-    return null;
+  }
+
+  @override
+  Future<int?> getEpisodeCount(String providerAnimeId) async {
+    return null; // Resolved dynamically per-episode
   }
 
   @override
@@ -110,50 +98,44 @@ class AnimeLokProvider implements HindiPlaybackProvider {
     String? animeTitle,
   }) async {
     try {
-      AppLogger.d(
-        '[Hindi] AnimeLok resolving $animeTitle Ep $episodeNumber from $providerAnimeId',
-      );
+      final aid = providerAnimeId;
+      final url = '$_baseUrl/api/get-vibeplayer-data?anilistId=$aid&epNum=$episodeNumber&type=dub';
 
-      final res = await http
-          .get(Uri.parse(providerAnimeId), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 8));
+      final res = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/'},
+      ).timeout(const Duration(seconds: 10));
 
-      if (res.statusCode != 200) return null;
+      if (res.statusCode != 200 || res.body.isEmpty) return null;
 
-      final body = res.body;
-      final m3u8Match = RegExp(
-        r'''(?:file|source|src)\s*:\s*["']([^"']+\.m3u8[^"']*)["']''',
-        caseSensitive: false,
-      ).firstMatch(body);
+      final dynamic data = jsonDecode(res.body);
+      final sources = (data['sources'] as List<dynamic>?) ?? [];
+      if (sources.isEmpty) return null;
 
-      final streamUrl = m3u8Match?.group(1);
-
-      if (streamUrl != null && streamUrl.isNotEmpty) {
-        final sources = [
-          Source(
-            url: streamUrl,
-            quality: 'AnimeLok (Hindi Dub)',
-            isM3U8: true,
-            isDub: false,
-            headers: {
-              'User-Agent': _userAgent,
-              'Referer': providerAnimeId,
-            },
-          ),
-        ];
-
-        AppLogger.success(
-          '[Hindi] AnimeLok successfully resolved stream for Ep $episodeNumber',
-        );
-        return BaseSourcesModel(
-          sources: sources,
-          headers: {'User-Agent': _userAgent, 'Referer': providerAnimeId},
-        );
+      final playable = <Source>[];
+      for (final s in sources) {
+        final streamUrl = s['url']?.toString();
+        if (streamUrl != null && streamUrl.isNotEmpty) {
+          playable.add(
+            Source(
+              url: streamUrl,
+              quality: s['quality']?.toString() ?? 'auto',
+              isM3U8: streamUrl.contains('.m3u8'),
+            ),
+          );
+        }
       }
+
+      if (playable.isEmpty) return null;
+
+      return BaseSourcesModel(
+        sources: playable,
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/'},
+      );
     } catch (e) {
-      AppLogger.w('[Hindi] AnimeLok resolveEpisode error: $e');
+      AppLogger.w('[AnimeLok] Resolution failed: $e');
+      return null;
     }
-    return null;
   }
 
   @override
@@ -161,7 +143,5 @@ class AnimeLokProvider implements HindiPlaybackProvider {
     required String providerAnimeId,
     required int episodeNumber,
     String? quality,
-  }) async {
-    return null;
-  }
+  }) async => null;
 }

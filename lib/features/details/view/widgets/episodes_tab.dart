@@ -32,6 +32,8 @@ import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
 
 enum EpisodeViewMode { list, compact, grid, block, banner }
 
@@ -75,12 +77,42 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
   bool _isSelecting = false;
+  int? _hindiEpisodeCount;
 
   @override
   void initState() {
     super.initState();
     _selectionNotifier = _getEpisodesSelectionNotifier(widget.mediaId);
     _selectionNotifier.addListener(_onSelectionChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchHindiEpisodeCount();
+    });
+  }
+
+  Future<void> _fetchHindiEpisodeCount() async {
+    final audio = ref.read(playerSettingsProvider).preferredAudioLanguage;
+    if (audio != 'hindi') {
+      if (_hindiEpisodeCount != null && mounted) {
+        setState(() => _hindiEpisodeCount = null);
+      }
+      return;
+    }
+    try {
+      final title = (widget.mediaTitle.english ??
+              widget.mediaTitle.romaji ??
+              widget.mediaTitle.native) ??
+          '';
+      final count = await ref
+          .read(hindiSourceManagerProvider.notifier)
+          .getEpisodeCount(
+            animeTitle: title,
+            romajiTitle: widget.mediaTitle.romaji,
+            anilistId: int.tryParse(widget.mediaId),
+          );
+      if (mounted && count != null) {
+        setState(() => _hindiEpisodeCount = count);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -421,19 +453,33 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     if (episodes.isNotEmpty && watchProgress != null) {
       final currentEpNum = watchProgress.currentEpisode;
       final currentProgress = watchProgress.episodesProgress[currentEpNum];
+      final dur = currentProgress?.durationInSeconds ?? 0;
+      final prog = currentProgress?.progressInSeconds ?? 0;
+      final isCurrentTrulyCompleted = (currentProgress?.isCompleted == true &&
+              (dur == 0 || prog >= dur - 45 || (prog / dur) >= 0.92)) ||
+          (dur > 0 && (prog / dur) >= 0.92);
+
       if (currentProgress != null &&
-          !currentProgress.isCompleted &&
+          !isCurrentTrulyCompleted &&
           (currentProgress.progressInSeconds ?? 0) > 0) {
         continueEpisode =
             episodes.firstWhereOrNull((e) => e.number == currentEpNum);
         continueEpProgress = currentProgress;
       } else {
         final nextEpNum = currentEpNum + 1;
-        continueEpisode =
-            episodes.firstWhereOrNull((e) => e.number == nextEpNum) ??
-            episodes.firstWhereOrNull((e) => e.number == currentEpNum);
-        continueEpProgress =
-            watchProgress.episodesProgress[continueEpisode?.number];
+        if (isCurrentTrulyCompleted && nextEpNum > totalEpisodes) {
+          continueEpisode = null;
+          continueEpProgress = null;
+        } else {
+          continueEpisode =
+              episodes.firstWhereOrNull((e) => e.number == nextEpNum);
+          if (continueEpisode == null && !isCurrentTrulyCompleted) {
+            continueEpisode =
+                episodes.firstWhereOrNull((e) => e.number == currentEpNum);
+          }
+          continueEpProgress =
+              watchProgress.episodesProgress[continueEpisode?.number];
+        }
       }
     }
 
@@ -1057,9 +1103,15 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
         }
       }
 
-      switch (viewMode) {
-        case EpisodeViewMode.grid:
-          return EpisodeGridItem(
+      final isHindiActive =
+          ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
+      final isHindiUnavailable = isHindiActive &&
+          _hindiEpisodeCount != null &&
+          _hindiEpisodeCount! > 0 &&
+          epNum > _hindiEpisodeCount!;
+
+      final Widget itemWidget = switch (viewMode) {
+        EpisodeViewMode.grid => EpisodeGridItem(
             episode: ep,
             index: index,
             isWatched: isWatched,
@@ -1079,9 +1131,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 ),
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
-          );
-        case EpisodeViewMode.compact:
-          return EpisodeCompactItem(
+          ),
+        EpisodeViewMode.compact => EpisodeCompactItem(
             episode: ep,
             index: index,
             isWatched: isWatched,
@@ -1100,9 +1151,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             onLongPress: onLongPressItem,
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
-          );
-        case EpisodeViewMode.block:
-          return EpisodeBlockItem(
+          ),
+        EpisodeViewMode.block => EpisodeBlockItem(
             episode: ep,
             index: index,
             isWatched: isWatched,
@@ -1113,9 +1163,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             onDownload: onDownloadItem,
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
-          );
-        case EpisodeViewMode.banner:
-          return EpisodeBannerItem(
+          ),
+        EpisodeViewMode.banner => EpisodeBannerItem(
             episode: ep,
             index: index,
             isWatched: isWatched,
@@ -1135,9 +1184,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             onLongPress: onLongPressItem,
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
-          );
-        case EpisodeViewMode.list:
-          return EpisodeListItem(
+          ),
+        EpisodeViewMode.list => EpisodeListItem(
             episode: ep,
             index: index,
             isWatched: isWatched,
@@ -1157,8 +1205,41 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             onLongPress: onLongPressItem,
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
-          );
+          ),
+      };
+
+      if (isHindiUnavailable) {
+        return Opacity(
+          opacity: 0.45,
+          child: Stack(
+            children: [
+              itemWidget,
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade900.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Hindi Soon',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
       }
+
+      return itemWidget;
     }
 
     if (viewMode == EpisodeViewMode.grid) {
@@ -1231,6 +1312,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     List<EpisodeDataModel> episodes,
     String animeIdForSource,
   ) {
+    final savedProgress = ref
+        .read(watchProgressRepositoryProvider)
+        .getEpisodeProgress(widget.mediaId, ep.number ?? 1);
+    final savedSeconds = savedProgress?.progressInSeconds ?? 0;
+    final savedDuration = savedProgress?.durationInSeconds ?? 0;
+    final shouldResume = savedSeconds > 0 &&
+        !(savedDuration > 0 && savedSeconds >= savedDuration - 20);
+
     navigateToWatch(
       mediaId: widget.mediaId,
       animeId: animeIdForSource,
@@ -1243,6 +1332,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       context: context,
       episodes: episodes,
       currentEpisode: ep.number ?? 1,
+      startAtPosition: shouldResume ? savedSeconds : null,
       malId: widget.malId,
       fromHentaiHub: widget.fromHentaiHub,
     );
@@ -1340,14 +1430,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                           ),
                           const TabBar(
                             tabs: [
-                              Tab(text: 'Built-in Sources'),
+                              Tab(text: 'Hindi Sources'),
                               Tab(text: 'Extensions'),
                             ],
                           ),
                           Expanded(
                             child: TabBarView(
                               children: [
-                                _buildLegacySourceList(
+                                _buildHindiSourceList(
                                   ref,
                                   scrollController,
                                   notifier,
@@ -1474,22 +1564,35 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     );
   }
 
-  Widget _buildLegacySourceList(
+  Widget _buildHindiSourceList(
     WidgetRef ref,
     ScrollController scrollController,
     DetailsPageNotifier notifier,
     String query,
   ) {
-    final registry = ref.read(animeSourceRegistryProvider);
-    final selectedAnimeSource = ref.watch(selectedAnimeProvider);
-    final sources =
-        registry.keys.where((s) {
-          if (query.isEmpty) return true;
-          return s.toLowerCase().contains(query.toLowerCase());
-        }).toList();
+    final hindiSources = ref.watch(hindiSourceManagerProvider);
+    final enabledSources = hindiSources.where((s) => s.enabled).toList();
+    final sources = enabledSources.where((s) {
+      if (query.isEmpty) return true;
+      return s.name.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    final currentAudio =
+        ref.watch(playerSettingsProvider).preferredAudioLanguage;
+    final isHindiActive = currentAudio == 'hindi';
+    final preferredProvider =
+        HindiSourcePreferences.instance.getPreferredProvider();
 
     if (sources.isEmpty) {
-      return const Center(child: Text('No sources found.'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text(
+            'No enabled Hindi sources found.\nEnable them in Settings → Hindi Sources.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return ListView.builder(
@@ -1497,26 +1600,41 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       itemCount: sources.length,
       itemBuilder: (context, index) {
         final source = sources[index];
-        final isSelected =
-            source.toLowerCase() == selectedAnimeSource?.providerName;
+        final isSelected = isHindiActive &&
+            (preferredProvider == source.id ||
+                (preferredProvider == 'auto' && index == 0));
+
         return ListTile(
-          leading: const CircleAvatar(
+          leading: CircleAvatar(
             radius: 20,
-            child: Icon(Icons.public, size: 20),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            child: Icon(
+              Icons.language,
+              color: Theme.of(context).colorScheme.primary,
+              size: 20,
+            ),
           ),
-          title: Text(source),
-          trailing:
-              isSelected
-                  ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                  : null,
-          onTap: () {
-            ref.read(selectedProviderKeyProvider.notifier).select(source);
-            ref.read(experimentalProvider.notifier).toggleExtensions(false);
-            Navigator.pop(context);
-            notifier.refresh();
+          title: Text(source.name),
+          subtitle: Text(
+            '${source.status.toUpperCase()} • ${(source.lastLatencyMs ?? 0) > 0 ? "${source.lastLatencyMs}ms" : "Multi-Audio HLS"}',
+          ),
+          trailing: isSelected
+              ? Icon(
+                  Icons.check_circle,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : null,
+          onTap: () async {
+            ref.read(playerSettingsProvider.notifier).updateSettings(
+                  (prev) => prev.copyWith(preferredAudioLanguage: 'hindi'),
+                );
+            await HindiSourcePreferences.instance
+                .setPreferredProvider(source.id);
+            if (context.mounted) {
+              Navigator.pop(context);
+              notifier.refresh();
+              _fetchHindiEpisodeCount();
+            }
           },
         );
       },

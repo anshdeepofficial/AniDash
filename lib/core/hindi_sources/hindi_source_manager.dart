@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
@@ -79,6 +80,10 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
         models.sort((a, b) => a.priority.compareTo(b.priority));
       }
 
+      for (final m in models) {
+        _providers[m.id]?.configure(m);
+      }
+
       state = models;
       _isInitialized = true;
       AppLogger.i(
@@ -121,10 +126,54 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
   }
 
   Future<void> _syncRemoteRegistry() async {
-    // Non-blocking background sync from remote if desired
     try {
-      // In production, can ping remote config URL without blocking
-    } catch (_) {}
+      final res = await http.get(
+        Uri.parse(
+          'https://raw.githubusercontent.com/anshdeepofficial/AniDash/beta/assets/sources/hindi_sources.json',
+        ),
+        headers: {'User-Agent': 'AniDash'},
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final dynamic decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic> &&
+            (decoded['schemaVersion'] as num? ?? 0) >= 1) {
+          final rawSources = decoded['sources'] as List<dynamic>? ?? [];
+          final enabledMap = _prefs.getEnabledMap();
+          final userOrder = _prefs.getOrder();
+
+          var updatedModels = rawSources
+              .map((m) => HindiSourceModel.fromMap(m as Map<String, dynamic>))
+              .where((m) => _providers.containsKey(m.id))
+              .map((m) {
+                final userPref = enabledMap[m.id];
+                return userPref != null ? m.copyWith(enabled: userPref) : m;
+              }).toList();
+
+          if (userOrder.isNotEmpty) {
+            final orderMap = {
+              for (int i = 0; i < userOrder.length; i++) userOrder[i]: i,
+            };
+            updatedModels.sort(
+              (a, b) =>
+                  (orderMap[a.id] ?? 999).compareTo(orderMap[b.id] ?? 999),
+            );
+          }
+
+          if (updatedModels.isNotEmpty) {
+            state = updatedModels;
+            for (final m in updatedModels) {
+              _providers[m.id]?.configure(m);
+            }
+            AppLogger.i(
+              '[Hindi Manager] Synced remote registry with ${updatedModels.length} providers',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.d('[Hindi Manager] Remote registry sync skipped: $e');
+    }
   }
 
   List<HindiSourceModel> getSources() => state;
@@ -206,6 +255,60 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     }
   }
 
+  /// Resolves total number of available Hindi episodes for an anime on active/preferred provider
+  Future<int?> getEpisodeCount({
+    required String animeTitle,
+    String? romajiTitle,
+    int? anilistId,
+    int? malId,
+    int? year,
+    String? manualProviderId,
+  }) async {
+    await init();
+    final enabledProviders = state.where((s) => s.enabled).toList();
+    if (enabledProviders.isEmpty) return null;
+
+    final targetProvider = (manualProviderId != null &&
+            manualProviderId.isNotEmpty &&
+            manualProviderId != 'auto' &&
+            state.any((s) => s.id == manualProviderId && s.enabled))
+        ? _providers[manualProviderId]
+        : _providers[enabledProviders.first.id];
+
+    if (targetProvider == null) return null;
+
+    try {
+      String? providerAnimeId = await _cache.getMappedAnimeId(
+        providerId: targetProvider.id,
+        title: animeTitle,
+        romajiTitle: romajiTitle,
+        anilistId: anilistId,
+      );
+      if (providerAnimeId == null || providerAnimeId.isEmpty) {
+        providerAnimeId = await targetProvider.findAnime(
+          title: animeTitle,
+          romajiTitle: romajiTitle,
+          anilistId: anilistId,
+          malId: malId,
+          year: year,
+        );
+        if (providerAnimeId != null && providerAnimeId.isNotEmpty) {
+          await _cache.saveMappedAnimeId(
+            providerId: targetProvider.id,
+            providerAnimeId: providerAnimeId,
+            title: animeTitle,
+            romajiTitle: romajiTitle,
+            anilistId: anilistId,
+          );
+        }
+      }
+      if (providerAnimeId != null && providerAnimeId.isNotEmpty) {
+        return await targetProvider.getEpisodeCount(providerAnimeId);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Fast hedged parallel resolution
   Future<BaseSourcesModel?> resolveEpisode({
     required String animeTitle,
@@ -221,30 +324,37 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
 
     final targetAnimeId = animeId ?? anilistId?.toString() ?? animeTitle;
 
-    // 1. Manual provider override
+    // 1. Manual provider override (strictly check that it is enabled!)
     if (manualProviderId != null &&
         manualProviderId.isNotEmpty &&
         manualProviderId != 'auto') {
-      final cachedStream = _cache.getCachedStream(
-        animeId: targetAnimeId,
-        episodeNumber: episodeNumber,
-        providerId: manualProviderId,
-      );
-      if (cachedStream != null) return cachedStream;
-
-      final provider = _providers[manualProviderId];
-      if (provider != null) {
-        AppLogger.i('[Hindi] Manual provider selected: $manualProviderId');
-        return await _resolveWithSingleProvider(
-          provider: provider,
-          animeTitle: animeTitle,
-          romajiTitle: romajiTitle,
-          episodeNumber: episodeNumber,
-          targetAnimeId: targetAnimeId,
-          anilistId: anilistId,
-          malId: malId,
-          year: year,
+      final model = state.firstWhereOrNull((s) => s.id == manualProviderId);
+      if (model != null && !model.enabled) {
+        AppLogger.w(
+          '[Hindi] Manual provider $manualProviderId is disabled by user. Falling back to Auto mode.',
         );
+      } else {
+        final cachedStream = _cache.getCachedStream(
+          animeId: targetAnimeId,
+          episodeNumber: episodeNumber,
+          providerId: manualProviderId,
+        );
+        if (cachedStream != null) return cachedStream;
+
+        final provider = _providers[manualProviderId];
+        if (provider != null) {
+          AppLogger.i('[Hindi] Manual provider selected: $manualProviderId');
+          return await _resolveWithSingleProvider(
+            provider: provider,
+            animeTitle: animeTitle,
+            romajiTitle: romajiTitle,
+            episodeNumber: episodeNumber,
+            targetAnimeId: targetAnimeId,
+            anilistId: anilistId,
+            malId: malId,
+            year: year,
+          );
+        }
       }
     }
 

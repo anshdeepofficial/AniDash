@@ -79,7 +79,12 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
         widget.latestVersion.startsWith('v')
             ? widget.latestVersion
             : 'v${widget.latestVersion}';
-    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/AniDash-$tag-Universal.apk';
+    final isBeta = tag.toLowerCase().contains('beta');
+    final apkName =
+        isBeta
+            ? 'AniDash-Beta-$tag-Universal.apk'
+            : 'AniDash-$tag-Universal.apk';
+    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/$apkName';
   }
 
   Future<void> _handleUpdateAction() async {

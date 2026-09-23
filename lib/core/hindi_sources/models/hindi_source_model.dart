@@ -12,6 +12,7 @@ class HindiSourceModel {
   final bool supportsDownloads;
   final bool supportsMultiAudio;
   final String baseUrl;
+  final List<String> mirrors;
   final bool isHealthy;
   final int? lastLatencyMs;
   final int consecutiveFailures;
@@ -30,6 +31,7 @@ class HindiSourceModel {
     this.supportsDownloads = false,
     this.supportsMultiAudio = true,
     this.baseUrl = '',
+    this.mirrors = const [],
     this.isHealthy = true,
     this.lastLatencyMs,
     this.consecutiveFailures = 0,
@@ -49,6 +51,7 @@ class HindiSourceModel {
     bool? supportsDownloads,
     bool? supportsMultiAudio,
     String? baseUrl,
+    List<String>? mirrors,
     bool? isHealthy,
     int? lastLatencyMs,
     int? consecutiveFailures,
@@ -67,6 +70,7 @@ class HindiSourceModel {
       supportsDownloads: supportsDownloads ?? this.supportsDownloads,
       supportsMultiAudio: supportsMultiAudio ?? this.supportsMultiAudio,
       baseUrl: baseUrl ?? this.baseUrl,
+      mirrors: mirrors ?? this.mirrors,
       isHealthy: isHealthy ?? this.isHealthy,
       lastLatencyMs: lastLatencyMs ?? this.lastLatencyMs,
       consecutiveFailures: consecutiveFailures ?? this.consecutiveFailures,
@@ -88,6 +92,7 @@ class HindiSourceModel {
       'supportsDownloads': supportsDownloads,
       'supportsMultiAudio': supportsMultiAudio,
       'baseUrl': baseUrl,
+      'mirrors': mirrors,
       'isHealthy': isHealthy,
       'lastLatencyMs': lastLatencyMs,
       'consecutiveFailures': consecutiveFailures,
@@ -109,6 +114,8 @@ class HindiSourceModel {
       supportsDownloads: map['supportsDownloads'] ?? false,
       supportsMultiAudio: map['supportsMultiAudio'] ?? true,
       baseUrl: map['baseUrl'] ?? '',
+      mirrors: (map['mirrors'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
+          (map['baseUrl'] != null ? [map['baseUrl'].toString()] : const []),
       isHealthy: map['isHealthy'] ?? true,
       lastLatencyMs: (map['lastLatencyMs'] as num?)?.toInt(),
       consecutiveFailures: (map['consecutiveFailures'] as num?)?.toInt() ?? 0,

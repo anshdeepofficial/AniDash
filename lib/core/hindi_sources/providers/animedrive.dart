@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/hindi_sources/interfaces/hindi_playback_provider.dart';
+import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
 class AnimeDriveProvider implements HindiPlaybackProvider {
@@ -12,8 +13,15 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
   @override
   String get name => 'AnimeDrive';
 
+  static const String _defaultBaseUrl = 'https://animedrive.in';
+  String _baseUrl = _defaultBaseUrl;
+  List<String> _mirrors = const [_defaultBaseUrl];
+
   @override
-  String get baseUrl => 'https://animedrive.top';
+  String get baseUrl => _baseUrl;
+
+  @override
+  List<String> get mirrors => _mirrors;
 
   @override
   bool get supportsStreaming => true;
@@ -24,32 +32,39 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
   @override
   bool get supportsMultiAudio => true;
 
-  static const String _userAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  static const String _ua =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-  Map<String, String> get _defaultHeaders => {
-        'User-Agent': _userAgent,
-        'Referer': '$baseUrl/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      };
+  @override
+  void configure(HindiSourceModel model) {
+    if (model.baseUrl.isNotEmpty) _baseUrl = model.baseUrl;
+    if (model.mirrors.isNotEmpty) _mirrors = model.mirrors;
+  }
 
   @override
   Future<bool> healthCheck() async {
     try {
-      final res = await http
-          .get(Uri.parse('$baseUrl/'), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 5));
-      return res.statusCode >= 200 && res.statusCode < 400;
+      final res = await http.get(
+        Uri.parse('$_baseUrl/'),
+        headers: {'User-Agent': _ua},
+      ).timeout(const Duration(seconds: 5));
+      return res.statusCode == 200;
     } catch (_) {
       return false;
     }
   }
 
-  String _cleanSearchTitle(String title) {
-    var clean = title.replaceAll(RegExp(r'\([^)]*\)'), '').trim();
-    clean = clean.replaceAll(RegExp(r'\[[^\]]*\]'), '').trim();
-    clean = clean.replaceAll(RegExp(r'[^\w\s]'), ' ').trim();
-    return clean.replaceAll(RegExp(r'\s+'), ' ');
+  String _cleanTitle(String raw) {
+    return raw
+        .replaceAll(
+          RegExp(
+            r'\s+(?:Hindi|Tamil|Telugu|English|Japanese|Multi[ -]?Audio|Dual[ -]?Audio|WEB-?DL|Episodes?|Download|Free)\b.*$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
   }
 
   @override
@@ -60,47 +75,101 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
     int? malId,
     int? year,
   }) async {
-    final searchTerms = <String>[];
-    final cleanTitle = _cleanSearchTitle(title);
-    searchTerms.add(cleanTitle);
-    if (romajiTitle != null && romajiTitle.isNotEmpty) {
-      final cleanRomaji = _cleanSearchTitle(romajiTitle);
-      if (!searchTerms.contains(cleanRomaji)) searchTerms.add(cleanRomaji);
-    }
+    final cleanQ = title
+        .replaceAll(RegExp(r'[^\w\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleanQ.isEmpty) return null;
 
-    for (final term in searchTerms) {
-      try {
-        AppLogger.d('[Hindi] AnimeDrive searching: $term');
-        final searchUrl = Uri.parse('$baseUrl/?s=${Uri.encodeComponent(term)}');
-        final res = await http
-            .get(searchUrl, headers: _defaultHeaders)
-            .timeout(const Duration(seconds: 8));
+    final url = '$_baseUrl/?s=${Uri.encodeComponent(cleanQ)}';
+    AppLogger.d('[AnimeDrive] Searching: $url');
 
-        if (res.statusCode == 200) {
-          final doc = html_parser.parse(res.body);
-          final links = doc.querySelectorAll('article a[href*="/anime/"], .post-title a');
-          for (final a in links) {
-            final linkTitle = a.text.trim().toLowerCase();
-            final href = a.attributes['href'];
-            if (href != null && href.isNotEmpty) {
-              if (linkTitle.contains(term.toLowerCase()) ||
-                  term.toLowerCase().contains(linkTitle) ||
-                  links.length == 1) {
-                AppLogger.success('[Hindi] AnimeDrive matched anime: $href');
-                return href;
-              }
-            }
-          }
-          if (links.isNotEmpty) {
-            final firstHref = links.first.attributes['href'];
-            if (firstHref != null && firstHref.isNotEmpty) return firstHref;
-          }
+    try {
+      final res = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (res.statusCode != 200 || res.body.isEmpty) return null;
+      final doc = html_parser.parse(res.body);
+
+      final links = doc.querySelectorAll('a[aria-label*="Read:"]');
+      final candidates = <Map<String, String>>[];
+
+      for (final link in links) {
+        final href = link.attributes['href'];
+        final aria = link.attributes['aria-label'] ?? '';
+        final cleanT = _cleanTitle(aria.replaceAll('Read:', ''));
+
+        if (href != null && cleanT.isNotEmpty) {
+          candidates.add({'title': cleanT, 'url': href});
         }
-      } catch (e) {
-        AppLogger.w('[Hindi] AnimeDrive search error for $term: $e');
       }
+
+      if (candidates.isEmpty) return null;
+
+      final normalizedTarget = title.toLowerCase();
+      final targetTokens = normalizedTarget.split(' ').where((t) => t.length > 2).toSet();
+
+      Map<String, String>? bestMatch;
+      int bestScore = -1;
+
+      for (final c in candidates) {
+        final cTitleNorm = c['title']!.toLowerCase();
+        if (cTitleNorm == normalizedTarget) {
+          bestMatch = c;
+          break;
+        }
+        final cTokens = cTitleNorm.split(' ').where((t) => t.length > 2).toSet();
+        final common = targetTokens.intersection(cTokens).length;
+        if (common > bestScore) {
+          bestScore = common;
+          bestMatch = c;
+        }
+      }
+
+      return bestMatch?['url'];
+    } catch (e) {
+      AppLogger.w('[AnimeDrive] Search error: $e');
+      return null;
     }
-    return null;
+  }
+
+  @override
+  Future<int?> getEpisodeCount(String providerAnimeId) async {
+    try {
+      final res = await http.get(
+        Uri.parse(providerAnimeId),
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/'},
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode != 200) return null;
+      final html = res.body;
+
+      final gwMatch = RegExp(
+        r'''https?://link\.animedrive\.in/[^\s"'<>]+''',
+        caseSensitive: false,
+      ).firstMatch(html);
+      if (gwMatch == null) return null;
+
+      final gwRes = await http.get(
+        Uri.parse(gwMatch.group(0)!),
+        headers: {'User-Agent': _ua, 'Referer': providerAnimeId},
+      ).timeout(const Duration(seconds: 8));
+
+      if (gwRes.statusCode != 200) return null;
+      final gwHtml = gwRes.body;
+
+      final epMatches = RegExp(r'Episode\s*(\d+)', caseSensitive: false).allMatches(gwHtml);
+      int maxEp = 0;
+      for (final m in epMatches) {
+        final ep = int.tryParse(m.group(1) ?? '') ?? 0;
+        if (ep > maxEp) maxEp = ep;
+      }
+      return maxEp > 0 ? maxEp : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -109,87 +178,174 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
     required int episodeNumber,
     String? animeTitle,
   }) async {
-    try {
-      AppLogger.d(
-        '[Hindi] AnimeDrive resolving $animeTitle Ep $episodeNumber from $providerAnimeId',
-      );
+    AppLogger.d('[AnimeDrive] Resolving Ep $episodeNumber on $providerAnimeId');
 
-      final res = await http
-          .get(Uri.parse(providerAnimeId), headers: _defaultHeaders)
-          .timeout(const Duration(seconds: 8));
+    try {
+      final res = await http.get(
+        Uri.parse(providerAnimeId),
+        headers: {'User-Agent': _ua, 'Referer': '$_baseUrl/'},
+      ).timeout(const Duration(seconds: 10));
 
       if (res.statusCode != 200) return null;
+      final html = res.body;
 
-      final doc = html_parser.parse(res.body);
-
-      // Search for episode link in the page
-      String? episodeUrl;
-      final epLinks = doc.querySelectorAll('a[href*="episode"], a[href*="ep-"]');
-      for (final a in epLinks) {
-        final text = a.text.toLowerCase();
-        if (text.contains('episode $episodeNumber') ||
-            text.contains('ep $episodeNumber') ||
-            text == '$episodeNumber') {
-          episodeUrl = a.attributes['href'];
-          break;
-        }
-      }
-
-      final pageToInspect = episodeUrl ?? providerAnimeId;
-      var targetRes = res;
-      if (episodeUrl != null && episodeUrl != providerAnimeId) {
-        targetRes = await http
-            .get(Uri.parse(episodeUrl), headers: _defaultHeaders)
-            .timeout(const Duration(seconds: 8));
-      }
-
-      final body = targetRes.body;
-
-      // Extract direct file / mp4 / m3u8
-      final streamMatch = RegExp(
-        r'''(?:file|source|src)\s*:\s*["']([^"']+\.(?:m3u8|mp4)[^"']*)["']''',
+      // Extract gateway link
+      final gwMatch = RegExp(
+        r'''https?://link\.animedrive\.in/[^\s"'<>]+''',
         caseSensitive: false,
-      ).firstMatch(body);
+      ).firstMatch(html);
+      if (gwMatch == null) {
+        AppLogger.w('[AnimeDrive] No gateway link found');
+        return null;
+      }
 
-      String? streamUrl = streamMatch?.group(1);
+      final gwUrl = gwMatch.group(0)!;
+      final gwRes = await http.get(
+        Uri.parse(gwUrl),
+        headers: {'User-Agent': _ua, 'Referer': providerAnimeId},
+      ).timeout(const Duration(seconds: 10));
 
-      // Check download button links with direct links
-      if (streamUrl == null) {
-        final downloadLink = html_parser.parse(body)
-            .querySelector('a.download-link, a[href*=".mp4"]')
-            ?.attributes['href'];
-        if (downloadLink != null && downloadLink.contains('.mp4')) {
-          streamUrl = downloadLink;
+      if (gwRes.statusCode != 200) return null;
+      final gwHtml = gwRes.body;
+
+      // Parse Episode blocks and HubCloud links
+      final epMarkers = <Map<String, dynamic>>[];
+      final epRegex = RegExp(r'Episode\s*(\d+)', caseSensitive: false);
+      for (final m in epRegex.allMatches(gwHtml)) {
+        epMarkers.add({'ep': int.parse(m.group(1)!), 'at': m.start});
+      }
+
+      if (epMarkers.isEmpty) return null;
+
+      final hubcloudHrefs = <String>[];
+      for (int i = 0; i < epMarkers.length; i++) {
+        final ep = epMarkers[i]['ep'] as int;
+        if (ep != episodeNumber) continue;
+
+        final start = epMarkers[i]['at'] as int;
+        final end = (i + 1 < epMarkers.length) ? (epMarkers[i + 1]['at'] as int) : gwHtml.length;
+        final block = gwHtml.substring(start, end);
+
+        final hubRe = RegExp(r'href=["\x27](https?://[a-z0-9.-]*hubcloud[a-z0-9.-]*/[^"\x27]+)["\x27]', caseSensitive: false);
+        for (final hm in hubRe.allMatches(block)) {
+          final hUrl = hm.group(1)!;
+          if (!hubcloudHrefs.contains(hUrl)) hubcloudHrefs.add(hUrl);
         }
       }
 
-      if (streamUrl != null && streamUrl.isNotEmpty) {
-        final isM3U8 = streamUrl.contains('.m3u8');
-        final sources = [
-          Source(
-            url: streamUrl,
-            quality: 'AnimeDrive Multi-Audio (Hindi)',
-            isM3U8: isM3U8,
-            isDub: false,
-            headers: {
-              'User-Agent': _userAgent,
-              'Referer': pageToInspect,
-            },
-          ),
-        ];
-
-        AppLogger.success(
-          '[Hindi] AnimeDrive successfully resolved stream for Ep $episodeNumber',
-        );
-        return BaseSourcesModel(
-          sources: sources,
-          headers: {'User-Agent': _userAgent, 'Referer': pageToInspect},
-        );
+      if (hubcloudHrefs.isEmpty) {
+        AppLogger.w('[AnimeDrive] No HubCloud links found for Ep $episodeNumber');
+        return null;
       }
+
+      // Resolve direct stream from first working HubCloud link
+      for (final hubUrl in hubcloudHrefs.take(4)) {
+        final directSource = await _resolveHubCloud(hubUrl);
+        if (directSource != null) {
+          AppLogger.success('[AnimeDrive] Playable stream resolved: ${directSource.url}');
+          return BaseSourcesModel(
+            sources: [directSource],
+            headers: {'User-Agent': _ua},
+          );
+        }
+      }
+
+      return null;
     } catch (e) {
-      AppLogger.w('[Hindi] AnimeDrive resolveEpisode error: $e');
+      AppLogger.e('[AnimeDrive] Episode resolution error: $e');
+      return null;
     }
-    return null;
+  }
+
+  Future<Source?> _resolveHubCloud(String url) async {
+    try {
+      final base = Uri.parse(url).origin;
+      String downloadPageUrl = url;
+
+      if (!url.contains('hubcloud.php')) {
+        final res = await http.get(
+          Uri.parse(url),
+          headers: {'User-Agent': _ua},
+        ).timeout(const Duration(seconds: 8));
+
+        if (res.statusCode == 200) {
+          final m = RegExp(r'id=["\x27]download["\x27][^>]*href=["\x27]([^"\x27]+)["\x27]').firstMatch(res.body) ??
+              RegExp(r'href=["\x27]([^"\x27]+)["\x27][^>]*id=["\x27]download["\x27]').firstMatch(res.body);
+          final raw = m?.group(1);
+          if (raw != null) {
+            downloadPageUrl = raw.startsWith('http') ? raw : '$base/${raw.replaceFirst(RegExp(r'^/'), '')}';
+          }
+        }
+      }
+
+      final docRes = await http.get(
+        Uri.parse(downloadPageUrl),
+        headers: {'User-Agent': _ua},
+      ).timeout(const Duration(seconds: 8));
+
+      if (docRes.statusCode != 200) return null;
+      final docHtml = docRes.body;
+
+      // Extract server download buttons
+      final btnRe = RegExp(
+        r'<a[^>]*href=["\x27]([^"\x27]+)["\x27][^>]*class=["\x27][^"\x27]*\bbtn\b[^"\x27]*["\x27][^>]*>([\s\S]*?)<\/a>',
+        caseSensitive: false,
+      );
+
+      for (final bm in btnRe.allMatches(docHtml)) {
+        final link = bm.group(1)!;
+        final text = bm.group(2)!.toLowerCase();
+
+        if (link.contains('.mp4') || link.contains('.m3u8')) {
+          return Source(
+            url: link,
+            quality: 'auto',
+            isM3U8: link.contains('.m3u8'),
+          );
+        }
+
+        if (text.contains('buzz') || text.contains('buzzserver')) {
+          try {
+            final client = http.Client();
+            final req = http.Request('GET', Uri.parse('$link/download'))..followRedirects = false;
+            req.headers.addAll({'Referer': link, 'User-Agent': _ua});
+            final streamedRes = await client.send(req).timeout(const Duration(seconds: 5));
+            client.close();
+            final hx = streamedRes.headers['hx-redirect'] ?? streamedRes.headers['HX-Redirect'];
+            if (hx != null && hx.isNotEmpty) {
+              return Source(
+                url: hx,
+                quality: 'auto',
+                isM3U8: hx.contains('.m3u8'),
+              );
+            }
+          } catch (_) {}
+        }
+
+        if (text.contains('pixeldra') || text.contains('pixel')) {
+          final b = Uri.parse(link).origin;
+          final id = link.replaceAll(RegExp(r'/$'), '').split('/').last;
+          final fin = link.contains('download') ? link : '$b/api/file/$id?download';
+          return Source(
+            url: fin,
+            quality: 'auto',
+            isM3U8: false,
+          );
+        }
+
+        if (text.contains('fsl') || text.contains('s3') || text.contains('mega') || text.contains('10gb')) {
+          return Source(
+            url: link,
+            quality: 'auto',
+            isM3U8: link.contains('.m3u8'),
+          );
+        }
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -198,10 +354,10 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
     required int episodeNumber,
     String? quality,
   }) async {
-    final streamData = await resolveEpisode(
+    final stream = await resolveEpisode(
       providerAnimeId: providerAnimeId,
       episodeNumber: episodeNumber,
     );
-    return streamData?.sources.firstOrNull?.url;
+    return stream?.sources.firstOrNull?.url;
   }
 }

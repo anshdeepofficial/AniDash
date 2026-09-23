@@ -317,11 +317,11 @@ class _HistoryTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final currentEp = entry.episodesProgress[entry.currentEpisode];
-    final isCurrentCompleted = currentEp?.isCompleted == true ||
-        ((currentEp?.durationInSeconds ?? 0) > 0 &&
-            ((currentEp?.progressInSeconds ?? 0) /
-                    currentEp!.durationInSeconds!) >=
-                0.90);
+    final dur = currentEp?.durationInSeconds ?? 0;
+    final prog = currentEp?.progressInSeconds ?? 0;
+    final isCurrentCompleted = (currentEp?.isCompleted == true &&
+            (dur == 0 || prog >= dur - 45 || (prog / dur) >= 0.92)) ||
+        (dur > 0 && (prog / dur) >= 0.92);
     final baseEp = entry.currentEpisode > 0 ? entry.currentEpisode : 1;
     final nextEpNum = isCurrentCompleted &&
             (entry.totalEpisodes == 0 || baseEp < entry.totalEpisodes)
