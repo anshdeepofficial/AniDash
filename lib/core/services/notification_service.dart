@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ani_dash/core/models/settings/notification_sound_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/services/notification_inbox_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
@@ -18,10 +18,9 @@ void notificationTapBackground(NotificationResponse response) async {
       await prefs.setString('remind_update_version', version);
     }
   } else if (response.actionId == 'update_skip_day') {
-    await prefs.setInt(
-      'remind_update_after',
-      DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
-    );
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    await prefs.setInt('remind_update_after', tomorrow.millisecondsSinceEpoch);
     if (version.isNotEmpty) {
       await prefs.setString('remind_update_version', version);
     }
@@ -50,19 +49,6 @@ class NotificationService {
   static const String _largeIconName = '@drawable/ic_notification_large';
   static const Color _brandColor = Color(0xFF4CAF50);
 
-  Future<NotificationSoundItem> _getActiveSound() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final soundId = prefs.getString('notification_sound_id') ?? 'anime_nezuko';
-      return kNotificationSounds.firstWhere(
-        (s) => s.id == soundId,
-        orElse: () => kNotificationSounds.first,
-      );
-    } catch (_) {
-      return kNotificationSounds.first;
-    }
-  }
-
   Future<void> initialize({bool isBackground = false}) async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings(_iconName);
@@ -88,7 +74,8 @@ class NotificationService {
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         final prefs = await SharedPreferences.getInstance();
-        final version = response.payload?.replaceFirst('update:', '').trim() ?? '';
+        final version =
+            response.payload?.replaceFirst('update:', '').trim() ?? '';
         if (response.actionId == 'update_remind_1h') {
           await prefs.setInt(
             'remind_update_after',
@@ -98,15 +85,18 @@ class NotificationService {
             await prefs.setString('remind_update_version', version);
           }
         } else if (response.actionId == 'update_skip_day') {
+          final now = DateTime.now();
+          final tomorrow = DateTime(now.year, now.month, now.day + 1);
           await prefs.setInt(
             'remind_update_after',
-            DateTime.now().add(const Duration(hours: 24)).millisecondsSinceEpoch,
+            tomorrow.millisecondsSinceEpoch,
           );
           if (version.isNotEmpty) {
             await prefs.setString('remind_update_version', version);
           }
         } else if (response.actionId == 'update_now' ||
-            (response.payload?.startsWith('update:') == true && response.actionId == null)) {
+            (response.payload?.startsWith('update:') == true &&
+                response.actionId == null)) {
           _instance.updateTapController.add(version);
         } else if (response.actionId != null) {
           _instance.playbackActionController.add(response.actionId!);
@@ -126,67 +116,47 @@ class NotificationService {
     }
   }
 
-  Future<void> ensureSoundChannelsCreated([String? soundId]) async {
-    final androidImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+  Future<void> ensureSoundChannelsCreated([String? ignoredSoundId]) async {
+    final androidImplementation =
+        flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
 
-    String activeSoundId = soundId ?? 'anime_nezuko';
-    if (soundId == null) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        activeSoundId = prefs.getString('notification_sound_id') ?? 'anime_nezuko';
-      } catch (_) {}
-    }
-
-    final soundItem = kNotificationSounds.firstWhere(
-      (s) => s.id == activeSoundId,
-      orElse: () => kNotificationSounds.first,
-    );
-
-    final sound = (!soundItem.isDefault && soundItem.rawResName != null)
-        ? RawResourceAndroidNotificationSound(soundItem.rawResName!)
-        : null;
-
-    final newsChannel = AndroidNotificationChannel(
-      'AniDash_news_${soundItem.id}',
+    const newsChannel = AndroidNotificationChannel(
+      'AniDash_news',
       'AniDash News',
       description: 'Notifications for latest anime news',
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
-      sound: sound,
     );
 
-    final episodeChannel = AndroidNotificationChannel(
-      'AniDash_episodes_${soundItem.id}',
+    const episodeChannel = AndroidNotificationChannel(
+      'AniDash_episodes',
       'Episode Releases',
       description: 'Notifications when new Sub or Dub episodes are released',
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
-      sound: sound,
     );
 
-    final updateChannel = AndroidNotificationChannel(
-      'AniDash_updates_${soundItem.id}',
+    const updateChannel = AndroidNotificationChannel(
+      'AniDash_updates',
       'App Updates',
       description: 'Notifications when a new AniDash version is available',
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
-      sound: sound,
     );
 
-    final reminderChannel = AndroidNotificationChannel(
-      'AniDash_reminders_${soundItem.id}',
+    const reminderChannel = AndroidNotificationChannel(
+      'AniDash_reminders',
       'Continue Watching Reminders',
       description: 'Reminders to continue watching your paused anime',
       importance: Importance.defaultImportance,
       playSound: true,
       enableVibration: true,
-      sound: sound,
     );
 
     await androidImplementation?.createNotificationChannel(newsChannel);
@@ -204,12 +174,24 @@ class NotificationService {
 
     // Delete deprecated v1 channels to migrate to custom sound channels
     try {
-      await androidImplementation?.deleteNotificationChannel('AniDash_news_channel');
-      await androidImplementation?.deleteNotificationChannel('AniDash_episodes_channel');
-      await androidImplementation?.deleteNotificationChannel('AniDash_updates_channel');
-      await androidImplementation?.deleteNotificationChannel('AniDash_news_channel_v2');
-      await androidImplementation?.deleteNotificationChannel('AniDash_episodes_channel_v2');
-      await androidImplementation?.deleteNotificationChannel('AniDash_updates_channel_v2');
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_news_channel',
+      );
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_episodes_channel',
+      );
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_updates_channel',
+      );
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_news_channel_v2',
+      );
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_episodes_channel_v2',
+      );
+      await androidImplementation?.deleteNotificationChannel(
+        'AniDash_updates_channel_v2',
+      );
     } catch (_) {}
 
     const AndroidNotificationChannel downloadChannel =
@@ -245,7 +227,6 @@ class NotificationService {
     required String channelBaseId,
     required String channelName,
     required String channelDescription,
-    required NotificationSoundItem soundItem,
     Importance importance = Importance.high,
     Priority priority = Priority.high,
     bool playSound = true,
@@ -254,22 +235,14 @@ class NotificationService {
     StyleInformation? styleInformation,
     Color? color,
   }) {
-    final sound = (playSound && !soundItem.isDefault && soundItem.rawResName != null)
-        ? RawResourceAndroidNotificationSound(soundItem.rawResName!)
-        : null;
-    final channelId = playSound
-        ? '${channelBaseId}_${soundItem.id}'
-        : channelBaseId;
-
     return AndroidNotificationDetails(
-      channelId,
+      channelBaseId,
       channelName,
       channelDescription: channelDescription,
       importance: importance,
       priority: priority,
       playSound: playSound,
       enableVibration: enableVibration,
-      sound: sound,
       icon: _iconName,
       largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
       color: color ?? _brandColor,
@@ -279,17 +252,16 @@ class NotificationService {
   }
 
   Future<void> showTestNotification({String? title, String? body}) async {
-    final soundItem = await _getActiveSound();
-    await ensureSoundChannelsCreated(soundItem.id);
+    await ensureSoundChannelsCreated();
 
     final details = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_updates',
         channelName: 'App Updates',
-        channelDescription: 'Notifications when a new AniDash version is available',
-        soundItem: soundItem,
+        channelDescription:
+            'Notifications when a new AniDash version is available',
         styleInformation: BigTextStyleInformation(
-          body ?? 'Playing tone: "${soundItem.name}". Notification sound is active!',
+          body ?? 'Notifications are enabled and using your system sound.',
           contentTitle: title ?? 'AniDash Notification Test',
         ),
       ),
@@ -298,7 +270,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.show(
       8888,
       title ?? 'AniDash Notification Test',
-      body ?? 'Playing tone: "${soundItem.name}". Notification sound is active!',
+      body ?? 'Notifications are enabled and using your system sound.',
       details,
     );
   }
@@ -308,15 +280,19 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    final soundItem = await _getActiveSound();
-    await ensureSoundChannelsCreated(soundItem.id);
+    await NotificationInboxService().add(
+      title: title,
+      body: body,
+      route: payload,
+      dedupeKey: 'news:${payload ?? title}',
+    );
+    await ensureSoundChannelsCreated();
 
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_news',
         channelName: 'AniDash News',
         channelDescription: 'Notifications for latest anime news',
-        soundItem: soundItem,
       ),
     );
 
@@ -370,6 +346,12 @@ class NotificationService {
     required String animeTitle,
     required int episodeNumber,
   }) async {
+    await NotificationInboxService().add(
+      title: 'Download Complete',
+      body: '$animeTitle - Episode $episodeNumber is ready offline',
+      route: '/downloads',
+      dedupeKey: 'download:$animeTitle:$episodeNumber',
+    );
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
           'AniDash_downloads_channel',
@@ -400,8 +382,12 @@ class NotificationService {
     required int episodeNumber,
     bool isDub = false,
   }) async {
-    final soundItem = await _getActiveSound();
-    await ensureSoundChannelsCreated(soundItem.id);
+    await NotificationInboxService().add(
+      title: 'New ${isDub ? 'Dub ' : 'Sub '}Episode',
+      body: 'Episode $episodeNumber of $animeTitle is now available.',
+      dedupeKey: 'release:$animeTitle:$episodeNumber:$isDub',
+    );
+    await ensureSoundChannelsCreated();
 
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
@@ -409,7 +395,6 @@ class NotificationService {
         channelName: 'Episode Releases',
         channelDescription:
             'Notifications when new Sub or Dub episodes are released',
-        soundItem: soundItem,
       ),
     );
 
@@ -426,16 +411,18 @@ class NotificationService {
     required String animeTitle,
     required int episodeNumber,
   }) async {
-    final soundItem = await _getActiveSound();
-    await ensureSoundChannelsCreated(soundItem.id);
+    await NotificationInboxService().add(
+      title: 'Continue Watching',
+      body: 'Resume $animeTitle from Episode $episodeNumber.',
+      dedupeKey: 'continue:$animeTitle:$episodeNumber',
+    );
+    await ensureSoundChannelsCreated();
 
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_reminders',
         channelName: 'Continue Watching Reminders',
-        channelDescription:
-            'Reminders to continue watching your paused anime',
-        soundItem: soundItem,
+        channelDescription: 'Reminders to continue watching your paused anime',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
       ),
@@ -454,8 +441,13 @@ class NotificationService {
   }
 
   Future<void> showUpdateAvailableNotification(String version) async {
-    final soundItem = await _getActiveSound();
-    await ensureSoundChannelsCreated(soundItem.id);
+    await NotificationInboxService().add(
+      title: 'AniDash v$version is available',
+      body: 'A new stable version is ready to install.',
+      route: '/settings/update',
+      dedupeKey: 'update:$version',
+    );
+    await ensureSoundChannelsCreated();
 
     final details = NotificationDetails(
       android: _buildAndroidDetails(
@@ -463,7 +455,6 @@ class NotificationService {
         channelName: 'App Updates',
         channelDescription:
             'Notifications when a new AniDash version is available',
-        soundItem: soundItem,
         styleInformation: const BigTextStyleInformation(
           'A new version has been released on GitHub. Tap to update or snooze.',
           contentTitle: 'AniDash Update Available',

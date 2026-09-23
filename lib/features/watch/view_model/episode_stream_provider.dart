@@ -133,6 +133,7 @@ class EpisodeDataState {
 
 @Riverpod(keepAlive: true)
 class EpisodeData extends _$EpisodeData {
+  int _loadGeneration = 0;
   EpisodeListState get _epList => ref.read(episodeListProvider);
   ExperimentalFeaturesModel get _exp => ref.read(experimentalProvider);
   AnimeProvider? get _provider => ref.read(selectedAnimeProvider);
@@ -146,13 +147,9 @@ class EpisodeData extends _$EpisodeData {
   }
 
   AnimeProvider? get _effectiveProvider {
-    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
     final registry = ref.read(animeSourceRegistryProvider);
     final currentKey = ref.read(selectedProviderKeyProvider)?.toLowerCase();
-    if (_provider?.providerName == 'justanime' ||
-        activeExt.contains('justanime') ||
-        currentKey == 'justanime' ||
-        (!_isNativeProvider && activeExt.isEmpty)) {
+    if (_provider?.providerName == 'justanime' || currentKey == 'justanime') {
       return registry.get('justanime') ?? JustAnimeProvider();
     }
     return _provider;
@@ -172,6 +169,7 @@ class EpisodeData extends _$EpisodeData {
       return;
     }
 
+    final generation = ++_loadGeneration;
     _player.setActiveSession(mediaId ?? _epList.animeId, ep);
 
     AppLogger.section('Loading Episode $ep');
@@ -187,14 +185,18 @@ class EpisodeData extends _$EpisodeData {
         isDub: false,
       );
     } else if (currentServer != null && currentServer.isDub != preferDub) {
-      final matching = state.servers.firstWhereOrNull(
-        (s) =>
-            s.isDub == preferDub &&
-            (s.id == currentServer?.id || s.name == currentServer?.name),
-      ) ?? state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
+      final matching =
+          state.servers.firstWhereOrNull(
+            (s) =>
+                s.isDub == preferDub &&
+                (s.id == currentServer?.id || s.name == currentServer?.name),
+          ) ??
+          state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
       currentServer = matching ?? currentServer.copyWith(isDub: preferDub);
     } else if (currentServer == null && state.servers.isNotEmpty) {
-      currentServer = state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
+      currentServer = state.servers.firstWhereOrNull(
+        (s) => s.isDub == preferDub,
+      );
     }
 
     state = state.copyWith(
@@ -207,9 +209,11 @@ class EpisodeData extends _$EpisodeData {
 
     // Server lists are useful for manual switching, but they must not hold the
     // first frame hostage. Discover servers concurrently in background.
-    _fetchServers(ep);
+    _fetchServers(ep, generation);
 
-    if (play) await _playCurrent(startAt ?? Duration.zero);
+    if (play) {
+      await _playCurrent(startAt ?? Duration.zero, generation: generation);
+    }
   }
 
   Future<void> changeEpisode(
@@ -222,16 +226,16 @@ class EpisodeData extends _$EpisodeData {
     final target = by != 0 ? currentEp + by : ep;
     if (target == null || !_isValidEp(target)) return;
 
-    // VLC mode: Stop playback after current episode
+    // Stop playback after current episode when requested.
     if (!force &&
         target > currentEp &&
         ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
       AppLogger.i(
         'Stop After This Episode active: Halting changeEpisode to $target.',
       );
-      ref.read(playerSettingsProvider.notifier).updateSettings(
-        (s) => s.copyWith(stopAfterCurrentEpisode: false),
-      );
+      ref
+          .read(playerSettingsProvider.notifier)
+          .updateSettings((s) => s.copyWith(stopAfterCurrentEpisode: false));
       ref.read(playerStateProvider.notifier).pause();
       ref.read(nextEpisodePromptProvider.notifier).dismiss();
       return;
@@ -262,7 +266,9 @@ class EpisodeData extends _$EpisodeData {
       animeId: targetMediaId,
       episodeNumber: episodeNumber,
     );
-    AppLogger.i('Cleared episode stream cache for $targetMediaId Ep $episodeNumber');
+    AppLogger.i(
+      'Cleared episode stream cache for $targetMediaId Ep $episodeNumber',
+    );
   }
 
   int? _prefetchedEpNum;
@@ -306,15 +312,17 @@ class EpisodeData extends _$EpisodeData {
 
   Future<void> changeServer(ServerData server) async {
     AppLogger.infoPair('Changing Server', server.name ?? server.id);
-    ref.read(playerSettingsProvider.notifier).updateSettings(
-      (s) => s.copyWith(preferDub: server.isDub),
-    );
+    ref
+        .read(playerSettingsProvider.notifier)
+        .updateSettings((s) => s.copyWith(preferDub: server.isDub));
     state = state.copyWith(selectedServer: server);
     await _playCurrent(ref.read(playerStateProvider).position);
   }
 
   Future<void> switchAudioLanguage(String language) async {
-    ref.read(playerSettingsProvider.notifier).setPreferredAudioLanguage(language);
+    ref
+        .read(playerSettingsProvider.notifier)
+        .setPreferredAudioLanguage(language);
 
     if (language == 'hindi') {
       AppLogger.i('Switching audio track to: HINDI');
@@ -333,8 +341,7 @@ class EpisodeData extends _$EpisodeData {
     final current = state.selectedServer;
     ServerData? alt = state.servers.firstWhereOrNull(
       (s) =>
-          s.isDub == isDub &&
-          (s.id == current?.id || s.name == current?.name),
+          s.isDub == isDub && (s.id == current?.id || s.name == current?.name),
     );
     alt ??= state.servers.firstWhereOrNull((s) => s.isDub == isDub);
     alt ??=
@@ -442,10 +449,9 @@ class EpisodeData extends _$EpisodeData {
       List<ServerData> servers = [];
       _showLoading(context);
       try {
-        servers = await _getRawServers(ep).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => <ServerData>[],
-        );
+        servers = await _getRawServers(
+          ep,
+        ).timeout(const Duration(seconds: 10), onTimeout: () => <ServerData>[]);
       } catch (e) {
         AppLogger.w('Failed to get raw servers: $e');
       } finally {
@@ -512,9 +518,10 @@ class EpisodeData extends _$EpisodeData {
       ServerData? preferredServer;
       try {
         if (_isNativeProvider) {
-          final servers = await _getRawServers(
-            ep,
-          ).timeout(const Duration(seconds: 12), onTimeout: () => <ServerData>[]);
+          final servers = await _getRawServers(ep).timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => <ServerData>[],
+          );
           preferredServer = servers.firstWhereOrNull(
             (server) => language == 'dub' ? server.isDub : !server.isDub,
           );
@@ -795,7 +802,10 @@ class EpisodeData extends _$EpisodeData {
     }
   }
 
-  void reset() => state = const EpisodeDataState();
+  void reset() {
+    _loadGeneration++;
+    state = const EpisodeDataState();
+  }
 
   bool _isValidEp(int ep) {
     if (_epList.episodes.isEmpty) {
@@ -808,28 +818,28 @@ class EpisodeData extends _$EpisodeData {
 
   Future<List<ServerData>> _getRawServers(EpisodeDataModel ep) async {
     final provider = _effectiveProvider;
-    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
-    final isJustAnime = provider?.providerName == 'justanime' || activeExt.contains('justanime');
+    final activeExt =
+        ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
+    final isJustAnime =
+        provider?.providerName == 'justanime' ||
+        activeExt.contains('justanime');
 
     if (!_isNativeProvider && _exp.useExtensions && !isJustAnime) {
       return [];
     }
 
-    final effectiveId = (int.tryParse(_epList.animeId ?? '') != null)
-        ? _epList.animeId
-        : (_epList.mediaId ?? _epList.animeId);
+    final effectiveId =
+        (int.tryParse(_epList.animeId ?? '') != null)
+            ? _epList.animeId
+            : (_epList.mediaId ?? _epList.animeId);
 
     return (await provider?.getSupportedServers(
-          metadata: {
-            'id': effectiveId,
-            'epNumber': ep.number,
-            'epId': ep.id,
-          },
+          metadata: {'id': effectiveId, 'epNumber': ep.number, 'epId': ep.id},
         ))?.flatten() ??
         [];
   }
 
-  Future<void> _fetchServers(int epNum) async {
+  Future<void> _fetchServers(int epNum, [int? generation]) async {
     final isHindiActive =
         ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi';
     if (isHindiActive) {
@@ -850,15 +860,10 @@ class EpisodeData extends _$EpisodeData {
       );
 
       var list = await _getRawServers(ep).timeout(const Duration(seconds: 15));
+      if (generation != null && generation != _loadGeneration) return;
       if (list.isEmpty) {
         state = state.copyWith(servers: [], selectedServer: null);
         return;
-      } else {
-        final hasDub = list.any((s) => s.isDub);
-        final hasSub = list.any((s) => !s.isDub);
-        if (!hasDub && hasSub) {
-          list = [...list, ...list.map((s) => s.copyWith(isDub: true))];
-        }
       }
 
       final preferDub = ref.read(playerSettingsProvider).preferDub;
@@ -885,7 +890,8 @@ class EpisodeData extends _$EpisodeData {
     }
   }
 
-  Future<void> _playCurrent(Duration startAt) async {
+  Future<void> _playCurrent(Duration startAt, {int? generation}) async {
+    final activeGeneration = generation ?? _loadGeneration;
     final epNum = state.selectedEpisode;
     if (epNum == null) return;
 
@@ -916,6 +922,8 @@ class EpisodeData extends _$EpisodeData {
         ).timeout(const Duration(seconds: 15));
       }
 
+      if (activeGeneration != _loadGeneration) return;
+
       if (data == null || data.sources.isEmpty) {
         throw StateError('No playable sources found');
       }
@@ -929,6 +937,7 @@ class EpisodeData extends _$EpisodeData {
       );
       try {
         await _loadSourceStream(0, startAt: startAt);
+        if (activeGeneration != _loadGeneration) return;
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
         var alternateStarted = false;
@@ -964,9 +973,13 @@ class EpisodeData extends _$EpisodeData {
 
         fallback ??= await _fetchFallbackNativeSourceData(epModel, category);
         if (fallback != null && fallback.sources.isNotEmpty) {
+          if (activeGeneration != _loadGeneration) return;
           ref
               .read(aniSkipProvider.notifier)
-              .setFallbackFromSource(intro: fallback.intro, outro: fallback.outro);
+              .setFallbackFromSource(
+                intro: fallback.intro,
+                outro: fallback.outro,
+              );
           state = state.copyWith(
             sources: fallback.sources,
             subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
@@ -987,9 +1000,13 @@ class EpisodeData extends _$EpisodeData {
               )
               .timeout(const Duration(seconds: 8));
           if (subFallback.sources.any((source) => !source.isDub)) {
+            if (activeGeneration != _loadGeneration) return;
             ref
                 .read(aniSkipProvider.notifier)
-                .setFallbackFromSource(intro: subFallback.intro, outro: subFallback.outro);
+                .setFallbackFromSource(
+                  intro: subFallback.intro,
+                  outro: subFallback.outro,
+                );
             state = state.copyWith(
               sources: subFallback.sources,
               subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
@@ -1004,6 +1021,7 @@ class EpisodeData extends _$EpisodeData {
         rethrow;
       }
     } catch (e, stack) {
+      if (activeGeneration != _loadGeneration) return;
       AppLogger.e('Episode playback failed', e, stack);
       state = state.copyWith(
         error: 'Unable to play episode. Try another server.',
@@ -1054,13 +1072,12 @@ class EpisodeData extends _$EpisodeData {
       final primarySrc = state.sources[sourceIdx];
       final streamHeaders = {...?state.headers, ...?primarySrc.headers};
 
-      allQualities.add({
-        'quality': 'Auto',
-        'url': primarySrc.url,
-      });
+      allQualities.add({'quality': 'Auto', 'url': primarySrc.url});
 
       for (final src in state.sources) {
-        if (src.url != null && src.url!.isNotEmpty && src.url != primarySrc.url) {
+        if (src.url != null &&
+            src.url!.isNotEmpty &&
+            src.url != primarySrc.url) {
           allQualities.add({
             'quality': src.quality ?? 'Default',
             'url': src.url,
@@ -1091,7 +1108,9 @@ class EpisodeData extends _$EpisodeData {
       int qIdx = 0;
       if (prefQuality.toLowerCase() != 'auto') {
         final matchIdx = allQualities.indexWhere(
-          (q) => (q['quality'] as String).toLowerCase().contains(prefQuality.toLowerCase()),
+          (q) => (q['quality'] as String).toLowerCase().contains(
+            prefQuality.toLowerCase(),
+          ),
         );
         if (matchIdx != -1) qIdx = matchIdx;
       }
@@ -1146,7 +1165,9 @@ class EpisodeData extends _$EpisodeData {
                   final u = m['url'] as String?;
                   final q = m['quality'] as String?;
                   if (u == null || seenUrls.contains(u)) return false;
-                  if (q != null && q != 'Auto' && seenNames.contains(q)) return false;
+                  if (q != null && q != 'Auto' && seenNames.contains(q)) {
+                    return false;
+                  }
                   seenUrls.add(u);
                   if (q != null) seenNames.add(q);
                   return true;
@@ -1170,9 +1191,10 @@ class EpisodeData extends _$EpisodeData {
     final playerSettings = ref.read(playerSettingsProvider);
     final isHindiRequested = playerSettings.preferredAudioLanguage == 'hindi';
 
-    final isDubRequested = isHindiRequested
-        ? (playerSettings.hindiFallbackAudio == 'dub')
-        : (server?.isDub ?? playerSettings.preferDub);
+    final isDubRequested =
+        isHindiRequested
+            ? (playerSettings.hindiFallbackAudio == 'dub')
+            : (server?.isDub ?? playerSettings.preferDub);
     final cacheKey =
         '${_epList.animeId}_${ep.number}_${server?.id}_${isHindiRequested ? "hindi" : (isDubRequested ? "dub" : "sub")}';
     final cached = _sourceCache[cacheKey];
@@ -1194,7 +1216,8 @@ class EpisodeData extends _$EpisodeData {
       final epNum = ep.number ?? 1;
       final animeTitle = _epList.animeTitle ?? '';
       final animeId = _epList.animeId;
-      final anilistId = int.tryParse(_epList.mediaId ?? '') ?? int.tryParse(animeId ?? '');
+      final anilistId =
+          int.tryParse(_epList.mediaId ?? '') ?? int.tryParse(animeId ?? '');
       final manualProvider = playerSettings.preferredHindiProvider;
 
       AppLogger.section('[Hindi] Resolving stream for $animeTitle Ep $epNum');
@@ -1209,7 +1232,9 @@ class EpisodeData extends _$EpisodeData {
         );
 
         if (hindiStream != null && hindiStream.sources.isNotEmpty) {
-          AppLogger.success('[Hindi] Playable Hindi stream resolved successfully!');
+          AppLogger.success(
+            '[Hindi] Playable Hindi stream resolved successfully!',
+          );
           return saveAndReturn(hindiStream);
         }
       } catch (e) {
@@ -1217,12 +1242,24 @@ class EpisodeData extends _$EpisodeData {
       }
 
       final fallbackLang = playerSettings.hindiFallbackAudio;
-      final fallbackLabel = fallbackLang == 'sub' ? 'Japanese SUB' : 'English DUB';
-      AppLogger.w('[Hindi] All Hindi providers failed for Ep $epNum. Falling back to $fallbackLabel.');
+      final fallbackLabel =
+          fallbackLang == 'sub' ? 'Japanese SUB' : 'English DUB';
+      AppLogger.w(
+        '[Hindi] All Hindi providers failed for Ep $epNum. Falling back to $fallbackLabel.',
+      );
 
       state = state.copyWith(
-        languageNotice: 'Hindi is unavailable for this episode. Playing $fallbackLabel.',
+        languageNotice:
+            'Hindi is unavailable for this episode. Playing $fallbackLabel.',
+        selectedServer: ServerData(
+          id: server?.id ?? 'auto',
+          name: fallbackLabel,
+          isDub: fallbackLang == 'dub',
+        ),
       );
+      ref
+          .read(playerSettingsProvider.notifier)
+          .setPreferredAudioLanguage(fallbackLang);
     }
 
     AppLogger.d(
@@ -1230,20 +1267,25 @@ class EpisodeData extends _$EpisodeData {
     );
 
     final provider = _effectiveProvider;
-    final activeExt = ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
-    final isJustAnime = provider?.providerName == 'justanime' || activeExt.contains('justanime');
+    final activeExt =
+        ref.read(sourceProvider).activeAnimeSource?.name?.toLowerCase() ?? '';
+    final isJustAnime =
+        provider?.providerName == 'justanime' ||
+        activeExt.contains('justanime');
 
-    final effectiveAnimeId = (int.tryParse(_epList.animeId ?? '') != null)
-        ? _epList.animeId!
-        : (_epList.mediaId ?? _epList.animeId ?? '');
+    final effectiveAnimeId =
+        (int.tryParse(_epList.animeId ?? '') != null)
+            ? _epList.animeId!
+            : (_epList.mediaId ?? _epList.animeId ?? '');
 
     // If JustAnime is active or available, fetch directly with full multi-server & exact intro/outro support!
     if (isJustAnime && provider != null && effectiveAnimeId.isNotEmpty) {
       try {
         final category = isDubRequested ? 'dub' : 'sub';
-        final targetEpId = (ep.id != null && ep.id!.isNotEmpty)
-            ? ep.id!
-            : (ep.number?.toString() ?? '1');
+        final targetEpId =
+            (ep.id != null && ep.id!.isNotEmpty)
+                ? ep.id!
+                : (ep.number?.toString() ?? '1');
         final res = await provider
             .getSources(effectiveAnimeId, targetEpId, server?.id, category)
             .timeout(const Duration(seconds: 8));
@@ -1458,7 +1500,9 @@ class EpisodeData extends _$EpisodeData {
                 (e) => e.number == ep.number,
               );
               resolvedEpId =
-                  targetEp?.id ?? altEps.episodes?.firstOrNull?.id ?? resolvedEpId;
+                  targetEp?.id ??
+                  altEps.episodes?.firstOrNull?.id ??
+                  resolvedEpId;
             } catch (_) {}
           }
 

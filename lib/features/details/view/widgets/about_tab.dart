@@ -11,6 +11,7 @@ import 'package:ani_dash/helpers/navigation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 
 class DetailsContent extends StatelessWidget {
   final UniversalMedia anime;
@@ -37,7 +38,7 @@ class DetailsContent extends StatelessWidget {
             NextEpisodeWidget(anime: anime),
             const SizedBox(height: 12),
           ],
-          AvailableLanguagesCard(mediaId: mediaId),
+          AvailableLanguagesCard(mediaId: mediaId, anime: anime),
           const SizedBox(height: 16),
           AnimeSynopsis(
             description: anime.description ?? '',
@@ -50,12 +51,19 @@ class DetailsContent extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           AdditionalInfoWidget(anime: anime),
-          if (anime.relations.any((relation) => _isLegitimateWatchOrderRelation(anime, relation))) ...[
+          if (anime.relations.any(
+            (relation) => _isLegitimateWatchOrderRelation(anime, relation),
+          )) ...[
             const SizedBox(height: 24),
             HorizontalMediaSection<UniversalMediaRelation>(
               title: 'Watch Order',
               items:
-                  anime.relations.where((relation) => _isLegitimateWatchOrderRelation(anime, relation)).toList()
+                  anime.relations
+                      .where(
+                        (relation) =>
+                            _isLegitimateWatchOrderRelation(anime, relation),
+                      )
+                      .toList()
                     ..sort(
                       (a, b) => (a.media.seasonYear ?? 9999).compareTo(
                         b.media.seasonYear ?? 9999,
@@ -129,46 +137,83 @@ class DetailsContent extends StatelessWidget {
     if (format == 'MANGA' ||
         format == 'NOVEL' ||
         format == 'ONE_SHOT' ||
-        format == 'MUSIC') {
+        format == 'MUSIC' ||
+        format == 'MOVIE' ||
+        format == 'OVA' ||
+        format == 'ONA' ||
+        format == 'SPECIAL') {
       return false;
     }
+    if (type.contains('SPIN')) return false;
 
     // Check significant title overlap between base anime and relation
-    final baseTitles = [
-      anime.title.english,
-      anime.title.romaji,
-      anime.title.native,
-    ].whereType<String>().map((s) => s.toLowerCase()).toList();
+    final baseTitles =
+        [
+          anime.title.english,
+          anime.title.romaji,
+          anime.title.native,
+        ].whereType<String>().map((s) => s.toLowerCase()).toList();
 
-    final relTitles = [
-      relation.media.title.english,
-      relation.media.title.romaji,
-      relation.media.title.native,
-    ].whereType<String>().map((s) => s.toLowerCase()).toList();
+    final relTitles =
+        [
+          relation.media.title.english,
+          relation.media.title.romaji,
+          relation.media.title.native,
+        ].whereType<String>().map((s) => s.toLowerCase()).toList();
 
     if (baseTitles.isEmpty || relTitles.isEmpty) return true;
 
     final stopWords = {
-      'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with',
-      'no', 'ni', 'wa', 'wo', 'ga', 'de', 'na', 'season', 'part', 'movie', 'tv',
-      'ova', 'ona', 'special', 'act', 'chapter', 'arc',
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'of',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'with',
+      'no',
+      'ni',
+      'wa',
+      'wo',
+      'ga',
+      'de',
+      'na',
+      'season',
+      'part',
+      'movie',
+      'tv',
+      'ova',
+      'ona',
+      'special',
+      'act',
+      'chapter',
+      'arc',
     };
 
-    final baseTokens = baseTitles
-        .expand(
-          (t) => t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
-        )
-        .where((w) => w.length >= 2 && !stopWords.contains(w))
-        .toSet();
+    final baseTokens =
+        baseTitles
+            .expand(
+              (t) =>
+                  t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
+            )
+            .where((w) => w.length >= 2 && !stopWords.contains(w))
+            .toSet();
 
     if (baseTokens.isEmpty) return true;
 
-    final relTokens = relTitles
-        .expand(
-          (t) => t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
-        )
-        .where((w) => w.length >= 2 && !stopWords.contains(w))
-        .toSet();
+    final relTokens =
+        relTitles
+            .expand(
+              (t) =>
+                  t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
+            )
+            .where((w) => w.length >= 2 && !stopWords.contains(w))
+            .toSet();
 
     return baseTokens.intersection(relTokens).isNotEmpty;
   }
@@ -182,8 +227,13 @@ class DetailsContent extends StatelessWidget {
 
 class AvailableLanguagesCard extends ConsumerStatefulWidget {
   final String mediaId;
+  final UniversalMedia anime;
 
-  const AvailableLanguagesCard({super.key, required this.mediaId});
+  const AvailableLanguagesCard({
+    super.key,
+    required this.mediaId,
+    required this.anime,
+  });
 
   @override
   ConsumerState<AvailableLanguagesCard> createState() =>
@@ -193,25 +243,26 @@ class AvailableLanguagesCard extends ConsumerStatefulWidget {
 class _AvailableLanguagesCardState
     extends ConsumerState<AvailableLanguagesCard> {
   String? _lookupKey;
-  Future<({bool sub, bool dub})>? _availability;
+  Future<({bool sub, bool dub, bool hindi})>? _availability;
 
   @override
   Widget build(BuildContext context) {
     final episodes = ref.watch(episodeListProvider);
     final detailsState = ref.watch(detailsPageProvider(widget.mediaId));
-    final isMatching = detailsState.animeIdForSource != null &&
+    final isMatching =
+        detailsState.animeIdForSource != null &&
         episodes.animeId == detailsState.animeIdForSource;
     final firstEpisode =
-        (!isMatching || episodes.episodes.isEmpty) ? null : episodes.episodes.first;
+        (!isMatching || episodes.episodes.isEmpty)
+            ? null
+            : episodes.episodes.first;
     final key = '${widget.mediaId}:${episodes.animeId}:${firstEpisode?.id}';
     if (firstEpisode != null && episodes.animeId != null && key != _lookupKey) {
       _lookupKey = key;
-      _availability = ref
-          .read(episodeDataProvider.notifier)
-          .checkLanguageAvailability(firstEpisode);
+      _availability = _checkAvailability(firstEpisode);
     }
 
-    return FutureBuilder<({bool sub, bool dub})>(
+    return FutureBuilder<({bool sub, bool dub, bool hindi})>(
       future: _availability,
       builder: (context, snapshot) {
         final result = snapshot.data;
@@ -233,11 +284,7 @@ class _AvailableLanguagesCardState
           ),
           child: Row(
             children: [
-              Icon(
-                Iconsax.headphone,
-                size: 16,
-                color: colors.primary,
-              ),
+              Icon(Iconsax.headphone, size: 16, color: colors.primary),
               const SizedBox(width: 8),
               Text(
                 'Audio & Subs',
@@ -259,11 +306,40 @@ class _AvailableLanguagesCardState
                 available: result?.dub,
                 loading: loading,
               ),
+              const SizedBox(width: 8),
+              _AudioBadge(
+                label: 'HINDI',
+                available: result?.hindi,
+                loading: loading,
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<({bool sub, bool dub, bool hindi})> _checkAvailability(
+    dynamic episode,
+  ) async {
+    final regular = await ref
+        .read(episodeDataProvider.notifier)
+        .checkLanguageAvailability(episode);
+    final title =
+        widget.anime.title.english ??
+        widget.anime.title.romaji ??
+        widget.anime.title.native ??
+        '';
+    final count = await ref
+        .read(hindiSourceManagerProvider.notifier)
+        .getEpisodeCount(
+          animeTitle: title,
+          romajiTitle: widget.anime.title.romaji,
+          anilistId: int.tryParse(widget.anime.id),
+          malId: int.tryParse(widget.anime.idMal ?? ''),
+          year: widget.anime.seasonYear,
+        );
+    return (sub: regular.sub, dub: regular.dub, hindi: (count ?? 0) > 0);
   }
 }
 
@@ -319,14 +395,16 @@ class _AudioBadge extends StatelessWidget {
 
     final isAvail = available == true;
     final badgeColor = isAvail ? Colors.green : colors.outlineVariant;
-    final bgColor = isAvail
-        ? Colors.green.withValues(alpha: 0.12)
-        : colors.surfaceContainerHighest.withValues(alpha: 0.4);
-    final textColor = isAvail
-        ? (theme.brightness == Brightness.dark
-            ? Colors.greenAccent
-            : Colors.green.shade800)
-        : colors.onSurfaceVariant.withValues(alpha: 0.5);
+    final bgColor =
+        isAvail
+            ? Colors.green.withValues(alpha: 0.12)
+            : colors.surfaceContainerHighest.withValues(alpha: 0.4);
+    final textColor =
+        isAvail
+            ? (theme.brightness == Brightness.dark
+                ? Colors.greenAccent
+                : Colors.green.shade800)
+            : colors.onSurfaceVariant.withValues(alpha: 0.5);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -334,9 +412,8 @@ class _AudioBadge extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isAvail
-              ? badgeColor.withValues(alpha: 0.35)
-              : Colors.transparent,
+          color:
+              isAvail ? badgeColor.withValues(alpha: 0.35) : Colors.transparent,
         ),
       ),
       child: Row(
@@ -381,19 +458,21 @@ class AnimeInfoCard extends ConsumerWidget {
         (nextEp != null && nextEp > 1) ? nextEp - 1 : null;
     final isReleasing = anime.status?.toLowerCase() == 'releasing';
 
-    final int? resolvedEpCount = isReleasing
-        ? (airingReleased ??
-            (loadedCount > 0 ? loadedCount : null) ??
-            (hasValidTotal ? anime.episodes : null))
-        : ((hasValidTotal ? anime.episodes : null) ??
-            airingReleased ??
-            (loadedCount > 0 ? loadedCount : null));
+    final int? resolvedEpCount =
+        isReleasing
+            ? (airingReleased ??
+                (loadedCount > 0 ? loadedCount : null) ??
+                (hasValidTotal ? anime.episodes : null))
+            : ((hasValidTotal ? anime.episodes : null) ??
+                airingReleased ??
+                (loadedCount > 0 ? loadedCount : null));
 
-    final String epValue = resolvedEpCount != null
-        ? (isReleasing || !hasValidTotal
-            ? '$resolvedEpCount+'
-            : '$resolvedEpCount')
-        : (isReleasing ? 'Ongoing' : 'TBA');
+    final String epValue =
+        resolvedEpCount != null
+            ? (isReleasing || !hasValidTotal
+                ? '$resolvedEpCount+'
+                : '$resolvedEpCount')
+            : (isReleasing ? 'Ongoing' : 'TBA');
 
     final String epLabel =
         (hasValidTotal && !isReleasing) ? 'Episodes' : 'Ongoing';
@@ -986,13 +1065,14 @@ class AnimeInformationGrid extends ConsumerWidget {
         (nextEp != null && nextEp > 1) ? nextEp - 1 : null;
     final isReleasing = anime.status?.toLowerCase() == 'releasing';
 
-    final int? resolvedEpCount = isReleasing
-        ? (airingReleased ??
-            (loadedCount > 0 ? loadedCount : null) ??
-            (hasValidTotal ? anime.episodes : null))
-        : ((hasValidTotal ? anime.episodes : null) ??
-            airingReleased ??
-            (loadedCount > 0 ? loadedCount : null));
+    final int? resolvedEpCount =
+        isReleasing
+            ? (airingReleased ??
+                (loadedCount > 0 ? loadedCount : null) ??
+                (hasValidTotal ? anime.episodes : null))
+            : ((hasValidTotal ? anime.episodes : null) ??
+                airingReleased ??
+                (loadedCount > 0 ? loadedCount : null));
 
     final items = [
       if (anime.title.english != null)
@@ -1004,10 +1084,7 @@ class AnimeInformationGrid extends ConsumerWidget {
       if (hasValidTotal && !isReleasing)
         _InfoItemData('Episodes', '${anime.episodes}')
       else if (resolvedEpCount != null && resolvedEpCount > 0)
-        _InfoItemData(
-          'Episodes',
-          '$resolvedEpCount+ (Ongoing)',
-        )
+        _InfoItemData('Episodes', '$resolvedEpCount+ (Ongoing)')
       else if (isReleasing)
         _InfoItemData('Episodes', 'Ongoing')
       else

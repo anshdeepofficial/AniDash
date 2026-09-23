@@ -22,7 +22,7 @@ class DefaultCard extends StatelessWidget {
     final borderRadius = BorderRadius.circular(16.0);
 
     return Material(
-      color: Colors.transparent,
+      color: Colors.black,
       borderRadius: borderRadius,
       elevation: isHovered ? 4 : 0,
       animationDuration: const Duration(milliseconds: 300),
@@ -51,7 +51,7 @@ class DefaultCard extends StatelessWidget {
                   Colors.transparent,
                   Colors.transparent,
                   Colors.black.withValues(alpha: 0.4),
-                  Colors.black.withValues(alpha: 0.95),
+                  Colors.black,
                 ],
                 stops: const [0.0, 0.4, 0.7, 1.0],
               ),

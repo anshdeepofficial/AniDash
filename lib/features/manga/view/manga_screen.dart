@@ -11,7 +11,6 @@ import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dar
 import 'package:ani_dash/core/services/auth_provider_enum.dart';
 import 'package:ani_dash/core/utils/greeting_methods.dart';
 import 'package:ani_dash/features/manga/utils/manga_helpers.dart';
-import 'package:ani_dash/main.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'manga_details_screen.dart';
@@ -30,20 +29,17 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
   List<DMedia> _spotlightList = [];
   List<DMedia> _latestList = [];
   List<DMedia> _popularList = [];
-  List<DMedia> _adultList = [];
   List<DMedia> _searchList = [];
 
   bool _isLoading = false;
   bool _isSearching = false;
   bool _showSearchBar = false;
-  bool _show18Plus = false;
   String? _error;
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _show18Plus = sharedPrefs.getBool('manga_show_18_plus') ?? false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadMangaContent();
     });
@@ -56,29 +52,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     super.dispose();
   }
 
-  void _toggle18Plus() {
-    setState(() {
-      _show18Plus = !_show18Plus;
-      sharedPrefs.setBool('manga_show_18_plus', _show18Plus);
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _show18Plus
-              ? '18+ Manga content enabled'
-              : '18+ Manga content hidden',
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-
-    // If enabling 18+, re-check or load content if needed
-    if (_show18Plus && _adultList.isEmpty) {
-      _loadMangaContent();
-    }
-  }
 
   Source? _getActiveMangaSource() {
     final sourceState = ref.read(sourceProvider);
@@ -137,16 +111,11 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
           finalPopular.isNotEmpty ? finalPopular : finalLatest;
       final spotlight = spotlightCandidates.take(6).toList();
 
-      // Separate 18+ items if any are detected in the feed
-      final allItems = <DMedia>{...finalLatest, ...finalPopular}.toList();
-      final adultItems =
-          allItems.where((m) => isMangaAdult(m, source: source)).toList();
 
       if (mounted) {
         setState(() {
           _latestList = finalLatest;
           _popularList = finalPopular;
-          _adultList = adultItems;
           _spotlightList = spotlight;
           _isLoading = false;
           if (_latestList.isEmpty && _popularList.isEmpty) {
@@ -182,9 +151,9 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     });
 
     try {
-      final pages = await source.methods.search(query.trim(), 1, []).timeout(
-        const Duration(seconds: 15),
-      );
+      final pages = await source.methods
+          .search(query.trim(), 1, [])
+          .timeout(const Duration(seconds: 15));
       if (mounted) {
         setState(() {
           _searchList = pages.list;
@@ -241,7 +210,10 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -285,7 +257,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               vertical: 6,
                             ),
                             child: Text(
-                              'Standard Manga Sources',
+                              'Manga Sources',
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -300,12 +272,13 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               subtitle: Text(
                                 'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
-                              trailing: isSelected
-                                  ? Icon(
-                                      Icons.check_circle,
-                                      color: colorScheme.primary,
-                                    )
-                                  : null,
+                              trailing:
+                                  isSelected
+                                      ? Icon(
+                                        Icons.check_circle,
+                                        color: colorScheme.primary,
+                                      )
+                                      : null,
                               onTap: () {
                                 ref
                                     .read(sourceProvider.notifier)
@@ -319,26 +292,6 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                           }),
                         ],
                         if (installedAdultManga.isNotEmpty) ...[
-                          const Divider(),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 6,
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '18+ Manga Sources',
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: Colors.redAccent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                build18PlusBadge(fontSize: 8),
-                              ],
-                            ),
-                          ),
                           ...installedAdultManga.map((src) {
                             final isSelected = activeSource?.id == src.id;
                             return ListTile(
@@ -356,12 +309,13 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               subtitle: Text(
                                 'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
-                              trailing: isSelected
-                                  ? Icon(
-                                      Icons.check_circle,
-                                      color: colorScheme.primary,
-                                    )
-                                  : null,
+                              trailing:
+                                  isSelected
+                                      ? Icon(
+                                        Icons.check_circle,
+                                        color: colorScheme.primary,
+                                      )
+                                      : null,
                               onTap: () {
                                 ref
                                     .read(sourceProvider.notifier)
@@ -391,10 +345,8 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => MangaDetailsScreen(
-            manga: item,
-            mangaSource: activeSource,
-          ),
+          builder:
+              (_) => MangaDetailsScreen(manga: item, mangaSource: activeSource),
         ),
       );
     }
@@ -412,9 +364,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     final user = ref.watch(
       authProvider.select(
         (s) =>
-            activePlatform == AuthPlatform.anilist
-                ? s.anilistUser
-                : s.malUser,
+            activePlatform == AuthPlatform.anilist ? s.anilistUser : s.malUser,
       ),
     );
     final activeSource = _getActiveMangaSource();
@@ -428,37 +378,43 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
             children: [
               // User Avatar
               GestureDetector(
-                onTap: () => context.push(
-                  user != null
-                      ? '/settings/account/profile'
-                      : '/settings/account',
-                ),
+                onTap:
+                    () => context.push(
+                      user != null
+                          ? '/settings/account/profile'
+                          : '/settings/account',
+                    ),
                 child: Hero(
                   tag: 'manga-user-avatar',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: user.avatarUrl!,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
+                    child:
+                        user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                            ? CachedNetworkImage(
+                              imageUrl: user.avatarUrl!,
                               width: 44,
                               height: 44,
-                              color: colorScheme.surfaceContainerHighest,
-                              child: const Icon(Icons.person),
+                              fit: BoxFit.cover,
+                              errorWidget:
+                                  (_, __, ___) => Container(
+                                    width: 44,
+                                    height: 44,
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: const Icon(Icons.person),
+                                  ),
+                            )
+                            : Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Iconsax.book,
+                                color: colorScheme.primary,
+                              ),
                             ),
-                          )
-                        : Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Iconsax.book, color: colorScheme.primary),
-                          ),
                   ),
                 ),
               ),
@@ -488,53 +444,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 ),
               ),
 
-              // Action 1: 18+ Toggle Button
-              InkWell(
-                onTap: _toggle18Plus,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _show18Plus
-                        ? Colors.red.shade900.withValues(alpha: 0.85)
-                        : colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: _show18Plus
-                        ? Border.all(
-                            color: Colors.redAccent.withValues(alpha: 0.8),
-                            width: 1.2,
-                          )
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.shield_outlined,
-                        size: 16,
-                        color: _show18Plus
-                            ? Colors.white
-                            : colorScheme.onSecondaryContainer,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '18+',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: _show18Plus
-                              ? Colors.white
-                              : colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
+
 
               // Action 2: Toggle Search
               Material(
@@ -592,7 +502,10 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 avatar: const Icon(Iconsax.book, size: 15),
                 label: Text(
                   activeSource?.name ?? 'Select Source',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 onPressed: () => _showSourceSelector(context),
               ),
@@ -601,25 +514,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 build18PlusBadge(fontSize: 8),
               ],
               const Spacer(),
-              if (_show18Plus)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    '18+ Visible',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+
             ],
           ),
 
@@ -736,10 +631,11 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                         CachedNetworkImage(
                           imageUrl: item.cover!,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: const Icon(Iconsax.book, size: 40),
-                          ),
+                          errorWidget:
+                              (_, __, ___) => Container(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: const Icon(Iconsax.book, size: 40),
+                              ),
                         )
                       else
                         Container(
@@ -781,13 +677,14 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                     child: CachedNetworkImage(
                                       imageUrl: item.cover ?? '',
                                       fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => Container(
-                                        color: Colors.black45,
-                                        child: const Icon(
-                                          Iconsax.book,
-                                          color: Colors.white70,
-                                        ),
-                                      ),
+                                      errorWidget:
+                                          (_, __, ___) => Container(
+                                            color: Colors.black45,
+                                            child: const Icon(
+                                              Iconsax.book,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
                                     ),
                                   ),
                                   if (isAdult)
@@ -817,7 +714,9 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: colorScheme.primary,
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: const Text(
                                           'TRENDING',
@@ -829,7 +728,8 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                           ),
                                         ),
                                       ),
-                                      if (isAdult) build18PlusBadge(fontSize: 8),
+                                      if (isAdult)
+                                        build18PlusBadge(fontSize: 8),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -852,7 +752,9 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.8),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.8,
+                                        ),
                                         fontSize: 11,
                                       ),
                                     ),
@@ -896,10 +798,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     final progressList = ref.watch(mangaReadingProgressProvider);
     final activeSource = _getActiveMangaSource();
 
-    final validEntries = progressList.where((e) {
-      if (!_show18Plus && e.isAdult) return false;
-      return true;
-    }).toList();
+    final validEntries = progressList;
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 
@@ -950,42 +849,46 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                     borderRadius: BorderRadius.circular(10),
                     onLongPress: () => _showContinueReadingMenu(context, entry),
                     onTap: () {
-                      final targetSource = activeSource ??
+                      final targetSource =
+                          activeSource ??
                           Source(
                             id: entry.sourceId ?? 'mangadex',
                             name: entry.sourceName ?? 'MangaDex',
                             isNsfw: entry.isAdult,
                           );
 
-                      final chapter = entry.chapterJson != null
-                          ? DEpisode.fromJson(entry.chapterJson!)
-                          : DEpisode(
-                              url: entry.chapterUrl,
-                              name: entry.chapterTitle,
-                              episodeNumber: entry.chapterNumber,
-                            );
+                      final chapter =
+                          entry.chapterJson != null
+                              ? DEpisode.fromJson(entry.chapterJson!)
+                              : DEpisode(
+                                url: entry.chapterUrl,
+                                name: entry.chapterTitle,
+                                episodeNumber: entry.chapterNumber,
+                              );
 
-                      final manga = entry.mangaJson != null
-                          ? DMedia.fromJson(entry.mangaJson!)
-                          : DMedia(
-                              title: entry.mangaTitle,
-                              url: entry.mangaUrl,
-                              cover: entry.mangaCover,
-                            );
+                      final manga =
+                          entry.mangaJson != null
+                              ? DMedia.fromJson(entry.mangaJson!)
+                              : DMedia(
+                                title: entry.mangaTitle,
+                                url: entry.mangaUrl,
+                                cover: entry.mangaCover,
+                              );
 
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => MangaReaderScreen(
-                            chapter: chapter,
-                            mangaTitle: entry.mangaTitle,
-                            mangaSource: targetSource,
-                            manga: manga,
-                            mangaCover: entry.mangaCover,
-                            mangaUrl: entry.mangaUrl,
-                            initialPage: entry.pageIndex,
-                            isAdult: entry.isAdult,
-                          ),
+                          builder:
+                              (_) => MangaReaderScreen(
+                                chapter: chapter,
+                                mangaTitle: entry.mangaTitle,
+                                mangaSource: targetSource,
+                                manga: manga,
+                                mangaCover: entry.mangaCover,
+                                mangaUrl: entry.mangaUrl,
+                                initialPage: entry.pageIndex,
+                                isAdult: entry.isAdult,
+                              ),
                         ),
                       );
                     },
@@ -1005,10 +908,13 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                   CachedNetworkImage(
                                     imageUrl: entry.mangaCover!,
                                     fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) => Container(
-                                      color: colorScheme.surfaceContainerHighest,
-                                      child: const Icon(Iconsax.book),
-                                    ),
+                                    errorWidget:
+                                        (_, __, ___) => Container(
+                                          color:
+                                              colorScheme
+                                                  .surfaceContainerHighest,
+                                          child: const Icon(Iconsax.book),
+                                        ),
                                   )
                                 else
                                   Container(
@@ -1177,42 +1083,46 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                   subtitle: Text('Continue from page ${entry.pageIndex}'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final targetSource = activeSource ??
+                    final targetSource =
+                        activeSource ??
                         Source(
                           id: entry.sourceId ?? 'mangadex',
                           name: entry.sourceName ?? 'MangaDex',
                           isNsfw: entry.isAdult,
                         );
 
-                    final chapter = entry.chapterJson != null
-                        ? DEpisode.fromJson(entry.chapterJson!)
-                        : DEpisode(
-                            url: entry.chapterUrl,
-                            name: entry.chapterTitle,
-                            episodeNumber: entry.chapterNumber,
-                          );
+                    final chapter =
+                        entry.chapterJson != null
+                            ? DEpisode.fromJson(entry.chapterJson!)
+                            : DEpisode(
+                              url: entry.chapterUrl,
+                              name: entry.chapterTitle,
+                              episodeNumber: entry.chapterNumber,
+                            );
 
-                    final manga = entry.mangaJson != null
-                        ? DMedia.fromJson(entry.mangaJson!)
-                        : DMedia(
-                            title: entry.mangaTitle,
-                            url: entry.mangaUrl,
-                            cover: entry.mangaCover,
-                          );
+                    final manga =
+                        entry.mangaJson != null
+                            ? DMedia.fromJson(entry.mangaJson!)
+                            : DMedia(
+                              title: entry.mangaTitle,
+                              url: entry.mangaUrl,
+                              cover: entry.mangaCover,
+                            );
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => MangaReaderScreen(
-                          chapter: chapter,
-                          mangaTitle: entry.mangaTitle,
-                          mangaSource: targetSource,
-                          manga: manga,
-                          mangaCover: entry.mangaCover,
-                          mangaUrl: entry.mangaUrl,
-                          initialPage: entry.pageIndex,
-                          isAdult: entry.isAdult,
-                        ),
+                        builder:
+                            (_) => MangaReaderScreen(
+                              chapter: chapter,
+                              mangaTitle: entry.mangaTitle,
+                              mangaSource: targetSource,
+                              manga: manga,
+                              mangaCover: entry.mangaCover,
+                              mangaUrl: entry.mangaUrl,
+                              initialPage: entry.pageIndex,
+                              isAdult: entry.isAdult,
+                            ),
                       ),
                     );
                   },
@@ -1220,32 +1130,38 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
 
                 // 2. View Manga Details
                 ListTile(
-                  leading: Icon(Iconsax.info_circle, color: colorScheme.primary),
+                  leading: Icon(
+                    Iconsax.info_circle,
+                    color: colorScheme.primary,
+                  ),
                   title: const Text('View Manga Details'),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final targetSource = activeSource ??
+                    final targetSource =
+                        activeSource ??
                         Source(
                           id: entry.sourceId ?? 'mangadex',
                           name: entry.sourceName ?? 'MangaDex',
                           isNsfw: entry.isAdult,
                         );
 
-                    final manga = entry.mangaJson != null
-                        ? DMedia.fromJson(entry.mangaJson!)
-                        : DMedia(
-                            title: entry.mangaTitle,
-                            url: entry.mangaUrl,
-                            cover: entry.mangaCover,
-                          );
+                    final manga =
+                        entry.mangaJson != null
+                            ? DMedia.fromJson(entry.mangaJson!)
+                            : DMedia(
+                              title: entry.mangaTitle,
+                              url: entry.mangaUrl,
+                              cover: entry.mangaCover,
+                            );
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => MangaDetailsScreen(
-                          manga: manga,
-                          mangaSource: targetSource,
-                        ),
+                        builder:
+                            (_) => MangaDetailsScreen(
+                              manga: manga,
+                              mangaSource: targetSource,
+                            ),
                       ),
                     );
                   },
@@ -1281,8 +1197,9 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                   subtitle: const Text('Clears your reading progress'),
                   onTap: () async {
                     Navigator.pop(sheetContext);
-                    final repo =
-                        ref.read(mangaReadingProgressRepositoryProvider);
+                    final repo = ref.read(
+                      mangaReadingProgressRepositoryProvider,
+                    );
                     await repo.removeProgress(entry.mangaUrl);
 
                     if (context.mounted) {
@@ -1332,11 +1249,12 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MangaSectionScreen(
-                      title: title,
-                      mangaList: list,
-                      mangaSource: activeSource,
-                    ),
+                    builder:
+                        (_) => MangaSectionScreen(
+                          title: title,
+                          mangaList: list,
+                          mangaSource: activeSource,
+                        ),
                   ),
                 );
               }
@@ -1396,22 +1314,30 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               CachedNetworkImage(
                                 imageUrl: item.cover ?? '',
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: theme.colorScheme.surfaceContainerHighest,
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                                placeholder:
+                                    (_, __) => Container(
+                                      color:
+                                          theme
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                errorWidget: (_, __, ___) => Container(
-                                  color: theme.colorScheme.surfaceContainerHighest,
-                                  child: const Icon(Iconsax.book, size: 30),
-                                ),
+                                errorWidget:
+                                    (_, __, ___) => Container(
+                                      color:
+                                          theme
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                      child: const Icon(Iconsax.book, size: 30),
+                                    ),
                               ),
                               // 18+ Badge
                               if (isAdult)
@@ -1534,10 +1460,11 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                             CachedNetworkImage(
                               imageUrl: item.cover ?? '',
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => Container(
-                                color: colorScheme.surfaceContainerHighest,
-                                child: const Icon(Iconsax.book, size: 30),
-                              ),
+                              errorWidget:
+                                  (_, __, ___) => Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: const Icon(Iconsax.book, size: 30),
+                                  ),
                             ),
                             if (isAdult)
                               Positioned(
@@ -1587,100 +1514,89 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
 
             // Content Area
             Expanded(
-              child: hasSearchQuery
-                  ? _buildSearchResultsGrid(colorScheme)
-                  : _isLoading
+              child:
+                  hasSearchQuery
+                      ? _buildSearchResultsGrid(colorScheme)
+                      : _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _error != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24.0),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Iconsax.book,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _error!,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Wrap(
-                                      spacing: 12,
-                                      runSpacing: 8,
-                                      alignment: WrapAlignment.center,
-                                      children: [
-                                        FilledButton.tonalIcon(
-                                          onPressed: () => context.push(
-                                            '/settings/extensions',
-                                          ),
-                                          icon: const Icon(
-                                            Icons.extension_outlined,
-                                          ),
-                                          label: const Text(
-                                            'Install Extensions',
-                                          ),
-                                        ),
-                                        ElevatedButton.icon(
-                                          onPressed: _loadMangaContent,
-                                          icon: const Icon(Icons.refresh),
-                                          label: const Text('Retry'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                      ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Iconsax.book,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _loadMangaContent,
-                              child: SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // 1. Spotlight Hero Banner
-                                    _buildSpotlightBanner(context, colorScheme),
-
-                                    // 2. Continue Reading Section
-                                    _buildContinueReadingSection(context, theme),
-
-                                    // 3. Popular Manga Section
-                                    _buildHorizontalSection(
-                                      context: context,
-                                      title: 'Popular Manga',
-                                      list: _popularList,
-                                    ),
-
-                                    // 4. Latest Updates Section
-                                    _buildHorizontalSection(
-                                      context: context,
-                                      title: 'Latest Updates',
-                                      list: _latestList,
-                                    ),
-
-                                    // 5. 18+ & Mature Manga Section (when 18+ is enabled or adult titles found)
-                                    if (_show18Plus && _adultList.isNotEmpty)
-                                      _buildHorizontalSection(
-                                        context: context,
-                                        title: '18+ & Mature Manga',
-                                        list: _adultList,
-                                        isAdultSection: true,
-                                      ),
-
-                                    // Bottom Navigation clearance padding
-                                    const SizedBox(height: 80),
-                                  ],
-                                ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  FilledButton.tonalIcon(
+                                    onPressed:
+                                        () => context.push(
+                                          '/settings/extensions',
+                                        ),
+                                    icon: const Icon(Icons.extension_outlined),
+                                    label: const Text('Install Extensions'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    onPressed: _loadMangaContent,
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
                               ),
-                            ),
+                            ],
+                          ),
+                        ),
+                      )
+                      : RefreshIndicator(
+                        onRefresh: _loadMangaContent,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 1. Spotlight Hero Banner
+                              _buildSpotlightBanner(context, colorScheme),
+
+                              // 2. Continue Reading Section
+                              _buildContinueReadingSection(context, theme),
+
+                              // 3. Popular Manga Section
+                              _buildHorizontalSection(
+                                context: context,
+                                title: 'Popular Manga',
+                                list: _popularList,
+                              ),
+
+                              // 4. Latest Updates Section
+                              _buildHorizontalSection(
+                                context: context,
+                                title: 'Latest Updates',
+                                list: _latestList,
+                              ),
+
+                              // Bottom Navigation clearance padding
+                              const SizedBox(height: 80),
+                            ],
+                          ),
+                        ),
+                      ),
             ),
           ],
         ),

@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
-import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
-import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/orientation_lock_provider.dart';
-import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
+import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -48,12 +46,6 @@ class TopControls extends ConsumerWidget {
       episodeDataProvider.select((e) => e.selectedEpisode),
     );
     final sources = ref.watch(episodeDataProvider.select((e) => e.sources));
-    final qualityOptions = ref.watch(
-      episodeDataProvider.select((e) => e.qualityOptions),
-    );
-    final hasSubtitles = ref.watch(
-      episodeDataProvider.select((e) => e.selectedSubtitleIdx != 0),
-    );
 
     final episodeTitle = ref.watch(
       episodeListProvider.select((s) {
@@ -163,7 +155,10 @@ class TopControls extends ConsumerWidget {
                     if (titleOverride != null ||
                         (selectedEp != null && sources.isNotEmpty))
                       Text(
-                        titleOverride ?? episodeTitle ?? 'Episode $selectedEp',
+                        titleOverride ??
+                            (episodeTitle?.trim().isNotEmpty == true
+                                ? 'E$selectedEp — $episodeTitle'
+                                : 'Episode $selectedEp'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -181,43 +176,6 @@ class TopControls extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (!isLocal && onSubtitlePressed != null)
-                    _TopIconButton(
-                      icon:
-                          hasSubtitles
-                              ? Icons.closed_caption_rounded
-                              : Icons.closed_caption_off_rounded,
-                      onTap: _wrap(onSubtitlePressed),
-                      color:
-                          hasSubtitles
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.white,
-                    ),
-
-                  if (!isLocal && qualityOptions.isNotEmpty)
-                    _TopIconButton(
-                      icon: Icons.high_quality_rounded,
-                      onTap: _wrap(onQualityPressed),
-                    ),
-
-                  _TopIconButton(
-                    icon: Icons.aspect_ratio_rounded,
-                    onTap: () {
-                      const fitModes = [
-                        BoxFit.contain,
-                        BoxFit.cover,
-                        BoxFit.fill,
-                      ];
-                      final notifier = ref.read(playerStateProvider.notifier);
-                      final currentFit = ref.read(playerStateProvider).fit;
-                      notifier.setFit(
-                        fitModes[(fitModes.indexOf(currentFit) + 1) %
-                            fitModes.length],
-                      );
-                      onInteraction();
-                    },
-                  ),
-
                   Consumer(
                     builder: (context, ref, _) {
                       final lockMode = ref.watch(orientationLockProvider);
@@ -247,17 +205,6 @@ class TopControls extends ConsumerWidget {
                           onInteraction();
                         },
                       );
-                    },
-                  ),
-
-                  _TopIconButton(
-                    icon: Icons.picture_in_picture_alt_rounded,
-                    tooltip: 'Picture-in-Picture',
-                    onTap: () async {
-                      try {
-                        await ref.read(pipProvider.notifier).enterPiP();
-                      } catch (_) {}
-                      onInteraction();
                     },
                   ),
 
@@ -388,11 +335,16 @@ class TopControls extends ConsumerWidget {
   }
 
   String _getSourceName(WidgetRef ref) {
-    if (!ref.watch(experimentalProvider).useExtensions) {
-      return ref.watch(selectedAnimeProvider)?.providerName ?? "Legacy";
-    } else {
-      return ref.watch(sourceProvider).activeAnimeSource?.name ?? 'Extension';
+    final settings = ref.watch(playerSettingsProvider);
+    if (settings.preferredAudioLanguage == 'hindi') {
+      final id = settings.preferredHindiProvider;
+      final sources = ref.watch(hindiSourceManagerProvider);
+      for (final source in sources) {
+        if (source.id == id) return source.name;
+      }
+      return 'Hindi Auto';
     }
+    return ref.watch(selectedAnimeProvider)?.providerName ?? 'AniDash';
   }
 }
 

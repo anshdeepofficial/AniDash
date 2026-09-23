@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax/iconsax.dart';
+
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
@@ -14,7 +15,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(notificationSettingsProvider);
     final notifier = ref.read(notificationSettingsProvider.notifier);
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,141 +27,113 @@ class NotificationSettingsScreen extends ConsumerWidget {
         forceMaterialTransparency: true,
         actions: [
           IconButton(
-            tooltip: 'Send Test Notification',
+            tooltip: 'Send test notification',
+            icon: const Icon(Icons.notifications_active_outlined),
             onPressed: () async {
               await NotificationService().showTestNotification(
-                title: 'AniDash Notification Test',
-                body: 'Testing tone: "${settings.soundItem.name}"',
+                body: 'Notifications are enabled and using your system sound.',
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Sent test notification with "${settings.soundItem.name}"!',
-                    ),
+                  const SnackBar(
+                    content: Text('Test notification sent.'),
                     behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
                   ),
                 );
               }
             },
-            icon: const Icon(Icons.notifications_active_outlined),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         children: [
-          SettingsSection(
-            title: 'Sound & Ringtone',
-            titleColor: colorScheme.primary,
-            onTap: () {},
-            children: [
-              NormalSettingsItem(
-                icon: Icon(Icons.music_note_rounded, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'Notification Sound',
-                description:
-                    '[${settings.soundItem.anime}] ${settings.soundItem.name} — ${settings.soundItem.description}',
-                onTap: () => context.push('/settings/notifications/sound'),
-              ),
-            ],
+          _section(
+            colors,
+            'Anime News',
+            ToggleableSettingsItem(
+              icon: Icon(Iconsax.document_text, color: colors.primary),
+              accent: colors.primary,
+              title: 'News Notifications',
+              description: 'Anime news and important announcements',
+              value: settings.enableNews,
+              onChanged:
+                  (value) => notifier.updateSettings(
+                    (state) => state.copyWith(enableNews: value),
+                  ),
+            ),
           ),
-          const SizedBox(height: 10),
-          SettingsSection(
-            title: 'Anime News',
-            titleColor: colorScheme.primary,
-            onTap: () {},
-            children: [
-              ToggleableSettingsItem(
-                icon: Icon(Iconsax.document_text, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'News Notifications',
-                description:
-                    'Get notified about the latest anime news and announcements',
-                value: settings.enableNews,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableNews: val),
-                ),
-              ),
-            ],
+          _section(
+            colors,
+            'Episode Releases',
+            ToggleableSettingsItem(
+              icon: Icon(Iconsax.translate, color: colors.primary),
+              accent: colors.primary,
+              title: 'Dub Releases',
+              description: 'English and Hindi dub releases for relevant titles',
+              value: settings.enableDubReleases,
+              onChanged:
+                  (value) => notifier.updateSettings(
+                    (state) => state.copyWith(enableDubReleases: value),
+                  ),
+            ),
+            ToggleableSettingsItem(
+              icon: Icon(Icons.subtitles_rounded, color: colors.primary),
+              accent: colors.primary,
+              title: 'Sub Releases',
+              description: 'Japanese audio with subtitle releases',
+              value: settings.enableSubReleases,
+              onChanged:
+                  (value) => notifier.updateSettings(
+                    (state) => state.copyWith(enableSubReleases: value),
+                  ),
+            ),
           ),
-          const SizedBox(height: 10),
-          SettingsSection(
-            title: 'Episode Releases',
-            titleColor: colorScheme.primary,
-            onTap: () {},
-            children: [
-              ToggleableSettingsItem(
-                icon: Icon(Iconsax.video_play, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'New Episode Alerts',
-                description:
-                    'Notify when new episodes of your watching anime are available',
-                value: settings.enableEpisodeReleases,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableEpisodeReleases: val),
-                ),
-              ),
-              ToggleableSettingsItem(
-                icon: Icon(Iconsax.translate, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'Dub Releases',
-                description:
-                    'Receive notifications when English/Hindi dubs release',
-                value: settings.enableDubReleases,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableDubReleases: val),
-                ),
-              ),
-              ToggleableSettingsItem(
-                icon: Icon(Icons.subtitles_rounded, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'Sub Releases',
-                description:
-                    'Receive notifications when Japanese sub releases',
-                value: settings.enableSubReleases,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableSubReleases: val),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SettingsSection(
-            title: 'Reminders & Downloads',
-            titleColor: colorScheme.primary,
-            onTap: () {},
-            children: [
-              ToggleableSettingsItem(
-                icon: Icon(Iconsax.clock, color: colorScheme.primary),
-                accent: colorScheme.primary,
-                title: 'Continue Watching Reminders',
-                description:
-                    'Reminds you: "You stopped here, watch more!" for paused shows',
-                value: settings.enableContinueWatching,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableContinueWatching: val),
-                ),
-              ),
-              ToggleableSettingsItem(
-                icon: Icon(
-                  Iconsax.document_download,
-                  color: colorScheme.primary,
-                ),
-                accent: colorScheme.primary,
-                title: 'Download Notifications',
-                description:
-                    'Show live download progress and completion notifications',
-                value: settings.enableDownloads,
-                onChanged: (val) => notifier.updateSettings(
-                  (s) => s.copyWith(enableDownloads: val),
-                ),
-              ),
-            ],
+          _section(
+            colors,
+            'Reminders & Downloads',
+            ToggleableSettingsItem(
+              icon: Icon(Iconsax.clock, color: colors.primary),
+              accent: colors.primary,
+              title: 'Continue Watching',
+              description: 'Occasional reminders for unfinished episodes',
+              value: settings.enableContinueWatching,
+              onChanged:
+                  (value) => notifier.updateSettings(
+                    (state) => state.copyWith(enableContinueWatching: value),
+                  ),
+            ),
+            ToggleableSettingsItem(
+              icon: Icon(Iconsax.document_download, color: colors.primary),
+              accent: colors.primary,
+              title: 'Download Notifications',
+              description: 'Download progress and completion status',
+              value: settings.enableDownloads,
+              onChanged:
+                  (value) => notifier.updateSettings(
+                    (state) => state.copyWith(enableDownloads: value),
+                  ),
+            ),
           ),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  Widget _section(
+    ColorScheme colors,
+    String title,
+    Widget first, [
+    Widget? second,
+  ]) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SettingsSection(
+        title: title,
+        titleColor: colors.primary,
+        onTap: () {},
+        children: [first, if (second != null) second],
       ),
     );
   }

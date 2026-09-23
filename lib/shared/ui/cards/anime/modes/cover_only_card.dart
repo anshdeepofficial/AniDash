@@ -22,6 +22,7 @@ class CoverOnlyCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Container(color: Colors.black),
           // Image with Scale Animation
           AnimatedScale(
             scale: isHovered ? 1.1 : 1.0,
@@ -71,7 +72,7 @@ class CoverOnlyCard extends StatelessWidget {
                   colors: [
                     Colors.transparent,
                     Colors.black.withValues(alpha: 0.6),
-                    Colors.black.withValues(alpha: 0.9),
+                    Colors.black,
                   ],
                   stops: const [0.5, 0.8, 1.0],
                 ),

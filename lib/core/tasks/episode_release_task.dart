@@ -12,7 +12,8 @@ class EpisodeReleaseTask {
         cacheOptions: const SharedPreferencesWithCacheOptions(),
       );
       final notifJson = pref.getString('notification_settings_data');
-      if (notifJson != null && notifJson.contains('"enableEpisodeReleases":false')) {
+      if (notifJson != null &&
+          notifJson.contains('"enableContinueWatching":false')) {
         return true;
       }
 
@@ -27,13 +28,25 @@ class EpisodeReleaseTask {
       for (final entry in box.values) {
         if (entry.status == 'watching') {
           // Check for episode reminder
-          if (notifJson == null || !notifJson.contains('"enableContinueWatching":false')) {
+          if (notifJson == null ||
+              !notifJson.contains('"enableContinueWatching":false')) {
             final lastWatched = entry.lastUpdated;
             if (lastWatched != null &&
                 DateTime.now().difference(lastWatched).inDays >= 2) {
+              final reminderKey =
+                  'continue_reminder_${entry.animeId}_${entry.currentEpisode}';
+              final lastReminder = pref.getInt(reminderKey) ?? 0;
+              if (DateTime.now().millisecondsSinceEpoch - lastReminder <
+                  const Duration(days: 7).inMilliseconds) {
+                continue;
+              }
               await NotificationService().showContinueWatchingNotification(
                 animeTitle: entry.animeTitle,
                 episodeNumber: entry.currentEpisode,
+              );
+              await pref.setInt(
+                reminderKey,
+                DateTime.now().millisecondsSinceEpoch,
               );
             }
           }

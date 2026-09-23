@@ -7,6 +7,7 @@ class PlayerGestureHandler extends StatefulWidget {
   final Function(double diff) onLongPressUpdate;
   final VoidCallback onLongPressEnd;
   final VoidCallback? onEpisodesPressed;
+  final ValueChanged<TapDownDetails>? onDoubleTapDown;
 
   const PlayerGestureHandler({
     super.key,
@@ -16,6 +17,7 @@ class PlayerGestureHandler extends StatefulWidget {
     required this.onLongPressUpdate,
     required this.onLongPressEnd,
     required this.onEpisodesPressed,
+    this.onDoubleTapDown,
     this.onVerticalDragStart,
     this.onVerticalDragUpdate,
     this.onVerticalDragEnd,
@@ -71,6 +73,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapUp: _handleTapUp,
+      onDoubleTapDown: widget.onDoubleTapDown,
       onSecondaryTap: widget.onEpisodesPressed,
       onLongPressStart: _onLongPressStart,
       onLongPressMoveUpdate: _onLongPressUpdate,

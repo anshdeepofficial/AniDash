@@ -16,6 +16,7 @@ import 'package:ani_dash/features/details/view/details_screen.dart';
 import 'package:ani_dash/features/error/view/error_screen.dart';
 import 'package:ani_dash/features/home/view/watch_history_screen.dart';
 import 'package:ani_dash/features/news/view/news_screen.dart';
+import 'package:ani_dash/features/notifications/view/notification_inbox_screen.dart';
 import 'package:ani_dash/features/onboarding/view/onboarding_screen.dart';
 import 'package:ani_dash/features/extensions/view/extensions_screen.dart';
 
@@ -39,7 +40,6 @@ import 'package:ani_dash/features/debug/view/debug_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/permissions_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/notification_settings_screen.dart';
-import 'package:ani_dash/features/settings/view/screens/notification_sound_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/security_settings_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
@@ -134,6 +134,10 @@ final routerConfig = GoRouter(
       contentBuilder: (_, _) => const NewsScreen(),
     ),
     AnimatedGoRoute(
+      path: '/notifications',
+      contentBuilder: (_, _) => const NotificationInboxScreen(),
+    ),
+    AnimatedGoRoute(
       path: '/onboarding',
       contentBuilder: (_, _) => const OnboardingScreen(),
     ),
@@ -200,14 +204,18 @@ final routerConfig = GoRouter(
             episode:
                 int.tryParse(state.uri.queryParameters['episode'] ?? '1') ?? 1,
             malId: int.tryParse(state.uri.queryParameters['malId'] ?? ''),
-            startAtPosition:
-                int.tryParse(state.uri.queryParameters['startAtPosition'] ?? ''),
+            startAtPosition: int.tryParse(
+              state.uri.queryParameters['startAtPosition'] ?? '',
+            ),
             forceRefetch: state.uri.queryParameters['forceRefetch'] == 'true',
-            episodes: (state.extra is List<EpisodeDataModel>)
-                ? state.extra as List<EpisodeDataModel>
-                : ((state.extra is List)
-                    ? (state.extra as List).whereType<EpisodeDataModel>().toList()
-                    : const <EpisodeDataModel>[]),
+            episodes:
+                (state.extra is List<EpisodeDataModel>)
+                    ? state.extra as List<EpisodeDataModel>
+                    : ((state.extra is List)
+                        ? (state.extra as List)
+                            .whereType<EpisodeDataModel>()
+                            .toList()
+                        : const <EpisodeDataModel>[]),
           ),
     ),
     AnimatedGoRoute(
@@ -263,12 +271,6 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'notifications',
           contentBuilder: (_, _) => const NotificationSettingsScreen(),
-          routes: [
-            AnimatedGoRoute(
-              path: 'sound',
-              contentBuilder: (_, _) => const NotificationSoundScreen(),
-            ),
-          ],
         ),
         AnimatedGoRoute(
           path: 'watch-history',

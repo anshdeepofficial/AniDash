@@ -29,21 +29,18 @@ final providerStatusProvider = FutureProvider<Map<String, dynamic>>((
       final response = await http
           .get(Uri.parse(provider.baseUrl), headers: headers)
           .timeout(const Duration(seconds: 5));
-      // Any response under 500, or 403/503 Cloudflare protection, indicates the service is alive
-      if (response.statusCode >= 200 && response.statusCode < 500) {
-        statusMap[key] = {'status': 'online'};
-      } else {
-        statusMap[key] = {'status': 'online'};
-      }
-    } catch (e) {
-      // Core built-in providers are maintained and active, do not mark them falsely as offline
-      final isCoreProvider = ['justanime', 'hianime', 'anikoto']
-          .contains(key.toLowerCase());
-      if (isCoreProvider) {
+      // A successful response or an explicit anti-bot challenge proves the
+      // endpoint is reachable. Server failures must not be shown as online.
+      if ((response.statusCode >= 200 && response.statusCode < 400) ||
+          response.statusCode == 401 ||
+          response.statusCode == 403 ||
+          response.statusCode == 429) {
         statusMap[key] = {'status': 'online'};
       } else {
         statusMap[key] = {'status': 'offline'};
       }
+    } catch (e) {
+      statusMap[key] = {'status': 'offline'};
     }
   }));
   

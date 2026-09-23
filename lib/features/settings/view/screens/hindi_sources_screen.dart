@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HindiSourcesScreen extends ConsumerStatefulWidget {
   const HindiSourcesScreen({super.key});
@@ -270,6 +271,29 @@ class _HindiSourcesScreenState extends ConsumerState<HindiSourcesScreen> {
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: CachedNetworkImage(
+                              imageUrl: '${source.baseUrl}/favicon.ico',
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, _, _) => Container(
+                                width: 36,
+                                height: 36,
+                                alignment: Alignment.center,
+                                color: colorScheme.primaryContainer,
+                                child: Text(
+                                  source.name.characters.first.toUpperCase(),
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

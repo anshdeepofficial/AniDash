@@ -8,7 +8,6 @@ import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart'
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
-import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:collection/collection.dart';
 
@@ -328,37 +327,6 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                                             isCompleted: newWatched,
                                             watchedAt: DateTime.now(),
                                           ),
-                                        );
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(
-                                        Icons.refresh_rounded,
-                                        color: Colors.cyanAccent,
-                                      ),
-                                      title: const Text(
-                                        'Refetch Episode',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      subtitle: const Text(
-                                        'Stop playback, clear cached stream, and fetch fresh source',
-                                      ),
-                                      onTap: () {
-                                        Navigator.pop(sheetContext);
-                                        widget.panelAnimation.reverse();
-                                        ref
-                                            .read(playerStateProvider.notifier)
-                                            .stop();
-                                        episodeNotifier.clearEpisodeCache(
-                                          mediaId: widget.mediaId,
-                                          episodeNumber: epNum,
-                                        );
-                                        episodeNotifier.loadEpisode(
-                                          ep: epNum,
-                                          play: true,
-                                          mediaId: widget.mediaId,
                                         );
                                       },
                                     ),

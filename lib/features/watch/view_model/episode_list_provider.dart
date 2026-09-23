@@ -255,6 +255,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                   'Source $altKey found ${altEps.length} episodes!',
                 );
                 state = state.copyWith(animeId: matchId);
+                // Keep the visible source selection, episode list and player
+                // on the same canonical provider after a real fallback.
+                ref.read(selectedProviderKeyProvider.notifier).select(altKey);
                 return altEps;
               }
             }
@@ -335,7 +338,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     }
 
     state = state.copyWith(isJikanSyncing: true);
-    AppLogger.i('Initializing metadata and episode name sync for: ${state.animeTitle}');
+    AppLogger.i(
+      'Initializing metadata and episode name sync for: ${state.animeTitle}',
+    );
 
     // unawaited ensures Riverpod doesn't block while fetching non-critical metadata
     unawaited(
@@ -373,8 +378,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
         for (var i = 0; i < updated.length; i++) {
           final epNum = updated[i].number ?? (i + 1);
           final isFiller =
-              fillerInfo.fillers.contains(epNum) ||
-              updated[i].isFiller == true;
+              fillerInfo.fillers.contains(epNum) || updated[i].isFiller == true;
           final isMixed = fillerInfo.mixed.contains(epNum);
           if (isFiller != (updated[i].isFiller ?? false) ||
               isMixed != (updated[i].isMixed ?? false)) {
@@ -418,7 +422,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       // 2. Direct AniList ID lookup (JustAnime uses exact AniList IDs for all anime)
       if (justAnimeEps == null && mediaId != null && mediaId.isNotEmpty) {
         try {
-          AppLogger.d('Enriching episode names via JustAnime direct AniList ID: $mediaId');
+          AppLogger.d(
+            'Enriching episode names via JustAnime direct AniList ID: $mediaId',
+          );
           final res = await justAnime
               .getEpisodes(mediaId)
               .timeout(const Duration(seconds: 15));
@@ -435,30 +441,31 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       // 3. Fallback: Search JustAnime by cleaned title
       if (justAnimeEps == null || justAnimeEps.isEmpty) {
         try {
-          final cleanTitle = currentTitle
-              .replaceAll(
-                RegExp(
-                  r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)',
-                  caseSensitive: false,
-                ),
-                '',
-              )
-              .replaceAll(
-                RegExp(
-                  r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]',
-                  caseSensitive: false,
-                ),
-                '',
-              )
-              .replaceAll(
-                RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false),
-                '',
-              )
-              .replaceAll('-', ' ')
-              .replaceAll(':', ' ')
-              .replaceAll(RegExp(r'[^\w\s]'), ' ')
-              .replaceAll(RegExp(r'\s+'), ' ')
-              .trim();
+          final cleanTitle =
+              currentTitle
+                  .replaceAll(
+                    RegExp(
+                      r'\s*\((?:Dub|Sub|TV|Audio|Uncensored)[^)]*\)',
+                      caseSensitive: false,
+                    ),
+                    '',
+                  )
+                  .replaceAll(
+                    RegExp(
+                      r'\s*\[(?:Dub|Sub|TV|Audio|Uncensored)[^\]]*\]',
+                      caseSensitive: false,
+                    ),
+                    '',
+                  )
+                  .replaceAll(
+                    RegExp(r'\s*-\s*(?:Dub|Sub)$', caseSensitive: false),
+                    '',
+                  )
+                  .replaceAll('-', ' ')
+                  .replaceAll(':', ' ')
+                  .replaceAll(RegExp(r'[^\w\s]'), ' ')
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .trim();
 
           final searchTitle = cleanTitle.isNotEmpty ? cleanTitle : currentTitle;
           AppLogger.d('Searching JustAnime for episode names: "$searchTitle"');
@@ -467,7 +474,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
               .getSearch(searchTitle, null, 1)
               .timeout(const Duration(seconds: 10));
           if (searchPage.results.isNotEmpty) {
-            final match = searchPage.results.firstWhereOrNull(
+            final match =
+                searchPage.results.firstWhereOrNull(
                   (r) => r.id == mediaId || r.anilistId?.toString() == mediaId,
                 ) ??
                 searchPage.results.firstOrNull;
@@ -480,7 +488,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
               if (res.episodes != null && res.episodes!.isNotEmpty) {
                 justAnimeEps = res.episodes;
                 _justAnimeTitlesCache[cacheKey] = res.episodes!;
-                if (mediaId != null) _justAnimeTitlesCache[mediaId] = res.episodes!;
+                if (mediaId != null) {
+                  _justAnimeTitlesCache[mediaId] = res.episodes!;
+                }
               }
             }
           }
@@ -511,17 +521,24 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
           // Title: enrich if current is generic or if JustAnime has a real title
           final currentEpTitle = ep.title?.trim() ?? '';
-          final isCurrentGeneric = currentEpTitle.isEmpty ||
-              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
-                  .hasMatch(currentEpTitle);
+          final isCurrentGeneric =
+              currentEpTitle.isEmpty ||
+              RegExp(
+                r'^(episode|ep\.?)\s*\d+$',
+                caseSensitive: false,
+              ).hasMatch(currentEpTitle);
 
           final justTitle = justEp.title?.trim();
-          final isJustGeneric = justTitle == null ||
+          final isJustGeneric =
+              justTitle == null ||
               justTitle.isEmpty ||
-              RegExp(r'^(episode|ep\.?)\s*\d+$', caseSensitive: false)
-                  .hasMatch(justTitle);
+              RegExp(
+                r'^(episode|ep\.?)\s*\d+$',
+                caseSensitive: false,
+              ).hasMatch(justTitle);
 
-          if (!isJustGeneric && (isCurrentGeneric || currentEpTitle != justTitle)) {
+          if (!isJustGeneric &&
+              (isCurrentGeneric || currentEpTitle != justTitle)) {
             ep = ep.copyWith(title: justTitle);
             modified = true;
             enrichedCount++;

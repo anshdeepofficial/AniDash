@@ -11,7 +11,12 @@ import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class SettingsSheetContent extends ConsumerWidget {
   final VoidCallback onDismiss;
-  const SettingsSheetContent({super.key, required this.onDismiss});
+  final VoidCallback? onSubtitlesPressed;
+  const SettingsSheetContent({
+    super.key,
+    required this.onDismiss,
+    this.onSubtitlesPressed,
+  });
 
   void _showDialog(
     BuildContext context, {
@@ -52,10 +57,23 @@ class SettingsSheetContent extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Settings",
+                "More",
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const Divider(height: 24),
+              if (onSubtitlesPressed != null)
+                ListTile(
+                  leading: const Icon(Icons.subtitles_rounded),
+                  title: const Text('Subtitles'),
+                  subtitle: const Text('Select, disable, or load a subtitle'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Future<void>.delayed(
+                      Duration.zero,
+                      onSubtitlesPressed,
+                    );
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.high_quality_rounded),
                 title: const Text("Video Quality"),
@@ -386,7 +404,7 @@ class SettingsSheetContent extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Iconsax.timer_1),
                 title: const Text("Jump to Time"),
-                subtitle: const Text("Seek to a specific time (VLC style)"),
+                subtitle: const Text("Seek to a specific time"),
                 trailing: Text(
                   _formatDuration(
                     ref.watch(playerStateProvider.select((p) => p.position)),

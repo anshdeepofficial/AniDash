@@ -113,6 +113,8 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                         displayedAnime.coverImage.medium ??
                         '',
                     fromHentaiHub: widget.fromHentaiHub,
+                    relations: displayedAnime.relations,
+                    onSeasonSelected: _onMediaTap,
                   ),
                 ),
                 _KeepAliveWrapper(

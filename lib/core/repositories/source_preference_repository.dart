@@ -53,4 +53,10 @@ class SourcePreferenceRepository {
   IsarSourcePreference? getSourcePreference(String animeId) {
     return isar.isarSourcePreferences.getSync(fastHash(animeId));
   }
+
+  Future<void> clearSourcePreference(String animeId) async {
+    await isar.writeTxn(() async {
+      await isar.isarSourcePreferences.delete(fastHash(animeId));
+    });
+  }
 }

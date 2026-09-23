@@ -21,6 +21,7 @@ class MinimalCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Container(color: Colors.black),
           AnimeImage(anime: anime, tag: tag, height: double.infinity),
           // Info overlay that fades in
           Container(
@@ -30,7 +31,7 @@ class MinimalCard extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(alpha: 0.9),
+                  Colors.black,
                 ],
                 stops: const [0.5, 1.0],
               ),

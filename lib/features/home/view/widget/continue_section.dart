@@ -15,6 +15,7 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
+import 'package:ani_dash/core/repositories/source_preference_repository.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
 
 class ContinueSection extends ConsumerWidget {
@@ -566,7 +567,34 @@ class ContinueSection extends ConsumerWidget {
                         .downloadEpisode(context, targetEpNum);
                   },
                 ),
-                // 5. Remove from Continue Watching
+                ListTile(
+                  leading: Icon(
+                    Icons.refresh_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('Refresh source match'),
+                  subtitle: const Text(
+                    'Clear the saved stream match and resolve it again',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await ref
+                        .read(sourcePreferenceRepositoryProvider)
+                        .clearSourcePreference(entry.animeId);
+                    ref.read(episodeDataProvider.notifier).clearEpisodeCache(
+                          mediaId: entry.animeId,
+                          episodeNumber: targetEpNum,
+                        );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Source match will refresh on next play.'),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                // Remove from Continue Watching
                 ListTile(
                   leading: Icon(
                     Iconsax.close_circle,

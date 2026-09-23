@@ -11,7 +11,6 @@ import 'package:ani_dash/core/models/settings/update_settings_model.dart';
 import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
-import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
 
 class UpdateScreen extends ConsumerStatefulWidget {
   const UpdateScreen({super.key});
@@ -40,7 +39,9 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
 
     if (updateInfo != null) {
       try {
-        await NotificationService().showUpdateAvailableNotification(updateInfo.version);
+        await NotificationService().showUpdateAvailableNotification(
+          updateInfo.version,
+        );
       } catch (_) {}
       if (!mounted) return;
       showUpdateBottomSheet(
@@ -100,7 +101,10 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                       children: const [
                         Text(
                           'Notification Permission Needed',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         SizedBox(height: 2),
                         Text(
@@ -180,16 +184,23 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   icon: Icon(Iconsax.clock, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'Run 24 Hours',
-                  description: settings.fullDay
-                      ? 'Continuously checking round the clock (Custom window disabled)'
-                      : 'Continuously check for updates round the clock',
+                  description:
+                      settings.fullDay
+                          ? 'Continuously checking round the clock (Custom window disabled)'
+                          : 'Continuously check for updates round the clock',
                   value: settings.fullDay,
                   onChanged: (value) {
                     notifier.updateSettings(
                       (state) => state.copyWith(
                         fullDay: value,
-                        startHour: state.startHour == state.endHour ? 20 : state.startHour,
-                        endHour: state.startHour == state.endHour ? 6 : state.endHour,
+                        startHour:
+                            state.startHour == state.endHour
+                                ? 20
+                                : state.startHour,
+                        endHour:
+                            state.startHour == state.endHour
+                                ? 6
+                                : state.endHour,
                       ),
                     );
                   },
@@ -226,47 +237,6 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   hour: settings.endHour,
                   is24HourMode: settings.fullDay,
                   onTap: () => _pickEndHour(context, settings, notifier),
-                ),
-                NormalSettingsItem(
-                  icon: Icon(Icons.music_note_rounded, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Notification Tone',
-                  description:
-                      '${ref.watch(notificationSettingsProvider).soundItem.name} — tap to change ringtone',
-                  onTap: () => context.push('/settings/notifications/sound'),
-                ),
-                NormalSettingsItem(
-                  icon: Icon(Iconsax.notification_bing, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Send Test Notification',
-                  description: 'Test notification sound, vibration, and actions',
-                  trailingWidgets: [
-                    FilledButton.tonal(
-                      onPressed: () async {
-                        await NotificationService().showUpdateAvailableNotification('9.9.9 (Test)');
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Test notification sent! Check your notification bar.'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Test'),
-                    ),
-                  ],
-                  onTap: () async {
-                    await NotificationService().showUpdateAvailableNotification('9.9.9 (Test)');
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Test notification sent! Check your notification bar.'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  },
                 ),
               ],
             ],
@@ -327,11 +297,7 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
     if (time.hour == settings.endHour) {
       // User selected 24-hour window: automatically switch to 24-hour mode and keep 8 PM - 6 AM
       notifier.updateSettings(
-        (state) => state.copyWith(
-          fullDay: true,
-          startHour: 20,
-          endHour: 6,
-        ),
+        (state) => state.copyWith(fullDay: true, startHour: 20, endHour: 6),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -363,11 +329,7 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
     if (time.hour == settings.startHour) {
       // User selected 24-hour window: automatically switch to 24-hour mode and keep 8 PM - 6 AM
       notifier.updateSettings(
-        (state) => state.copyWith(
-          fullDay: true,
-          startHour: 20,
-          endHour: 6,
-        ),
+        (state) => state.copyWith(fullDay: true, startHour: 20, endHour: 6),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

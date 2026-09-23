@@ -22,9 +22,10 @@ Future<void> checkForUpdates(
   bool useTestReleases = false,
 }) async {
   try {
-    final repo = useTestReleases
-        ? 'anshdeepofficial/Anidash-test-releases'
-        : 'anshdeepofficial/Anidash';
+    final repo =
+        useTestReleases
+            ? 'anshdeepofficial/Anidash-test-releases'
+            : 'anshdeepofficial/Anidash';
 
     final pageSize = (includeBeta || includeAlpha) ? 5 : 1;
     final url = Uri.parse(
@@ -152,11 +153,27 @@ UpdateType _determineUpdateType(String tag, bool prerelease) {
 }
 
 bool _isNewerVersion(String latestTag, String currentVersion) {
-  final cleanLatest = latestTag.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
-  final cleanCurrent = currentVersion.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
+  final cleanLatest =
+      latestTag
+          .replaceAll(RegExp(r'^v'), '')
+          .split('+')
+          .first
+          .split('-')
+          .first
+          .trim();
+  final cleanCurrent =
+      currentVersion
+          .replaceAll(RegExp(r'^v'), '')
+          .split('+')
+          .first
+          .split('-')
+          .first
+          .trim();
 
-  final lParts = cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-  final cParts = cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  final lParts =
+      cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  final cParts =
+      cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
   while (lParts.length < 3) lParts.add(0);
   while (cParts.length < 3) cParts.add(0);
@@ -182,7 +199,7 @@ bool _isNewerVersion(String latestTag, String currentVersion) {
   return false;
 }
 
-void showUpdateBottomSheet(
+Future<void> showUpdateBottomSheet(
   BuildContext context,
   String latestVersion,
   String currentVersion,
@@ -190,20 +207,21 @@ void showUpdateBottomSheet(
   String? releaseNotes,
   String? apkDownloadUrl,
 }) {
-  showGeneralDialog(
+  return showGeneralDialog<void>(
     context: context,
     useRootNavigator: true,
     barrierDismissible: true,
     barrierLabel: 'Dismiss',
     barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, animation, secondaryAnimation) => UpdateDialog(
-      latestVersion: latestVersion,
-      currentVersion: currentVersion,
-      type: type,
-      releaseNotes: releaseNotes,
-      apkDownloadUrl: apkDownloadUrl,
-    ),
+    pageBuilder:
+        (context, animation, secondaryAnimation) => UpdateDialog(
+          latestVersion: latestVersion,
+          currentVersion: currentVersion,
+          type: type,
+          releaseNotes: releaseNotes,
+          apkDownloadUrl: apkDownloadUrl,
+        ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curvedAnimation = CurvedAnimation(
         parent: animation,

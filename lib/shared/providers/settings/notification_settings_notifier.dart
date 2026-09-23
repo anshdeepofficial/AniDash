@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/settings/notification_settings_model.dart';
-import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/main.dart';
 
 final notificationSettingsProvider =
@@ -21,8 +20,7 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettingsModel> {
         return NotificationSettingsModel.fromJson(map);
       } catch (_) {}
     }
-    final soundId = sharedPrefs.getString('notification_sound_id') ?? 'anidash_biwa';
-    return NotificationSettingsModel(soundId: soundId);
+    return const NotificationSettingsModel();
   }
 
   void updateSettings(
@@ -30,11 +28,5 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettingsModel> {
   ) {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, jsonEncode(state.toJson()));
-    sharedPrefs.setString('notification_sound_id', state.soundId);
-    NotificationService().ensureSoundChannelsCreated(state.soundId);
-  }
-
-  void setSound(String soundId) {
-    updateSettings((s) => s.copyWith(soundId: soundId));
   }
 }

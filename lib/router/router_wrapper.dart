@@ -69,6 +69,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     with WidgetsBindingObserver {
   late final PageController _pageController;
   bool _updateCheckInProgress = false;
+  bool _updateSheetVisible = false;
   DateTime? _lastForegroundUpdateCheck;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _foregroundUpdateTimer;
@@ -85,14 +86,16 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     _pageController = PageController(
       initialPage: widget.navigationShell.currentIndex,
     );
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       if (results.any((r) => r != ConnectivityResult.none)) {
         OfflineSyncQueueService.flushQueue(ref);
       }
     });
-    _updateTapSubscription =
-        NotificationService().onUpdateTapped.listen((version) {
+    _updateTapSubscription = NotificationService().onUpdateTapped.listen((
+      version,
+    ) {
       if (mounted) {
         _checkForScheduledUpdate(isAppOpen: true, force: true);
       }
@@ -103,7 +106,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _openDownloadsOffline();
       try {
-        await ref.read(permissionsProvider.notifier).requestNotificationPermission();
+        await ref
+            .read(permissionsProvider.notifier)
+            .requestNotificationPermission();
       } catch (_) {}
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) _checkForScheduledUpdate(isAppOpen: true);
@@ -178,13 +183,24 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         // Check if user snoozed ("Remind in 1 hour" or "Skip for today")
         final remindAfter = prefs.getInt('remind_update_after') ?? 0;
         final remindVersion = prefs.getString('remind_update_version');
-        final isSnoozed = !force &&
+        final isSnoozed =
+            !force &&
             remindVersion == latest &&
             now.millisecondsSinceEpoch < remindAfter;
 
         if (isSnoozed) {
           return;
         }
+
+        // A foreground timer, app-resume callback and the background worker can
+        // all discover the same release. Present it at most once per 24 hours.
+        final lastPresentedVersion = prefs.getString('last_presented_update');
+        final lastPresentedAt = prefs.getInt('last_presented_update_time') ?? 0;
+        final wasRecentlyPresented =
+            lastPresentedVersion == latest &&
+            now.millisecondsSinceEpoch - lastPresentedAt <
+                const Duration(hours: 24).inMilliseconds;
+        if (!force && (wasRecentlyPresented || _updateSheetVisible)) return;
 
         if (remindAfter != 0 && now.millisecondsSinceEpoch >= remindAfter) {
           await prefs.remove('remind_update_after');
@@ -195,20 +211,33 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         try {
           await NotificationService().showUpdateAvailableNotification(latest);
         } catch (notifErr) {
-          AppLogger.w('Notification post encountered non-fatal error: $notifErr');
+          AppLogger.w(
+            'Notification post encountered non-fatal error: $notifErr',
+          );
         }
 
         // Also trigger the in-app update dialog so the user sees it immediately on screen
         final packageInfo = await PackageInfo.fromPlatform();
         if (!mounted) return;
-        showUpdateBottomSheet(
-          context,
-          updateInfo.version,
-          packageInfo.version,
-          UpdateType.stable,
-          releaseNotes: updateInfo.releaseNotes,
-          apkDownloadUrl: updateInfo.downloadUrl,
+        _updateSheetVisible = true;
+        await prefs.setString('last_presented_update', latest);
+        await prefs.setInt(
+          'last_presented_update_time',
+          now.millisecondsSinceEpoch,
         );
+        if (!mounted) return;
+        try {
+          await showUpdateBottomSheet(
+            context,
+            updateInfo.version,
+            packageInfo.version,
+            UpdateType.stable,
+            releaseNotes: updateInfo.releaseNotes,
+            apkDownloadUrl: updateInfo.downloadUrl,
+          );
+        } finally {
+          _updateSheetVisible = false;
+        }
       }
     } catch (e) {
       AppLogger.w('Update check encountered error: $e');
@@ -239,7 +268,6 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       );
     }
   }
-
 
   void _onPageChanged(int index) {
     if (index != widget.navigationShell.currentIndex) {

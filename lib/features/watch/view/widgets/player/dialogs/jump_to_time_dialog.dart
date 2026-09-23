@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-/// A VLC-inspired dialog allowing users to seek or jump directly to a specific timestamp.
+/// A dialog allowing users to seek or jump directly to a specific timestamp.
 /// Supports both in-player seeking and jumping into playback from Continue Watching.
 class JumpToTimeDialog extends StatefulWidget {
   final Duration currentPosition;

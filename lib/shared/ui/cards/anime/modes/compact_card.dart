@@ -24,6 +24,7 @@ class CompactCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Container(color: Colors.black),
           AnimeImage(anime: anime, tag: tag, height: double.infinity),
 
           // Rating Tag (Top Right)
@@ -64,7 +65,7 @@ class CompactCard extends StatelessWidget {
                 colors: [
                   Colors.transparent,
                   Colors.black.withValues(alpha: 0.5),
-                  Colors.black.withValues(alpha: 0.9),
+                  Colors.black,
                 ],
                 stops: const [0.5, 0.8, 1.0],
               ),

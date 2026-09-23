@@ -15,6 +15,7 @@ class ControlsOverlay extends ConsumerWidget {
   final VoidCallback onQualityPressed;
   final VoidCallback onSourcePressed;
   final VoidCallback onServerPressed;
+  final VoidCallback onAudioPressed;
   final VoidCallback onSubtitlePressed;
   final VoidCallback onFullScreenPressed;
   final String? localTitle;
@@ -31,6 +32,7 @@ class ControlsOverlay extends ConsumerWidget {
     required this.onQualityPressed,
     required this.onSourcePressed,
     required this.onServerPressed,
+    required this.onAudioPressed,
     required this.onSubtitlePressed,
     required this.onFullScreenPressed,
     this.localTitle,
@@ -118,6 +120,7 @@ class ControlsOverlay extends ConsumerWidget {
               onSourcePressed: onSourcePressed,
               onSubtitlePressed: onSubtitlePressed,
               onServerPressed: onServerPressed,
+              onAudioPressed: onAudioPressed,
               onFullScreenPressed: onFullScreenPressed,
               isLocal: isLocal,
             ),

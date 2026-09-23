@@ -10,7 +10,7 @@ import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/features/home/view/widget/search_model.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/core/utils/greeting_methods.dart';
-
+import 'package:ani_dash/core/services/notification_inbox_service.dart';
 
 class HeaderSection extends ConsumerWidget {
   final bool isDesktop;
@@ -76,7 +76,8 @@ class HeaderSection extends ConsumerWidget {
                 ),
                 const Spacer(),
                 const _NewsActionBadge(),
-
+                const SizedBox(width: 8),
+                const _NotificationInboxButton(),
                 const SizedBox(width: 8),
                 _ActionButton(
                   icon: Icons.settings_outlined,
@@ -189,9 +190,10 @@ class UserProfileCard extends StatelessWidget {
 
     return _HeaderBaseCard(
       color: theme.colorScheme.surface,
-      onTap: () => context.push(
-        user != null ? '/settings/account/profile' : '/settings/account',
-      ),
+      onTap:
+          () => context.push(
+            user != null ? '/settings/account/profile' : '/settings/account',
+          ),
       child: Row(
         children: [
           _UserAvatar(user: user),
@@ -255,10 +257,11 @@ class _UserAvatar extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorWidget: (_, _, _) => Container(
-            color: decoration.color,
-            child: const Icon(Icons.person),
-          ),
+          errorWidget:
+              (_, _, _) => Container(
+                color: decoration.color,
+                child: const Icon(Icons.person),
+              ),
           placeholder: (_, _) => Container(color: decoration.color),
         ),
       ),
@@ -292,7 +295,8 @@ class ActionPanel extends StatelessWidget {
         children: [
           if (!isDesktop) ...[
             const _NewsActionBadge(),
-
+            const SizedBox(width: 8),
+            const _NotificationInboxButton(),
             const SizedBox(width: 8),
           ],
           const _ActionButton(icon: Iconsax.setting_2, route: '/settings'),
@@ -302,16 +306,34 @@ class ActionPanel extends StatelessWidget {
   }
 }
 
+class _NotificationInboxButton extends StatelessWidget {
+  const _NotificationInboxButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<int>(
+      future: NotificationInboxService().unreadCount(),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return Badge(
+          isLabelVisible: count > 0,
+          label: Text(count > 99 ? '99+' : '$count'),
+          child: _ActionButton(
+            icon: Icons.notifications_none_rounded,
+            onTap: () => context.push('/notifications'),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String? route;
   final VoidCallback? onTap;
 
-  const _ActionButton({
-    required this.icon,
-    this.route,
-    this.onTap,
-  });
+  const _ActionButton({required this.icon, this.route, this.onTap});
 
   @override
   Widget build(BuildContext context) {

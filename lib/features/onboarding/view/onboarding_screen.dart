@@ -20,6 +20,8 @@ import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/update_provider.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
+import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -28,10 +30,31 @@ class OnboardingScreen extends ConsumerStatefulWidget {
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
+class _OnboardingBenefit extends StatelessWidget {
+  const _OnboardingBenefit({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+}
+
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _totalPages = Platform.isAndroid ? 8 : 7;
+  final int _totalPages = Platform.isAndroid ? 9 : 8;
 
   @override
   void dispose() {
@@ -103,6 +126,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) => setState(() => _currentPage = index),
                 children: [
+                  _buildIntroStep(context),
                   _buildAuthStep(context),
                   _buildThemeStep(context, ref),
                   _buildSourceStep(context, ref),
@@ -191,23 +215,98 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildAuthStep(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(
-          context,
-          'Welcome to\nAniDash',
-          'Your ultimate anime destination. Sign in to sync your progress.',
-        ),
-        const Expanded(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: AccountAuthenticationSection(),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(
+            context,
+            'Connect your\naccount',
+            'Optional, but useful when you want your progress everywhere.',
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: AccountAuthenticationSection(),
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Card(
+              elevation: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Why connect?',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const _OnboardingBenefit(
+                      icon: Icons.sync_rounded,
+                      text: 'Sync watch progress with AniList',
+                    ),
+                    const _OnboardingBenefit(
+                      icon: Icons.devices_rounded,
+                      text: 'Keep your library across devices',
+                    ),
+                    const _OnboardingBenefit(
+                      icon: Icons.cloud_off_rounded,
+                      text: 'Skip now and use AniDash completely locally',
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntroStep(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: Icon(
+              Icons.play_circle_fill_rounded,
+              size: 68,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(height: 34),
+          Text(
+            'Welcome to AniDash',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Discover anime, choose your preferred language and provider, download episodes, and continue exactly where you stopped.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -318,6 +417,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final registry = ref.read(animeSourceRegistryProvider);
     final animeSources = preferredOrder.where(registry.has).toList();
     final providerStatus = ref.watch(providerStatusProvider);
+    final hindiSources =
+        ref
+            .watch(hindiSourceManagerProvider)
+            .where(
+              (source) =>
+                  source.enabled &&
+                  source.status != 'experimental' &&
+                  source.isHealthy != false,
+            )
+            .toList();
+    final playerSettings = ref.watch(playerSettingsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,9 +442,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             data:
                 (statusData) => ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: animeSources.length,
+                  itemCount: animeSources.length + hindiSources.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
+                    if (index >= animeSources.length) {
+                      final source = hindiSources[index - animeSources.length];
+                      final selected =
+                          playerSettings.preferredAudioLanguage == 'hindi' &&
+                          playerSettings.preferredHindiProvider == source.id;
+                      return SelectableSettingsItem(
+                        icon: const Icon(Icons.language_rounded),
+                        iconColor: Colors.green,
+                        accent: Colors.green,
+                        title: source.name.toUpperCase(),
+                        description: 'HINDI  •  ${source.status.toUpperCase()}',
+                        isInSelectionMode: true,
+                        isSelected: selected,
+                        onTap: () {
+                          final notifier = ref.read(
+                            playerSettingsProvider.notifier,
+                          );
+                          notifier.setPreferredAudioLanguage('hindi');
+                          notifier.setPreferredHindiProvider(source.id);
+                        },
+                      );
+                    }
                     final provider = animeSources[index];
                     final status = statusData[provider]?['status'] as String?;
                     final isSelected =
@@ -355,10 +487,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               : status?.toUpperCase() ?? 'UNKNOWN',
                       isInSelectionMode: true,
                       isSelected: isSelected,
-                      onTap:
-                          () => ref
-                              .read(selectedProviderKeyProvider.notifier)
-                              .select(provider),
+                      onTap: () {
+                        ref
+                            .read(selectedProviderKeyProvider.notifier)
+                            .select(provider);
+                        ref
+                            .read(playerSettingsProvider.notifier)
+                            .setPreferredAudioLanguage('sub');
+                      },
                     );
                   },
                 ),

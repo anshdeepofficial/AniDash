@@ -7,7 +7,6 @@ import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
-import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/helpers/anime_match_search.dart';
@@ -52,6 +51,8 @@ class EpisodesTab extends ConsumerStatefulWidget {
   final String mediaFormat;
   final String mediaCover;
   final bool fromHentaiHub;
+  final List<UniversalMediaRelation> relations;
+  final ValueChanged<UniversalMedia>? onSeasonSelected;
 
   const EpisodesTab({
     super.key,
@@ -61,6 +62,8 @@ class EpisodesTab extends ConsumerStatefulWidget {
     required this.mediaFormat,
     required this.mediaCover,
     this.fromHentaiHub = false,
+    this.relations = const [],
+    this.onSeasonSelected,
   });
 
   @override
@@ -406,6 +409,30 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
 
     final exposedName = state.bestMatchName;
     final theme = Theme.of(context);
+    final seasonRelations = widget.relations
+        .where((relation) {
+          final relationType = relation.relationType.toUpperCase();
+          final format = relation.media.format?.toUpperCase() ?? '';
+          const excludedFormats = {
+            'MOVIE',
+            'OVA',
+            'ONA',
+            'SPECIAL',
+            'TV_SHORT',
+            'MUSIC',
+            'MANGA',
+            'NOVEL',
+            'ONE_SHOT',
+          };
+          return (relationType == 'SEQUEL' || relationType == 'PREQUEL') &&
+              !excludedFormats.contains(format);
+        })
+        .toList()
+      ..sort(
+        (a, b) => (a.media.seasonYear ?? 9999).compareTo(
+          b.media.seasonYear ?? 9999,
+        ),
+      );
 
     List<EpisodeDataModel> visibleEpisodes = episodes;
     if (state.selectedRange != 'All') {
@@ -498,7 +525,20 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'MATCHED ( by ${ref.watch(experimentalProvider).useExtensions ? ref.read(sourceProvider).activeAnimeSource?.name : ref.read(selectedAnimeProvider)?.providerName} )',
+                          () {
+                            final playerSettings = ref.watch(playerSettingsProvider);
+                            if (playerSettings.preferredAudioLanguage == 'hindi') {
+                              final preferred = HindiSourcePreferences.instance.getPreferredProvider();
+                              final hindiSources = ref.watch(hindiSourceManagerProvider);
+                              final matchedSource = hindiSources.firstWhereOrNull((s) => s.id == preferred) ??
+                                  hindiSources.firstWhereOrNull((s) => s.enabled);
+                              return 'MATCHED ( by ${matchedSource?.name ?? "Hindi"} )';
+                            }
+                            final sourceName = ref.watch(experimentalProvider).useExtensions
+                                ? ref.read(sourceProvider).activeAnimeSource?.name
+                                : ref.read(selectedAnimeProvider)?.providerName;
+                            return 'MATCHED ( by ${sourceName ?? "Unknown"} )';
+                          }(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
@@ -543,6 +583,59 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               ),
             ),
           ),
+
+          if (seasonRelations.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seasons',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 38,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text('Current'),
+                              selected: true,
+                              onSelected: null,
+                            ),
+                          ),
+                          ...seasonRelations.map(
+                            (relation) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ActionChip(
+                                label: Text(
+                                  relation.media.title.english ??
+                                      relation.media.title.romaji ??
+                                      relation.media.title.native ??
+                                      relation.relationType,
+                                ),
+                                onPressed: widget.onSeasonSelected == null
+                                    ? null
+                                    : () => widget.onSeasonSelected!(
+                                          relation.media,
+                                        ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           if (continueEpisode != null && !loading && episodes.isNotEmpty)
             SliverToBoxAdapter(
@@ -1556,6 +1649,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             ref.read(selectedProviderKeyProvider.notifier).clear();
             ref.read(sourceProvider.notifier).setActiveSource(source);
             ref.read(experimentalProvider.notifier).toggleExtensions(true);
+            if (ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi') {
+              ref.read(playerSettingsProvider.notifier).updateSettings(
+                    (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
+                  );
+            }
             Navigator.pop(context);
             notifier.refresh();
           },
@@ -1605,13 +1703,28 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 (preferredProvider == 'auto' && index == 0));
 
         return ListTile(
-          leading: CircleAvatar(
-            radius: 20,
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: Icon(
-              Icons.language,
-              color: Theme.of(context).colorScheme.primary,
-              size: 20,
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: '/favicon.ico',
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                color: Theme.of(context).colorScheme.primaryContainer,
+                child: Text(
+                  source.name.isNotEmpty
+                      ? source.name.characters.first.toUpperCase()
+                      : 'H',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
           ),
           title: Text(source.name),
@@ -1821,48 +1934,6 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         ),
                         behavior: SnackBarBehavior.floating,
                       ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.refresh_rounded,
-                    color: Colors.cyanAccent,
-                  ),
-                  title: const Text(
-                    'Refetch Episode',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text(
-                    'Stop playback, clear cached stream, and fetch fresh source',
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    // 1. Stop current player playback
-                    ref.read(playerStateProvider.notifier).stop();
-                    // 2. Clear cache for this episode and anime
-                    ref.read(episodeDataProvider.notifier).clearEpisodeCache(
-                          mediaId: widget.mediaId,
-                          episodeNumber: epNum,
-                        );
-                    // 3. Navigate to watch screen with forceRefetch: true
-                    final allEpisodes = ref.read(episodeListProvider).episodes;
-                    final state = ref.read(detailsPageProvider(widget.mediaId));
-                    final animeIdForSource = state.animeIdForSource ?? '';
-                    navigateToWatch(
-                      mediaId: widget.mediaId,
-                      animeId: animeIdForSource,
-                      animeName: (widget.mediaTitle.english ??
-                          widget.mediaTitle.romaji ??
-                          widget.mediaTitle.native)!,
-                      animeFormat: widget.mediaFormat,
-                      animeCover: widget.mediaCover,
-                      context: context,
-                      episodes: allEpisodes.isNotEmpty ? allEpisodes : [episode],
-                      currentEpisode: epNum,
-                      malId: widget.malId,
-                      fromHentaiHub: widget.fromHentaiHub,
-                      forceRefetch: true,
                     );
                   },
                 ),

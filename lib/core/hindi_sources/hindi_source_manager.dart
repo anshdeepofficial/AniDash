@@ -19,10 +19,12 @@ import 'providers/animelok.dart';
 
 final hindiSourceManagerProvider =
     NotifierProvider<HindiSourceManagerNotifier, List<HindiSourceModel>>(
-  HindiSourceManagerNotifier.new,
-);
+      HindiSourceManagerNotifier.new,
+    );
 
 class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
+  final Map<String, ({int? count, DateTime checkedAt})>
+      _episodeCountCache = {};
   @override
   List<HindiSourceModel> build() {
     Future.microtask(() => init());
@@ -49,21 +51,24 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
       await _cache.init();
 
       // 1. Load bundled registry
-      final bundledRaw =
-          await rootBundle.loadString('assets/sources/hindi_sources.json');
+      final bundledRaw = await rootBundle.loadString(
+        'assets/sources/hindi_sources.json',
+      );
       final decoded = json.decode(bundledRaw) as Map<String, dynamic>;
       final rawList = decoded['sources'] as List<dynamic>? ?? [];
 
-      var models = rawList
-          .map((m) => HindiSourceModel.fromMap(m as Map<String, dynamic>))
-          .toList();
+      var models =
+          rawList
+              .map((m) => HindiSourceModel.fromMap(m as Map<String, dynamic>))
+              .toList();
 
       // 2. Apply user custom enabled/disabled status
       final enabledMap = _prefs.getEnabledMap();
-      models = models.map((m) {
-        final userPref = enabledMap[m.id];
-        return userPref != null ? m.copyWith(enabled: userPref) : m;
-      }).toList();
+      models =
+          models.map((m) {
+            final userPref = enabledMap[m.id];
+            return userPref != null ? m.copyWith(enabled: userPref) : m;
+          }).toList();
 
       // 3. Apply user custom ordering
       final userOrder = _prefs.getOrder();
@@ -93,7 +98,11 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
       // 4. Background non-blocking remote registry check
       _syncRemoteRegistry();
     } catch (e, stack) {
-      AppLogger.e('[Hindi Manager] Init failed, using fallback defaults', e, stack);
+      AppLogger.e(
+        '[Hindi Manager] Init failed, using fallback defaults',
+        e,
+        stack,
+      );
       state = [
         const HindiSourceModel(
           id: 'animesalt',
@@ -127,12 +136,14 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
 
   Future<void> _syncRemoteRegistry() async {
     try {
-      final res = await http.get(
-        Uri.parse(
-          'https://raw.githubusercontent.com/anshdeepofficial/AniDash/beta/assets/sources/hindi_sources.json',
-        ),
-        headers: {'User-Agent': 'AniDash'},
-      ).timeout(const Duration(seconds: 4));
+      final res = await http
+          .get(
+            Uri.parse(
+              'https://raw.githubusercontent.com/anshdeepofficial/AniDash/beta/assets/sources/hindi_sources.json',
+            ),
+            headers: {'User-Agent': 'AniDash'},
+          )
+          .timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200 && res.body.isNotEmpty) {
         final dynamic decoded = jsonDecode(res.body);
@@ -142,13 +153,17 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
           final enabledMap = _prefs.getEnabledMap();
           final userOrder = _prefs.getOrder();
 
-          var updatedModels = rawSources
-              .map((m) => HindiSourceModel.fromMap(m as Map<String, dynamic>))
-              .where((m) => _providers.containsKey(m.id))
-              .map((m) {
-                final userPref = enabledMap[m.id];
-                return userPref != null ? m.copyWith(enabled: userPref) : m;
-              }).toList();
+          var updatedModels =
+              rawSources
+                  .map(
+                    (m) => HindiSourceModel.fromMap(m as Map<String, dynamic>),
+                  )
+                  .where((m) => _providers.containsKey(m.id))
+                  .map((m) {
+                    final userPref = enabledMap[m.id];
+                    return userPref != null ? m.copyWith(enabled: userPref) : m;
+                  })
+                  .toList();
 
           if (userOrder.isNotEmpty) {
             final orderMap = {
@@ -196,10 +211,11 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
 
   Future<void> setSourceEnabled(String id, bool enabled) async {
     await _prefs.setSourceEnabled(id, enabled);
-    state = state.map((m) {
-      if (m.id == id) return m.copyWith(enabled: enabled);
-      return m;
-    }).toList();
+    state =
+        state.map((m) {
+          if (m.id == id) return m.copyWith(enabled: enabled);
+          return m;
+        }).toList();
   }
 
   Future<void> resetToDefaults() async {
@@ -216,36 +232,38 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     final sw = Stopwatch()..start();
     try {
       final ok = await provider.healthCheck().timeout(
-            const Duration(seconds: 6),
-            onTimeout: () => false,
-          );
+        const Duration(seconds: 6),
+        onTimeout: () => false,
+      );
       sw.stop();
       final ms = sw.elapsedMilliseconds;
       if (ok) {
         _health.recordSuccess(id, ms);
-        state = state.map((m) {
-          if (m.id == id) {
-            return m.copyWith(
-              isHealthy: true,
-              lastLatencyMs: ms,
-              lastTestedTime: DateTime.now(),
-            );
-          }
-          return m;
-        }).toList();
+        state =
+            state.map((m) {
+              if (m.id == id) {
+                return m.copyWith(
+                  isHealthy: true,
+                  lastLatencyMs: ms,
+                  lastTestedTime: DateTime.now(),
+                );
+              }
+              return m;
+            }).toList();
         return (success: true, latencyMs: ms);
       } else {
         _health.recordFailure(id);
-        state = state.map((m) {
-          if (m.id == id) {
-            return m.copyWith(
-              isHealthy: false,
-              lastLatencyMs: ms,
-              lastTestedTime: DateTime.now(),
-            );
-          }
-          return m;
-        }).toList();
+        state =
+            state.map((m) {
+              if (m.id == id) {
+                return m.copyWith(
+                  isHealthy: false,
+                  lastLatencyMs: ms,
+                  lastTestedTime: DateTime.now(),
+                );
+              }
+              return m;
+            }).toList();
         return (success: false, latencyMs: ms);
       }
     } catch (_) {
@@ -267,46 +285,70 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     await init();
     final enabledProviders = state.where((s) => s.enabled).toList();
     if (enabledProviders.isEmpty) return null;
+    final cacheKey =
+        '${anilistId ?? malId ?? animeTitle.toLowerCase()}_${manualProviderId ?? 'auto'}';
+    final cached = _episodeCountCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.checkedAt) <
+            const Duration(minutes: 30)) {
+      return cached.count;
+    }
 
-    final targetProvider = (manualProviderId != null &&
+    final candidates = manualProviderId != null &&
             manualProviderId.isNotEmpty &&
-            manualProviderId != 'auto' &&
-            state.any((s) => s.id == manualProviderId && s.enabled))
-        ? _providers[manualProviderId]
-        : _providers[enabledProviders.first.id];
+            manualProviderId != 'auto'
+        ? enabledProviders.where((s) => s.id == manualProviderId).toList()
+        : enabledProviders.where((s) => _health.isAvailable(s.id)).toList();
+    final usable = candidates.isEmpty ? enabledProviders : candidates;
 
-    if (targetProvider == null) return null;
-
-    try {
-      String? providerAnimeId = await _cache.getMappedAnimeId(
-        providerId: targetProvider.id,
-        title: animeTitle,
-        romajiTitle: romajiTitle,
-        anilistId: anilistId,
-      );
-      if (providerAnimeId == null || providerAnimeId.isEmpty) {
-        providerAnimeId = await targetProvider.findAnime(
+    Future<int?> checkProvider(HindiSourceModel model) async {
+      final provider = _providers[model.id];
+      if (provider == null) return null;
+      try {
+        String? providerAnimeId = await _cache.getMappedAnimeId(
+          providerId: provider.id,
           title: animeTitle,
           romajiTitle: romajiTitle,
           anilistId: anilistId,
-          malId: malId,
-          year: year,
         );
-        if (providerAnimeId != null && providerAnimeId.isNotEmpty) {
-          await _cache.saveMappedAnimeId(
-            providerId: targetProvider.id,
-            providerAnimeId: providerAnimeId,
+        if (providerAnimeId == null || providerAnimeId.isEmpty) {
+          providerAnimeId = await provider.findAnime(
             title: animeTitle,
             romajiTitle: romajiTitle,
             anilistId: anilistId,
+            malId: malId,
+            year: year,
           );
+          if (providerAnimeId != null && providerAnimeId.isNotEmpty) {
+            await _cache.saveMappedAnimeId(
+              providerId: provider.id,
+              providerAnimeId: providerAnimeId,
+              title: animeTitle,
+              romajiTitle: romajiTitle,
+              anilistId: anilistId,
+            );
+          }
         }
+        if (providerAnimeId == null || providerAnimeId.isEmpty) return null;
+        final count = await provider
+            .getEpisodeCount(providerAnimeId)
+            .timeout(const Duration(seconds: 7));
+        return count != null && count > 0 ? count : null;
+      } catch (_) {
+        return null;
       }
-      if (providerAnimeId != null && providerAnimeId.isNotEmpty) {
-        return await targetProvider.getEpisodeCount(providerAnimeId);
-      }
-    } catch (_) {}
-    return null;
+    }
+
+    final counts = await Future.wait(usable.map(checkProvider));
+    final available = counts.whereType<int>().toList();
+    final result = available.isEmpty
+        ? null
+        : available.reduce((a, b) => a > b ? a : b);
+    _episodeCountCache[cacheKey] = (
+      count: result,
+      checkedAt: DateTime.now(),
+    );
+    return result;
   }
 
   /// Fast hedged parallel resolution
@@ -369,14 +411,14 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     }
 
     // 3. Collect candidate providers: enabled & available (not in cooldown)
-    final candidateModels = state
-        .where((s) => s.enabled && _health.isAvailable(s.id))
-        .toList();
+    final candidateModels =
+        state.where((s) => s.enabled && _health.isAvailable(s.id)).toList();
 
     // Fallback: if all candidate providers in cooldown, allow all enabled
-    final activeCandidates = candidateModels.isNotEmpty
-        ? candidateModels
-        : state.where((s) => s.enabled).toList();
+    final activeCandidates =
+        candidateModels.isNotEmpty
+            ? candidateModels
+            : state.where((s) => s.enabled).toList();
 
     if (activeCandidates.isEmpty) {
       AppLogger.w('[Hindi] No enabled Hindi providers available');
@@ -493,7 +535,9 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     }
 
     if (mappedId == null || mappedId.isEmpty) {
-      AppLogger.d('[Hindi] ${provider.name}: Could not find anime "$animeTitle"');
+      AppLogger.d(
+        '[Hindi] ${provider.name}: Could not find anime "$animeTitle"',
+      );
       return null;
     }
 
@@ -541,12 +585,13 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
     }
 
     // Prefetch using preferred provider first
-    final targetProvider = preferredProviderId != null
-        ? _providers[preferredProviderId]
-        : () {
-            final firstEnabled = state.firstWhereOrNull((s) => s.enabled);
-            return firstEnabled != null ? _providers[firstEnabled.id] : null;
-          }();
+    final targetProvider =
+        preferredProviderId != null
+            ? _providers[preferredProviderId]
+            : () {
+              final firstEnabled = state.firstWhereOrNull((s) => s.enabled);
+              return firstEnabled != null ? _providers[firstEnabled.id] : null;
+            }();
 
     if (targetProvider != null) {
       AppLogger.d(

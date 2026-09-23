@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/manga/manga_reading_progress_model.dart';
 import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dart';
 import 'package:ani_dash/features/manga/utils/manga_helpers.dart';
+import 'package:ani_dash/main.dart';
+
+enum _ReaderMode { vertical, book }
 
 class MangaReaderScreen extends ConsumerStatefulWidget {
   final DEpisode chapter;
@@ -34,26 +38,60 @@ class MangaReaderScreen extends ConsumerStatefulWidget {
 
 class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
   final ScrollController _scrollController = ScrollController();
+  late final PageController _pageController;
   List<PageUrl> _pages = [];
   bool _isLoading = true;
   String? _error;
   int _currentPage = 1;
   bool _showControls = true;
+  late _ReaderMode _readerMode;
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage > 0 ? widget.initialPage : 1;
+    _readerMode =
+        sharedPrefs.getString('manga_reader_mode') == 'book'
+            ? _ReaderMode.book
+            : _ReaderMode.vertical;
+    _pageController = PageController(initialPage: _currentPage - 1);
     _scrollController.addListener(_onScroll);
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _loadPages();
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _saveProgress();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
+  }
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (_readerMode != _ReaderMode.book) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+      if (_pageController.hasClients) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      }
+      return true;
+    } else if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+      if (_pageController.hasClients) {
+        _pageController.previousPage(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      }
+      return true;
+    }
+    return false;
   }
 
   void _onScroll() {
@@ -75,7 +113,8 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
     if (_pages.isEmpty) return;
     try {
       final url = widget.manga?.url ?? widget.mangaUrl ?? widget.mangaTitle;
-      final isAdultContent = widget.isAdult ||
+      final isAdultContent =
+          widget.isAdult ||
           (widget.manga != null &&
               isMangaAdult(widget.manga!, source: widget.mangaSource));
 
@@ -86,8 +125,8 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
         sourceId: widget.mangaSource.id,
         sourceName: widget.mangaSource.name,
         chapterUrl: widget.chapter.url,
-        chapterTitle: widget.chapter.name ??
-            'Chapter ${widget.chapter.episodeNumber}',
+        chapterTitle:
+            widget.chapter.name ?? 'Chapter ${widget.chapter.episodeNumber}',
         chapterNumber: widget.chapter.episodeNumber,
         pageIndex: _currentPage,
         totalPages: _pages.length,
@@ -122,14 +161,16 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
         });
 
         // If resuming a page, jump to it after layout
-        if (widget.initialPage > 1 && pages.length > 1) {
+        if (_readerMode == _ReaderMode.vertical &&
+            widget.initialPage > 1 &&
+            pages.length > 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_scrollController.hasClients &&
                 _scrollController.position.maxScrollExtent > 0) {
               final targetFraction =
                   (widget.initialPage - 1) / (pages.length - 1);
-              final targetOffset = targetFraction *
-                  _scrollController.position.maxScrollExtent;
+              final targetOffset =
+                  targetFraction * _scrollController.position.maxScrollExtent;
               _scrollController.jumpTo(
                 targetOffset.clamp(
                   0.0,
@@ -157,9 +198,73 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
     });
   }
 
+  void _setReaderMode(_ReaderMode mode) {
+    if (_readerMode == mode) return;
+    setState(() => _readerMode = mode);
+    sharedPrefs.setString('manga_reader_mode', mode.name);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mode == _ReaderMode.book && _pageController.hasClients) {
+        _pageController.jumpToPage(_currentPage - 1);
+      }
+    });
+  }
+
+  Widget _pageImage(PageUrl page, int index) {
+    return InteractiveViewer(
+      minScale: 1,
+      maxScale: 4.5,
+      child: Center(
+        child: CachedNetworkImage(
+          imageUrl: page.url,
+          httpHeaders: page.headers,
+          fit: BoxFit.contain,
+          placeholder:
+              (_, _) => const Center(
+                child: CircularProgressIndicator(color: Colors.white60),
+              ),
+          errorWidget:
+              (_, _, _) => Center(
+                child: Text(
+                  'Failed to load page ${index + 1}',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bookReader(BuildContext context) {
+    final twoPage = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final totalCount = twoPage ? ((_pages.length + 1) ~/ 2) : _pages.length;
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: totalCount,
+      onPageChanged: (index) {
+        final calculatedPage = twoPage ? (index * 2 + 1) : index + 1;
+        setState(() => _currentPage = calculatedPage.clamp(1, _pages.length));
+        _saveProgress();
+      },
+      itemBuilder: (context, index) {
+        final first = twoPage ? (index * 2) : index;
+        if (!twoPage) return _pageImage(_pages[first], first);
+        return Row(
+          children: [
+            Expanded(child: _pageImage(_pages[first], first)),
+            if (first + 1 < _pages.length)
+              Expanded(child: _pageImage(_pages[first + 1], first + 1))
+            else
+              const Spacer(),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isAdult = widget.isAdult ||
+    final isAdult =
+        widget.isAdult ||
         (widget.manga != null &&
             isMangaAdult(widget.manga!, source: widget.mangaSource));
 
@@ -170,112 +275,117 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
           // Main Manga Viewer
           GestureDetector(
             onTap: _toggleControls,
-            child: _isLoading
-                ? const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: Colors.white),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading chapter...',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  )
-                : _error != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                color: Colors.redAccent,
-                                size: 48,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: _loadPages,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Retry'),
-                              ),
-                            ],
+            child:
+                _isLoading
+                    ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: Colors.white),
+                          SizedBox(height: 16),
+                          Text(
+                            'Loading chapter...',
+                            style: TextStyle(color: Colors.white70),
                           ),
-                        ),
-                      )
-                    : InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 3.5,
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          itemCount: _pages.length,
-                          padding: EdgeInsets.zero,
-                          itemBuilder: (context, index) {
-                            final page = _pages[index];
-                            return CachedNetworkImage(
-                              imageUrl: page.url,
-                              httpHeaders: page.headers,
-                              fit: BoxFit.fitWidth,
-                              placeholder: (context, url) => Container(
-                                height: 400,
-                                color: Colors.grey[900],
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white60,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'Page ${index + 1}',
-                                        style: const TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                height: 280,
-                                color: Colors.grey[900],
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.broken_image,
-                                        color: Colors.redAccent,
-                                        size: 36,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Failed to load page ${index + 1}',
-                                        style: const TextStyle(
-                                          color: Colors.white54,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                        ],
+                      ),
+                    )
+                    : _error != null
+                    ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              color: Colors.redAccent,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: _loadPages,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       ),
+                    )
+                    : _readerMode == _ReaderMode.book
+                    ? _bookReader(context)
+                    : InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 3.5,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        itemCount: _pages.length,
+                        padding: EdgeInsets.zero,
+                        itemBuilder: (context, index) {
+                          final page = _pages[index];
+                          return CachedNetworkImage(
+                            imageUrl: page.url,
+                            httpHeaders: page.headers,
+                            fit: BoxFit.fitWidth,
+                            placeholder:
+                                (context, url) => Container(
+                                  height: 400,
+                                  color: Colors.grey[900],
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white60,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          'Page ${index + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            errorWidget:
+                                (context, url, error) => Container(
+                                  height: 280,
+                                  color: Colors.grey[900],
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.broken_image,
+                                          color: Colors.redAccent,
+                                          size: 36,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Failed to load page ${index + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                          );
+                        },
+                      ),
+                    ),
           ),
 
           // Top App Bar Controls
@@ -366,6 +476,53 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
                         ),
                       ),
                     ),
+                  IconButton(
+                    tooltip: 'Reader mode',
+                    icon: const Icon(
+                      Icons.menu_book_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed:
+                        () => showModalBottomSheet<void>(
+                          context: context,
+                          builder:
+                              (sheetContext) => SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    RadioListTile<_ReaderMode>(
+                                      value: _ReaderMode.vertical,
+                                      groupValue: _readerMode,
+                                      title: const Text('Vertical scroll'),
+                                      subtitle: const Text(
+                                        'Continuous chapter reading',
+                                      ),
+                                      onChanged: (value) {
+                                        Navigator.pop(sheetContext);
+                                        if (value != null) {
+                                          _setReaderMode(value);
+                                        }
+                                      },
+                                    ),
+                                    RadioListTile<_ReaderMode>(
+                                      value: _ReaderMode.book,
+                                      groupValue: _readerMode,
+                                      title: const Text('Book mode'),
+                                      subtitle: const Text(
+                                        'Animated pages; two pages in landscape',
+                                      ),
+                                      onChanged: (value) {
+                                        Navigator.pop(sheetContext);
+                                        if (value != null) {
+                                          _setReaderMode(value);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                        ),
+                  ),
                 ],
               ),
             ),

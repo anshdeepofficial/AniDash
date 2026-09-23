@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/controls_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/player_gesture_handler.dart';
@@ -26,7 +27,8 @@ import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_ui_controller.dart';
-import 'package:ani_dash/features/watch/view/widgets/player/vlc_seek_overlay.dart';
+import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/features/watch/view/widgets/player/seek_feedback_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/fetching_progress_badge.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/next_episode_prompt_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/floating_skip_button_overlay.dart';
@@ -67,6 +69,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
+  Timer? _doubleTapTimer;
+  int _doubleTapPairCount = 0;
+  Duration _doubleTapAnchor = Duration.zero;
 
 
   bool _isDraggingSeek = false;
@@ -114,6 +119,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   void dispose() {
     _focusNode.dispose();
     _volumeOverlayTimer?.cancel();
+    _doubleTapTimer?.cancel();
 
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
@@ -178,7 +184,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final w = MediaQuery.of(context).size.width;
     _isDragLeft = details.globalPosition.dx < w / 2;
     // A swipe that begins below 100% stops at normal maximum. Starting a new
-    // upward swipe on the right side at 100% explicitly unlocks VLC-style amplified volume.
+    // upward swipe on the right side at 100% explicitly unlocks amplified volume.
     _allowVolumeBoostForGesture =
         !_isDragLeft && ref.read(playerUIControllerProvider).volume >= 0.99;
 
@@ -335,6 +341,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
   void _openSettings() => _sheet(
     SettingsSheetContent(
+      onSubtitlesPressed: _openSubtitle,
       onDismiss: () {
         ref.read(playerUIControllerProvider.notifier).restartHideTimer();
       },
@@ -403,6 +410,138 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
           ref.read(episodeDataProvider.notifier).changeServer(data.servers[i]);
           Navigator.pop(context);
         },
+      ),
+    );
+  }
+
+  void _onDoubleTap(TapDownDetails details) {
+    if (ref.read(playerUIControllerProvider).isLocked) return;
+    final player = ref.read(playerStateProvider);
+    final isForward =
+        details.globalPosition.dx >= MediaQuery.sizeOf(context).width / 2;
+
+    if (_doubleTapPairCount == 0 ||
+        (_isDragSeekForward != isForward && _doubleTapPairCount > 0)) {
+      _doubleTapPairCount = 1;
+      _doubleTapAnchor = player.position;
+      _dragTargetPos = player.position;
+      _dragDiff = Duration.zero;
+    } else {
+      _doubleTapPairCount++;
+      final seconds = (_doubleTapPairCount - 1) * 10;
+      final signed = isForward ? seconds : -seconds;
+      final targetMs = (_doubleTapAnchor.inMilliseconds + signed * 1000).clamp(
+        0,
+        player.duration.inMilliseconds > 0
+            ? player.duration.inMilliseconds
+            : 24 * 60 * 60 * 1000,
+      );
+      _dragTargetPos = Duration(milliseconds: targetMs);
+      _dragDiff = Duration(seconds: signed);
+    }
+
+    _isDragSeekForward = isForward;
+    setState(() => _isDraggingSeek = true);
+    _doubleTapTimer?.cancel();
+    _doubleTapTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      if (_doubleTapPairCount > 1) {
+        ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
+      }
+      setState(() {
+        _isDraggingSeek = false;
+        _doubleTapPairCount = 0;
+      });
+    });
+  }
+
+  void _openAudio() {
+    final current = ref.read(playerSettingsProvider).preferredAudioLanguage;
+    final episodeState = ref.read(episodeListProvider);
+    final selectedEpisode =
+        ref.read(episodeDataProvider).selectedEpisode ?? 1;
+    final availability = ref
+        .read(hindiSourceManagerProvider.notifier)
+        .getEpisodeCount(
+          animeTitle: episodeState.animeTitle ?? '',
+          anilistId: int.tryParse(episodeState.mediaId ?? ''),
+        )
+        .then((count) => count != null && count >= selectedEpisode)
+        .timeout(const Duration(seconds: 8), onTimeout: () => false);
+    _sheet(
+      SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Audio', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              for (final option in const [
+                ('sub', 'Japanese', 'SUB'),
+                ('dub', 'English', 'DUB'),
+              ])
+                ListTile(
+                  leading: Icon(
+                    current == option.$1
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                  ),
+                  title: Text(option.$2),
+                  subtitle: Text(option.$3),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (current != option.$1) {
+                      ref
+                          .read(episodeDataProvider.notifier)
+                          .switchAudioLanguage(option.$1);
+                    }
+                  },
+                ),
+              FutureBuilder<bool>(
+                future: availability,
+                initialData: current == 'hindi' ? true : null,
+                builder: (context, snapshot) {
+                  final available = snapshot.data == true;
+                  return ListTile(
+                    enabled: available,
+                    leading: snapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            snapshot.data == null
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            current == 'hindi'
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_off_rounded,
+                          ),
+                    title: const Text('Hindi'),
+                    subtitle: Text(
+                      available
+                          ? 'Hindi audio available'
+                          : snapshot.connectionState == ConnectionState.waiting
+                              ? 'Checking availability…'
+                              : 'Unavailable for this episode',
+                    ),
+                    onTap: available
+                        ? () {
+                            Navigator.pop(context);
+                            if (current != 'hindi') {
+                              ref
+                                  .read(episodeDataProvider.notifier)
+                                  .switchAudioLanguage('hindi');
+                            }
+                          }
+                        : null,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -515,6 +654,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 // Gesture Layer (Background)
                 Positioned.fill(
                 child: PlayerGestureHandler(
+                  onDoubleTapDown: _onDoubleTap,
                   onTap: () {
                     widget.onPanelCloseRequest?.call();
                     uiController.toggleVisibility();
@@ -545,6 +685,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 onQualityPressed: _openQuality,
                 onSourcePressed: _openSource,
                 onServerPressed: _openServer,
+                onAudioPressed: _openAudio,
                 onSubtitlePressed: _openSubtitle,
                 onFullScreenPressed: _toggleFullScreen,
                 localTitle: widget.localTitle,
@@ -602,9 +743,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                   ),
                 ),
 
-              // VLC-style Horizontal Swipe Seek Indicator
+              // Horizontal swipe and rapid double-tap seek indicator
               if (_isDraggingSeek)
-                VlcSeekOverlay(
+                SeekFeedbackOverlay(
                   targetPosition: _dragTargetPos,
                   totalDuration: ref.read(playerStateProvider).duration,
                   diffDuration: _dragDiff,

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-class VlcSeekOverlay extends StatelessWidget {
+class SeekFeedbackOverlay extends StatelessWidget {
   final Duration targetPosition;
   final Duration totalDuration;
   final Duration diffDuration;
   final bool isForward;
 
-  const VlcSeekOverlay({
+  const SeekFeedbackOverlay({
     super.key,
     required this.targetPosition,
     required this.totalDuration,
@@ -37,9 +37,11 @@ class VlcSeekOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = totalDuration.inMilliseconds > 0
-        ? (targetPosition.inMilliseconds / totalDuration.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
+    final progress =
+        totalDuration.inMilliseconds > 0
+            ? (targetPosition.inMilliseconds / totalDuration.inMilliseconds)
+                .clamp(0.0, 1.0)
+            : 0.0;
 
     return Center(
       child: Container(
@@ -48,7 +50,8 @@ class VlcSeekOverlay extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: (isForward ? Colors.cyanAccent : Colors.orangeAccent).withValues(alpha: 0.7),
+            color: (isForward ? Colors.cyanAccent : Colors.orangeAccent)
+                .withValues(alpha: 0.7),
             width: 1.5,
           ),
           boxShadow: [
@@ -66,7 +69,9 @@ class VlcSeekOverlay extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isForward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+                  isForward
+                      ? Icons.fast_forward_rounded
+                      : Icons.fast_rewind_rounded,
                   color: isForward ? Colors.cyanAccent : Colors.orangeAccent,
                   size: 28,
                 ),

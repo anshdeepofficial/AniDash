@@ -80,6 +80,13 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     if (remindVersion == latest && now.millisecondsSinceEpoch < remindAfter) {
       return true;
     }
+    final lastNotifiedVersion = preferences.getString('last_notified_update');
+    final lastNotifiedAt = preferences.getInt('last_notified_update_time') ?? 0;
+    if (lastNotifiedVersion == latest &&
+        now.millisecondsSinceEpoch - lastNotifiedAt <
+            const Duration(hours: 24).inMilliseconds) {
+      return true;
+    }
 
     final notifications = NotificationService();
     await notifications.initialize(isBackground: true);

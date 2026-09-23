@@ -8,7 +8,6 @@ import 'package:ani_dash/core/utils/formatter.dart';
 import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
-import 'package:ani_dash/helpers/show_subtitle_sidebar.dart';
 import 'package:ani_dash/main.dart';
 
 class BottomControls extends ConsumerStatefulWidget {
@@ -17,6 +16,7 @@ class BottomControls extends ConsumerStatefulWidget {
   final VoidCallback onSourcePressed;
   final VoidCallback onSubtitlePressed;
   final VoidCallback onServerPressed;
+  final VoidCallback onAudioPressed;
   final VoidCallback onForwardPressed;
   final VoidCallback onSettingsPressed;
   final VoidCallback? onEpisodePressed;
@@ -30,6 +30,7 @@ class BottomControls extends ConsumerStatefulWidget {
     required this.onSourcePressed,
     required this.onSubtitlePressed,
     required this.onServerPressed,
+    required this.onAudioPressed,
     required this.onForwardPressed,
     required this.onSettingsPressed,
     required this.onFullScreenPressed,
@@ -120,49 +121,57 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                             : 'SUB',
                                   ),
                                 ),
-                                onTap:
-                                    () =>
-                                        ref
-                                            .read(episodeDataProvider.notifier)
-                                            .toggleDubSub(),
+                                onTap: widget.onAudioPressed,
                                 isAccent: true,
                                 scheme: scheme,
                               ),
                               Builder(
                                 builder: (context) {
                                   final servers = ref.watch(
-                                    episodeDataProvider.select((s) => s.servers),
+                                    episodeDataProvider.select(
+                                      (s) => s.servers,
+                                    ),
                                   );
                                   final currentServer = ref.watch(
                                     episodeDataProvider.select(
                                       (s) => s.selectedServer,
                                     ),
                                   );
-                                  final validServers = servers.where((s) {
-                                    final id = s.id?.toLowerCase() ?? '';
-                                    final name = s.name?.toLowerCase() ?? '';
-                                    return id != 'ext' &&
-                                        name != 'extension' &&
-                                        id != 'default' &&
-                                        name != 'default';
-                                  }).toList();
+                                  final validServers =
+                                      servers.where((s) {
+                                        final id = s.id?.toLowerCase() ?? '';
+                                        final name =
+                                            s.name?.toLowerCase() ?? '';
+                                        return id != 'ext' &&
+                                            name != 'extension' &&
+                                            id != 'default' &&
+                                            name != 'default';
+                                      }).toList();
 
                                   if (validServers.length <= 1) {
                                     return const SizedBox.shrink();
                                   }
 
-                                  final serverName = currentServer?.name ?? currentServer?.id ?? 'SERVER';
-                                  if (serverName.toLowerCase() == 'extension' || serverName.toLowerCase() == 'default') {
+                                  final serverName =
+                                      currentServer?.name ??
+                                      currentServer?.id ??
+                                      'SERVER';
+                                  if (serverName.toLowerCase() == 'extension' ||
+                                      serverName.toLowerCase() == 'default') {
                                     return const SizedBox.shrink();
                                   }
 
-                                  final cleanName = serverName
-                                      .replaceAll(RegExp(r'\(.*?\)'), '')
-                                      .trim()
-                                      .toUpperCase();
+                                  final cleanName =
+                                      serverName
+                                          .replaceAll(RegExp(r'\(.*?\)'), '')
+                                          .trim()
+                                          .toUpperCase();
 
                                   return _FlatTextBtn(
-                                    text: cleanName.isEmpty ? 'SERVER' : cleanName,
+                                    text:
+                                        cleanName.isEmpty
+                                            ? 'SERVER'
+                                            : cleanName,
                                     onTap: widget.onServerPressed,
                                     isAccent: false,
                                     scheme: scheme,
@@ -170,18 +179,12 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
                                 },
                               ),
                             ],
-                            if (!widget.isLocal)
-                              _ToolbarIcon(
-                                icon: Icons.subtitles_rounded,
-                                onTap: widget.onSubtitlePressed,
-                                onHold: () => showSubtitleSettings(context),
-                              ),
                             _ToolbarIcon(
                               icon: Icons.fullscreen_rounded,
                               onTap: widget.onFullScreenPressed,
                             ),
                             _ToolbarIcon(
-                              icon: Icons.settings_rounded,
+                              icon: Icons.more_vert_rounded,
                               onTap: widget.onSettingsPressed,
                             ),
                           ],
@@ -504,9 +507,9 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
 class _ToolbarIcon extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
-  final VoidCallback? onHold;
 
-  const _ToolbarIcon({required this.icon, this.onTap, this.onHold});
+
+  const _ToolbarIcon({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -514,7 +517,7 @@ class _ToolbarIcon extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        onLongPress: onHold,
+
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.all(6.0),

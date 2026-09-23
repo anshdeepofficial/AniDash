@@ -246,7 +246,8 @@ class AnimeImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Hero(
       tag: tag,
-      child: SizedBox(
+      child: Container(
+        color: Colors.black,
         height: height,
         width: double.infinity,
         child: CachedNetworkImage(

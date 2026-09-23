@@ -134,6 +134,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         final local = progressRepo.getProgress(mediaId);
 
+        final localEpisode =
+            local == null ? null : local.episodesProgress[local.currentEpisode];
+        final localDuration = localEpisode?.durationInSeconds ?? 0;
+        final localPosition = localEpisode?.progressInSeconds ?? 0;
+        final hasUnfinishedLocalEpisode =
+            localEpisode != null &&
+            localPosition > 0 &&
+            !localEpisode.isCompleted &&
+            (localDuration <= 0 || localPosition / localDuration < 0.90);
+        if (hasUnfinishedLocalEpisode) {
+          // A remote tracker stores episode counts, not exact playback time.
+          // Never let it skip a locally unfinished episode.
+          continue;
+        }
+
         if (local != null && local.currentEpisode > targetProgress) {
           continue;
         }
@@ -308,6 +323,7 @@ class _HomeSectionRenderer extends ConsumerWidget {
                         (_) => SectionScreen(
                           title: section.title,
                           fetchItems: fetcher,
+                          ranked: section.dataId == 'trending',
                         ),
                   ),
                 );
@@ -472,9 +488,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
         final combinedList =
             merged.values.toList()
-              ..sort(
-                (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
-              );
+              ..sort((a, b) => b.latestWatchTime.compareTo(a.latestWatchTime));
 
         if (combinedList.isEmpty) return const SizedBox.shrink();
         return ContinueSection(allProgress: combinedList.take(15).toList());

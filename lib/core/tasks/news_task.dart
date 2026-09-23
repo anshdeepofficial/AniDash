@@ -21,6 +21,10 @@ class NewsBackgroundTask {
         );
         final isAppOpen = pref.getBool('is_app_open') ?? false;
         if (isAppOpen) return true;
+        final settings = pref.getString('notification_settings_data');
+        if (settings != null && settings.contains('"enableNews":false')) {
+          return true;
+        }
       } catch (_) {}
 
       final service = AnimeNewsNetworkService();

@@ -330,7 +330,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     void triggerAutoAdvance() {
       if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
 
-      // VLC Mode: Halt playback if "Stop after this episode" is enabled
+      // Halt playback if "Stop after this episode" is enabled.
       if (ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
         AppLogger.i('Stop After This Episode active: Halting auto-advance.');
         ref.read(playerSettingsProvider.notifier).updateSettings(
