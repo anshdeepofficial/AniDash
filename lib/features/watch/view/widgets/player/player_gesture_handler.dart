@@ -85,14 +85,15 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
 
     final forward = isRight;
 
-    // If an active multi-tap seek sequence is already underway on the same side:
-    // Every additional tap (3rd, 4th, 5th...) immediately accumulates seek!
-    if (_isSeekingSequence && _lastTapForward == forward) {
+    // If an active multi-tap seek sequence is already underway:
+    // Every additional tap immediately accumulates seek!
+    if (_isSeekingSequence) {
       _lastTapTime = now;
+      _lastTapForward = forward;
       widget.onDoubleTap(forward);
 
       _multiTapResetTimer?.cancel();
-      _multiTapResetTimer = Timer(const Duration(milliseconds: 850), () {
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 1200), () {
         _resetTapState();
       });
       return;
@@ -114,7 +115,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       widget.onDoubleTap(forward);
 
       _multiTapResetTimer?.cancel();
-      _multiTapResetTimer = Timer(const Duration(milliseconds: 850), () {
+      _multiTapResetTimer = Timer(const Duration(milliseconds: 1200), () {
         _resetTapState();
       });
     } else {
@@ -123,7 +124,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       _lastTapTime = now;
       _lastTapForward = forward;
 
-      _singleTapTimer = Timer(const Duration(milliseconds: 280), () {
+      _singleTapTimer = Timer(const Duration(milliseconds: 320), () {
         _singleTapTimer = null;
         if (!_isSeekingSequence) {
           _lastTapTime = null;

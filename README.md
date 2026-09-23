@@ -7,6 +7,7 @@
 **A modern anime streaming, tracking, discovery, and manga client built with Flutter.**
 
 [![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial/AniDash?style=for-the-badge&logo=github&label=Latest)](https://github.com/anshdeepofficial/AniDash/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/anshdeepofficial/AniDash/total?style=for-the-badge&logo=github&label=Downloads)](https://github.com/anshdeepofficial/AniDash/releases)
 ![Flutter](https://img.shields.io/badge/Flutter-3.8%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.8%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20Windows-111827?style=for-the-badge)

@@ -38,4 +38,16 @@ class PlayerSettingsNotifier extends Notifier<PlayerModel> {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, state.toJson());
   }
+
+  void setPreferredAudioLanguage(String language) {
+    updateSettings((prev) => prev.copyWith(preferredAudioLanguage: language));
+  }
+
+  void setPreferredHindiProvider(String? providerId) {
+    updateSettings((prev) => prev.copyWith(preferredHindiProvider: providerId));
+  }
+
+  void setHindiFallbackAudio(String fallback) {
+    updateSettings((prev) => prev.copyWith(hindiFallbackAudio: fallback));
+  }
 }

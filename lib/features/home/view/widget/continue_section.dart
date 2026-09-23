@@ -155,7 +155,8 @@ class ContinueSection extends ConsumerWidget {
                             context,
                             ref,
                             entry,
-                            currentEp,
+                            nextEpisodeNum,
+                            displayEp,
                             colorScheme,
                           );
                         },
@@ -338,7 +339,8 @@ class ContinueSection extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     AnimeWatchProgressEntry entry,
-    EpisodeProgress? currentEp,
+    int targetEpNum,
+    EpisodeProgress? targetEp,
     ColorScheme colorScheme,
   ) {
     showModalBottomSheet(
@@ -375,11 +377,11 @@ class ContinueSection extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (currentEp != null)
+                if (targetEp != null)
                   Text(
-                    currentEp.episodeTitle.isNotEmpty
-                        ? currentEp.episodeTitle
-                        : 'EP ${currentEp.episodeNumber}',
+                    targetEp.episodeTitle.isNotEmpty
+                        ? targetEp.episodeTitle
+                        : 'EP $targetEpNum',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -404,29 +406,27 @@ class ContinueSection extends ConsumerWidget {
                     color: Colors.green,
                   ),
                   title: Text(
-                    'Mark Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} as Watched',
+                    'Mark Episode $targetEpNum as Watched',
                   ),
                   subtitle: const Text(
                     'Marks this episode complete and updates progress',
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final targetEpNum = currentEp?.episodeNumber ??
-                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
-                    final duration = (currentEp?.durationInSeconds != null &&
-                            currentEp!.durationInSeconds! > 0)
-                        ? currentEp.durationInSeconds!
+                    final duration = (targetEp?.durationInSeconds != null &&
+                            targetEp!.durationInSeconds! > 0)
+                        ? targetEp.durationInSeconds!
                         : 1440;
                     final repo = ref.read(watchProgressRepositoryProvider);
                     repo.updateEpisodeProgress(
                       entry.animeId,
                       EpisodeProgress(
                         episodeNumber: targetEpNum,
-                        episodeTitle: currentEp?.episodeTitle.isNotEmpty == true
-                            ? currentEp!.episodeTitle
+                        episodeTitle: targetEp?.episodeTitle.isNotEmpty == true
+                            ? targetEp!.episodeTitle
                             : 'Episode $targetEpNum',
                         episodeThumbnail:
-                            currentEp?.episodeThumbnail ?? entry.animeCover,
+                            targetEp?.episodeThumbnail ?? entry.animeCover,
                         progressInSeconds: duration,
                         durationInSeconds: duration,
                         isCompleted: true,
@@ -455,19 +455,17 @@ class ContinueSection extends ConsumerWidget {
                   ),
                   title: const Text('Jump to Time'),
                   subtitle: Text(
-                    'Start Episode ${currentEp?.episodeNumber ?? (entry.currentEpisode > 0 ? entry.currentEpisode : 1)} from a specific timestamp',
+                    'Start Episode $targetEpNum from a specific timestamp',
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final targetEpNum = currentEp?.episodeNumber ??
-                        (entry.currentEpisode > 0 ? entry.currentEpisode : 1);
-                    final totalDur = (currentEp?.durationInSeconds != null &&
-                            currentEp!.durationInSeconds! > 0)
-                        ? Duration(seconds: currentEp.durationInSeconds!)
+                    final totalDur = (targetEp?.durationInSeconds != null &&
+                            targetEp!.durationInSeconds! > 0)
+                        ? Duration(seconds: targetEp.durationInSeconds!)
                         : Duration.zero;
-                    final currentPos = (currentEp?.progressInSeconds != null &&
-                            currentEp!.progressInSeconds! > 0)
-                        ? Duration(seconds: currentEp.progressInSeconds!)
+                    final currentPos = (targetEp?.progressInSeconds != null &&
+                            targetEp!.progressInSeconds! > 0)
+                        ? Duration(seconds: targetEp.progressInSeconds!)
                         : Duration.zero;
 
                     showDialog(
@@ -530,11 +528,9 @@ class ContinueSection extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   ),
                   title: const Text('Download this episode'),
-                  subtitle: Text('Episode ${currentEp?.episodeNumber ?? entry.currentEpisode}'),
+                  subtitle: Text('Episode $targetEpNum'),
                   onTap: () async {
                     Navigator.pop(sheetContext);
-                    final targetEpNum =
-                        currentEp?.episodeNumber ?? entry.currentEpisode;
                     final currentEpList = ref.read(episodeListProvider);
                     if (currentEpList.animeId != entry.animeId ||
                         currentEpList.episodes.isEmpty) {

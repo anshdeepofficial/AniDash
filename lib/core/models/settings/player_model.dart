@@ -5,7 +5,9 @@ class PlayerModel {
   final bool enableAniSkip;
   final bool enableAutoSkip;
   final bool skipFillerEpisodes;
-  final bool preferDub;
+  final String preferredAudioLanguage; // 'sub', 'dub', 'hindi'
+  final String? preferredHindiProvider; // null or 'auto', or provider ID like 'animesalt'
+  final String hindiFallbackAudio; // 'dub', 'sub', 'ask' (default: 'dub')
   final int seekDuration;
   final int autoHideDuration;
   final int lockAutoHideDuration;
@@ -24,7 +26,10 @@ class PlayerModel {
     this.enableAniSkip = true,
     this.enableAutoSkip = false,
     this.skipFillerEpisodes = false,
-    this.preferDub = true,
+    bool? preferDub,
+    String? preferredAudioLanguage,
+    this.preferredHindiProvider,
+    this.hindiFallbackAudio = 'dub',
     this.bufferSize = 32,
     this.seekDuration = 10,
     this.autoHideDuration = 5,
@@ -37,7 +42,11 @@ class PlayerModel {
     this.mpvSettings = const {},
     this.showManualSkip = true,
     this.manualSkipDuration = 85,
-  });
+  }) : preferredAudioLanguage = preferredAudioLanguage ??
+            (preferDub != null ? (preferDub ? 'dub' : 'sub') : 'dub');
+
+  /// 100% backward-compatible getter for existing code paths
+  bool get preferDub => preferredAudioLanguage == 'dub';
 
   PlayerModel copyWith({
     String? defaultQuality,
@@ -45,6 +54,9 @@ class PlayerModel {
     bool? enableAutoSkip,
     bool? skipFillerEpisodes,
     bool? preferDub,
+    String? preferredAudioLanguage,
+    String? preferredHindiProvider,
+    String? hindiFallbackAudio,
     int? seekDuration,
     int? autoHideDuration,
     int? lockAutoHideDuration,
@@ -58,12 +70,20 @@ class PlayerModel {
     bool? showManualSkip,
     int? manualSkipDuration,
   }) {
+    final newAudioLang = preferredAudioLanguage ??
+        (preferDub != null
+            ? (preferDub ? 'dub' : 'sub')
+            : this.preferredAudioLanguage);
+
     return PlayerModel(
       defaultQuality: defaultQuality ?? this.defaultQuality,
       enableAniSkip: enableAniSkip ?? this.enableAniSkip,
       enableAutoSkip: enableAutoSkip ?? this.enableAutoSkip,
       skipFillerEpisodes: skipFillerEpisodes ?? this.skipFillerEpisodes,
-      preferDub: preferDub ?? this.preferDub,
+      preferredAudioLanguage: newAudioLang,
+      preferredHindiProvider:
+          preferredHindiProvider ?? this.preferredHindiProvider,
+      hindiFallbackAudio: hindiFallbackAudio ?? this.hindiFallbackAudio,
       seekDuration: seekDuration ?? this.seekDuration,
       autoHideDuration: autoHideDuration ?? this.autoHideDuration,
       lockAutoHideDuration: lockAutoHideDuration ?? this.lockAutoHideDuration,
@@ -89,6 +109,9 @@ class PlayerModel {
       'enableAutoSkip': enableAutoSkip,
       'skipFillerEpisodes': skipFillerEpisodes,
       'preferDub': preferDub,
+      'preferredAudioLanguage': preferredAudioLanguage,
+      'preferredHindiProvider': preferredHindiProvider,
+      'hindiFallbackAudio': hindiFallbackAudio,
       'seekDuration': seekDuration,
       'bufferSize': bufferSize,
       'autoHideDuration': autoHideDuration,
@@ -105,12 +128,19 @@ class PlayerModel {
   }
 
   factory PlayerModel.fromMap(Map<String, dynamic> map) {
+    final rawPrefLang = map['preferredAudioLanguage'] as String?;
+    final rawPreferDub = map['preferDub'] as bool?;
+    final audioLang = rawPrefLang ??
+        (rawPreferDub != null ? (rawPreferDub ? 'dub' : 'sub') : 'dub');
+
     return PlayerModel(
       defaultQuality: map['defaultQuality'] ?? 'Auto',
       enableAniSkip: map['enableAniSkip'] ?? true,
       enableAutoSkip: map['enableAutoSkip'] ?? false,
       skipFillerEpisodes: map['skipFillerEpisodes'] ?? false,
-      preferDub: map['preferDub'] ?? true,
+      preferredAudioLanguage: audioLang,
+      preferredHindiProvider: map['preferredHindiProvider'] as String?,
+      hindiFallbackAudio: map['hindiFallbackAudio'] as String? ?? 'dub',
       seekDuration: map['seekDuration'] ?? 10,
       autoHideDuration: map['autoHideDuration'] ?? 5,
       lockAutoHideDuration: map['lockAutoHideDuration'] ?? 3,
@@ -119,7 +149,8 @@ class PlayerModel {
       prefetchNextEpisode: map['prefetchNextEpisode'] ?? true,
       showNextEpisodePrompt: map['showNextEpisodePrompt'] ?? true,
       stopAfterCurrentEpisode: map['stopAfterCurrentEpisode'] ?? false,
-      defaultPlaybackSpeed: (map['defaultPlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
+      defaultPlaybackSpeed:
+          (map['defaultPlaybackSpeed'] as num?)?.toDouble() ?? 1.0,
       mpvSettings: Map<String, String>.from(map['mpvSettings'] ?? {}),
       showManualSkip: map['showManualSkip'] ?? true,
       manualSkipDuration: map['manualSkipDuration'] ?? 85,

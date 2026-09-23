@@ -72,7 +72,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   Timer? _tapSeekCommitTimer;
   Duration? _tapSeekTarget;
   Duration? _tapSeekBasePosition;
-  bool? _tapSeekForward;
   int _accumulatedSeekSeconds = 0;
 
   bool _isDraggingSeek = false;
@@ -298,47 +297,49 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final settings = ref.read(playerSettingsProvider);
     final jump = settings.seekDuration;
     final player = ref.read(playerStateProvider);
-    final sameSequence =
-        _tapSeekBasePosition != null && _tapSeekForward == forward;
 
-    if (sameSequence) {
-      _accumulatedSeekSeconds += jump;
+    // If an active sequence is underway, accumulate onto existing net offset
+    if (_tapSeekBasePosition != null) {
+      if (forward) {
+        _accumulatedSeekSeconds += jump;
+      } else {
+        _accumulatedSeekSeconds -= jump;
+      }
     } else {
+      // First tap in sequence: capture base position from player
       _tapSeekBasePosition = player.position;
-      _accumulatedSeekSeconds = jump;
-      _tapSeekForward = forward;
+      _accumulatedSeekSeconds = forward ? jump : -jump;
     }
 
-    final delta = Duration(
-      seconds: forward ? _accumulatedSeekSeconds : -_accumulatedSeekSeconds,
-    );
-    var target = _tapSeekBasePosition! + delta;
+    final isForward = _accumulatedSeekSeconds >= 0;
+    final displaySeconds = _accumulatedSeekSeconds.abs();
+
+    var target = _tapSeekBasePosition! + Duration(seconds: _accumulatedSeekSeconds);
     if (target < Duration.zero) target = Duration.zero;
     if (player.duration > Duration.zero && target > player.duration) {
       target = player.duration;
     }
     _tapSeekTarget = target;
 
-    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s, 50s...)
+    // Show indicator with total accumulated seconds (e.g. 10s, 20s, 30s, 40s, 50s, 60s...)
     ref
         .read(playerUIControllerProvider.notifier)
-        .showSeekIndicator(forward, _accumulatedSeekSeconds);
+        .showSeekIndicator(isForward, displaySeconds == 0 ? jump : displaySeconds);
 
-    // Smooth seek commit: 550ms after the LAST tap commits the final accumulated jump
+    // Smooth seek commit: 600ms after the LAST tap commits the final accumulated jump
     _tapSeekCommitTimer?.cancel();
-    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 550), () {
+    _tapSeekCommitTimer = Timer(const Duration(milliseconds: 600), () {
       final pending = _tapSeekTarget;
       if (pending != null && mounted) {
         ref.read(playerStateProvider.notifier).seek(pending);
       }
     });
 
-    // Reset sequence only after 1200ms of inactivity
+    // Reset sequence only after 1400ms of inactivity
     _tapSeekResetTimer?.cancel();
-    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1200), () {
+    _tapSeekResetTimer = Timer(const Duration(milliseconds: 1400), () {
       _tapSeekTarget = null;
       _tapSeekBasePosition = null;
-      _tapSeekForward = null;
       _accumulatedSeekSeconds = 0;
     });
   }

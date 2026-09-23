@@ -5,6 +5,8 @@ import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
+import 'package:collection/collection.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class SettingsSheetContent extends ConsumerWidget {
@@ -103,9 +105,125 @@ class SettingsSheetContent extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.record_voice_over_rounded),
                 title: const Text("Audio Track"),
-                trailing: Text(isDub ? 'DUB' : 'SUB'),
-                onTap: () => streamNotifier.toggleDubSub(),
+                trailing: Text(
+                  playerSettings.preferredAudioLanguage == 'hindi'
+                      ? 'Hindi'
+                      : (isDub ? 'DUB' : 'SUB'),
+                ),
+                onTap: () {
+                  _showDialog(
+                    context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("Select Audio Track"),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            title: const Text("Japanese (SUB)"),
+                            trailing: playerSettings.preferredAudioLanguage == 'sub'
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              streamNotifier.switchAudioLanguage('sub');
+                            },
+                          ),
+                          ListTile(
+                            title: const Text("English (DUB)"),
+                            trailing: playerSettings.preferredAudioLanguage == 'dub'
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              streamNotifier.switchAudioLanguage('dub');
+                            },
+                          ),
+                          ListTile(
+                            title: const Text("Hindi"),
+                            trailing: playerSettings.preferredAudioLanguage == 'hindi'
+                                ? const Icon(Icons.check, color: Colors.green)
+                                : null,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              streamNotifier.switchAudioLanguage('hindi');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
+              if (playerSettings.preferredAudioLanguage == 'hindi')
+                Builder(
+                  builder: (context) {
+                    final hindiSources = ref.watch(hindiSourceManagerProvider);
+                    final preferredId = playerSettings.preferredHindiProvider;
+                    final selectedName = (preferredId == null || preferredId == 'auto')
+                        ? 'Auto'
+                        : (hindiSources.firstWhereOrNull((s) => s.id == preferredId)?.name ??
+                            preferredId);
+
+                    return ListTile(
+                      leading: const Icon(Icons.tune_rounded),
+                      title: const Text("Hindi Source"),
+                      trailing: Text(selectedName),
+                      onTap: () {
+                        _showDialog(
+                          context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text("Select Hindi Source"),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    title: const Text("Auto (Recommended)"),
+                                    subtitle: const Text("Fastest healthy provider"),
+                                    trailing: (preferredId == null || preferredId == 'auto')
+                                        ? const Icon(Icons.check, color: Colors.green)
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      ref
+                                          .read(playerSettingsProvider.notifier)
+                                          .setPreferredHindiProvider('auto');
+                                      streamNotifier.loadEpisode(
+                                        ep: streamData.selectedEpisode ?? 1,
+                                        play: true,
+                                        startAt: ref.read(playerStateProvider).position,
+                                      );
+                                    },
+                                  ),
+                                  ...hindiSources.map((source) => ListTile(
+                                        title: Text(source.name),
+                                        subtitle: Text(
+                                          '${source.status.toUpperCase()}${source.lastLatencyMs != null ? " • ${source.lastLatencyMs}ms" : ""}',
+                                        ),
+                                        trailing: preferredId == source.id
+                                            ? const Icon(Icons.check, color: Colors.green)
+                                            : null,
+                                        onTap: () {
+                                          Navigator.pop(ctx);
+                                          ref
+                                              .read(playerSettingsProvider.notifier)
+                                              .setPreferredHindiProvider(source.id);
+                                          streamNotifier.loadEpisode(
+                                            ep: streamData.selectedEpisode ?? 1,
+                                            play: true,
+                                            startAt: ref.read(playerStateProvider).position,
+                                          );
+                                        },
+                                      )),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.dns_rounded),
                 title: const Text("Server"),

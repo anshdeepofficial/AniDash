@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "animesalt",
+      "name": "AnimeSalt",
+      "language": ["hi", "multi"],
+      "priority": 10,
+      "enabledByDefault": true,
+      "status": "stable",
+      "supportsStreaming": true,
+      "supportsDownloads": true,
+      "supportsMultiAudio": true,
+      "baseUrl": "https://animesalt.cc"
+    },
+    {
+      "id": "animixstream",
+      "name": "AnimixStream",
+      "language": ["hi", "multi"],
+      "priority": 20,
+      "enabledByDefault": true,
+      "status": "stable",
+      "supportsStreaming": true,
+      "supportsDownloads": false,
+      "supportsMultiAudio": true,
+      "baseUrl": "https://animixstream.com"
+    },
+    {
+      "id": "animedrive",
+      "name": "AnimeDrive",
+      "language": ["hi", "multi"],
+      "priority": 30,
+      "enabledByDefault": true,
+      "status": "backup",
+      "supportsStreaming": true,
+      "supportsDownloads": true,
+      "supportsMultiAudio": true,
+      "baseUrl": "https://animedrive.top"
+    },
+    {
+      "id": "animelok",
+      "name": "AnimeLok",
+      "language": ["hi"],
+      "priority": 40,
+      "enabledByDefault": false,
+      "status": "experimental",
+      "supportsStreaming": true,
+      "supportsDownloads": false,
+      "supportsMultiAudio": false,
+      "baseUrl": "https://animelok.org"
+    }
+  ]
+}
