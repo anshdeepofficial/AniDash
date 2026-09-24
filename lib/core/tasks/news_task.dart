@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -22,8 +23,11 @@ class NewsBackgroundTask {
         final isAppOpen = pref.getBool('is_app_open') ?? false;
         if (isAppOpen) return true;
         final settings = pref.getString('notification_settings_data');
-        if (settings != null && settings.contains('"enableNews":false')) {
-          return true;
+        if (settings != null) {
+          try {
+            final decoded = json.decode(settings) as Map<String, dynamic>;
+            if (decoded['enableNews'] == false) return true;
+          } catch (_) {}
         }
       } catch (_) {}
 

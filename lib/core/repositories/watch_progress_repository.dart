@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
@@ -28,6 +29,53 @@ final animeWatchProgressProvider = StreamProvider.autoDispose
 
 class WatchProgressRepository implements WatchProgressRepositoryInterface {
   WatchProgressRepository();
+
+  static const _lastPlayedPrefKey = 'anime_last_played_at_map';
+  bool _lastPlayedLoaded = false;
+  final Map<String, DateTime> _lastPlayedMap = {};
+
+  void _ensureLastPlayedLoaded() {
+    if (_lastPlayedLoaded) return;
+    _lastPlayedLoaded = true;
+    try {
+      final raw = sharedPrefs.getString(_lastPlayedPrefKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        for (final entry in decoded.entries) {
+          final parsed = DateTime.tryParse(entry.value.toString());
+          if (parsed != null) {
+            _lastPlayedMap[entry.key] = parsed;
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.e('Failed to load last played map from sharedPrefs: $e');
+    }
+  }
+
+  DateTime? _getLastPlayed(String animeId) {
+    _ensureLastPlayedLoaded();
+    return _lastPlayedMap[animeId];
+  }
+
+  Future<void> _setLastPlayed(String animeId, DateTime? timestamp) async {
+    _ensureLastPlayedLoaded();
+    if (timestamp != null) {
+      _lastPlayedMap[animeId] = timestamp;
+    } else {
+      _lastPlayedMap.remove(animeId);
+    }
+    try {
+      await sharedPrefs.setString(
+        _lastPlayedPrefKey,
+        jsonEncode(
+          _lastPlayedMap.map((k, v) => MapEntry(k, v.toIso8601String())),
+        ),
+      );
+    } catch (e) {
+      AppLogger.e('Failed to persist last played map: $e');
+    }
+  }
 
   // --- Migration ---
 
@@ -107,6 +155,9 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     if (entry.isAdult) {
       await markAdultAnimeId(entry.animeId);
     }
+    if (entry.lastPlayedAt != null) {
+      await _setLastPlayed(entry.animeId, entry.lastPlayedAt);
+    }
     try {
       final dismissed =
           (sharedPrefs.getStringList('dismissed_continue_watching_ids') ?? [])
@@ -164,6 +215,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   AnimeWatchProgressEntry? getProgress(String animeId) {
     final isarEntry = isar.isarAnimeWatchProgress.getSync(fastHash(animeId));
     final isAdult = isAdultAnimeId(animeId);
+    final lastPlayed = _getLastPlayed(animeId);
     if (isarEntry != null) {
       return AnimeWatchProgressEntry(
         animeId: isarEntry.animeId,
@@ -172,6 +224,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         animeCover: isarEntry.animeCover,
         totalEpisodes: isarEntry.totalEpisodes,
         lastUpdated: isarEntry.lastUpdated,
+        lastPlayedAt: lastPlayed,
         currentEpisode: isarEntry.currentEpisode,
         status: isarEntry.status,
         isAdult: isAdult,
@@ -186,10 +239,13 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       if (Hive.isBoxOpen('anime_watch_progress')) {
         final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
         final entry = box.get(animeId);
-        if (entry != null && isAdult && !entry.isAdult) {
-          return entry.copyWith(isAdult: true);
+        if (entry != null) {
+          final effectiveEntry = entry.copyWith(
+            lastPlayedAt: lastPlayed ?? entry.lastPlayedAt,
+            isAdult: isAdult || entry.isAdult,
+          );
+          return effectiveEntry;
         }
-        return entry;
       }
     } catch (_) {}
     return null;
@@ -204,7 +260,10 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
             ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
             : null;
         if (box != null && box.isNotEmpty) {
-          final hiveList = box.values.toList();
+          final hiveList = box.values.map((e) {
+            final lastPlayed = _getLastPlayed(e.animeId) ?? e.lastPlayedAt;
+            return e.copyWith(lastPlayedAt: lastPlayed);
+          }).toList();
           migrateFromHive();
           return hiveList;
         }
@@ -213,6 +272,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
     return isarEntries.map((isarEntry) {
       final isAdult = isAdultAnimeId(isarEntry.animeId);
+      final lastPlayed = _getLastPlayed(isarEntry.animeId);
       return AnimeWatchProgressEntry(
         animeId: isarEntry.animeId,
         animeTitle: isarEntry.animeTitle,
@@ -220,6 +280,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         animeCover: isarEntry.animeCover,
         totalEpisodes: isarEntry.totalEpisodes,
         lastUpdated: isarEntry.lastUpdated,
+        lastPlayedAt: lastPlayed,
         currentEpisode: isarEntry.currentEpisode,
         status: isarEntry.status,
         isAdult: isAdult,
@@ -236,16 +297,22 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   @override
   Future<void> updateEpisodeProgress(
     String animeId,
-    EpisodeProgress episodeProgress,
-  ) async {
+    EpisodeProgress episodeProgress, {
+    bool isLocalPlayback = false,
+  }) async {
     var entry = getProgress(animeId);
+    final now = DateTime.now();
+    final existingLastPlayed = entry?.lastPlayedAt ?? _getLastPlayed(animeId);
+    final effectiveLastPlayed = isLocalPlayback ? now : existingLastPlayed;
+
     entry ??= AnimeWatchProgressEntry(
       animeId: animeId,
       animeTitle: '',
       animeFormat: '',
       animeCover: '',
       totalEpisodes: 0,
-      lastUpdated: DateTime.now(),
+      lastUpdated: now,
+      lastPlayedAt: effectiveLastPlayed,
       currentEpisode: episodeProgress.episodeNumber,
       episodesProgress: {},
     );
@@ -272,7 +339,8 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
-      lastUpdated: DateTime.now(),
+      lastUpdated: now,
+      lastPlayedAt: effectiveLastPlayed,
       currentEpisode: episodeProgress.episodeNumber,
       status: isAllWatched ? 'completed' : entry.status,
     );
@@ -292,7 +360,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     if (entry != null) {
       final updated = entry.copyWith(
         currentEpisode: currentEpisode,
-        lastUpdated: DateTime.now(),
+        lastPlayedAt: entry.lastPlayedAt,
       );
       await saveProgress(updated);
     } else if (animeTitle != null && animeTitle.isNotEmpty) {
@@ -302,7 +370,8 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         animeFormat: animeFormat,
         animeCover: animeCover ?? '',
         totalEpisodes: 0,
-        lastUpdated: DateTime.now(),
+        lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
+        lastPlayedAt: null,
         currentEpisode: currentEpisode,
         episodesProgress: {
           currentEpisode: EpisodeProgress(
@@ -312,7 +381,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
             progressInSeconds: 0,
             durationInSeconds: 1440,
             isCompleted: false,
-            watchedAt: DateTime.now(),
+            watchedAt: DateTime.fromMillisecondsSinceEpoch(0),
           ),
         },
       );
@@ -335,7 +404,8 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       animeFormat: animeFormat,
       animeCover: animeCover,
       totalEpisodes: 0,
-      lastUpdated: DateTime.now(),
+      lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
+      lastPlayedAt: null,
       currentEpisode: upToEpisodeNumber,
       episodesProgress: {},
     );
@@ -351,7 +421,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         episodeTitle: existing?.episodeTitle ?? 'Episode $i',
         episodeThumbnail: existing?.episodeThumbnail,
         isCompleted: true,
-        watchedAt: DateTime.now(),
+        watchedAt: existing?.watchedAt ?? DateTime.fromMillisecondsSinceEpoch(0),
       );
     }
 
@@ -360,7 +430,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
-      lastUpdated: DateTime.now(),
+      lastPlayedAt: entry.lastPlayedAt,
       currentEpisode: upToEpisodeNumber,
       status: isAllWatched ? 'completed' : entry.status,
       animeTitle: animeTitle.isNotEmpty ? animeTitle : entry.animeTitle,
@@ -374,6 +444,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
   @override
   Future<void> deleteProgress(String animeId) async {
+    await _setLastPlayed(animeId, null);
     await isar.writeTxn(() async {
       await isar.isarAnimeWatchProgress.delete(fastHash(animeId));
     });
@@ -407,16 +478,27 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     );
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
-      lastUpdated: DateTime.now(),
+      lastPlayedAt: entry.lastPlayedAt,
       currentEpisode: newCurrentEpisode,
     );
-
     await saveProgress(updatedEntry);
     AppLogger.d('Deleted episode $episodeNumber progress for anime: $animeId');
   }
 
   @override
   Future<void> deleteMultipleProgress(List<String> animeIds) async {
+    _ensureLastPlayedLoaded();
+    for (final id in animeIds) {
+      _lastPlayedMap.remove(id);
+    }
+    try {
+      await sharedPrefs.setString(
+        _lastPlayedPrefKey,
+        jsonEncode(
+          _lastPlayedMap.map((k, v) => MapEntry(k, v.toIso8601String())),
+        ),
+      );
+    } catch (_) {}
     await isar.writeTxn(() async {
       await isar.isarAnimeWatchProgress.deleteAll(
         animeIds.map(fastHash).toList(),

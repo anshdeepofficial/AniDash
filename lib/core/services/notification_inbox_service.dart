@@ -10,6 +10,10 @@ class InboxNotification {
     required this.createdAt,
     this.route,
     this.isRead = false,
+    this.notificationType,
+    this.mediaId,
+    this.episodeNumber,
+    this.language,
   });
 
   final String id;
@@ -18,6 +22,10 @@ class InboxNotification {
   final DateTime createdAt;
   final String? route;
   final bool isRead;
+  final String? notificationType;
+  final String? mediaId;
+  final int? episodeNumber;
+  final String? language;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -26,6 +34,10 @@ class InboxNotification {
     'createdAt': createdAt.toIso8601String(),
     'route': route,
     'isRead': isRead,
+    'notificationType': notificationType,
+    'mediaId': mediaId,
+    'episodeNumber': episodeNumber,
+    'language': language,
   };
 
   factory InboxNotification.fromJson(Map<String, dynamic> json) {
@@ -38,6 +50,35 @@ class InboxNotification {
           DateTime.now(),
       route: json['route']?.toString(),
       isRead: json['isRead'] as bool? ?? false,
+      notificationType: json['notificationType']?.toString(),
+      mediaId: json['mediaId']?.toString(),
+      episodeNumber: (json['episodeNumber'] as num?)?.toInt(),
+      language: json['language']?.toString(),
+    );
+  }
+  InboxNotification copyWith({
+    String? id,
+    String? title,
+    String? body,
+    DateTime? createdAt,
+    String? route,
+    bool? isRead,
+    String? notificationType,
+    String? mediaId,
+    int? episodeNumber,
+    String? language,
+  }) {
+    return InboxNotification(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      createdAt: createdAt ?? this.createdAt,
+      route: route ?? this.route,
+      isRead: isRead ?? this.isRead,
+      notificationType: notificationType ?? this.notificationType,
+      mediaId: mediaId ?? this.mediaId,
+      episodeNumber: episodeNumber ?? this.episodeNumber,
+      language: language ?? this.language,
     );
   }
 }
@@ -49,7 +90,7 @@ class NotificationInboxService {
   Future<List<InboxNotification>> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return [];
     try {
       return (jsonDecode(raw) as List<dynamic>)
           .whereType<Map>()
@@ -60,7 +101,7 @@ class NotificationInboxService {
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (_) {
-      return const [];
+      return [];
     }
   }
 
@@ -72,8 +113,12 @@ class NotificationInboxService {
     required String body,
     String? route,
     String? dedupeKey,
+    String? notificationType,
+    String? mediaId,
+    int? episodeNumber,
+    String? language,
   }) async {
-    final items = await load();
+    final items = (await load()).toList();
     final id = dedupeKey ?? '${DateTime.now().microsecondsSinceEpoch}';
     items.removeWhere((item) => item.id == id);
     items.insert(
@@ -84,47 +129,33 @@ class NotificationInboxService {
         body: body,
         createdAt: DateTime.now(),
         route: route,
+        notificationType: notificationType,
+        mediaId: mediaId,
+        episodeNumber: episodeNumber,
+        language: language,
       ),
     );
     await _save(items.take(_maxItems).toList());
   }
 
   Future<void> markRead(String id) async {
-    final items = await load();
+    final items = (await load()).toList();
     await _save([
       for (final item in items)
-        if (item.id == id)
-          InboxNotification(
-            id: item.id,
-            title: item.title,
-            body: item.body,
-            createdAt: item.createdAt,
-            route: item.route,
-            isRead: true,
-          )
-        else
-          item,
+        if (item.id == id) item.copyWith(isRead: true) else item,
     ]);
   }
 
   Future<void> delete(String id) async {
-    final items = await load();
+    final items = (await load()).toList();
     items.removeWhere((item) => item.id == id);
     await _save(items);
   }
 
   Future<void> markAllRead() async {
-    final items = await load();
+    final items = (await load()).toList();
     await _save([
-      for (final item in items)
-        InboxNotification(
-          id: item.id,
-          title: item.title,
-          body: item.body,
-          createdAt: item.createdAt,
-          route: item.route,
-          isRead: true,
-        ),
+      for (final item in items) item.copyWith(isRead: true),
     ]);
   }
 

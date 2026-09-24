@@ -42,9 +42,7 @@ class ContinueSection extends ConsumerWidget {
             if (entry.isCompletedOrFinished) return false;
             return true;
           }).toList()
-          ..sort(
-            (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
-          );
+          ..sort(AnimeWatchProgressEntry.compareByRecency);
 
     if (validEntries.isEmpty) return const SizedBox.shrink();
 

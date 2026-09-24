@@ -15,11 +15,15 @@ import 'package:workmanager/workmanager.dart';
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
-    if (task == updateCheckTask) {
+    if (task == updateCheckTask || task == '${updateCheckTask}_immediate') {
       return await _checkForAppUpdate(inputData);
     }
     if (task == "sync_tracking_task") {
       return await SyncTrackingTask.performSync(inputData);
+    }
+    if (task == NotificationService.notificationCheckTask) {
+      await EpisodeReleaseTask.performCheck();
+      return await NewsBackgroundTask.performUpdate();
     }
     await EpisodeReleaseTask.performCheck();
     return await NewsBackgroundTask.performUpdate();

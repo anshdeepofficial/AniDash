@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:ani_dash/main.dart';
 import 'package:ani_dash/core/models/manga/manga_reading_progress_model.dart';
 import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dart';
 import 'package:ani_dash/core/services/auth_provider_enum.dart';
@@ -16,6 +17,46 @@ import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'manga_details_screen.dart';
 import 'manga_reader_screen.dart';
 import 'manga_section_screen.dart';
+
+class _MangaChapterResolver {
+  static final List<({DMedia item, Source source, VoidCallback onResolved})>
+      _queue = [];
+  static int _activeRequests = 0;
+  static const int _maxConcurrency = 2;
+  static final Set<String> _pendingKeys = {};
+
+  static void enqueue(DMedia item, Source source, VoidCallback onResolved) {
+    final key = item.url ?? item.title;
+    if (key == null || key.isEmpty) return;
+    if (_pendingKeys.contains(key)) return;
+    _pendingKeys.add(key);
+
+    _queue.add((item: item, source: source, onResolved: onResolved));
+    _drainQueue();
+  }
+
+  static void _drainQueue() {
+    while (_activeRequests < _maxConcurrency && _queue.isNotEmpty) {
+      final next = _queue.removeAt(0);
+      final key = next.item.url ?? next.item.title;
+      if (key == null) continue;
+
+      _activeRequests++;
+      next.source.methods
+          .getDetail(next.item)
+          .timeout(const Duration(seconds: 4))
+          .then((detail) {
+        if (detail.episodes != null && detail.episodes!.isNotEmpty) {
+          sharedPrefs.setInt('manga_ch_count_$key', detail.episodes!.length);
+          next.onResolved();
+        }
+      }).catchError((_) {}).whenComplete(() {
+        _activeRequests--;
+        _drainQueue();
+      });
+    }
+  }
+}
 
 class MangaScreen extends ConsumerStatefulWidget {
   const MangaScreen({super.key});
@@ -270,7 +311,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               leading: const Icon(Iconsax.book),
                               title: Text(src.name ?? 'Unknown'),
                               subtitle: Text(
-                                'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
+                                'v${src.version ?? '0.0.1'} â€¢ ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
                               trailing:
                                   isSelected
@@ -307,7 +348,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                 ],
                               ),
                               subtitle: Text(
-                                'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
+                                'v${src.version ?? '0.0.1'} â€¢ ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
                               trailing:
                                   isSelected
@@ -350,6 +391,52 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
         ),
       );
     }
+  }
+
+  int? _getChapterCount(DMedia item) {
+    if (item.episodes != null && item.episodes!.isNotEmpty) {
+      return item.episodes!.length;
+    }
+    final key = item.url ?? item.title;
+    if (key != null && key.isNotEmpty) {
+      try {
+        final cached = sharedPrefs.getInt('manga_ch_count_$key');
+        if (cached != null) return cached;
+
+        final source = _getActiveMangaSource();
+        if (source != null) {
+          _MangaChapterResolver.enqueue(item, source, () {
+            if (mounted) setState(() {});
+          });
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildChapterBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.25),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        'Ch. $count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -693,6 +780,15 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                       left: 4,
                                       child: build18PlusBadge(fontSize: 8),
                                     ),
+                                  if (_getChapterCount(item) != null &&
+                                      _getChapterCount(item)! > 0)
+                                    Positioned(
+                                      bottom: 4,
+                                      right: 4,
+                                      child: _buildChapterBadge(
+                                        _getChapterCount(item)!,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -1006,7 +1102,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          '${entry.chapterTitle} • Page ${entry.pageIndex}/${entry.totalPages}',
+                          '${entry.chapterTitle} â€¢ Page ${entry.pageIndex}/${entry.totalPages}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -1069,7 +1165,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${entry.chapterTitle} • Page ${entry.pageIndex}/${entry.totalPages}',
+                  '${entry.chapterTitle} â€¢ Page ${entry.pageIndex}/${entry.totalPages}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1296,6 +1392,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
               final item = list[index];
               final isAdult =
                   isAdultSection || isMangaAdult(item, source: activeSource);
+              final chCount = _getChapterCount(item);
 
               return GestureDetector(
                 onTap: () => _openMangaDetails(item),
@@ -1345,6 +1442,13 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                   top: 6,
                                   left: 6,
                                   child: build18PlusBadge(fontSize: 8.5),
+                                ),
+                              // Chapter Badge
+                              if (chCount != null && chCount > 0)
+                                Positioned(
+                                  bottom: 6,
+                                  right: 6,
+                                  child: _buildChapterBadge(chCount),
                                 ),
                               // Bottom subtle gradient
                               Positioned(
@@ -1444,6 +1548,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 item,
                 source: _getActiveMangaSource(),
               );
+              final chCount = _getChapterCount(item);
 
               return InkWell(
                 onTap: () => _openMangaDetails(item),
@@ -1471,6 +1576,12 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                 top: 5,
                                 left: 5,
                                 child: build18PlusBadge(fontSize: 8.5),
+                              ),
+                            if (chCount != null && chCount > 0)
+                              Positioned(
+                                bottom: 5,
+                                right: 5,
+                                child: _buildChapterBadge(chCount),
                               ),
                           ],
                         ),

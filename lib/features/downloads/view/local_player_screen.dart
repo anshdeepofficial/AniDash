@@ -113,6 +113,7 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
             currentEpisode: widget.item.episodeNumber,
             totalEpisodes: existing?.totalEpisodes ?? downloadedEpisodeCount,
             lastUpdated: DateTime.now(),
+            lastPlayedAt: DateTime.now(),
           ),
     );
   }

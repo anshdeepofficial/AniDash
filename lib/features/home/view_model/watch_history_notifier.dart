@@ -65,10 +65,16 @@ class WatchHistoryNotifier extends _$WatchHistoryNotifier {
       if (e.isCompletedOrFinished) return true;
       return false;
     });
-    copy.sort(
-      (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
-    );
-    return copy;
+    final Map<String, AnimeWatchProgressEntry> uniqueMap = {};
+    for (final e in copy) {
+      if (!uniqueMap.containsKey(e.animeId) ||
+          e.effectiveLastPlayedTime.isAfter(uniqueMap[e.animeId]!.effectiveLastPlayedTime)) {
+        uniqueMap[e.animeId] = e;
+      }
+    }
+    final result = uniqueMap.values.toList()
+      ..sort(AnimeWatchProgressEntry.compareByRecency);
+    return result;
   }
 
   void setSearchQuery(String query) {

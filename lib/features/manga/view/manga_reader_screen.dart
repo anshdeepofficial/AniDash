@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/manga/manga_reading_progress_model.dart';
 import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dart';
 import 'package:ani_dash/features/manga/utils/manga_helpers.dart';
+import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/main.dart';
 
 enum _ReaderMode { vertical, book }
@@ -45,6 +46,7 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
   int _currentPage = 1;
   bool _showControls = true;
   late _ReaderMode _readerMode;
+  Orientation? _lastOrientation;
 
   @override
   void initState() {
@@ -62,12 +64,23 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
 
   @override
   void dispose() {
+    UIHelper.forcePortrait();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _saveProgress();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _toggleOrientation() {
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    if (isLandscape) {
+      UIHelper.forcePortrait();
+    } else {
+      UIHelper.forceLandscape();
+    }
   }
 
   bool _handleKeyEvent(KeyEvent event) {
@@ -204,7 +217,25 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
     sharedPrefs.setString('manga_reader_mode', mode.name);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mode == _ReaderMode.book && _pageController.hasClients) {
-        _pageController.jumpToPage(_currentPage - 1);
+        final isLandscape =
+            MediaQuery.orientationOf(context) == Orientation.landscape;
+        final targetPage =
+            isLandscape ? ((_currentPage - 1) ~/ 2) : (_currentPage - 1);
+        _pageController.jumpToPage(
+          targetPage.clamp(0, _pages.isNotEmpty ? _pages.length - 1 : 0),
+        );
+      } else if (mode == _ReaderMode.vertical &&
+          _scrollController.hasClients &&
+          _pages.length > 1) {
+        final targetFraction = (_currentPage - 1) / (_pages.length - 1);
+        final targetOffset =
+            targetFraction * _scrollController.position.maxScrollExtent;
+        _scrollController.jumpTo(
+          targetOffset.clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
       }
     });
   }
@@ -240,6 +271,7 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
     return PageView.builder(
       controller: _pageController,
       itemCount: totalCount,
+      physics: const BouncingScrollPhysics(),
       onPageChanged: (index) {
         final calculatedPage = twoPage ? (index * 2 + 1) : index + 1;
         setState(() => _currentPage = calculatedPage.clamp(1, _pages.length));
@@ -247,15 +279,53 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
       },
       itemBuilder: (context, index) {
         final first = twoPage ? (index * 2) : index;
-        if (!twoPage) return _pageImage(_pages[first], first);
-        return Row(
-          children: [
-            Expanded(child: _pageImage(_pages[first], first)),
-            if (first + 1 < _pages.length)
-              Expanded(child: _pageImage(_pages[first + 1], first + 1))
-            else
-              const Spacer(),
-          ],
+        final pageWidget = !twoPage
+            ? _pageImage(_pages[first], first)
+            : Row(
+                children: [
+                  Expanded(child: _pageImage(_pages[first], first)),
+                  if (first + 1 < _pages.length)
+                    Expanded(child: _pageImage(_pages[first + 1], first + 1))
+                  else
+                    const Spacer(),
+                ],
+              );
+
+        return AnimatedBuilder(
+          animation: _pageController,
+          builder: (context, child) {
+            double diff = 0.0;
+            if (_pageController.position.haveDimensions) {
+              diff = (_pageController.page ?? _pageController.initialPage.toDouble()) - index;
+            }
+            final normalized = diff.clamp(-1.0, 1.0);
+            if (normalized.abs() < 0.001) {
+              return child!;
+            }
+            final opacity = (1.0 - (normalized.abs() * 0.12)).clamp(0.0, 1.0);
+            return Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0006)
+                ..rotateY(normalized * 0.08),
+              alignment: normalized > 0 ? Alignment.centerRight : Alignment.centerLeft,
+              child: Opacity(
+                opacity: opacity,
+                child: child,
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: pageWidget,
+          ),
         );
       },
     );
@@ -263,13 +333,35 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final orientation = MediaQuery.orientationOf(context);
+    if (_lastOrientation != null && _lastOrientation != orientation) {
+      final isLandscape = orientation == Orientation.landscape;
+      _lastOrientation = orientation;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_readerMode == _ReaderMode.book && _pageController.hasClients) {
+          final targetPage =
+              isLandscape ? ((_currentPage - 1) ~/ 2) : (_currentPage - 1);
+          _pageController.jumpToPage(
+            targetPage.clamp(0, _pages.isNotEmpty ? _pages.length - 1 : 0),
+          );
+        }
+      });
+    } else {
+      _lastOrientation = orientation;
+    }
+
     final isAdult =
         widget.isAdult ||
         (widget.manga != null &&
             isMangaAdult(widget.manga!, source: widget.mangaSource));
 
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        _saveProgress();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Main Manga Viewer
@@ -477,6 +569,16 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
                       ),
                     ),
                   IconButton(
+                    tooltip: 'Toggle 2-Page Landscape',
+                    icon: Icon(
+                      MediaQuery.orientationOf(context) == Orientation.landscape
+                          ? Icons.stay_current_portrait_rounded
+                          : Icons.stay_current_landscape_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: _toggleOrientation,
+                  ),
+                  IconButton(
                     tooltip: 'Reader mode',
                     icon: const Icon(
                       Icons.menu_book_rounded,
@@ -565,6 +667,7 @@ class _MangaReaderScreenState extends ConsumerState<MangaReaderScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 }

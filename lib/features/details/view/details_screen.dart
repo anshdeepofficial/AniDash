@@ -15,6 +15,7 @@ class AnimeDetailsScreen extends ConsumerStatefulWidget {
   final String tag;
   final bool forceFetch;
   final bool fromHentaiHub;
+  final int initialTabIndex;
 
   const AnimeDetailsScreen({
     super.key,
@@ -22,6 +23,7 @@ class AnimeDetailsScreen extends ConsumerStatefulWidget {
     required this.tag,
     this.forceFetch = false,
     this.fromHentaiHub = false,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -35,7 +37,11 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = widget.anime.id;

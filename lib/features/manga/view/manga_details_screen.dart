@@ -3,6 +3,7 @@ import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/repositories/manga_reading_progress_repository.dart';
 import 'package:ani_dash/features/manga/utils/manga_helpers.dart';
 import 'manga_reader_screen.dart';
@@ -43,6 +44,14 @@ class _MangaDetailsScreenState extends ConsumerState<MangaDetailsScreen> {
       final details = await widget.mangaSource.methods
           .getDetail(widget.manga)
           .timeout(const Duration(seconds: 20));
+
+      if (details.episodes != null && details.episodes!.isNotEmpty) {
+        final cacheKey = widget.manga.url ?? widget.manga.title;
+        if (cacheKey != null && cacheKey.isNotEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('manga_ch_count_$cacheKey', details.episodes!.length);
+        }
+      }
 
       if (mounted) {
         setState(() {

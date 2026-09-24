@@ -24,6 +24,7 @@ class UpdateScheduler {
     if (!Platform.isAndroid) return;
     if (!settings.autoCheckEnabled) {
       await Workmanager().cancelByUniqueName(updateCheckTask);
+      await Workmanager().cancelByUniqueName('${updateCheckTask}_immediate');
       return;
     }
 
@@ -53,5 +54,20 @@ class UpdateScheduler {
         'fullDay': settings.fullDay,
       },
     );
+
+    // Immediate one-off check so the user does not wait for first periodic execution
+    if (insideWindow) {
+      await Workmanager().registerOneOffTask(
+        '${updateCheckTask}_immediate',
+        updateCheckTask,
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+        constraints: Constraints(networkType: NetworkType.connected),
+        inputData: {
+          'startHour': settings.startHour,
+          'endHour': settings.endHour,
+          'fullDay': settings.fullDay,
+        },
+      );
+    }
   }
 }

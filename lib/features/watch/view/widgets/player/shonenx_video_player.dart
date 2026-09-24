@@ -424,28 +424,28 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
         (_isDragSeekForward != isForward && _doubleTapPairCount > 0)) {
       _doubleTapPairCount = 1;
       _doubleTapAnchor = player.position;
-      _dragTargetPos = player.position;
-      _dragDiff = Duration.zero;
     } else {
       _doubleTapPairCount++;
-      final seconds = (_doubleTapPairCount - 1) * 10;
-      final signed = isForward ? seconds : -seconds;
-      final targetMs = (_doubleTapAnchor.inMilliseconds + signed * 1000).clamp(
-        0,
-        player.duration.inMilliseconds > 0
-            ? player.duration.inMilliseconds
-            : 24 * 60 * 60 * 1000,
-      );
-      _dragTargetPos = Duration(milliseconds: targetMs);
-      _dragDiff = Duration(seconds: signed);
     }
+
+    final seconds = _doubleTapPairCount * 10;
+    final signed = isForward ? seconds : -seconds;
+    final maxMs = player.duration.inMilliseconds > 0
+        ? player.duration.inMilliseconds
+        : 24 * 60 * 60 * 1000;
+    final targetMs = (_doubleTapAnchor.inMilliseconds + signed * 1000).clamp(
+      0,
+      maxMs,
+    );
+    _dragTargetPos = Duration(milliseconds: targetMs);
+    _dragDiff = Duration(seconds: signed);
 
     _isDragSeekForward = isForward;
     setState(() => _isDraggingSeek = true);
     _doubleTapTimer?.cancel();
     _doubleTapTimer = Timer(const Duration(milliseconds: 650), () {
       if (!mounted) return;
-      if (_doubleTapPairCount > 1) {
+      if (_doubleTapPairCount >= 1) {
         ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
       }
       setState(() {
@@ -656,6 +656,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                 child: PlayerGestureHandler(
                   onDoubleTapDown: _onDoubleTap,
                   onTap: () {
+                    if (_isDraggingSeek) return;
                     widget.onPanelCloseRequest?.call();
                     uiController.toggleVisibility();
                   },

@@ -58,6 +58,7 @@ class AppInitializer {
     await _initializeMediaKit();
     try {
       await NotificationService().initialize();
+      await NotificationService().registerPeriodicNotificationWorker();
       AppLogger.success('Notification service initialized');
     } catch (e, st) {
       AppLogger.fail('Notification service initialization failed');

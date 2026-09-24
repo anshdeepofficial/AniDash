@@ -6,8 +6,9 @@ abstract class WatchProgressRepositoryInterface {
   List<AnimeWatchProgressEntry> getAllProgress();
   Future<void> updateEpisodeProgress(
     String animeId,
-    EpisodeProgress episodeProgress,
-  );
+    EpisodeProgress episodeProgress, {
+    bool isLocalPlayback = false,
+  });
   Future<void> updateCurrentEpisode(
     String animeId,
     int currentEpisode, {

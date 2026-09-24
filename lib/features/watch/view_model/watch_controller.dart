@@ -84,7 +84,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _playbackActionSubscription?.cancel();
     NotificationService().hidePlaybackNotification();
     AudioFocusService().reset();
-    _triggerSave();
+    _triggerSave(force: true);
   }
 
   @override
@@ -501,6 +501,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   Future<void> _triggerSave({
     bool takeScreenshot = false,
     int? targetPos,
+    bool force = false,
   }) async {
     if (_mediaId == null || _epNum == null) return;
 
@@ -521,14 +522,15 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           dur: _dur,
           takeScreenshot: takeScreenshot,
           isAdult: _fromHentaiHub,
+          force: force,
         );
 
     if (newThumb != null) _epThumb = newThumb;
   }
 
-  Future<void> saveProgressManual({bool takeScreenshot = false}) async {
+  Future<void> saveProgressManual({bool takeScreenshot = false, bool force = false}) async {
     if (_isDisposed) return;
-    await _triggerSave(takeScreenshot: takeScreenshot);
+    await _triggerSave(takeScreenshot: takeScreenshot, force: force);
   }
 
   void _checkAniSkip(String mediaId, String animeName, Duration duration) {

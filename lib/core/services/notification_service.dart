@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/services/notification_inbox_service.dart';
 
@@ -34,6 +36,8 @@ class NotificationService {
 
   NotificationService._internal();
 
+  static const notificationCheckTask = 'anidash_notification_check';
+
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -44,6 +48,29 @@ class NotificationService {
   final StreamController<String> updateTapController =
       StreamController<String>.broadcast();
   Stream<String> get onUpdateTapped => updateTapController.stream;
+
+  final StreamController<String> notificationRouteController =
+      StreamController<String>.broadcast();
+  Stream<String> get onNotificationRoute => notificationRouteController.stream;
+
+  Future<void> registerPeriodicNotificationWorker({bool forceReplace = false}) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await Workmanager().registerPeriodicTask(
+        notificationCheckTask,
+        notificationCheckTask,
+        frequency: const Duration(minutes: 60),
+        existingWorkPolicy:
+            forceReplace ? ExistingWorkPolicy.replace : ExistingWorkPolicy.keep,
+        constraints: Constraints(networkType: NetworkType.connected),
+      );
+      AppLogger.i(
+        '[NotificationWorker] Registered unique periodic task "$notificationCheckTask" (frequency: 60m, policy: ${forceReplace ? "replace" : "keep"})',
+      );
+    } catch (e) {
+      AppLogger.w('Could not register periodic notification worker: $e');
+    }
+  }
 
   static const String _iconName = '@drawable/ic_notification';
   static const String _largeIconName = '@drawable/ic_notification_large';
@@ -100,6 +127,20 @@ class NotificationService {
           _instance.updateTapController.add(version);
         } else if (response.actionId != null) {
           _instance.playbackActionController.add(response.actionId!);
+        } else if (response.payload != null && response.payload!.isNotEmpty) {
+          final payload = response.payload!;
+          if (payload.startsWith('details:') || payload.startsWith('/details/')) {
+            final mediaId = payload.replaceFirst('details:', '').replaceFirst('/details/', '').trim();
+            final targetRoute = mediaId.contains('?')
+                ? (mediaId.startsWith('/') ? mediaId : '/details/$mediaId')
+                : '/details/$mediaId?tab=episodes';
+            _instance.notificationRouteController.add(targetRoute);
+          } else if (payload.startsWith('route:')) {
+            final route = payload.replaceFirst('route:', '').trim();
+            _instance.notificationRouteController.add(route);
+          } else if (payload == '/downloads' || payload == '/news' || payload == '/watchlist') {
+            _instance.notificationRouteController.add(payload);
+          }
         }
         AppLogger.infoPair('Notification tapped', response.payload);
       },
@@ -381,11 +422,31 @@ class NotificationService {
     required String animeTitle,
     required int episodeNumber,
     bool isDub = false,
+    String? mediaId,
+    String? customTitle,
+    String? customBody,
+    String? audioType,
+    String? dedupeKey,
   }) async {
+    final title = customTitle ?? (audioType == 'hindi_dub'
+        ? 'New Hindi Dub Available'
+        : (isDub || audioType == 'english_dub'
+            ? 'New English Dub Episode'
+            : 'New SUB Episode'));
+    final body = customBody ??
+        '$animeTitle Episode $episodeNumber is now available.';
+    final effectiveDedupeKey = dedupeKey ??
+        'release:${mediaId ?? animeTitle}:$episodeNumber:${audioType ?? (isDub ? "dub" : "sub")}';
+
     await NotificationInboxService().add(
-      title: 'New ${isDub ? 'Dub ' : 'Sub '}Episode',
-      body: 'Episode $episodeNumber of $animeTitle is now available.',
-      dedupeKey: 'release:$animeTitle:$episodeNumber:$isDub',
+      title: title,
+      body: body,
+      route: mediaId != null ? '/details/$mediaId?tab=episodes' : null,
+      dedupeKey: effectiveDedupeKey,
+      notificationType: audioType ?? (isDub ? 'dub' : 'sub'),
+      mediaId: mediaId,
+      episodeNumber: episodeNumber,
+      language: audioType == 'hindi_dub' ? 'hi' : (isDub || audioType == 'english_dub' ? 'en' : 'ja'),
     );
     await ensureSoundChannelsCreated();
 
@@ -398,23 +459,35 @@ class NotificationService {
       ),
     );
 
-    final type = isDub ? 'dub ' : '';
     await flutterLocalNotificationsPlugin.show(
-      animeTitle.hashCode ^ episodeNumber,
-      'New ${type.toUpperCase()}Episode Released!',
-      'New ${type}episode $episodeNumber of $animeTitle has been released. You can watch on AniDash.',
+      (mediaId ?? animeTitle).hashCode ^ episodeNumber ^ (audioType ?? '').hashCode,
+      title,
+      body,
       platformChannelSpecifics,
+      payload: mediaId != null ? 'details:$mediaId?tab=episodes' : null,
     );
   }
 
   Future<void> showContinueWatchingNotification({
     required String animeTitle,
     required int episodeNumber,
+    String? mediaId,
+    String? customBody,
   }) async {
+    final title = 'Continue Watching $animeTitle';
+    final body = customBody ??
+        'You stopped at Episode $episodeNumber. Continue where you left off.';
+    final effectiveDedupeKey =
+        'continue:${mediaId ?? animeTitle}:$episodeNumber';
+
     await NotificationInboxService().add(
-      title: 'Continue Watching',
-      body: 'Resume $animeTitle from Episode $episodeNumber.',
-      dedupeKey: 'continue:$animeTitle:$episodeNumber',
+      title: title,
+      body: body,
+      route: mediaId != null ? '/details/$mediaId?tab=episodes' : '/watchlist',
+      dedupeKey: effectiveDedupeKey,
+      notificationType: 'continue_watching',
+      mediaId: mediaId,
+      episodeNumber: episodeNumber,
     );
     await ensureSoundChannelsCreated();
 
@@ -429,10 +502,11 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      animeTitle.hashCode,
-      'Continue Watching',
-      'You stopped at Episode $episodeNumber of $animeTitle. Watch more on AniDash!',
+      (mediaId ?? animeTitle).hashCode,
+      title,
+      body,
       platformChannelSpecifics,
+      payload: mediaId != null ? 'details:$mediaId?tab=episodes' : '/watchlist',
     );
   }
 

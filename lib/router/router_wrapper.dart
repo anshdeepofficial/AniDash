@@ -101,6 +101,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _foregroundUpdateTimer;
   StreamSubscription<String>? _updateTapSubscription;
+  StreamSubscription<String>? _notificationRouteSubscription;
   ProviderSubscription? _updateSettingsSub;
 
   @override
@@ -127,6 +128,13 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         _checkForScheduledUpdate(isAppOpen: true, force: true);
       }
     });
+    _notificationRouteSubscription = NotificationService().onNotificationRoute.listen((
+      route,
+    ) {
+      if (mounted) {
+        context.push(route);
+      }
+    });
     _updateSettingsSub = ref.listenManual(updateSettingsProvider, (prev, next) {
       _startPeriodicForegroundUpdateCheck();
     });
@@ -150,6 +158,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     _foregroundUpdateTimer?.cancel();
     _updateSettingsSub?.close();
     _updateTapSubscription?.cancel();
+    _notificationRouteSubscription?.cancel();
     _connectivitySubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();

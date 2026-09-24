@@ -169,7 +169,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   (i == targetProgress && entry.progress == 0 ? 0 : 1440),
               durationInSeconds: existing?.durationInSeconds ?? 1440,
               isCompleted: i < targetProgress,
-              watchedAt: existing?.watchedAt ?? DateTime.now(),
+              watchedAt: existing?.watchedAt ??
+                  DateTime.fromMillisecondsSinceEpoch(0),
             );
           }
         }
@@ -189,14 +190,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   animeCover: cover,
                   totalEpisodes: media.episodes ?? 0,
                   episodesProgress: episodesMap,
-                  lastUpdated: DateTime.now(),
+                  lastUpdated: local?.lastUpdated ??
+                      DateTime.fromMillisecondsSinceEpoch(0),
+                  lastPlayedAt: local?.lastPlayedAt,
                   currentEpisode: targetProgress,
                   status: 'watching',
                 ))
             .copyWith(
               episodesProgress: episodesMap,
               currentEpisode: targetProgress,
-              lastUpdated: DateTime.now(),
+              lastPlayedAt: local?.lastPlayedAt,
               status: 'watching',
               animeTitle: title.isNotEmpty ? title : null,
               animeCover: cover.isNotEmpty ? cover : null,
@@ -421,7 +424,7 @@ final sortedWatchProgressProvider =
             .whereType<AnimeWatchProgressEntry>()
             .where((e) => !e.isAdult)
             .toList()
-          ..sort((a, b) => b.latestWatchTime.compareTo(a.latestWatchTime));
+          ..sort(AnimeWatchProgressEntry.compareByRecency);
       });
     });
 
@@ -488,7 +491,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
         final combinedList =
             merged.values.toList()
-              ..sort((a, b) => b.latestWatchTime.compareTo(a.latestWatchTime));
+              ..sort(AnimeWatchProgressEntry.compareByRecency);
 
         if (combinedList.isEmpty) return const SizedBox.shrink();
         return ContinueSection(allProgress: combinedList.take(15).toList());
@@ -502,9 +505,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   .getAllProgress()
                   .where((e) => !dismissedIds.contains(e.animeId))
                   .toList()
-                ..sort(
-                  (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
-                );
+                ..sort(AnimeWatchProgressEntry.compareByRecency);
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());
@@ -552,9 +553,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
                   .getAllProgress()
                   .where((e) => !dismissedIds.contains(e.animeId))
                   .toList()
-                ..sort(
-                  (a, b) => b.latestWatchTime.compareTo(a.latestWatchTime),
-                );
+                ..sort(AnimeWatchProgressEntry.compareByRecency);
         } catch (_) {}
         if (syncList.isNotEmpty) {
           return ContinueSection(allProgress: syncList.take(15).toList());

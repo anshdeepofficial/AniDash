@@ -200,13 +200,14 @@ class AnimeWatchProgressEntryAdapter
       currentEpisode: fields[7] == null ? 1 : (fields[7] as num).toInt(),
       status: fields[8] == null ? 'watching' : fields[8] as String,
       isAdult: fields[9] == null ? false : fields[9] as bool,
+      lastPlayedAt: fields[10] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AnimeWatchProgressEntry obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.animeId)
       ..writeByte(1)
@@ -226,7 +227,9 @@ class AnimeWatchProgressEntryAdapter
       ..writeByte(8)
       ..write(obj.status)
       ..writeByte(9)
-      ..write(obj.isAdult);
+      ..write(obj.isAdult)
+      ..writeByte(10)
+      ..write(obj.lastPlayedAt);
   }
 
   @override

@@ -514,7 +514,7 @@ class _HistoryTile extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
         subtitle: Text(
-          "$epText • ${DateFormat.MMMd().format(entry.latestWatchTime)}",
+          "$epText • ${DateFormat.MMMd().format(entry.effectiveLastPlayedTime)}",
           style: const TextStyle(fontSize: 12),
         ),
         trailing: Row(

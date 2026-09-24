@@ -55,6 +55,30 @@ class _CachedSourceEntry {
 }
 
 final Map<String, _CachedSourceEntry> _sourceCache = {};
+final Map<String, List<ServerData>> _serverListCache = {};
+final Map<String, String> _animeSearchMatchCache = {};
+final Map<String, List<EpisodeDataModel>> _animeEpisodesCache = {};
+
+class _PlaybackTiming {
+  final int episode;
+  final Stopwatch totalStopwatch = Stopwatch()..start();
+  int? mappingMs;
+  int? streamResolveMs;
+  int? playerOpenMs;
+
+  _PlaybackTiming({required this.episode});
+
+  void logSummary({String? server, String? provider}) {
+    totalStopwatch.stop();
+    AppLogger.d(
+      '[PlaybackTiming] Ep $episode (${provider ?? "unknown"}${server != null ? " / $server" : ""}) | '
+      'Mapping: ${mappingMs ?? 0}ms | '
+      'Stream: ${streamResolveMs ?? 0}ms | '
+      'Player Open: ${playerOpenMs ?? 0}ms | '
+      'Total: ${totalStopwatch.elapsedMilliseconds}ms',
+    );
+  }
+}
 
 @immutable
 class EpisodeDataState {
@@ -249,12 +273,17 @@ class EpisodeData extends _$EpisodeData {
     final targetMediaId = mediaId ?? _epList.animeId ?? _epList.mediaId;
     if (targetMediaId == null && episodeNumber == null) {
       _sourceCache.clear();
+      _serverListCache.clear();
+      _animeSearchMatchCache.clear();
+      _animeEpisodesCache.clear();
     } else if (targetMediaId != null && episodeNumber != null) {
       _sourceCache.removeWhere(
         (k, _) => k.startsWith('${targetMediaId}_$episodeNumber'),
       );
+      _serverListCache.remove('${targetMediaId}_$episodeNumber');
     } else if (targetMediaId != null) {
       _sourceCache.removeWhere((k, _) => k.startsWith('${targetMediaId}_'));
+      _serverListCache.removeWhere((k, _) => k.startsWith('${targetMediaId}_'));
     }
     _prefetchedEpNum = null;
     _prefetchedSourceData = null;
@@ -311,15 +340,20 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<void> changeServer(ServerData server) async {
+    final generation = ++_loadGeneration;
     AppLogger.infoPair('Changing Server', server.name ?? server.id);
     ref
         .read(playerSettingsProvider.notifier)
         .updateSettings((s) => s.copyWith(preferDub: server.isDub));
     state = state.copyWith(selectedServer: server);
-    await _playCurrent(ref.read(playerStateProvider).position);
+    await _playCurrent(
+      ref.read(playerStateProvider).position,
+      generation: generation,
+    );
   }
 
   Future<void> switchAudioLanguage(String language) async {
+    final generation = ++_loadGeneration;
     ref
         .read(playerSettingsProvider.notifier)
         .setPreferredAudioLanguage(language);
@@ -333,7 +367,10 @@ class EpisodeData extends _$EpisodeData {
           isDub: false,
         ),
       );
-      await _playCurrent(ref.read(playerStateProvider).position);
+      await _playCurrent(
+        ref.read(playerStateProvider).position,
+        generation: generation,
+      );
       return;
     }
 
@@ -351,7 +388,10 @@ class EpisodeData extends _$EpisodeData {
 
     AppLogger.i('Switching audio track to: ${isDub ? "DUB" : "SUB"}');
     state = state.copyWith(selectedServer: alt);
-    await _playCurrent(ref.read(playerStateProvider).position);
+    await _playCurrent(
+      ref.read(playerStateProvider).position,
+      generation: generation,
+    );
   }
 
   Future<void> toggleDubSub() async {
@@ -846,6 +886,27 @@ class EpisodeData extends _$EpisodeData {
       return;
     }
 
+    final cacheKey = '${_epList.animeId}_$epNum';
+    final cached = _serverListCache[cacheKey];
+    if (cached != null && cached.isNotEmpty) {
+      final preferDub = ref.read(playerSettingsProvider).preferDub;
+      final currentServer = state.selectedServer;
+      ServerData? selected;
+      if (currentServer != null) {
+        selected = cached.firstWhereOrNull(
+          (s) =>
+              (s.id == currentServer.id || s.name == currentServer.name) &&
+              s.isDub == currentServer.isDub,
+        );
+      }
+      selected ??= cached.firstWhereOrNull((s) => s.isDub == preferDub);
+      selected ??= cached.firstOrNull;
+
+      state = state.copyWith(servers: cached, selectedServer: selected);
+      AppLogger.d('Using cached servers (${cached.length}) for Ep $epNum');
+      return;
+    }
+
     state = state.copyWith(
       addState: EpisodeStreamState.SERVER_LOADING,
       clearError: true,
@@ -879,6 +940,7 @@ class EpisodeData extends _$EpisodeData {
       selected ??= list.firstWhereOrNull((s) => s.isDub == preferDub);
       selected ??= list.firstOrNull;
 
+      _serverListCache[cacheKey] = list;
       state = state.copyWith(servers: list, selectedServer: selected);
       AppLogger.success(
         'Fetched ${list.length} servers (Default: ${selected?.name}, Dub: ${selected?.isDub})',
@@ -895,6 +957,8 @@ class EpisodeData extends _$EpisodeData {
     final epNum = state.selectedEpisode;
     if (epNum == null) return;
 
+    final timing = _PlaybackTiming(episode: epNum);
+
     state = state.copyWith(
       addState: EpisodeStreamState.SOURCE_LOADING,
       clearError: true,
@@ -910,6 +974,7 @@ class EpisodeData extends _$EpisodeData {
       );
 
       BaseSourcesModel? data;
+      final streamSw = Stopwatch()..start();
       if (epNum == _prefetchedEpNum && _prefetchedSourceData != null) {
         AppLogger.success('⚡ Using pre-fetched stream data for Episode $epNum');
         data = _prefetchedSourceData;
@@ -919,8 +984,11 @@ class EpisodeData extends _$EpisodeData {
         data = await _fetchSourceData(
           epModel,
           server: state.selectedServer,
+          generation: activeGeneration,
         ).timeout(const Duration(seconds: 15));
       }
+      streamSw.stop();
+      timing.streamResolveMs = streamSw.elapsedMilliseconds;
 
       if (activeGeneration != _loadGeneration) return;
 
@@ -936,14 +1004,29 @@ class EpisodeData extends _$EpisodeData {
         headers: data.headers?.cast<String, String>(),
       );
       try {
-        await _loadSourceStream(0, startAt: startAt);
+        final playerSw = Stopwatch()..start();
+        await _loadSourceStream(
+          0,
+          startAt: startAt,
+          generation: activeGeneration,
+        );
+        playerSw.stop();
+        timing.playerOpenMs = playerSw.elapsedMilliseconds;
+        timing.logSummary(
+          server: state.selectedServer?.name ?? state.selectedServer?.id,
+          provider: _effectiveProvider?.providerName,
+        );
         if (activeGeneration != _loadGeneration) return;
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
         var alternateStarted = false;
         for (var index = 1; index < state.sources.length; index++) {
           try {
-            await _loadSourceStream(index, startAt: startAt);
+            await _loadSourceStream(
+              index,
+              startAt: startAt,
+              generation: activeGeneration,
+            );
             alternateStarted = true;
             break;
           } catch (_) {}
@@ -971,7 +1054,11 @@ class EpisodeData extends _$EpisodeData {
           }
         }
 
-        fallback ??= await _fetchFallbackNativeSourceData(epModel, category);
+        fallback ??= await _fetchFallbackNativeSourceData(
+          epModel,
+          category,
+          generation: activeGeneration,
+        );
         if (fallback != null && fallback.sources.isNotEmpty) {
           if (activeGeneration != _loadGeneration) return;
           ref
@@ -985,7 +1072,11 @@ class EpisodeData extends _$EpisodeData {
             subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
             headers: fallback.headers?.cast<String, String>(),
           );
-          await _loadSourceStream(0, startAt: startAt);
+          await _loadSourceStream(
+            0,
+            startAt: startAt,
+            generation: activeGeneration,
+          );
           return;
         }
 
@@ -1014,7 +1105,11 @@ class EpisodeData extends _$EpisodeData {
               languageNotice:
                   'The English DUB stream could not be loaded for this episode. Japanese SUB is playing.',
             );
-            await _loadSourceStream(0, startAt: startAt);
+            await _loadSourceStream(
+              0,
+              startAt: startAt,
+              generation: activeGeneration,
+            );
             return;
           }
         }
@@ -1061,8 +1156,11 @@ class EpisodeData extends _$EpisodeData {
   Future<void> _loadSourceStream(
     int sourceIdx, {
     required Duration startAt,
+    int? generation,
   }) async {
+    final activeGeneration = generation ?? _loadGeneration;
     if (sourceIdx < 0 || sourceIdx >= state.sources.length) return;
+    if (activeGeneration != _loadGeneration) return;
 
     state = state.copyWith(addState: EpisodeStreamState.QUALITY_LOADING);
 
@@ -1135,6 +1233,8 @@ class EpisodeData extends _$EpisodeData {
           )
           .timeout(const Duration(seconds: 15));
 
+      if (activeGeneration != _loadGeneration) return;
+
       final isDub = state.selectedServer?.isDub == true || primarySrc.isDub;
       if (!isDub) {
         final engIdx = state.subtitles.indexWhere(
@@ -1148,6 +1248,15 @@ class EpisodeData extends _$EpisodeData {
         selectedSourceIdx: sourceIdx,
         selectedQualityIdx: qIdx,
       );
+
+      // Light pre-fetch next episode metadata / stream after initial playback is rolling
+      if (ref.read(playerSettingsProvider).prefetchNextEpisode) {
+        Future.delayed(const Duration(seconds: 4), () {
+          if (activeGeneration == _loadGeneration && !_isPrefetching) {
+            prefetchNextEpisode();
+          }
+        });
+      }
 
       // In background, extract sub-qualities for M3U8 without delaying playback start
       if (primarySrc.isM3U8) {
@@ -1187,7 +1296,11 @@ class EpisodeData extends _$EpisodeData {
   Future<BaseSourcesModel?> _fetchSourceData(
     EpisodeDataModel ep, {
     ServerData? server,
+    int? generation,
   }) async {
+    final activeGeneration = generation ?? _loadGeneration;
+    if (activeGeneration != _loadGeneration) return null;
+
     final playerSettings = ref.read(playerSettingsProvider);
     final isHindiRequested = playerSettings.preferredAudioLanguage == 'hindi';
 
@@ -1439,14 +1552,22 @@ class EpisodeData extends _$EpisodeData {
       }
     }
 
-    final fallback = await _fetchFallbackNativeSourceData(ep, category);
+    final fallback = await _fetchFallbackNativeSourceData(
+      ep,
+      category,
+      generation: activeGeneration,
+    );
     return saveAndReturn(fallback);
   }
 
   Future<BaseSourcesModel?> _fetchFallbackNativeSourceData(
     EpisodeDataModel ep,
-    String category,
-  ) async {
+    String category, {
+    int? generation,
+  }) async {
+    final activeGeneration = generation ?? _loadGeneration;
+    if (activeGeneration != _loadGeneration) return null;
+
     final registry = ref.read(animeSourceRegistryProvider);
     final currentKey = ref.read(selectedProviderKeyProvider);
     final targetEpId =
@@ -1476,39 +1597,60 @@ class EpisodeData extends _$EpisodeData {
     for (final altKey in candidateKeys) {
       () async {
         try {
+          if (activeGeneration != _loadGeneration) return;
           final altProvider = registry.get(altKey);
           if (altProvider == null) return;
           AppLogger.w('Trying fallback provider for stream: $altKey');
-          final altSearch = await altProvider.getSearch(
-            cleanTitle.isNotEmpty ? cleanTitle : (_epList.animeTitle ?? ''),
-            null,
-            1,
-          );
-          final altMatch = altSearch.results.firstOrNull;
-          if (altMatch == null || altMatch.id == null) return;
+
+          final searchCacheKey = '$altKey:$cleanTitle';
+          String? altMatchId = _animeSearchMatchCache[searchCacheKey];
+          if (altMatchId == null) {
+            final altSearch = await altProvider.getSearch(
+              cleanTitle.isNotEmpty ? cleanTitle : (_epList.animeTitle ?? ''),
+              null,
+              1,
+            );
+            if (activeGeneration != _loadGeneration) return;
+            altMatchId = altSearch.results.firstOrNull?.id;
+            if (altMatchId != null) {
+              _animeSearchMatchCache[searchCacheKey] = altMatchId;
+            }
+          }
+          if (altMatchId == null) return;
 
           String resolvedEpId = ep.number?.toString() ?? targetEpId;
           if (altProvider.providerName != 'justanime') {
             try {
-              final altEps = await altProvider
-                  .getEpisodes(altMatch.id!)
-                  .timeout(const Duration(seconds: 4));
-              final targetEp = altEps.episodes?.firstWhereOrNull(
+              final episodeCacheKey = '$altKey:$altMatchId';
+              var altEpsList = _animeEpisodesCache[episodeCacheKey];
+              if (altEpsList == null) {
+                final altEps = await altProvider
+                    .getEpisodes(altMatchId)
+                    .timeout(const Duration(seconds: 4));
+                if (activeGeneration != _loadGeneration) return;
+                altEpsList = altEps.episodes;
+                if (altEpsList != null) {
+                  _animeEpisodesCache[episodeCacheKey] = altEpsList;
+                }
+              }
+              final targetEp = altEpsList?.firstWhereOrNull(
                 (e) => e.number == ep.number,
               );
               resolvedEpId =
                   targetEp?.id ??
-                  altEps.episodes?.firstOrNull?.id ??
+                  altEpsList?.firstOrNull?.id ??
                   resolvedEpId;
             } catch (_) {}
           }
 
+          if (activeGeneration != _loadGeneration) return;
           final altSources = await altProvider.getSources(
-            altMatch.id!,
+            altMatchId,
             resolvedEpId,
             null,
             category,
           );
+          if (activeGeneration != _loadGeneration) return;
           if (altSources.sources.isNotEmpty && !result.isCompleted) {
             AppLogger.success('Fallback provider $altKey found sources!');
             result.complete(altSources);

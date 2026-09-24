@@ -526,18 +526,35 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       children: [
                         Text(
                           () {
-                            final playerSettings = ref.watch(playerSettingsProvider);
+                            final playerSettings =
+                                ref.watch(playerSettingsProvider);
                             if (playerSettings.preferredAudioLanguage == 'hindi') {
-                              final preferred = HindiSourcePreferences.instance.getPreferredProvider();
-                              final hindiSources = ref.watch(hindiSourceManagerProvider);
-                              final matchedSource = hindiSources.firstWhereOrNull((s) => s.id == preferred) ??
+                              final preferred =
+                                  playerSettings.preferredHindiProvider ??
+                                  HindiSourcePreferences.instance
+                                      .getPreferredProvider();
+                              final hindiSources =
+                                  ref.watch(hindiSourceManagerProvider);
+                              final matchedSource =
+                                  hindiSources.firstWhereOrNull(
+                                    (s) => s.id == preferred,
+                                  ) ??
                                   hindiSources.firstWhereOrNull((s) => s.enabled);
                               return 'MATCHED ( by ${matchedSource?.name ?? "Hindi"} )';
                             }
-                            final sourceName = ref.watch(experimentalProvider).useExtensions
-                                ? ref.read(sourceProvider).activeAnimeSource?.name
-                                : ref.read(selectedAnimeProvider)?.providerName;
-                            return 'MATCHED ( by ${sourceName ?? "Unknown"} )';
+                            final sourceName =
+                                ref.watch(experimentalProvider).useExtensions
+                                    ? ref.watch(sourceProvider).activeAnimeSource?.name
+                                    : ref.watch(selectedAnimeProvider)?.providerName;
+                            String formatName(String? name) {
+                              if (name == null || name.isEmpty) return 'Unknown';
+                              if (name.toLowerCase() == 'hianime') return 'HiAnime';
+                              if (name.toLowerCase() == 'justanime') return 'JustAnime';
+                              if (name.toLowerCase() == 'anikoto') return 'AniKoto';
+                              return name.substring(0, 1).toUpperCase() +
+                                  name.substring(1);
+                            }
+                            return 'MATCHED ( by ${formatName(sourceName)} )';
                           }(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
@@ -1570,44 +1587,99 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       ...sourceState.installedAnimeExtensions,
     ];
     final seenIds = <dynamic>{};
-    final uniqueAvailable = allAvailable.where((s) => seenIds.add(s.id)).toList();
+    final uniqueAvailable =
+        allAvailable.where((s) => seenIds.add(s.id)).toList();
 
-    final sources =
+    final extensions =
         uniqueAvailable.where((s) {
             if (query.isEmpty) return true;
             return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
           }).toList()
-          ..sort((a, b) {
-            final aRecommended = a.name?.toLowerCase() == 'justanime';
-            final bRecommended = b.name?.toLowerCase() == 'justanime';
-            if (aRecommended != bRecommended) return aRecommended ? -1 : 1;
-            return (a.name ?? '').compareTo(b.name ?? '');
-          });
+          ..sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
 
     final isHindiActive =
         ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
+    final useExtensions = ref.watch(experimentalProvider).useExtensions;
+    final selectedNativeKey =
+        ref.watch(selectedProviderKeyProvider)?.toLowerCase();
     final activeId =
         sourceState.activeAdultAnimeSource?.id ??
         sourceState.activeAnimeSource?.id;
 
-    if (sources.isEmpty) {
+    final nativeSources = [
+      {'id': 'justanime', 'name': 'JustAnime', 'subtitle': 'Recommended • Built-in'},
+      {'id': 'hianime', 'name': 'HiAnime', 'subtitle': 'Sub & Dub • Built-in'},
+      {'id': 'anikoto', 'name': 'AniKoto', 'subtitle': 'Sub & Dub • Built-in'},
+    ].where((n) {
+      if (query.isEmpty) return true;
+      return n['name']!.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    if (nativeSources.isEmpty && extensions.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
-            'No extensions found.',
+            'No sources found.',
             textAlign: TextAlign.center,
           ),
         ),
       );
     }
 
+    final totalItems = nativeSources.length + extensions.length;
+
     return ListView.builder(
       controller: scrollController,
-      itemCount: sources.length,
+      itemCount: totalItems,
       itemBuilder: (context, index) {
-        final source = sources[index];
-        final isSelected = !isHindiActive && source.id == activeId;
+        if (index < nativeSources.length) {
+          final native = nativeSources[index];
+          final isSelected = !isHindiActive &&
+              !useExtensions &&
+              selectedNativeKey == native['id'];
+
+          return ListTile(
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              child: const Icon(Icons.play_circle_outline, size: 22),
+            ),
+            title: Text(native['name']!),
+            subtitle: Text(native['subtitle']!),
+            selected: isSelected,
+            trailing: isSelected
+                ? Icon(
+                    Icons.check_circle,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                : null,
+            onTap: () {
+              ref
+                  .read(selectedProviderKeyProvider.notifier)
+                  .select(native['id']!);
+              ref.read(experimentalProvider.notifier).toggleExtensions(false);
+              if (ref
+                      .read(playerSettingsProvider)
+                      .preferredAudioLanguage ==
+                  'hindi') {
+                ref.read(playerSettingsProvider.notifier).updateSettings(
+                      (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
+                    );
+              }
+              Navigator.pop(context);
+              notifier.refresh();
+            },
+          );
+        }
+
+        final extIndex = index - nativeSources.length;
+        final source = extensions[extIndex];
+        final isSelected = !isHindiActive && useExtensions && source.id == activeId;
         return ListTile(
           leading: Container(
             width: 40,
@@ -1628,16 +1700,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     : const Icon(Icons.extension, size: 20),
           ),
           title: Text(source.name ?? 'Unknown'),
-          subtitle: Text(
-            source.name?.toLowerCase() == 'justanime'
-                ? '${source.lang ?? ''} • Recommended'
-                : source.lang ?? '',
-          ),
+          subtitle: Text(source.lang ?? 'Extension'),
           selected: isSelected,
           trailing:
               isSelected
                   ? IconButton(
-                    icon: Icon(Icons.settings_rounded),
+                    icon: const Icon(Icons.settings_rounded),
                     color: Theme.of(context).colorScheme.primary,
                     onPressed:
                         () => context.push(
@@ -1646,12 +1714,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                         ),
                   )
                   : null,
-
           onTap: () {
             ref.read(selectedProviderKeyProvider.notifier).clear();
             ref.read(sourceProvider.notifier).setActiveSource(source);
             ref.read(experimentalProvider.notifier).toggleExtensions(true);
-            if (ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi') {
+            if (ref.read(playerSettingsProvider).preferredAudioLanguage ==
+                'hindi') {
               ref.read(playerSettingsProvider.notifier).updateSettings(
                     (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
                   );
@@ -1741,7 +1809,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               : null,
           onTap: () async {
             ref.read(playerSettingsProvider.notifier).updateSettings(
-                  (prev) => prev.copyWith(preferredAudioLanguage: 'hindi'),
+                  (prev) => prev.copyWith(
+                    preferredAudioLanguage: 'hindi',
+                    preferredHindiProvider: source.id,
+                  ),
                 );
             await HindiSourcePreferences.instance
                 .setPreferredProvider(source.id);

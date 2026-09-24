@@ -52,8 +52,9 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
     required int dur,
     bool takeScreenshot = false,
     bool isAdult = false,
+    bool force = false,
   }) async {
-    if (_repo == null || dur <= 0 || pos <= 0 || pos == _lastSavedPos) {
+    if (_repo == null || dur <= 0 || pos <= 0 || (!force && pos == _lastSavedPos)) {
       return epThumb;
     }
 
@@ -85,6 +86,7 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         entry = entry.copyWith(status: 'completed');
       }
 
+      final now = DateTime.now();
       final progress = EpisodeProgress(
         episodeNumber: epNum,
         episodeTitle: epTitle ?? 'Episode $epNum',
@@ -92,11 +94,20 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         progressInSeconds: pos,
         durationInSeconds: dur,
         isCompleted: isCompleted,
-        watchedAt: DateTime.now(),
+        watchedAt: now,
+      );
+
+      entry = entry.copyWith(
+        lastPlayedAt: now,
+        lastUpdated: now,
       );
 
       await _repo!.saveProgress(entry);
-      await _repo!.updateEpisodeProgress(mediaId, progress);
+      await _repo!.updateEpisodeProgress(
+        mediaId,
+        progress,
+        isLocalPlayback: true,
+      );
 
       _lastSavedPos = pos;
     } catch (e) {

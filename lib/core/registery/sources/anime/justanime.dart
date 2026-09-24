@@ -43,8 +43,20 @@ class JustAnimeProvider extends AnimeProvider {
     throw UnimplementedError();
   }
 
+  static final Map<String, ({DateTime time, SearchPage page})> _searchCache =
+      {};
+
   @override
   Future<SearchPage> getSearch(String keyword, String? type, int page) async {
+    final searchKey = keyword.trim().toLowerCase();
+    if (page == 1) {
+      final cached = _searchCache[searchKey];
+      if (cached != null &&
+          DateTime.now().difference(cached.time) < const Duration(minutes: 30)) {
+        return cached.page;
+      }
+    }
+
     Future<SearchPage> doSearch(String q) async {
       try {
         final url = Uri.parse(
@@ -55,7 +67,7 @@ class JustAnimeProvider extends AnimeProvider {
             .timeout(const Duration(seconds: 20));
         final Map<String, dynamic> decoded = json.decode(res.body);
         final results = (decoded['results'] as List<dynamic>? ?? const []);
-        return SearchPage(
+        final searchPage = SearchPage(
           results:
               results.map((raw) {
                 final item = Map<String, dynamic>.from(raw as Map);
@@ -74,6 +86,10 @@ class JustAnimeProvider extends AnimeProvider {
                 );
               }).toList(),
         );
+        if (page == 1 && searchPage.results.isNotEmpty) {
+          _searchCache[searchKey] = (time: DateTime.now(), page: searchPage);
+        }
+        return searchPage;
       } catch (_) {
         return SearchPage(results: []);
       }
@@ -221,7 +237,7 @@ class JustAnimeProvider extends AnimeProvider {
     final cacheKey = '$animeId:$episode:$serverName:$requestedAudio';
     final cached = _sourcesCache[cacheKey];
     if (cached != null &&
-        DateTime.now().difference(cached.time) < const Duration(minutes: 5)) {
+        DateTime.now().difference(cached.time) < const Duration(minutes: 20)) {
       return cached.data;
     }
 
@@ -415,17 +431,60 @@ class JustAnimeProvider extends AnimeProvider {
       }
     }
 
-    for (final ep in endpoints) {
-      try {
-        final payload = await request(ep).timeout(const Duration(seconds: 6));
+    final completer = Completer<BaseSourcesModel?>();
+    var isDone = false;
+    var nextIndex = 0;
+    var inFlight = 0;
+    var failedCount = 0;
+
+    void spawnNext() {
+      if (isDone || nextIndex >= endpoints.length) return;
+      final ep = endpoints[nextIndex++];
+      inFlight++;
+
+      request(ep).timeout(const Duration(seconds: 6)).then((payload) {
+        if (isDone) return;
         final model = parseSource(ep, payload);
-        if (model != null && model.sources.isNotEmpty) {
+        if (model != null && model.sources.isNotEmpty && !isDone) {
+          isDone = true;
           _sourcesCache[cacheKey] = (time: DateTime.now(), data: model);
-          return model;
+          if (!completer.isCompleted) completer.complete(model);
+          return;
         }
-      } catch (_) {
-        // Fallback to next endpoint in priority list
-      }
+        throw Exception('Empty or unplayable source');
+      }).catchError((_) {
+        failedCount++;
+        inFlight--;
+        if (failedCount >= endpoints.length && !isDone) {
+          isDone = true;
+          if (!completer.isCompleted) completer.complete(null);
+        } else if (!isDone && nextIndex < endpoints.length && inFlight < 2) {
+          spawnNext();
+        }
+      });
+    }
+
+    // Start candidate #1 immediately
+    spawnNext();
+
+    // Hedge with candidate #2 after 800ms if candidate #1 hasn't resolved
+    Timer? hedgeTimer;
+    if (endpoints.length > 1) {
+      hedgeTimer = Timer(const Duration(milliseconds: 800), () {
+        if (!isDone && inFlight < 2 && nextIndex < endpoints.length) {
+          spawnNext();
+        }
+      });
+    }
+
+    final resolvedModel = await completer.future.timeout(
+      const Duration(seconds: 12),
+      onTimeout: () => null,
+    );
+    hedgeTimer?.cancel();
+
+    if (resolvedModel != null && resolvedModel.sources.isNotEmpty) {
+      return resolvedModel;
     }
 
     throw Exception('No playable JustAnime source found for episode $episode');

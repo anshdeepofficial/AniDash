@@ -8,6 +8,7 @@ class AnimeWatchProgressEntry {
   final int totalEpisodes;
   final Map<int, EpisodeProgress> episodesProgress;
   final DateTime? lastUpdated;
+  final DateTime? lastPlayedAt;
   final int currentEpisode;
   final String status;
   final bool isAdult;
@@ -20,10 +21,44 @@ class AnimeWatchProgressEntry {
     required this.totalEpisodes,
     this.episodesProgress = const {},
     this.lastUpdated,
+    this.lastPlayedAt,
     this.currentEpisode = 1,
     this.status = 'watching',
     this.isAdult = false,
   });
+
+  DateTime get effectiveLastPlayedTime => lastPlayedAt ?? latestWatchTime;
+
+  static int compareByRecency(
+    AnimeWatchProgressEntry a,
+    AnimeWatchProgressEntry b,
+  ) {
+    // 1. Items with real local lastPlayedAt always come first
+    if (a.lastPlayedAt != null && b.lastPlayedAt == null) {
+      return -1;
+    }
+    if (a.lastPlayedAt == null && b.lastPlayedAt != null) {
+      return 1;
+    }
+
+    // 2. Both have real local lastPlayedAt: newest lastPlayedAt strictly wins
+    if (a.lastPlayedAt != null && b.lastPlayedAt != null) {
+      final cmp = b.lastPlayedAt!.compareTo(a.lastPlayedAt!);
+      if (cmp != 0) return cmp;
+      final titleCmp = a.animeTitle.compareTo(b.animeTitle);
+      if (titleCmp != 0) return titleCmp;
+      return a.animeId.compareTo(b.animeId);
+    }
+
+    // 3. Both have null lastPlayedAt: safe legacy fallback
+    final aTime = a.latestWatchTime;
+    final bTime = b.latestWatchTime;
+    final cmp = bTime.compareTo(aTime);
+    if (cmp != 0) return cmp;
+    final titleCmp = a.animeTitle.compareTo(b.animeTitle);
+    if (titleCmp != 0) return titleCmp;
+    return a.animeId.compareTo(b.animeId);
+  }
 
   DateTime get latestWatchTime {
     var latest = lastUpdated ?? DateTime(0);
@@ -102,6 +137,7 @@ class AnimeWatchProgressEntry {
     int? totalEpisodes,
     Map<int, EpisodeProgress>? episodesProgress,
     DateTime? lastUpdated,
+    DateTime? lastPlayedAt,
     int? currentEpisode,
     String? status,
     bool? isAdult,
@@ -114,6 +150,7 @@ class AnimeWatchProgressEntry {
       totalEpisodes: totalEpisodes ?? this.totalEpisodes,
       episodesProgress: episodesProgress ?? this.episodesProgress,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       currentEpisode: currentEpisode ?? this.currentEpisode,
       status: status ?? this.status,
       isAdult: isAdult ?? this.isAdult,
@@ -157,6 +194,7 @@ class AnimeWatchProgressEntry {
         (k, v) => MapEntry(k.toString(), v.toMap()),
       ),
       'lastUpdated': lastUpdated?.toIso8601String(),
+      'lastPlayedAt': lastPlayedAt?.toIso8601String(),
       'currentEpisode': currentEpisode,
       'status': status,
       'isAdult': isAdult,
@@ -180,6 +218,9 @@ class AnimeWatchProgressEntry {
           {},
       lastUpdated: map['lastUpdated'] != null
           ? DateTime.tryParse(map['lastUpdated'])
+          : null,
+      lastPlayedAt: map['lastPlayedAt'] != null
+          ? DateTime.tryParse(map['lastPlayedAt'])
           : null,
       currentEpisode: map['currentEpisode']?.toInt() ?? 1,
       status: map['status'] ?? 'watching',

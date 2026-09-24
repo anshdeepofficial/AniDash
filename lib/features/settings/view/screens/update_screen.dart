@@ -210,7 +210,9 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   accent: colorScheme.primary,
                   title: 'Check Interval',
                   description:
-                      'Check every ${settings.checkIntervalMinutes} minutes',
+                      settings.checkIntervalMinutes < 15
+                          ? 'Checks approximately every 15 minutes (Android WorkManager minimum)'
+                          : 'Checks approximately every ${settings.checkIntervalMinutes} minutes',
                   value: settings.checkIntervalMinutes.toDouble(),
                   min: 5,
                   max: 60,

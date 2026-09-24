@@ -396,7 +396,8 @@ class MediaTracker extends _$MediaTracker {
                 (existing?.durationInSeconds ?? 1440),
             durationInSeconds: existing?.durationInSeconds ?? 1440,
             isCompleted: true,
-            watchedAt: existing?.watchedAt ?? DateTime.now(),
+            watchedAt: existing?.watchedAt ??
+                DateTime.fromMillisecondsSinceEpoch(0),
           );
         }
       }
@@ -413,7 +414,9 @@ class MediaTracker extends _$MediaTracker {
                     media.coverImage.large ?? media.coverImage.medium ?? '',
                 totalEpisodes: media.episodes ?? 0,
                 episodesProgress: episodesMap,
-                lastUpdated: DateTime.now(),
+                lastUpdated: local?.lastUpdated ??
+                    DateTime.fromMillisecondsSinceEpoch(0),
+                lastPlayedAt: local?.lastPlayedAt,
                 currentEpisode: targetProgress,
                 status: isCompleted ? 'completed' : 'watching',
               ))
@@ -422,7 +425,7 @@ class MediaTracker extends _$MediaTracker {
             currentEpisode: targetProgress > (local?.currentEpisode ?? 0)
                 ? targetProgress
                 : local?.currentEpisode,
-            lastUpdated: DateTime.now(),
+            lastPlayedAt: local?.lastPlayedAt,
             status: isCompleted ? 'completed' : null,
           );
 

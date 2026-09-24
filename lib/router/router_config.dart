@@ -164,10 +164,14 @@ final routerConfig = GoRouter(
                   ),
                   coverImage: const UniversalCoverImage(),
                 );
+        final tabParam = state.uri.queryParameters['tab'];
+        final initialTabIndex =
+            tabParam == 'episodes' ? 1 : (int.tryParse(tabParam ?? '') ?? 0);
         return AnimeDetailsScreen(
           anime: anime,
           tag: state.uri.queryParameters['tag'] ?? '',
           forceFetch: true,
+          initialTabIndex: initialTabIndex,
         );
       },
     ),
@@ -185,10 +189,14 @@ final routerConfig = GoRouter(
                   ),
                   coverImage: const UniversalCoverImage(),
                 );
+        final tabParam = state.uri.queryParameters['tab'];
+        final initialTabIndex =
+            tabParam == 'episodes' ? 1 : (int.tryParse(tabParam ?? '') ?? 0);
         return AnimeDetailsScreen(
           anime: anime,
           tag: state.uri.queryParameters['tag'] ?? '',
           forceFetch: true,
+          initialTabIndex: initialTabIndex,
         );
       },
     ),
