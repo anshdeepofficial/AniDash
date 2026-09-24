@@ -81,6 +81,83 @@ class UiSettingsScreen extends ConsumerWidget {
                 ],
               ),
               SettingsSection(
+                title: 'Navigation Bar',
+                titleColor: colorScheme.primary,
+                children: [
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.home, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Home',
+                    description: 'Primary landing screen (Always enabled)',
+                    value: true,
+                    onChanged: (val) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Home tab cannot be disabled'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.search_normal_1, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Browse',
+                    description: 'Discover trending, popular and seasonal anime',
+                    value: uiSettings.showBrowseNav,
+                    onChanged: (value) {
+                      ref
+                          .read(uiSettingsProvider.notifier)
+                          .updateSettings(
+                            (s) => s.copyWith(showBrowseNav: value),
+                          );
+                    },
+                  ),
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.book, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Manga',
+                    description: 'Read manga chapters and titles',
+                    value: uiSettings.showMangaNav,
+                    onChanged: (value) {
+                      ref
+                          .read(uiSettingsProvider.notifier)
+                          .updateSettings(
+                            (s) => s.copyWith(showMangaNav: value),
+                          );
+                    },
+                  ),
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.receive_square, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Downloads',
+                    description: 'Offline episodes and manager',
+                    value: uiSettings.showDownloadsNav,
+                    onChanged: (value) {
+                      ref
+                          .read(uiSettingsProvider.notifier)
+                          .updateSettings(
+                            (s) => s.copyWith(showDownloadsNav: value),
+                          );
+                    },
+                  ),
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.bookmark, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Watchlist',
+                    description: 'Personal anime library and tracker',
+                    value: uiSettings.showWatchlistNav,
+                    onChanged: (value) {
+                      ref
+                          .read(uiSettingsProvider.notifier)
+                          .updateSettings(
+                            (s) => s.copyWith(showWatchlistNav: value),
+                          );
+                    },
+                  ),
+                ],
+              ),
+              SettingsSection(
                 title: "Responsive",
                 children: [
                   SliderSettingsItem(

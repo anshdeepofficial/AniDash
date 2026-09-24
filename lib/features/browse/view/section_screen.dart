@@ -68,9 +68,10 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Backend caps perPage at 50, fetch honestly up to 50 per request
       final response = await widget.fetchItems(
         page: _currentPage,
-        perPage: widget.ranked ? 100 : 20,
+        perPage: widget.ranked ? 50 : 20,
       );
       final newItems = response.data;
       if (mounted) {
@@ -80,6 +81,9 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
           } else {
             _items.addAll(newItems);
             _currentPage++;
+            if (newItems.length < (widget.ranked ? 50 : 20)) {
+              _hasMore = false;
+            }
           }
           _isLoading = false;
         });
@@ -96,6 +100,9 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
   Widget build(BuildContext context) {
     final mode = ref.watch(uiSettingsProvider).cardStyle;
     final size = mode.getDimensions(context);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Dynamic navigation inset: system bottom inset + custom floating nav height (~64px) + margin
+    final navBarPadding = bottomInset + 88.0;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -110,7 +117,7 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
               : widget.ranked
               ? ListView.separated(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+                padding: EdgeInsets.fromLTRB(12, 8, 12, navBarPadding),
                 itemCount: _items.length + 1,
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
@@ -133,18 +140,53 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
                   }
                   final media = _items[index];
                   final rank = index + 1;
-                  final podium = rank <= 3;
                   final title =
                       media.title.english ??
                       media.title.romaji ??
                       media.title.native ??
                       'Untitled';
+
+                  // Distinct podium treatments
+                  Color? rankColor;
+                  Color? rankBgColor;
+                  BorderSide? rankBorderSide;
+
+                  if (rank == 1) {
+                    // Gold
+                    rankColor = const Color(0xFFFFD700);
+                    rankBgColor = const Color(0xFFFFD700).withValues(alpha: 0.12);
+                    rankBorderSide = BorderSide(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.55),
+                      width: 1.2,
+                    );
+                  } else if (rank == 2) {
+                    // Silver
+                    rankColor = const Color(0xFFD6D6D6);
+                    rankBgColor = const Color(0xFFD6D6D6).withValues(alpha: 0.10);
+                    rankBorderSide = BorderSide(
+                      color: const Color(0xFFD6D6D6).withValues(alpha: 0.45),
+                      width: 1.2,
+                    );
+                  } else if (rank == 3) {
+                    // Bronze
+                    rankColor = const Color(0xFFCD7F32);
+                    rankBgColor = const Color(0xFFCD7F32).withValues(alpha: 0.12);
+                    rankBorderSide = BorderSide(
+                      color: const Color(0xFFCD7F32).withValues(alpha: 0.50),
+                      width: 1.2,
+                    );
+                  }
+
                   return Card(
-                    elevation: podium ? 2 : 0,
-                    color:
-                        podium
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : null,
+                    elevation: rank <= 3 ? 2 : 0,
+                    color: rankBgColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: rankBorderSide ?? BorderSide(
+                        color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+                        width: 0.8,
+                      ),
+                    ),
                     child: ListTile(
                       onTap:
                           () => navigateToDetail(
@@ -155,18 +197,16 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
                       leading: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
-                            width: 38,
+                          Container(
+                            width: 42,
+                            alignment: Alignment.center,
                             child: Text(
                               '#$rank',
                               style: Theme.of(
                                 context,
                               ).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w900,
-                                color:
-                                    podium
-                                        ? Theme.of(context).colorScheme.primary
-                                        : null,
+                                color: rankColor ?? Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -203,7 +243,7 @@ class _SectionScreenState extends ConsumerState<SectionScreen> {
                 },
               )
               : AniDashGridView(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.fromLTRB(10, 10, 10, navBarPadding),
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
                 mainAxisSpacing: 10,

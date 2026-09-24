@@ -17,6 +17,27 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
 
   void _reload() => setState(() => _items = _service.load());
 
+  String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inSeconds < 45) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
+      final m = diff.inMinutes;
+      return '$m ${m == 1 ? 'min' : 'mins'} ago';
+    } else if (diff.inHours < 24) {
+      final h = diff.inHours;
+      return '$h ${h == 1 ? 'hour' : 'hours'} ago';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} days ago';
+    } else {
+      return '${dt.day}/${dt.month}/${dt.year}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,14 +81,32 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
               return Card(
                 elevation: 0,
                 child: ListTile(
-                  leading: Icon(
-                    item.isRead
-                        ? Icons.notifications_none_rounded
-                        : Icons.notifications_active_rounded,
-                    color:
+                  leading: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
                         item.isRead
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : Theme.of(context).colorScheme.primary,
+                            ? Icons.notifications_none_rounded
+                            : Icons.notifications_active_rounded,
+                        color:
+                            item.isRead
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                : Theme.of(context).colorScheme.primary,
+                      ),
+                      if (!item.isRead)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   title: Text(
                     item.title,
@@ -76,15 +115,38 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                           item.isRead ? FontWeight.w500 : FontWeight.w800,
                     ),
                   ),
-                  subtitle: Text(item.body),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (item.body.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(item.body),
+                      ],
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTime(item.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Delete notification',
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () async {
+                      await _service.delete(item.id);
+                      _reload();
+                    },
+                  ),
                   onTap: () async {
                     await _service.markRead(item.id);
                     if (!context.mounted) return;
                     if (item.route?.isNotEmpty == true) {
                       context.push(item.route!);
-                    } else {
-                      _reload();
                     }
+                    _reload();
                   },
                 ),
               );

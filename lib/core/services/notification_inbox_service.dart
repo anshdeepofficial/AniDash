@@ -107,6 +107,12 @@ class NotificationInboxService {
     ]);
   }
 
+  Future<void> delete(String id) async {
+    final items = await load();
+    items.removeWhere((item) => item.id == id);
+    await _save(items);
+  }
+
   Future<void> markAllRead() async {
     final items = await load();
     await _save([

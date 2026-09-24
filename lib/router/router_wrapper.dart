@@ -19,35 +19,62 @@ import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/update_settings_notifier.dart';
 import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NavItem {
+  final int branchIndex;
   final String path;
   final IconData icon;
   final Widget screen;
+  final String label;
 
-  const NavItem({required this.path, required this.icon, required this.screen});
+  const NavItem({
+    required this.branchIndex,
+    required this.path,
+    required this.icon,
+    required this.screen,
+    required this.label,
+  });
 }
 
 final List<NavItem> navItems = [
-  const NavItem(path: '/', icon: Iconsax.home, screen: h_screen.HomeScreen()),
   const NavItem(
+    branchIndex: 0,
+    path: '/',
+    icon: Iconsax.home,
+    screen: h_screen.HomeScreen(),
+    label: 'Home',
+  ),
+  const NavItem(
+    branchIndex: 1,
     path: '/browse',
     icon: Iconsax.search_normal_1,
     screen: BrowseScreen(),
+    label: 'Browse',
   ),
-  const NavItem(path: '/manga', icon: Iconsax.book, screen: MangaScreen()),
   const NavItem(
+    branchIndex: 2,
+    path: '/manga',
+    icon: Iconsax.book,
+    screen: MangaScreen(),
+    label: 'Manga',
+  ),
+  const NavItem(
+    branchIndex: 3,
     path: '/downloads',
     icon: Iconsax.receive_square,
     screen: DownloadsScreen(),
+    label: 'Downloads',
   ),
   const NavItem(
+    branchIndex: 4,
     path: '/watchlist',
     icon: Iconsax.bookmark,
     screen: WatchlistScreen(),
+    label: 'Watchlist',
   ),
 ];
 
@@ -269,12 +296,6 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     }
   }
 
-  void _onPageChanged(int index) {
-    if (index != widget.navigationShell.currentIndex) {
-      widget.navigationShell.goBranch(index);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen(updateSettingsProvider, (previous, next) {
@@ -288,6 +309,37 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     });
 
     final isWide = MediaQuery.sizeOf(context).width > 800;
+    final uiSettings = ref.watch(uiSettingsProvider);
+
+    final visibleNavItems = navItems.where((item) {
+      switch (item.branchIndex) {
+        case 0:
+          return true; // Home is always enabled
+        case 1:
+          return uiSettings.showBrowseNav;
+        case 2:
+          return uiSettings.showMangaNav;
+        case 3:
+          return uiSettings.showDownloadsNav;
+        case 4:
+          return uiSettings.showWatchlistNav;
+        default:
+          return true;
+      }
+    }).toList();
+
+    // If active branch was disabled by user in settings, safely redirect to Home (branch 0)
+    final isCurrentVisible = visibleNavItems.any(
+      (item) => item.branchIndex == widget.navigationShell.currentIndex,
+    );
+    if (!isCurrentVisible && widget.navigationShell.currentIndex != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.navigationShell.goBranch(0);
+          _pageController.jumpToPage(0);
+        }
+      });
+    }
 
     return PopScope(
       canPop: false,
@@ -307,7 +359,16 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
           children: [
             PageView(
               controller: _pageController,
-              onPageChanged: _onPageChanged,
+              onPageChanged: (index) {
+                if (index != widget.navigationShell.currentIndex) {
+                  if (visibleNavItems.any((item) => item.branchIndex == index)) {
+                    widget.navigationShell.goBranch(index);
+                  } else {
+                    widget.navigationShell.goBranch(0);
+                    _pageController.jumpToPage(0);
+                  }
+                }
+              },
               physics: const BouncingScrollPhysics(),
               children:
                   widget.children.map((child) {
@@ -333,8 +394,14 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
               child: SafeArea(
                 child:
                     isWide
-                        ? _SideNav(shell: widget.navigationShell)
-                        : _BottomNav(shell: widget.navigationShell),
+                        ? _SideNav(
+                            shell: widget.navigationShell,
+                            items: visibleNavItems,
+                          )
+                        : _BottomNav(
+                            shell: widget.navigationShell,
+                            items: visibleNavItems,
+                          ),
               ),
             ),
           ],
@@ -346,8 +413,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
 class _SideNav extends StatelessWidget {
   final StatefulNavigationShell shell;
+  final List<NavItem> items;
 
-  const _SideNav({required this.shell});
+  const _SideNav({required this.shell, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -369,13 +437,14 @@ class _SideNav extends StatelessWidget {
         ],
       ),
       child: Column(
-        children: List.generate(navItems.length, (index) {
-          final isSelected = shell.currentIndex == index;
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          final isSelected = shell.currentIndex == item.branchIndex;
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.all(5),
               child: InkWell(
-                onTap: () => shell.goBranch(index),
+                onTap: () => shell.goBranch(item.branchIndex),
                 borderRadius: BorderRadius.circular(30),
                 child: Container(
                   decoration: BoxDecoration(
@@ -387,7 +456,7 @@ class _SideNav extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Icon(
-                    navItems[index].icon,
+                    item.icon,
                     color:
                         isSelected
                             ? colorScheme.primary
@@ -405,8 +474,9 @@ class _SideNav extends StatelessWidget {
 
 class _BottomNav extends StatelessWidget {
   final StatefulNavigationShell shell;
+  final List<NavItem> items;
 
-  const _BottomNav({required this.shell});
+  const _BottomNav({required this.shell, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -431,11 +501,12 @@ class _BottomNav extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(navItems.length, (index) {
-                final isSelected = shell.currentIndex == index;
+              children: List.generate(items.length, (index) {
+                final item = items[index];
+                final isSelected = shell.currentIndex == item.branchIndex;
                 return Expanded(
                   child: InkWell(
-                    onTap: () => shell.goBranch(index),
+                    onTap: () => shell.goBranch(item.branchIndex),
                     borderRadius: BorderRadius.circular(100),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -448,7 +519,7 @@ class _BottomNav extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: Icon(
-                        navItems[index].icon,
+                        item.icon,
                         color:
                             isSelected
                                 ? colorScheme.primary

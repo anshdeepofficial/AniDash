@@ -1257,9 +1257,6 @@ class EpisodeData extends _$EpisodeData {
           isDub: fallbackLang == 'dub',
         ),
       );
-      ref
-          .read(playerSettingsProvider.notifier)
-          .setPreferredAudioLanguage(fallbackLang);
     }
 
     AppLogger.d(

@@ -9,6 +9,10 @@ class UiSettings {
   final bool immersiveMode;
   final String episodeViewMode;
   final double scale;
+  final bool showBrowseNav;
+  final bool showMangaNav;
+  final bool showDownloadsNav;
+  final bool showWatchlistNav;
 
   UiSettings({
     this.cardStyle = AnimeCardMode.defaults,
@@ -16,6 +20,10 @@ class UiSettings {
     this.spotlightCardStyle = SpotlightCardMode.defaults,
     this.episodeViewMode = 'list',
     this.scale = 1.0,
+    this.showBrowseNav = true,
+    this.showMangaNav = true,
+    this.showDownloadsNav = true,
+    this.showWatchlistNav = true,
   });
 
   UiSettings copyWith({
@@ -24,6 +32,10 @@ class UiSettings {
     SpotlightCardMode? spotlightCardStyle,
     String? episodeViewMode,
     double? scale,
+    bool? showBrowseNav,
+    bool? showMangaNav,
+    bool? showDownloadsNav,
+    bool? showWatchlistNav,
   }) {
     return UiSettings(
       cardStyle: cardStyle ?? this.cardStyle,
@@ -31,6 +43,10 @@ class UiSettings {
       spotlightCardStyle: spotlightCardStyle ?? this.spotlightCardStyle,
       episodeViewMode: episodeViewMode ?? this.episodeViewMode,
       scale: scale ?? this.scale,
+      showBrowseNav: showBrowseNav ?? this.showBrowseNav,
+      showMangaNav: showMangaNav ?? this.showMangaNav,
+      showDownloadsNav: showDownloadsNav ?? this.showDownloadsNav,
+      showWatchlistNav: showWatchlistNav ?? this.showWatchlistNav,
     );
   }
 
@@ -41,6 +57,10 @@ class UiSettings {
       'spotlightCardStyle': spotlightCardStyle.index,
       'episodeViewMode': episodeViewMode,
       'scale': scale,
+      'showBrowseNav': showBrowseNav,
+      'showMangaNav': showMangaNav,
+      'showDownloadsNav': showDownloadsNav,
+      'showWatchlistNav': showWatchlistNav,
     };
   }
 
@@ -51,7 +71,11 @@ class UiSettings {
       spotlightCardStyle:
           SpotlightCardMode.values[map['spotlightCardStyle'] ?? 0],
       episodeViewMode: map['episodeViewMode'] ?? 'list',
-      scale: map['scale'] ?? 1.0,
+      scale: (map['scale'] as num?)?.toDouble() ?? 1.0,
+      showBrowseNav: map['showBrowseNav'] ?? true,
+      showMangaNav: map['showMangaNav'] ?? true,
+      showDownloadsNav: map['showDownloadsNav'] ?? true,
+      showWatchlistNav: map['showWatchlistNav'] ?? true,
     );
   }
 
