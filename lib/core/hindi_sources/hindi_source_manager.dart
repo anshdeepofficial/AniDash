@@ -386,7 +386,7 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
         final provider = _providers[manualProviderId];
         if (provider != null) {
           AppLogger.i('[Hindi] Manual provider selected: $manualProviderId');
-          return await _resolveWithSingleProvider(
+          final manualResult = await _resolveWithSingleProvider(
             provider: provider,
             animeTitle: animeTitle,
             romajiTitle: romajiTitle,
@@ -396,6 +396,8 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
             malId: malId,
             year: year,
           );
+          if (manualResult != null) return manualResult;
+          AppLogger.w('[Hindi] Manual provider $manualProviderId failed or has no stream. Trying next enabled Hindi providers.');
         }
       }
     }

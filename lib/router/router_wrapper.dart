@@ -220,10 +220,15 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         }
 
         // A foreground timer, app-resume callback and the background worker can
-        // all discover the same release. Present it at most once per 24 hours.
+        // all discover the same release. Present it at most once per 24 hours unless explicit reminder is due.
         final lastPresentedVersion = prefs.getString('last_presented_update');
         final lastPresentedAt = prefs.getInt('last_presented_update_time') ?? 0;
+        final isExplicitReminderDue =
+            remindVersion == latest &&
+            remindAfter > 0 &&
+            now.millisecondsSinceEpoch >= remindAfter;
         final wasRecentlyPresented =
+            !isExplicitReminderDue &&
             lastPresentedVersion == latest &&
             now.millisecondsSinceEpoch - lastPresentedAt <
                 const Duration(hours: 24).inMilliseconds;
@@ -273,26 +278,63 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     }
   }
 
+  List<NavItem> _getVisibleNavItems(dynamic uiSettings) {
+    return navItems.where((item) {
+      switch (item.branchIndex) {
+        case 0:
+          return true; // Home is always enabled
+        case 1:
+          return uiSettings.showBrowseNav as bool;
+        case 2:
+          return uiSettings.showMangaNav as bool;
+        case 3:
+          return uiSettings.showDownloadsNav as bool;
+        case 4:
+          return uiSettings.showWatchlistNav as bool;
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  int _pageIndexForBranch(int branchIndex, List<NavItem> visibleItems) {
+    final idx = visibleItems.indexWhere((it) => it.branchIndex == branchIndex);
+    return idx != -1 ? idx : 0;
+  }
+
+  void _onNavTap(int branchIndex, List<NavItem> visibleItems) {
+    final targetPage = _pageIndexForBranch(branchIndex, visibleItems);
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(targetPage);
+    }
+    widget.navigationShell.goBranch(branchIndex);
+  }
+
   Future<void> _openDownloadsOffline() async {
     final connections = await Connectivity().checkConnectivity();
     if (!mounted || widget.navigationShell.currentIndex != 0) return;
     if (connections.every(
       (connection) => connection == ConnectivityResult.none,
     )) {
+      final uiSettings = ref.read(uiSettingsProvider);
+      if (!uiSettings.showDownloadsNav) return;
+      final visibleItems = _getVisibleNavItems(uiSettings);
+      final targetPage = _pageIndexForBranch(3, visibleItems);
       widget.navigationShell.goBranch(3);
-      _pageController.jumpToPage(3);
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(targetPage);
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant AppRouterScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.navigationShell.currentIndex != _pageController.page?.round()) {
-      _pageController.animateToPage(
-        widget.navigationShell.currentIndex,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+    final uiSettings = ref.read(uiSettingsProvider);
+    final visibleItems = _getVisibleNavItems(uiSettings);
+    final targetPage = _pageIndexForBranch(widget.navigationShell.currentIndex, visibleItems);
+    if (_pageController.hasClients && _pageController.page?.round() != targetPage) {
+      _pageController.jumpToPage(targetPage);
     }
   }
 
@@ -310,23 +352,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
     final isWide = MediaQuery.sizeOf(context).width > 800;
     final uiSettings = ref.watch(uiSettingsProvider);
-
-    final visibleNavItems = navItems.where((item) {
-      switch (item.branchIndex) {
-        case 0:
-          return true; // Home is always enabled
-        case 1:
-          return uiSettings.showBrowseNav;
-        case 2:
-          return uiSettings.showMangaNav;
-        case 3:
-          return uiSettings.showDownloadsNav;
-        case 4:
-          return uiSettings.showWatchlistNav;
-        default:
-          return true;
-      }
-    }).toList();
+    final visibleNavItems = _getVisibleNavItems(uiSettings);
 
     // If active branch was disabled by user in settings, safely redirect to Home (branch 0)
     final isCurrentVisible = visibleNavItems.any(
@@ -336,7 +362,21 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           widget.navigationShell.goBranch(0);
-          _pageController.jumpToPage(0);
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(0);
+          }
+        }
+      });
+    }
+
+    final currentTargetPage = _pageIndexForBranch(
+      widget.navigationShell.currentIndex,
+      visibleNavItems,
+    );
+    if (_pageController.hasClients && _pageController.page?.round() != currentTargetPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients && _pageController.page?.round() != currentTargetPage) {
+          _pageController.jumpToPage(currentTargetPage);
         }
       });
     }
@@ -347,6 +387,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         if (didPop) return;
         if (widget.navigationShell.currentIndex != 0) {
           widget.navigationShell.goBranch(0);
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(0);
+          }
         } else {
           showExitConfirmationDialog(context, isSystemExit: true);
         }
@@ -359,19 +402,18 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
           children: [
             PageView(
               controller: _pageController,
-              onPageChanged: (index) {
-                if (index != widget.navigationShell.currentIndex) {
-                  if (visibleNavItems.any((item) => item.branchIndex == index)) {
-                    widget.navigationShell.goBranch(index);
-                  } else {
-                    widget.navigationShell.goBranch(0);
-                    _pageController.jumpToPage(0);
+              onPageChanged: (pageIndex) {
+                if (pageIndex >= 0 && pageIndex < visibleNavItems.length) {
+                  final targetBranch = visibleNavItems[pageIndex].branchIndex;
+                  if (targetBranch != widget.navigationShell.currentIndex) {
+                    widget.navigationShell.goBranch(targetBranch);
                   }
                 }
               },
               physics: const BouncingScrollPhysics(),
               children:
-                  widget.children.map((child) {
+                  visibleNavItems.map((item) {
+                    final child = widget.children[item.branchIndex];
                     return Padding(
                       padding: EdgeInsets.fromLTRB(
                         isWide ? 90 : 0,
@@ -397,10 +439,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
                         ? _SideNav(
                             shell: widget.navigationShell,
                             items: visibleNavItems,
+                            onTabSelected: (branch) => _onNavTap(branch, visibleNavItems),
                           )
                         : _BottomNav(
                             shell: widget.navigationShell,
                             items: visibleNavItems,
+                            onTabSelected: (branch) => _onNavTap(branch, visibleNavItems),
                           ),
               ),
             ),
@@ -414,8 +458,13 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 class _SideNav extends StatelessWidget {
   final StatefulNavigationShell shell;
   final List<NavItem> items;
+  final void Function(int branchIndex)? onTabSelected;
 
-  const _SideNav({required this.shell, required this.items});
+  const _SideNav({
+    required this.shell,
+    required this.items,
+    this.onTabSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -444,7 +493,13 @@ class _SideNav extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(5),
               child: InkWell(
-                onTap: () => shell.goBranch(item.branchIndex),
+                onTap: () {
+                  if (onTabSelected != null) {
+                    onTabSelected!(item.branchIndex);
+                  } else {
+                    shell.goBranch(item.branchIndex);
+                  }
+                },
                 borderRadius: BorderRadius.circular(30),
                 child: Container(
                   decoration: BoxDecoration(
@@ -475,8 +530,13 @@ class _SideNav extends StatelessWidget {
 class _BottomNav extends StatelessWidget {
   final StatefulNavigationShell shell;
   final List<NavItem> items;
+  final void Function(int branchIndex)? onTabSelected;
 
-  const _BottomNav({required this.shell, required this.items});
+  const _BottomNav({
+    required this.shell,
+    required this.items,
+    this.onTabSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +566,13 @@ class _BottomNav extends StatelessWidget {
                 final isSelected = shell.currentIndex == item.branchIndex;
                 return Expanded(
                   child: InkWell(
-                    onTap: () => shell.goBranch(item.branchIndex),
+                    onTap: () {
+                      if (onTabSelected != null) {
+                        onTabSelected!(item.branchIndex);
+                      } else {
+                        shell.goBranch(item.branchIndex);
+                      }
+                    },
                     borderRadius: BorderRadius.circular(100),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),

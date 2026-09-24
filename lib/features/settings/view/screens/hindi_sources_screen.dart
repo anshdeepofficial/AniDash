@@ -278,7 +278,7 @@ class _HindiSourcesScreenState extends ConsumerState<HindiSourcesScreen> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(9),
                             child: CachedNetworkImage(
-                              imageUrl: '${source.baseUrl}/favicon.ico',
+                              imageUrl: source.logoUrl,
                               width: 36,
                               height: 36,
                               fit: BoxFit.cover,

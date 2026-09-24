@@ -1584,6 +1584,8 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             return (a.name ?? '').compareTo(b.name ?? '');
           });
 
+    final isHindiActive =
+        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
     final activeId =
         sourceState.activeAdultAnimeSource?.id ??
         sourceState.activeAnimeSource?.id;
@@ -1605,7 +1607,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       itemCount: sources.length,
       itemBuilder: (context, index) {
         final source = sources[index];
-        final isSelected = source.id == activeId;
+        final isSelected = !isHindiActive && source.id == activeId;
         return ListTile(
           leading: Container(
             width: 40,
@@ -1706,7 +1708,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           leading: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: CachedNetworkImage(
-              imageUrl: '/favicon.ico',
+              imageUrl: source.logoUrl,
               width: 36,
               height: 36,
               fit: BoxFit.cover,

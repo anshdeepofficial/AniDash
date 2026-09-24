@@ -39,6 +39,12 @@ class HindiSourceModel {
     this.lastTestedTime,
   });
 
+  String get logoUrl {
+    if (baseUrl.isEmpty) return '';
+    final cleanUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    return '$cleanUrl/favicon.ico';
+  }
+
   HindiSourceModel copyWith({
     String? id,
     String? name,
