@@ -1,5 +1,186 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
+
+/// Formatter that automatically inserts colon separators from raw digits
+/// as the user types without requiring manual ':' entry.
+class TimeDigitInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Extract only digits from new value
+    final rawDigits = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (rawDigits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+
+    // Limit to max 6 digits (hhmmss)
+    final digits = rawDigits.length > 6 ? rawDigits.substring(0, 6) : rawDigits;
+
+    String formattedText;
+    if (digits.length == 1) {
+      formattedText = digits;
+    } else if (digits.length == 2) {
+      formattedText = digits;
+    } else if (digits.length == 3) {
+      if (digits.startsWith('0')) {
+        // e.g. 060 -> "06:0"
+        formattedText = '${digits.substring(0, 2)}:${digits[2]}';
+      } else {
+        // e.g. 607 -> "6:07"
+        formattedText = '${digits[0]}:${digits.substring(1)}';
+      }
+    } else if (digits.length == 4) {
+      // e.g. 0607 -> "06:07", 1234 -> "12:34", 0159 -> "01:59"
+      formattedText = '${digits.substring(0, 2)}:${digits.substring(2)}';
+    } else if (digits.length == 5) {
+      // e.g. 10203 -> "1:02:03"
+      formattedText = '${digits[0]}:${digits.substring(1, 3)}:${digits.substring(3)}';
+    } else {
+      // 6 digits: 010203 -> "01:02:03"
+      formattedText = '${digits.substring(0, 2)}:${digits.substring(2, 4)}:${digits.substring(4)}';
+    }
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
+}
+
+/// Parses jump-to-time user input in both raw digit buffer formats (607, 0607, 1234)
+/// and standard formatted/suffix formats (6:07, 06:07, 20m, etc.).
+Duration? parseJumpTimeInput(
+  String input, {
+  Duration totalDuration = Duration.zero,
+  void Function(String error)? onError,
+}) {
+  input = input.trim().toLowerCase();
+  if (input.isEmpty) return null;
+
+  // 1. Unit suffix format: e.g. "20m", "20min", "45s", "1h 30m"
+  if (input.contains('m') || input.contains('s') || input.contains('h')) {
+    int totalSec = 0;
+    final hourMatch = RegExp(r'(\d+)\s*(?:h|hr|hrs)').firstMatch(input);
+    final minMatch = RegExp(r'(\d+)\s*(?:m|min|mins)').firstMatch(input);
+    final secMatch = RegExp(r'(\d+)\s*(?:s|sec|secs)').firstMatch(input);
+
+    bool foundAny = false;
+    if (hourMatch != null) {
+      totalSec += int.parse(hourMatch.group(1)!) * 3600;
+      foundAny = true;
+    }
+    if (minMatch != null) {
+      totalSec += int.parse(minMatch.group(1)!) * 60;
+      foundAny = true;
+    }
+    if (secMatch != null) {
+      totalSec += int.parse(secMatch.group(1)!);
+      foundAny = true;
+    }
+
+    if (foundAny) return Duration(seconds: totalSec);
+  }
+
+  // 2. Colon separated format: mm:ss or hh:mm:ss
+  if (input.contains(':')) {
+    final parts = input.split(':');
+    if (parts.length == 2) {
+      final m = int.tryParse(parts[0].trim());
+      final s = int.tryParse(parts[1].trim());
+      if (m != null && s != null) {
+        if (s < 0 || s > 59) {
+          onError?.call('Seconds must be between 00 and 59');
+          return null;
+        }
+        return Duration(minutes: m, seconds: s);
+      }
+    } else if (parts.length == 3) {
+      final h = int.tryParse(parts[0].trim());
+      final m = int.tryParse(parts[1].trim());
+      final s = int.tryParse(parts[2].trim());
+      if (h != null && m != null && s != null) {
+        if (m < 0 || m > 59) {
+          onError?.call('Minutes must be between 00 and 59');
+          return null;
+        }
+        if (s < 0 || s > 59) {
+          onError?.call('Seconds must be between 00 and 59');
+          return null;
+        }
+        return Duration(hours: h, minutes: m, seconds: s);
+      }
+    }
+    onError?.call('Invalid time format (e.g. 6:07, 12:34)');
+    return null;
+  }
+
+  // 3. Raw digit buffer format (no colons entered by user or raw numeric input)
+  final digits = input.replaceAll(RegExp(r'[^\d]'), '');
+  if (digits.isNotEmpty) {
+    if (digits.length == 3) {
+      // e.g. 607 -> min 6, sec 07 (6 minutes, 7 seconds)
+      final m = int.parse(digits[0]);
+      final s = int.parse(digits.substring(1));
+      if (s > 59) {
+        onError?.call('Seconds must be between 00 and 59');
+        return null;
+      }
+      return Duration(minutes: m, seconds: s);
+    } else if (digits.length == 4) {
+      // e.g. 0607 -> min 06, sec 07; 1234 -> min 12, sec 34; 0159 -> min 1, sec 59
+      final m = int.parse(digits.substring(0, 2));
+      final s = int.parse(digits.substring(2));
+      if (s > 59) {
+        onError?.call('Seconds must be between 00 and 59');
+        return null;
+      }
+      return Duration(minutes: m, seconds: s);
+    } else if (digits.length == 5) {
+      final h = int.parse(digits[0]);
+      final m = int.parse(digits.substring(1, 3));
+      final s = int.parse(digits.substring(3));
+      if (m > 59 || s > 59) {
+        onError?.call('Minutes and seconds must be between 00 and 59');
+        return null;
+      }
+      return Duration(hours: h, minutes: m, seconds: s);
+    } else if (digits.length == 6) {
+      final h = int.parse(digits.substring(0, 2));
+      final m = int.parse(digits.substring(2, 4));
+      final s = int.parse(digits.substring(4));
+      if (m > 59 || s > 59) {
+        onError?.call('Minutes and seconds must be between 00 and 59');
+        return null;
+      }
+      return Duration(hours: h, minutes: m, seconds: s);
+    } else {
+      // 1 or 2 digits: treat as minutes
+      final plainNumber = int.tryParse(digits);
+      if (plainNumber != null) {
+        if (totalDuration > Duration.zero) {
+          final totalMinutes = totalDuration.inMinutes;
+          if (plainNumber <= totalMinutes) {
+            return Duration(minutes: plainNumber);
+          }
+          if (plainNumber <= totalDuration.inSeconds) {
+            return Duration(seconds: plainNumber);
+          }
+        }
+        return Duration(minutes: plainNumber);
+      }
+    }
+  }
+
+  onError?.call('Invalid format (e.g. 607, 06:07, 20 min)');
+  return null;
+}
 
 /// A dialog allowing users to seek or jump directly to a specific timestamp.
 /// Supports both in-player seeking and jumping into playback from Continue Watching.
@@ -58,11 +239,17 @@ class _JumpToTimeDialogState extends State<JumpToTimeDialog> {
       return;
     }
 
-    final parsed = _parseInput(text);
+    String? customError;
+    final parsed = parseJumpTimeInput(
+      text,
+      totalDuration: widget.totalDuration,
+      onError: (err) => customError = err,
+    );
+
     setState(() {
       if (parsed == null) {
         _parsedDuration = null;
-        _errorMessage = 'Invalid format (e.g. 20, 20:00, 1:15:00)';
+        _errorMessage = customError ?? 'Invalid format (e.g. 607, 06:07, 20 min)';
       } else {
         if (widget.totalDuration > Duration.zero &&
             parsed > widget.totalDuration) {
@@ -75,77 +262,6 @@ class _JumpToTimeDialogState extends State<JumpToTimeDialog> {
         }
       }
     });
-  }
-
-  Duration? _parseInput(String input) {
-    input = input.trim().toLowerCase();
-
-    // 1. Colon separated format: mm:ss or hh:mm:ss
-    if (input.contains(':')) {
-      final parts = input.split(':');
-      if (parts.length == 2) {
-        final m = int.tryParse(parts[0].trim());
-        final s = int.tryParse(parts[1].trim());
-        if (m != null && s != null && s >= 0 && s < 60) {
-          return Duration(minutes: m, seconds: s);
-        }
-      } else if (parts.length == 3) {
-        final h = int.tryParse(parts[0].trim());
-        final m = int.tryParse(parts[1].trim());
-        final s = int.tryParse(parts[2].trim());
-        if (h != null &&
-            m != null &&
-            s != null &&
-            m >= 0 &&
-            m < 60 &&
-            s >= 0 &&
-            s < 60) {
-          return Duration(hours: h, minutes: m, seconds: s);
-        }
-      }
-      return null;
-    }
-
-    // 2. Unit suffix format: e.g. "20m", "20min", "45s", "1h 30m"
-    if (input.contains('m') || input.contains('s') || input.contains('h')) {
-      int totalSec = 0;
-      final hourMatch = RegExp(r'(\d+)\s*(?:h|hr|hrs)').firstMatch(input);
-      final minMatch = RegExp(r'(\d+)\s*(?:m|min|mins)').firstMatch(input);
-      final secMatch = RegExp(r'(\d+)\s*(?:s|sec|secs)').firstMatch(input);
-
-      bool foundAny = false;
-      if (hourMatch != null) {
-        totalSec += int.parse(hourMatch.group(1)!) * 3600;
-        foundAny = true;
-      }
-      if (minMatch != null) {
-        totalSec += int.parse(minMatch.group(1)!) * 60;
-        foundAny = true;
-      }
-      if (secMatch != null) {
-        totalSec += int.parse(secMatch.group(1)!);
-        foundAny = true;
-      }
-
-      if (foundAny) return Duration(seconds: totalSec);
-    }
-
-    // 3. Plain integer: e.g. "20"
-    final plainNumber = int.tryParse(input);
-    if (plainNumber != null && plainNumber >= 0) {
-      if (widget.totalDuration > Duration.zero) {
-        final totalMinutes = widget.totalDuration.inMinutes;
-        if (plainNumber <= totalMinutes) {
-          return Duration(minutes: plainNumber);
-        }
-        if (plainNumber <= widget.totalDuration.inSeconds) {
-          return Duration(seconds: plainNumber);
-        }
-      }
-      return Duration(minutes: plainNumber);
-    }
-
-    return null;
   }
 
   void _submit() {
@@ -261,6 +377,7 @@ class _JumpToTimeDialogState extends State<JumpToTimeDialog> {
                 focusNode: _focusNode,
                 autofocus: true,
                 keyboardType: TextInputType.datetime,
+                inputFormatters: [TimeDigitInputFormatter()],
                 textInputAction: TextInputAction.done,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,

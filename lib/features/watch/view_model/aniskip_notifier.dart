@@ -168,11 +168,11 @@ class AniSkipNotifier extends _$AniSkipNotifier {
         _malIdCache[mediaId] = malId;
         _malIdCache[cacheKey] = malId;
 
-        AppLogger.d('Resolved MAL ID $malId for $animeTitle ($mediaId)');
+        final effectiveLength = episodeLength > 0 ? episodeLength : 1440;
         final results = await aniSkipService.getSkipTimes(
           malId,
           episodeNumber,
-          episodeLength,
+          effectiveLength,
         );
         // Merge AniSkip results: Stream source intro/outro always takes absolute priority!
         state = _mergeWithSourcePriority(results);

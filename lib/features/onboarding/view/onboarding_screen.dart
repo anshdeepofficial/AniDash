@@ -21,6 +21,8 @@ import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/update_provider.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
+import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
+import 'package:ani_dash/shared/ui/hindi_provider_icon.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -282,10 +284,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               color: scheme.primaryContainer,
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Icon(
-              Icons.play_circle_fill_rounded,
-              size: 68,
-              color: scheme.primary,
+            padding: const EdgeInsets.all(16),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/icons/anidash_logo.png',
+              fit: BoxFit.contain,
             ),
           ),
           const SizedBox(height: 34),
@@ -439,19 +442,74 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         Expanded(
           child: providerStatus.when(
-            data:
-                (statusData) => ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: animeSources.length + hindiSources.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    if (index >= animeSources.length) {
-                      final source = hindiSources[index - animeSources.length];
-                      final selected =
-                          playerSettings.preferredAudioLanguage == 'hindi' &&
-                          playerSettings.preferredHindiProvider == source.id;
-                      return SelectableSettingsItem(
-                        icon: const Icon(Icons.language_rounded),
+            data: (statusData) => ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                  child: Text(
+                    'EXTENSIONS & CANONICAL',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                for (final provider in animeSources) ...[
+                  Builder(builder: (context) {
+                    final status = statusData[provider]?['status'] as String?;
+                    final isSelected = selectedAnimeSource?.providerName ==
+                        provider.toLowerCase();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: SelectableSettingsItem(
+                        icon: Icon(_getStatusIcon(status)),
+                        iconColor: _getStatusColor(status),
+                        accent: _getStatusColor(status),
+                        title: provider == 'justanime'
+                            ? 'JUSTANIME  •  RECOMMENDED'
+                            : provider.toUpperCase(),
+                        description: provider == 'justanime'
+                            ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
+                            : status?.toUpperCase() ?? 'UNKNOWN',
+                        isInSelectionMode: true,
+                        isSelected: isSelected,
+                        onTap: () {
+                          ref
+                              .read(selectedProviderKeyProvider.notifier)
+                              .select(provider);
+                        },
+                      ),
+                    );
+                  }),
+                ],
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                  child: Text(
+                    'HINDI SOURCES',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                for (final source in hindiSources) ...[
+                  Builder(builder: (context) {
+                    final selected =
+                        playerSettings.preferredHindiProvider == source.id ||
+                        (playerSettings.preferredHindiProvider == null &&
+                            source.id ==
+                                HindiSourcePreferences.instance
+                                    .getPreferredProvider());
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: SelectableSettingsItem(
+                        leading: HindiProviderIcon(source: source, size: 28, borderRadius: 6),
                         iconColor: Colors.green,
                         accent: Colors.green,
                         title: source.name.toUpperCase(),
@@ -462,42 +520,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           final notifier = ref.read(
                             playerSettingsProvider.notifier,
                           );
-                          notifier.setPreferredAudioLanguage('hindi');
                           notifier.setPreferredHindiProvider(source.id);
+                          HindiSourcePreferences.instance
+                              .setPreferredProvider(source.id);
                         },
-                      );
-                    }
-                    final provider = animeSources[index];
-                    final status = statusData[provider]?['status'] as String?;
-                    final isSelected =
-                        selectedAnimeSource?.providerName ==
-                        provider.toLowerCase();
-
-                    return SelectableSettingsItem(
-                      icon: Icon(_getStatusIcon(status)),
-                      iconColor: _getStatusColor(status),
-                      accent: _getStatusColor(status),
-                      title:
-                          provider == 'justanime'
-                              ? 'JUSTANIME  •  RECOMMENDED'
-                              : provider.toUpperCase(),
-                      description:
-                          provider == 'justanime'
-                              ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
-                              : status?.toUpperCase() ?? 'UNKNOWN',
-                      isInSelectionMode: true,
-                      isSelected: isSelected,
-                      onTap: () {
-                        ref
-                            .read(selectedProviderKeyProvider.notifier)
-                            .select(provider);
-                        ref
-                            .read(playerSettingsProvider.notifier)
-                            .setPreferredAudioLanguage('sub');
-                      },
+                      ),
                     );
-                  },
-                ),
+                  }),
+                ],
+              ],
+            ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Center(child: Text('Error: $e')),
           ),

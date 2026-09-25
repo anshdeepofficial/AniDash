@@ -84,6 +84,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _playbackActionSubscription?.cancel();
     NotificationService().hidePlaybackNotification();
     AudioFocusService().reset();
+    try {
+      ref.read(playerStateProvider.notifier).setActiveSession(null, null);
+    } catch (_) {}
     _triggerSave(force: true);
   }
 
@@ -169,6 +172,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   }) async {
     _isDisposed = false;
     _wasPlayingBeforeLock = false;
+
+    // If the player has an active session for a different anime, stop and clear it
+    final playerNotifier = ref.read(playerStateProvider.notifier);
+    if (playerNotifier.activeMediaId != null &&
+        playerNotifier.activeMediaId != mediaId) {
+      AppLogger.i(
+        'Clearing stale player session: ${playerNotifier.activeMediaId} -> $mediaId',
+      );
+      await playerNotifier.pause();
+      playerNotifier.setActiveSession(null, null);
+    }
 
     _mediaId = mediaId;
     _animeName = animeName;

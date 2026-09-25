@@ -306,24 +306,22 @@ class ActionPanel extends StatelessWidget {
   }
 }
 
-class _NotificationInboxButton extends StatelessWidget {
+class _NotificationInboxButton extends ConsumerWidget {
   const _NotificationInboxButton();
 
   @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<int>(
-      future: NotificationInboxService().unreadCount(),
-      builder: (context, snapshot) {
-        final count = snapshot.data ?? 0;
-        return Badge(
-          isLabelVisible: count > 0,
-          label: Text(count > 99 ? '99+' : '$count'),
-          child: _ActionButton(
-            icon: Icons.notifications_none_rounded,
-            onTap: () => context.push('/notifications'),
-          ),
-        );
-      },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(unreadNotificationCountProvider);
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text(count > 99 ? '99+' : '$count'),
+      child: _ActionButton(
+        icon: Icons.notifications_none_rounded,
+        onTap: () async {
+          await context.push('/notifications');
+          ref.read(unreadNotificationCountProvider.notifier).refresh();
+        },
+      ),
     );
   }
 }

@@ -52,7 +52,8 @@ Future<BaseAnimeModel?> providerAnimeMatchSearch({
       return restoredAnime;
     }
 
-    if (directAutoMatch && withAnimeMatch) {
+    final selectedKey = ref.read(selectedProviderKeyProvider)?.toLowerCase();
+    if ((directAutoMatch || selectedKey == 'justanime') && withAnimeMatch) {
       final match = await ref
           .read(animeMatchServiceProvider)
           .findBestMatch(

@@ -5,6 +5,7 @@ import 'package:ani_dash/core/models/anime/source_model.dart';
 import 'package:ani_dash/core/hindi_sources/interfaces/hindi_playback_provider.dart';
 import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/helpers/matcher.dart';
 
 class AnimeDriveProvider implements HindiPlaybackProvider {
   @override
@@ -108,27 +109,20 @@ class AnimeDriveProvider implements HindiPlaybackProvider {
 
       if (candidates.isEmpty) return null;
 
-      final normalizedTarget = title.toLowerCase();
-      final targetTokens = normalizedTarget.split(' ').where((t) => t.length > 2).toSet();
+      final matches = getBestMatches<Map<String, String>>(
+        results: candidates,
+        title: title,
+        nameSelector: (c) => c['title'],
+        idSelector: (c) => c['url'],
+        minThreshold: 0.5,
+      );
 
-      Map<String, String>? bestMatch;
-      int bestScore = -1;
-
-      for (final c in candidates) {
-        final cTitleNorm = c['title']!.toLowerCase();
-        if (cTitleNorm == normalizedTarget) {
-          bestMatch = c;
-          break;
-        }
-        final cTokens = cTitleNorm.split(' ').where((t) => t.length > 2).toSet();
-        final common = targetTokens.intersection(cTokens).length;
-        if (common > bestScore) {
-          bestScore = common;
-          bestMatch = c;
-        }
+      if (matches.isNotEmpty) {
+        final best = matches.first.result;
+        AppLogger.d('[AnimeDrive] Matched: ${best['title']} (score: ${matches.first.similarity})');
+        return best['url'];
       }
-
-      return bestMatch?['url'];
+      return null;
     } catch (e) {
       AppLogger.w('[AnimeDrive] Search error: $e');
       return null;

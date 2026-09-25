@@ -245,7 +245,7 @@ class JustAnimeProvider extends AnimeProvider {
       try {
         final response = await UniversalHttpClient.instance
             .get(Uri.parse('$apiUrl$path'), headers: headers)
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode < 200 || response.statusCode >= 300) {
           return null;
         }
@@ -418,10 +418,10 @@ class JustAnimeProvider extends AnimeProvider {
       endpoints.add('/watch/$animeId/episode/$episode/animegg');
     }
 
-    // Default priority order: Zoko (ZokoAnime / 1embed.buzz) > Momo (Megaplay) > Gigi (AnimeGG) > Neko (AniNeko)
+    // Default priority order: Momo (Megaplay - has exact intro/outro timestamps) > Zoko (ZokoAnime) > Gigi (AnimeGG) > Neko (AniNeko)
     final priorityEndpoints = [
-      '/watch/$animeId/episode/$episode/zokoanime',
       '/watch/$animeId/episode/$episode/megaplay',
+      '/watch/$animeId/episode/$episode/zokoanime',
       '/watch/$animeId/episode/$episode/animegg',
       '/watch/$animeId/episode/$episode/anineko/$requestedAudio',
     ];
@@ -436,19 +436,35 @@ class JustAnimeProvider extends AnimeProvider {
     var nextIndex = 0;
     var inFlight = 0;
     var failedCount = 0;
+    Intro? discoveredIntro;
+    Intro? discoveredOutro;
 
     void spawnNext() {
       if (isDone || nextIndex >= endpoints.length) return;
       final ep = endpoints[nextIndex++];
       inFlight++;
 
-      request(ep).timeout(const Duration(seconds: 6)).then((payload) {
-        if (isDone) return;
+      request(ep).timeout(const Duration(seconds: 12)).then((payload) {
         final model = parseSource(ep, payload);
+        if (model != null) {
+          if (model.intro != null && discoveredIntro == null) {
+            discoveredIntro = model.intro;
+          }
+          if (model.outro != null && discoveredOutro == null) {
+            discoveredOutro = model.outro;
+          }
+        }
         if (model != null && model.sources.isNotEmpty && !isDone) {
           isDone = true;
-          _sourcesCache[cacheKey] = (time: DateTime.now(), data: model);
-          if (!completer.isCompleted) completer.complete(model);
+          final finalModel = BaseSourcesModel(
+            sources: model.sources,
+            tracks: model.tracks,
+            headers: model.headers,
+            intro: model.intro ?? discoveredIntro,
+            outro: model.outro ?? discoveredOutro,
+          );
+          _sourcesCache[cacheKey] = (time: DateTime.now(), data: finalModel);
+          if (!completer.isCompleted) completer.complete(finalModel);
           return;
         }
         throw Exception('Empty or unplayable source');
@@ -464,26 +480,36 @@ class JustAnimeProvider extends AnimeProvider {
       });
     }
 
-    // Start candidate #1 immediately
+    // Start candidate #1 (Momo/Megaplay) immediately
     spawnNext();
 
-    // Hedge with candidate #2 after 800ms if candidate #1 hasn't resolved
+    // Hedge with candidate #2 after 1800ms if candidate #1 hasn't resolved
     Timer? hedgeTimer;
     if (endpoints.length > 1) {
-      hedgeTimer = Timer(const Duration(milliseconds: 800), () {
+      hedgeTimer = Timer(const Duration(milliseconds: 1800), () {
         if (!isDone && inFlight < 2 && nextIndex < endpoints.length) {
           spawnNext();
         }
       });
     }
 
-    final resolvedModel = await completer.future.timeout(
-      const Duration(seconds: 12),
+    var resolvedModel = await completer.future.timeout(
+      const Duration(seconds: 20),
       onTimeout: () => null,
     );
     hedgeTimer?.cancel();
 
     if (resolvedModel != null && resolvedModel.sources.isNotEmpty) {
+      if ((resolvedModel.intro == null || resolvedModel.outro == null) &&
+          (discoveredIntro != null || discoveredOutro != null)) {
+        resolvedModel = BaseSourcesModel(
+          sources: resolvedModel.sources,
+          tracks: resolvedModel.tracks,
+          headers: resolvedModel.headers,
+          intro: resolvedModel.intro ?? discoveredIntro,
+          outro: resolvedModel.outro ?? discoveredOutro,
+        );
+      }
       return resolvedModel;
     }
 
@@ -493,17 +519,17 @@ class JustAnimeProvider extends AnimeProvider {
   @override
   Future<BaseServerModel> getSupportedServers({dynamic metadata}) async {
     final subServers = [
-      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: false),
       ServerData(name: "Momo (HLS)", id: "megaplay", isDub: false),
-      ServerData(name: "Neko (HLS)", id: "anineko", isDub: false),
+      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: false),
       ServerData(name: "Gigi (MP4)", id: "animegg", isDub: false),
+      ServerData(name: "Neko (HLS)", id: "anineko", isDub: false),
     ];
 
     final dubServers = [
-      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: true),
       ServerData(name: "Momo (HLS)", id: "megaplay", isDub: true),
-      ServerData(name: "Neko (HLS)", id: "anineko", isDub: true),
+      ServerData(name: "Zoko (HLS)", id: "zokoanime", isDub: true),
       ServerData(name: "Gigi (MP4)", id: "animegg", isDub: true),
+      ServerData(name: "Neko (HLS)", id: "anineko", isDub: true),
     ];
 
     return BaseServerModel(sub: subServers, dub: dubServers);

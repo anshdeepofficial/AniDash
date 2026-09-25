@@ -45,8 +45,31 @@ double _calculateHybridScore(
   int? qSeason,
   int? tSeason,
 ) {
-  // Season Mismatch Penalty: heavily penalize if seasons are present and don't match.
+  // Season Mismatch Penalty:
+  // 1. Both have explicit seasons and they don't match
   if (qSeason != null && tSeason != null && qSeason != tSeason) {
+    return 0.0;
+  }
+  // 2. Query has no season (>1) but target is Season 2, 3, etc.
+  if ((qSeason == null || qSeason == 1) && tSeason != null && tSeason > 1) {
+    return 0.0;
+  }
+  // 3. Query specifies Season 2+ but target is base / Season 1
+  if (qSeason != null && qSeason > 1 && (tSeason == null || tSeason == 1)) {
+    return 0.0;
+  }
+
+  // Zero / Prequel mismatch (e.g. "Jujutsu Kaisen" vs "Jujutsu Kaisen 0")
+  final qHasZero = qTokens.contains('0');
+  final tHasZero = tTokens.contains('0');
+  if (qHasZero != tHasZero) {
+    return 0.0;
+  }
+
+  // Movie / Film mismatch
+  final qHasMovie = qTokens.contains('movie') || qTokens.contains('film');
+  final tHasMovie = tTokens.contains('movie') || tTokens.contains('film');
+  if (qHasMovie != tHasMovie && (qHasMovie || tHasMovie)) {
     return 0.0;
   }
 

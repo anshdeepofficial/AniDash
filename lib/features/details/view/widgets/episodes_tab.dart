@@ -34,6 +34,7 @@ import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
 import 'package:ani_dash/core/services/franchise_service.dart';
+import 'package:ani_dash/shared/ui/hindi_provider_icon.dart';
 
 enum EpisodeViewMode { list, compact, grid, block, banner }
 
@@ -1535,10 +1536,14 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     final isNative =
                         nativeKey != null &&
                         ref.watch(animeSourceRegistryProvider).has(nativeKey);
-                    final initialIndex = (useExtensions && !isNative) ? 1 : 0;
+                    final isHindiActive =
+                        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
+                    final initialIndex = isHindiActive
+                        ? 1
+                        : (useExtensions && !isNative ? 2 : 0);
 
                     return DefaultTabController(
-                      length: 2,
+                      length: 3,
                       initialIndex: initialIndex,
                       child: Column(
                         children: [
@@ -1594,6 +1599,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                           ),
                           const TabBar(
                             tabs: [
+                              Tab(text: 'Built-in Sources'),
                               Tab(text: 'Hindi Sources'),
                               Tab(text: 'Extensions'),
                             ],
@@ -1601,6 +1607,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                           Expanded(
                             child: TabBarView(
                               children: [
+                                _buildCanonicalSourceList(
+                                  ref,
+                                  scrollController,
+                                  notifier,
+                                  searchQuery,
+                                ),
                                 _buildHindiSourceList(
                                   ref,
                                   scrollController,
@@ -1623,6 +1635,87 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 );
               },
             );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCanonicalSourceList(
+    WidgetRef ref,
+    ScrollController scrollController,
+    DetailsPageNotifier notifier,
+    String query,
+  ) {
+    final registry = ref.watch(animeSourceRegistryProvider);
+    final activeKey = ref.watch(selectedProviderKeyProvider)?.toLowerCase();
+    final isHindiActive =
+        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
+    final useExtensions = ref.watch(experimentalProvider).useExtensions;
+
+    final candidates = [
+      (
+        key: 'justanime',
+        name: 'JustAnime',
+        sub: 'HLS / Multi-Server / Intro Skip',
+        icon: Icons.play_circle_fill_rounded,
+      ),
+      (
+        key: 'hianime',
+        name: 'HiAnime',
+        sub: 'Native HLS Stream',
+        icon: Icons.movie_filter_rounded,
+      ),
+      (
+        key: 'anikoto',
+        name: 'AniKoto',
+        sub: 'Native Fast Stream',
+        icon: Icons.video_collection_rounded,
+      ),
+    ].where((c) => registry.has(c.key)).where((c) {
+      if (query.isEmpty) return true;
+      return c.name.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return ListView.builder(
+      controller: scrollController,
+      itemCount: candidates.length,
+      itemBuilder: (context, index) {
+        final item = candidates[index];
+        final isSelected = !isHindiActive && !useExtensions && activeKey == item.key;
+        return ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+            child: Icon(
+              item.icon,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(item.sub),
+          trailing: isSelected
+              ? Icon(
+                  Icons.check_circle,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : null,
+          onTap: () {
+            ref.read(selectedProviderKeyProvider.notifier).select(item.key);
+            ref.read(experimentalProvider.notifier).toggleExtensions(false);
+            if (ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi') {
+              ref.read(playerSettingsProvider.notifier).updateSettings(
+                    (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
+                  );
+            }
+            Navigator.pop(context);
+            notifier.refresh();
           },
         );
       },
@@ -1772,29 +1865,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 (preferredProvider == 'auto' && index == 0));
 
         return ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: source.logoUrl,
-              width: 36,
-              height: 36,
-              fit: BoxFit.cover,
-              errorWidget: (_, _, _) => Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: Text(
-                  source.name.isNotEmpty
-                      ? source.name.characters.first.toUpperCase()
-                      : 'H',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
+          leading: HindiProviderIcon(
+            source: source,
+            size: 36,
+            borderRadius: 8,
           ),
           title: Text(source.name),
           subtitle: Text(

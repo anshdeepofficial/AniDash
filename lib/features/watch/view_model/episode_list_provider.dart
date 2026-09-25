@@ -204,6 +204,20 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       final currentKey = ref.read(selectedProviderKeyProvider);
       final isNative = currentKey != null && registry.has(currentKey);
 
+      // Fast path for JustAnime: AniList mediaId is the exact anime ID
+      if (currentKey == 'justanime') {
+        final directId = (int.tryParse(animeId ?? '') != null)
+            ? animeId
+            : (int.tryParse(state.mediaId ?? '') != null ? state.mediaId : null);
+        if (directId != null) {
+          final directEps = await _fetchLegacyEpisodes(directId);
+          if (directEps.isNotEmpty) {
+            state = state.copyWith(animeId: directId);
+            return directEps;
+          }
+        }
+      }
+
       var eps =
           (!isNative && _exp.useExtensions)
               ? await _fetchExtensionEpisodes(media)
@@ -236,15 +250,22 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
             AppLogger.w(
               'Resolving episodes by title on: $altKey for "$cleanTitle"',
             );
-            final searchResults = await altProvider
-                .getSearch(
-                  cleanTitle.isNotEmpty ? cleanTitle : state.animeTitle!,
-                  null,
-                  1,
-                )
-                .timeout(const Duration(seconds: 8));
-            final altMatch = searchResults.results.firstOrNull;
-            final matchId = altMatch?.id;
+            String? matchId;
+            if (altKey == 'justanime' &&
+                state.mediaId != null &&
+                int.tryParse(state.mediaId!) != null) {
+              matchId = state.mediaId;
+            } else {
+              final searchResults = await altProvider
+                  .getSearch(
+                    cleanTitle.isNotEmpty ? cleanTitle : state.animeTitle!,
+                    null,
+                    1,
+                  )
+                  .timeout(const Duration(seconds: 20));
+              final altMatch = searchResults.results.firstOrNull;
+              matchId = altMatch?.id;
+            }
             if (matchId != null && matchId.isNotEmpty) {
               final altResult = await altProvider
                   .getEpisodes(matchId)
@@ -255,9 +276,6 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                   'Source $altKey found ${altEps.length} episodes!',
                 );
                 state = state.copyWith(animeId: matchId);
-                // Keep the visible source selection, episode list and player
-                // on the same canonical provider after a real fallback.
-                ref.read(selectedProviderKeyProvider.notifier).select(altKey);
                 return altEps;
               }
             }
@@ -319,9 +337,17 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       return [];
     }
 
-    AppLogger.d('Fetching episodes via Legacy Provider: $provider');
+    var targetId = animeId;
+    if (provider.providerName == 'justanime' &&
+        int.tryParse(animeId) == null &&
+        state.mediaId != null &&
+        int.tryParse(state.mediaId!) != null) {
+      targetId = state.mediaId!;
+    }
+
+    AppLogger.d('Fetching episodes via Legacy Provider: $provider (id: $targetId)');
     try {
-      return (await provider.getEpisodes(animeId)).episodes ?? [];
+      return (await provider.getEpisodes(targetId)).episodes ?? [];
     } catch (e) {
       AppLogger.w('Direct legacy episode fetch failed: $e');
       return [];

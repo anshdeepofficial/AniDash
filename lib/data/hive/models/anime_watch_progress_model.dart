@@ -81,16 +81,20 @@ class AnimeWatchProgressEntry {
   bool get isCompletedOrFinished {
     if (status.toLowerCase() == 'completed') return true;
 
-    if (totalEpisodes > 0) {
-      if (currentEpisode > totalEpisodes) return true;
+    final effectiveTotal = totalEpisodes > 0
+        ? totalEpisodes
+        : (animeFormat?.toUpperCase() == 'MOVIE' ? 1 : 0);
 
-      final finalEp = episodesProgress[totalEpisodes];
+    if (effectiveTotal > 0) {
+      if (currentEpisode > effectiveTotal) return true;
+
+      final finalEp = episodesProgress[effectiveTotal];
       if (finalEp?.isCompleted == true) return true;
       final finalDur = finalEp?.durationInSeconds ?? 0;
       final finalProg = finalEp?.progressInSeconds ?? 0;
       if (finalDur > 0 && finalProg / finalDur >= 0.90) return true;
 
-      if (currentEpisode == totalEpisodes) {
+      if (currentEpisode == effectiveTotal) {
         final curEp = episodesProgress[currentEpisode];
         if (curEp?.isCompleted == true) return true;
         final curDur = curEp?.durationInSeconds ?? 0;
@@ -99,7 +103,7 @@ class AnimeWatchProgressEntry {
       }
 
       bool allCompleted = true;
-      for (int i = 1; i <= totalEpisodes; i++) {
+      for (int i = 1; i <= effectiveTotal; i++) {
         final ep = episodesProgress[i];
         if (ep == null) {
           allCompleted = false;
@@ -114,14 +118,30 @@ class AnimeWatchProgressEntry {
         }
       }
       if (allCompleted) return true;
-    } else if (episodesProgress.isNotEmpty) {
-      final highestEp = episodesProgress.keys.reduce((a, b) => a > b ? a : b);
-      final ep = episodesProgress[highestEp];
-      if (ep != null) {
+    }
+
+    // For Specials, OVAs, and single-episode media where totalEpisodes was unrecorded or 0
+    if (episodesProgress.isNotEmpty) {
+      final isSpecialOrMovie = animeFormat?.toUpperCase() == 'SPECIAL' ||
+          animeFormat?.toUpperCase() == 'MOVIE' ||
+          animeFormat?.toUpperCase() == 'OVA';
+
+      bool allKnownCompleted = true;
+      for (final ep in episodesProgress.values) {
         final dur = ep.durationInSeconds ?? 0;
         final prog = ep.progressInSeconds ?? 0;
-        final isFinished = ep.isCompleted || (dur > 0 && prog / dur >= 0.90);
-        if (isFinished && status.toLowerCase() == 'completed') {
+        final finished = ep.isCompleted || (dur > 0 && prog / dur >= 0.90);
+        if (!finished) {
+          allKnownCompleted = false;
+          break;
+        }
+      }
+
+      if (allKnownCompleted) {
+        if (isSpecialOrMovie || status.toLowerCase() == 'completed') {
+          return true;
+        }
+        if (totalEpisodes == 0 && episodesProgress.length == 1) {
           return true;
         }
       }

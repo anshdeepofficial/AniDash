@@ -13,9 +13,12 @@ class NotificationInboxScreen extends StatefulWidget {
 
 class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
   final _service = NotificationInboxService();
-  late Future<List<InboxNotification>> _items = _service.load();
 
-  void _reload() => setState(() => _items = _service.load());
+  @override
+  void initState() {
+    super.initState();
+    _service.load();
+  }
 
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
@@ -48,7 +51,6 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
             tooltip: 'Mark all read',
             onPressed: () async {
               await _service.markAllRead();
-              _reload();
             },
             icon: const Icon(Icons.done_all_rounded),
           ),
@@ -56,19 +58,14 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
             tooltip: 'Clear inbox',
             onPressed: () async {
               await _service.clear();
-              _reload();
             },
             icon: const Icon(Icons.delete_sweep_outlined),
           ),
         ],
       ),
-      body: FutureBuilder<List<InboxNotification>>(
-        future: _items,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final items = snapshot.data!;
+      body: ValueListenableBuilder<List<InboxNotification>>(
+        valueListenable: _service.itemsNotifier,
+        builder: (context, items, _) {
           if (items.isEmpty) {
             return const Center(child: Text('No notifications yet'));
           }
@@ -137,16 +134,17 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                     icon: const Icon(Icons.close_rounded, size: 20),
                     onPressed: () async {
                       await _service.delete(item.id);
-                      _reload();
                     },
                   ),
                   onTap: () async {
                     await _service.markRead(item.id);
                     if (!context.mounted) return;
                     if (item.route?.isNotEmpty == true) {
-                      context.push(item.route!);
+                      await context.push(item.route!);
+                      if (context.mounted) {
+                        _service.load();
+                      }
                     }
-                    _reload();
                   },
                 ),
               );

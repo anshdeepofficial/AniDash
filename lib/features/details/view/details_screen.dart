@@ -33,10 +33,12 @@ class AnimeDetailsScreen extends ConsumerStatefulWidget {
 class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late UniversalMedia _activeMedia;
 
   @override
   void initState() {
     super.initState();
+    _activeMedia = widget.anime;
     _tabController = TabController(
       length: 3,
       vsync: this,
@@ -44,8 +46,8 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final id = widget.anime.id;
-      ref.read(detailsPageProvider(id).notifier).init(widget.anime);
+      final id = _activeMedia.id;
+      ref.read(detailsPageProvider(id).notifier).init(_activeMedia);
     });
   }
 
@@ -70,19 +72,11 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
   }
 
   void _onSeasonSelected(UniversalMedia media) {
-    if (media.id == widget.anime.id) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder:
-            (_) => AnimeDetailsScreen(
-              anime: media,
-              tag: 'tag-${media.id}',
-              fromHentaiHub: widget.fromHentaiHub,
-              initialTabIndex: 1,
-            ),
-      ),
-    );
+    if (media.id == _activeMedia.id) return;
+    setState(() {
+      _activeMedia = media;
+    });
+    ref.read(detailsPageProvider(media.id).notifier).init(media);
   }
 
   @override
@@ -93,9 +87,9 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
       experimentalProvider.select((exp) => exp.useExtensions),
     );
 
-    final id = widget.anime.id;
+    final id = _activeMedia.id;
     final pageState = ref.watch(detailsPageProvider(id));
-    final displayedAnime = pageState.details.value ?? widget.anime;
+    final displayedAnime = pageState.details.value ?? _activeMedia;
     final isLoading = pageState.isLoading;
 
     return Scaffold(
@@ -104,7 +98,13 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
         bottom: false,
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [DetailsHeader(anime: displayedAnime, tag: widget.tag)];
+            return [
+              DetailsHeader(
+                key: ValueKey('header-${displayedAnime.id}'),
+                anime: displayedAnime,
+                tag: widget.tag,
+              ),
+            ];
           },
           body: ScrollConfiguration(
             behavior: ScrollConfiguration.of(
@@ -114,9 +114,11 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
               controller: _tabController,
               children: [
                 _KeepAliveWrapper(
+                  key: ValueKey('about-wrap-${displayedAnime.id}'),
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
                     child: DetailsContent(
+                      key: ValueKey('content-${displayedAnime.id}'),
                       anime: displayedAnime,
                       mediaId: id.toString(),
                       isLoading: isLoading,
@@ -125,7 +127,9 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                   ),
                 ),
                 _KeepAliveWrapper(
+                  key: ValueKey('episodes-wrap-${displayedAnime.id}'),
                   child: EpisodesTab(
+                    key: ValueKey('episodes-${displayedAnime.id}'),
                     anime: displayedAnime,
                     mediaId: displayedAnime.id.toString(),
                     malId: int.tryParse(displayedAnime.idMal ?? ''),
@@ -141,7 +145,9 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                   ),
                 ),
                 _KeepAliveWrapper(
+                  key: ValueKey('chars-wrap-${displayedAnime.id}'),
                   child: CharactersTab(
+                    key: ValueKey('chars-${displayedAnime.id}'),
                     characters: displayedAnime.characters,
                     isLoading: isLoading,
                     onRetry:
@@ -251,7 +257,7 @@ class _WatchFabState extends ConsumerState<_WatchFab> {
 
 class _KeepAliveWrapper extends StatefulWidget {
   final Widget child;
-  const _KeepAliveWrapper({required this.child});
+  const _KeepAliveWrapper({super.key, required this.child});
 
   @override
   State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();

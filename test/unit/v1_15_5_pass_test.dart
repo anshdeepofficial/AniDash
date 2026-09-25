@@ -53,27 +53,42 @@ void main() {
               startDate: UniversalFuzzyDate(year: 2014, month: 11, day: 22),
             ),
           ),
+          UniversalMediaRelation(
+            relationType: 'SIDE_STORY',
+            media: const UniversalMedia(
+              id: '1004',
+              title: UniversalTitle(
+                romaji: 'Attack on Titan: Ilse\'s Notebook',
+                english: 'Attack on Titan OVA',
+              ),
+              coverImage: UniversalCoverImage(large: 'https://example.com/cover4.jpg'),
+              format: 'OVA',
+              seasonYear: 2013,
+            ),
+          ),
         ],
       );
 
       final result = await FranchiseService().getFranchiseWatchOrder(season1Media);
 
-      // Main Story should contain S1 and S2
-      expect(result.mainStory.length, 2);
+      // Main Story should contain S1, Inlined Movie (2014), and S2 (2017)
+      expect(result.mainStory.length, 3);
       expect(result.mainStory[0].id, '1001');
       expect(result.mainStory[0].chipLabel, 'Season 1');
       expect(result.mainStory[0].isCurrent, true);
-      expect(result.mainStory[1].id, '1002');
-      expect(result.mainStory[1].chipLabel, 'Season 2');
+      expect(result.mainStory[1].id, '1003');
+      expect(result.mainStory[1].isMovie, true);
+      expect(result.mainStory[1].placementNote, isNotNull);
+      expect(result.mainStory[2].id, '1002');
+      expect(result.mainStory[2].chipLabel, 'Season 2');
 
-      // Extras should contain the side-story movie
+      // Extras should contain the OVA
       expect(result.optionalExtras.length, 1);
-      final extraMovie = result.optionalExtras.first;
-      expect(extraMovie.id, '1003');
-      expect(extraMovie.isMovie, true);
-      expect(extraMovie.placementNote, contains('Movie'));
+      final extraOva = result.optionalExtras.first;
+      expect(extraOva.id, '1004');
+      expect(extraOva.isMovie, false);
 
-      // TV seasons for chips
+      // TV seasons for chips (only TV/Special, movies excluded from season chips)
       expect(result.tvSeasons.length, 2);
       expect(result.tvSeasons[0].chipLabel, 'Season 1');
       expect(result.tvSeasons[1].chipLabel, 'Season 2');

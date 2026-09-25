@@ -76,12 +76,21 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
             totalEpisodes: totalEps,
             isAdult: isAdult,
           );
+      if (totalEps > 0 && entry.totalEpisodes == 0) {
+        entry = entry.copyWith(totalEpisodes: totalEps);
+      }
       if (isAdult && !entry.isAdult) {
         entry = entry.copyWith(isAdult: true);
       }
 
       final isCompleted = dur > 0 ? (pos / dur >= 0.90) : false;
-      final isAnimeFinished = totalEps > 0 && epNum >= totalEps && isCompleted;
+      final isSpecialOrMovie = (animeFormat?.toUpperCase() == 'SPECIAL' ||
+              animeFormat?.toUpperCase() == 'MOVIE' ||
+              animeFormat?.toUpperCase() == 'OVA') ||
+          (totalEps <= 1);
+      final isAnimeFinished =
+          (totalEps > 0 && epNum >= totalEps && isCompleted) ||
+              (isSpecialOrMovie && isCompleted);
       if (isAnimeFinished) {
         entry = entry.copyWith(status: 'completed');
       }

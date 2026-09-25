@@ -111,7 +111,7 @@ class DetailsContent extends ConsumerWidget {
   }
 }
 
-class _WatchOrderSection extends ConsumerWidget {
+class _WatchOrderSection extends ConsumerStatefulWidget {
   final UniversalMedia anime;
   final Function(UniversalMedia)? onMediaTap;
 
@@ -121,8 +121,15 @@ class _WatchOrderSection extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final franchiseAsync = ref.watch(franchiseWatchOrderProvider(anime));
+  ConsumerState<_WatchOrderSection> createState() => _WatchOrderSectionState();
+}
+
+class _WatchOrderSectionState extends ConsumerState<_WatchOrderSection> {
+  bool _isExtrasExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final franchiseAsync = ref.watch(franchiseWatchOrderProvider(widget.anime));
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -187,7 +194,7 @@ class _WatchOrderSection extends ConsumerWidget {
                     WatchGuideBottomSheet.show(
                       context,
                       item: item,
-                      onOpenDetails: () => onMediaTap?.call(item.media),
+                      onOpenDetails: () => widget.onMediaTap?.call(item.media),
                     );
                   },
                   borderRadius: BorderRadius.circular(12),
@@ -251,6 +258,31 @@ class _WatchOrderSection extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 2),
+                              if (item.placementNote != null &&
+                                  item.placementNote!.isNotEmpty) ...[
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondaryContainer
+                                        .withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    item.placementNote!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSecondaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
                               Text(
                                 metadataParts.join(' • '),
                                 maxLines: 1,
@@ -324,113 +356,161 @@ class _WatchOrderSection extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: extraItems.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final item = extraItems[index];
-                  final isCurrent = item.isCurrent;
-                  final note = item.placementNote ?? item.format ?? 'Extra';
+              Builder(
+                builder: (context) {
+                  final displayedExtras =
+                      _isExtrasExpanded ? extraItems : extraItems.take(3).toList();
 
-                  return InkWell(
-                    onTap: () {
-                      WatchGuideBottomSheet.show(
-                        context,
-                        item: item,
-                        onOpenDetails: () => onMediaTap?.call(item.media),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCurrent
-                            ? colorScheme.primaryContainer.withValues(alpha: 0.25)
-                            : colorScheme.surfaceContainerHigh.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isCurrent
-                              ? colorScheme.primary
-                              : colorScheme.outlineVariant.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            item.isMovie
-                                ? Icons.movie_outlined
-                                : (item.isOvaOrSpecial
-                                    ? Icons.video_library_outlined
-                                    : Icons.play_circle_outline),
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.displayTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: isCurrent
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isCurrent
-                                        ? colorScheme.primary
-                                        : colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  note,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSurface.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (isCurrent)
-                            Container(
+                  return Column(
+                    children: [
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: displayedExtras.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final item = displayedExtras[index];
+                          final isCurrent = item.isCurrent;
+                          final note = item.placementNote ?? item.format ?? 'Extra';
+
+                          return InkWell(
+                            onTap: () {
+                              WatchGuideBottomSheet.show(
+                                context,
+                                item: item,
+                                onOpenDetails: () =>
+                                    widget.onMediaTap?.call(item.media),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
+                                horizontal: 14,
+                                vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'CURRENT',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 9,
+                                color: isCurrent
+                                    ? colorScheme.primaryContainer
+                                        .withValues(alpha: 0.25)
+                                    : colorScheme.surfaceContainerHigh
+                                        .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? colorScheme.primary
+                                      : colorScheme.outlineVariant
+                                          .withValues(alpha: 0.3),
                                 ),
                               ),
-                            )
-                          else
-                            Icon(
-                              Icons.chevron_right,
-                              size: 18,
-                              color: colorScheme.onSurface.withValues(alpha: 0.4),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    item.isMovie
+                                        ? Icons.movie_outlined
+                                        : (item.isOvaOrSpecial
+                                            ? Icons.video_library_outlined
+                                            : Icons.play_circle_outline),
+                                    size: 20,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.displayTitle,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            fontWeight: isCurrent
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            color: isCurrent
+                                                ? colorScheme.primary
+                                                : colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          note,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: colorScheme.onSurface
+                                                .withValues(
+                                              alpha: 0.6,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (isCurrent)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'CURRENT',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: colorScheme.onPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: 18,
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.4),
+                                    ),
+                                ],
+                              ),
                             ),
-                        ],
+                          );
+                        },
                       ),
-                    ),
+                      if (extraItems.length > 3) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isExtrasExpanded = !_isExtrasExpanded;
+                              });
+                            },
+                            icon: Icon(
+                              _isExtrasExpanded
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              size: 20,
+                            ),
+                            label: Text(
+                              _isExtrasExpanded
+                                  ? 'Show Less'
+                                  : 'Show More (${extraItems.length - 3} more)',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   );
                 },
               ),

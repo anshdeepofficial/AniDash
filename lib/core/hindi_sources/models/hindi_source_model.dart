@@ -42,6 +42,33 @@ class HindiSourceModel {
     this.configuredLogoUrl,
   });
 
+  String get localAssetPath => 'assets/provider_icons/${id.toLowerCase()}.png';
+
+  bool get hasLocalAsset =>
+      id.toLowerCase() == 'animesalt' ||
+      id.toLowerCase() == 'animixstream' ||
+      id.toLowerCase() == 'animedrive' ||
+      id.toLowerCase() == 'animelok';
+
+  String get fallbackInitials {
+    switch (id.toLowerCase()) {
+      case 'animesalt':
+        return 'AS';
+      case 'animixstream':
+        return 'AX';
+      case 'animedrive':
+        return 'AD';
+      case 'animelok':
+        return 'AL';
+      default:
+        final parts = name.trim().split(RegExp(r'\s+'));
+        if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+          return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+        }
+        return name.isNotEmpty ? name.substring(0, name.length >= 2 ? 2 : name.length).toUpperCase() : 'H';
+    }
+  }
+
   String get logoUrl {
     if (configuredLogoUrl != null && configuredLogoUrl!.trim().isNotEmpty) {
       return configuredLogoUrl!.trim();

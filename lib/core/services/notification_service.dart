@@ -134,11 +134,14 @@ class NotificationService {
             final targetRoute = mediaId.contains('?')
                 ? (mediaId.startsWith('/') ? mediaId : '/details/$mediaId')
                 : '/details/$mediaId?tab=episodes';
+            unawaited(NotificationInboxService().markReadByRouteOrMedia(targetRoute, mediaId));
             _instance.notificationRouteController.add(targetRoute);
           } else if (payload.startsWith('route:')) {
             final route = payload.replaceFirst('route:', '').trim();
+            unawaited(NotificationInboxService().markReadByRouteOrMedia(route, null));
             _instance.notificationRouteController.add(route);
           } else if (payload == '/downloads' || payload == '/news' || payload == '/watchlist') {
+            unawaited(NotificationInboxService().markReadByRouteOrMedia(payload, null));
             _instance.notificationRouteController.add(payload);
           }
         }
@@ -321,11 +324,13 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    const notifId = 1000;
     await NotificationInboxService().add(
       title: title,
       body: body,
       route: payload,
       dedupeKey: 'news:${payload ?? title}',
+      systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
 
@@ -338,7 +343,7 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      1000,
+      notifId,
       title,
       body,
       platformChannelSpecifics,
@@ -392,6 +397,7 @@ class NotificationService {
       body: '$animeTitle - Episode $episodeNumber is ready offline',
       route: '/downloads',
       dedupeKey: 'download:$animeTitle:$episodeNumber',
+      systemNotificationId: id,
     );
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -437,6 +443,8 @@ class NotificationService {
         '$animeTitle Episode $episodeNumber is now available.';
     final effectiveDedupeKey = dedupeKey ??
         'release:${mediaId ?? animeTitle}:$episodeNumber:${audioType ?? (isDub ? "dub" : "sub")}';
+    final notifId =
+        (mediaId ?? animeTitle).hashCode ^ episodeNumber ^ (audioType ?? '').hashCode;
 
     await NotificationInboxService().add(
       title: title,
@@ -447,6 +455,7 @@ class NotificationService {
       mediaId: mediaId,
       episodeNumber: episodeNumber,
       language: audioType == 'hindi_dub' ? 'hi' : (isDub || audioType == 'english_dub' ? 'en' : 'ja'),
+      systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
 
@@ -460,7 +469,7 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      (mediaId ?? animeTitle).hashCode ^ episodeNumber ^ (audioType ?? '').hashCode,
+      notifId,
       title,
       body,
       platformChannelSpecifics,
@@ -479,6 +488,7 @@ class NotificationService {
         'You stopped at Episode $episodeNumber. Continue where you left off.';
     final effectiveDedupeKey =
         'continue:${mediaId ?? animeTitle}:$episodeNumber';
+    final notifId = (mediaId ?? animeTitle).hashCode;
 
     await NotificationInboxService().add(
       title: title,
@@ -488,6 +498,7 @@ class NotificationService {
       notificationType: 'continue_watching',
       mediaId: mediaId,
       episodeNumber: episodeNumber,
+      systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
 
@@ -502,7 +513,7 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      (mediaId ?? animeTitle).hashCode,
+      notifId,
       title,
       body,
       platformChannelSpecifics,
@@ -511,15 +522,25 @@ class NotificationService {
   }
 
   Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
+    try {
+      await flutterLocalNotificationsPlugin.cancel(id);
+    } catch (_) {}
+  }
+
+  Future<void> cancelAllNotifications() async {
+    try {
+      await flutterLocalNotificationsPlugin.cancelAll();
+    } catch (_) {}
   }
 
   Future<void> showUpdateAvailableNotification(String version) async {
+    const notifId = 1901;
     await NotificationInboxService().add(
       title: 'AniDash v$version is available',
       body: 'A new stable version is ready to install.',
       route: '/settings/update',
       dedupeKey: 'update:$version',
+      systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
 

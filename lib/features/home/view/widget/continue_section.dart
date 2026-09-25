@@ -154,7 +154,7 @@ class ContinueSection extends ConsumerWidget {
                             ref,
                             entry,
                             nextEpisodeNum,
-                            displayEp,
+                            entry.episodesProgress[nextEpisodeNum],
                             colorScheme,
                           );
                         },
@@ -355,6 +355,24 @@ class ContinueSection extends ConsumerWidget {
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
         final screenHeight = MediaQuery.sizeOf(sheetContext).height;
+
+        final epList = ref.read(episodeListProvider);
+        String resolvedTitle = 'Episode $targetEpNum';
+        if (targetEp != null &&
+            targetEp.episodeNumber == targetEpNum &&
+            targetEp.episodeTitle.trim().isNotEmpty) {
+          resolvedTitle = targetEp.episodeTitle;
+        } else if (epList.animeId == entry.animeId) {
+          final match = epList.episodes
+              .where((e) => e.number == targetEpNum)
+              .firstOrNull;
+          if (match != null &&
+              match.title != null &&
+              match.title!.trim().isNotEmpty) {
+            resolvedTitle = match.title!;
+          }
+        }
+
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -386,15 +404,12 @@ class ContinueSection extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (targetEp != null)
-                  Text(
-                    targetEp.episodeTitle.isNotEmpty
-                        ? targetEp.episodeTitle
-                        : 'EP $targetEpNum',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                Text(
+                  resolvedTitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
                 const Divider(height: 24),
                 // 1. View Anime Details
                 ListTile(
@@ -422,8 +437,11 @@ class ContinueSection extends ConsumerWidget {
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final duration = (targetEp?.durationInSeconds != null &&
-                            targetEp!.durationInSeconds! > 0)
+                    final isSameEp = targetEp != null &&
+                        targetEp.episodeNumber == targetEpNum;
+                    final duration = (isSameEp &&
+                            targetEp.durationInSeconds != null &&
+                            targetEp.durationInSeconds! > 0)
                         ? targetEp.durationInSeconds!
                         : 1440;
                     final repo = ref.read(watchProgressRepositoryProvider);
@@ -431,11 +449,11 @@ class ContinueSection extends ConsumerWidget {
                       entry.animeId,
                       EpisodeProgress(
                         episodeNumber: targetEpNum,
-                        episodeTitle: targetEp?.episodeTitle.isNotEmpty == true
-                            ? targetEp!.episodeTitle
-                            : 'Episode $targetEpNum',
-                        episodeThumbnail:
-                            targetEp?.episodeThumbnail ?? entry.animeCover,
+                        episodeTitle: resolvedTitle,
+                        episodeThumbnail: (isSameEp &&
+                                targetEp.episodeThumbnail != null)
+                            ? targetEp.episodeThumbnail!
+                            : entry.animeCover,
                         progressInSeconds: duration,
                         durationInSeconds: duration,
                         isCompleted: true,
@@ -468,12 +486,16 @@ class ContinueSection extends ConsumerWidget {
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    final totalDur = (targetEp?.durationInSeconds != null &&
-                            targetEp!.durationInSeconds! > 0)
+                    final isSameEp = targetEp != null &&
+                        targetEp.episodeNumber == targetEpNum;
+                    final totalDur = (isSameEp &&
+                            targetEp.durationInSeconds != null &&
+                            targetEp.durationInSeconds! > 0)
                         ? Duration(seconds: targetEp.durationInSeconds!)
                         : Duration.zero;
-                    final currentPos = (targetEp?.progressInSeconds != null &&
-                            targetEp!.progressInSeconds! > 0)
+                    final currentPos = (isSameEp &&
+                            targetEp.progressInSeconds != null &&
+                            targetEp.progressInSeconds! > 0)
                         ? Duration(seconds: targetEp.progressInSeconds!)
                         : Duration.zero;
 

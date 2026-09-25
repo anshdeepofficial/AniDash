@@ -46,6 +46,32 @@ class AnimeMatchService {
     BaseAnimeModel? bestCandidate;
     double bestSimilarity = 0.0;
 
+    final nativeKey = _ref.read(selectedProviderKeyProvider)?.toLowerCase();
+    // Fast Path for JustAnime: JustAnime anime ID is exactly the AniList media ID!
+    if (nativeKey == 'justanime' && mediaId != null && int.tryParse(mediaId) != null) {
+      try {
+        final registry = _ref.read(animeSourceRegistryProvider);
+        final justProvider = registry.get('justanime');
+        if (justProvider != null) {
+          final eps = await justProvider
+              .getEpisodes(mediaId)
+              .timeout(const Duration(seconds: 15));
+          if (eps.episodes?.isNotEmpty == true) {
+            AppLogger.success(
+              'JustAnime direct AniList ID match verified for ID: $mediaId (${eps.episodes!.length} episodes)',
+            );
+            return BaseAnimeModel(
+              id: mediaId,
+              anilistId: int.tryParse(mediaId),
+              name: title.english ?? title.romaji ?? title.userPreferred,
+            );
+          }
+        }
+      } catch (e) {
+        AppLogger.w('JustAnime direct AniList ID probe failed: $e');
+      }
+    }
+
     for (final title in titles) {
       try {
         final results = await search(title, isAdult: isAdult);
@@ -145,7 +171,7 @@ class AnimeMatchService {
         try {
           final res = await candidate
               .getSearch(query, null, 1)
-              .timeout(const Duration(seconds: 8));
+              .timeout(const Duration(seconds: 20));
           final results =
               res.results
                   .where((item) => item.id != null && item.name != null)
