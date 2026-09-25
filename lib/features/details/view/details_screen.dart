@@ -69,6 +69,22 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
     );
   }
 
+  void _onSeasonSelected(UniversalMedia media) {
+    if (media.id == widget.anime.id) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => AnimeDetailsScreen(
+              anime: media,
+              tag: 'tag-${media.id}',
+              fromHentaiHub: widget.fromHentaiHub,
+              initialTabIndex: 1,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -110,6 +126,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                 ),
                 _KeepAliveWrapper(
                   child: EpisodesTab(
+                    anime: displayedAnime,
                     mediaId: displayedAnime.id.toString(),
                     malId: int.tryParse(displayedAnime.idMal ?? ''),
                     mediaTitle: displayedAnime.title,
@@ -120,7 +137,7 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                         '',
                     fromHentaiHub: widget.fromHentaiHub,
                     relations: displayedAnime.relations,
-                    onSeasonSelected: _onMediaTap,
+                    onSeasonSelected: _onSeasonSelected,
                   ),
                 ),
                 _KeepAliveWrapper(

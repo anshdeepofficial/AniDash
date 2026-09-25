@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/core/tasks/episode_release_task.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
@@ -113,6 +114,72 @@ class NotificationSettingsScreen extends ConsumerWidget {
                   (value) => notifier.updateSettings(
                     (state) => state.copyWith(enableDownloads: value),
                   ),
+            ),
+          ),
+          _section(
+            colors,
+            'Diagnostics',
+            NormalSettingsItem(
+              icon: Icon(Iconsax.refresh, color: colors.primary),
+              accent: colors.primary,
+              title: 'Check Releases Now',
+              description: 'Manually run episode release check & diagnostics',
+              onTap: () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Checking latest releases...'),
+                    duration: Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                final res = await EpisodeReleaseTask.performCheck(isManual: true);
+                if (context.mounted) {
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    builder: (ctx) => Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                res.success ? Icons.check_circle_outline : Icons.error_outline,
+                                color: res.success ? Colors.green : Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                res.success ? 'Check Completed' : 'Check Failed',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text('• AniList Query Status: ${res.success ? "Success" : "Failed"}'),
+                          Text('• Total Airing Schedules: ${res.schedulesReturned}'),
+                          Text('• Relevant Watching Titles: ${res.relevantCount}'),
+                          Text('• Notifications Sent: ${res.sentCount}'),
+                          Text('• Duplicates Suppressed: ${res.duplicateSuppressed}'),
+                          const SizedBox(height: 8),
+                          Text(
+                            res.message,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
             ),
           ),
           const SizedBox(height: 20),

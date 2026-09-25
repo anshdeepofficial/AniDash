@@ -107,24 +107,28 @@ class HindiSourceManagerNotifier extends Notifier<List<HindiSourceModel>> {
         const HindiSourceModel(
           id: 'animesalt',
           name: 'AnimeSalt',
+          configuredLogoUrl: 'https://animesalt.to/favicon.ico',
           priority: 10,
           status: 'stable',
         ),
         const HindiSourceModel(
           id: 'animixstream',
           name: 'AnimixStream',
+          configuredLogoUrl: 'https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://animixstream.com&size=128',
           priority: 20,
           status: 'stable',
         ),
         const HindiSourceModel(
           id: 'animedrive',
           name: 'AnimeDrive',
+          configuredLogoUrl: 'https://animedrive.cc/wp-content/uploads/2026/07/animedrive-logo-fixed.png',
           priority: 30,
           status: 'backup',
         ),
         const HindiSourceModel(
           id: 'animelok',
           name: 'AnimeLok',
+          configuredLogoUrl: '',
           priority: 40,
           enabled: false,
           status: 'experimental',

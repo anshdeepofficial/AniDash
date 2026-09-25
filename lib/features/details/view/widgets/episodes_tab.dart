@@ -33,6 +33,7 @@ import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
+import 'package:ani_dash/core/services/franchise_service.dart';
 
 enum EpisodeViewMode { list, compact, grid, block, banner }
 
@@ -45,6 +46,7 @@ ValueNotifier<Set<int>> _getEpisodesSelectionNotifier(String mediaId) {
 }
 
 class EpisodesTab extends ConsumerStatefulWidget {
+  final UniversalMedia? anime;
   final String mediaId;
   final int? malId;
   final UniversalTitle mediaTitle;
@@ -56,6 +58,7 @@ class EpisodesTab extends ConsumerStatefulWidget {
 
   const EpisodesTab({
     super.key,
+    this.anime,
     required this.mediaId,
     this.malId,
     required this.mediaTitle,
@@ -407,6 +410,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             episodeListState.error == null);
     final error = state.error ?? (isMatchingAnime ? episodeListState.error : null);
 
+    final franchiseOrder = widget.anime != null
+        ? ref.watch(franchiseWatchOrderProvider(widget.anime!)).asData?.value
+        : null;
+    final tvSeasons = franchiseOrder?.tvSeasons ?? [];
+
     final exposedName = state.bestMatchName;
     final theme = Theme.of(context);
     final seasonRelations = widget.relations
@@ -601,7 +609,53 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             ),
           ),
 
-          if (seasonRelations.isNotEmpty)
+          if (tvSeasons.length > 1)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seasons',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 38,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: tvSeasons.length,
+                        itemBuilder: (context, index) {
+                          final seasonItem = tvSeasons[index];
+                          final isCurrent = seasonItem.isCurrent ||
+                              seasonItem.id.toString() == widget.mediaId;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(
+                                seasonItem.chipLabel,
+                              ),
+                              selected: isCurrent,
+                              onSelected: isCurrent
+                                  ? null
+                                  : (selected) {
+                                      if (widget.onSeasonSelected != null) {
+                                        widget.onSeasonSelected!(seasonItem.media);
+                                      }
+                                    },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (seasonRelations.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1586,9 +1640,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       ...sourceState.installedAdultAnimeExtensions,
       ...sourceState.installedAnimeExtensions,
     ];
-    final seenIds = <dynamic>{};
-    final uniqueAvailable =
-        allAvailable.where((s) => seenIds.add(s.id)).toList();
+    final seenIds = <String>{};
+    final uniqueAvailable = allAvailable.where((s) {
+      final key = (s.id?.toString() ?? s.name ?? '').trim();
+      if (key.isEmpty) return true;
+      return seenIds.add(key);
+    }).toList();
 
     final extensions =
         uniqueAvailable.where((s) {
@@ -1600,85 +1657,27 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final isHindiActive =
         ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
     final useExtensions = ref.watch(experimentalProvider).useExtensions;
-    final selectedNativeKey =
-        ref.watch(selectedProviderKeyProvider)?.toLowerCase();
     final activeId =
         sourceState.activeAdultAnimeSource?.id ??
         sourceState.activeAnimeSource?.id;
 
-    final nativeSources = [
-      {'id': 'justanime', 'name': 'JustAnime', 'subtitle': 'Recommended • Built-in'},
-      {'id': 'hianime', 'name': 'HiAnime', 'subtitle': 'Sub & Dub • Built-in'},
-      {'id': 'anikoto', 'name': 'AniKoto', 'subtitle': 'Sub & Dub • Built-in'},
-    ].where((n) {
-      if (query.isEmpty) return true;
-      return n['name']!.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    if (nativeSources.isEmpty && extensions.isEmpty) {
+    if (extensions.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
           child: Text(
-            'No sources found.',
+            'No extensions found.',
             textAlign: TextAlign.center,
           ),
         ),
       );
     }
 
-    final totalItems = nativeSources.length + extensions.length;
-
     return ListView.builder(
       controller: scrollController,
-      itemCount: totalItems,
+      itemCount: extensions.length,
       itemBuilder: (context, index) {
-        if (index < nativeSources.length) {
-          final native = nativeSources[index];
-          final isSelected = !isHindiActive &&
-              !useExtensions &&
-              selectedNativeKey == native['id'];
-
-          return ListTile(
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
-              child: const Icon(Icons.play_circle_outline, size: 22),
-            ),
-            title: Text(native['name']!),
-            subtitle: Text(native['subtitle']!),
-            selected: isSelected,
-            trailing: isSelected
-                ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                : null,
-            onTap: () {
-              ref
-                  .read(selectedProviderKeyProvider.notifier)
-                  .select(native['id']!);
-              ref.read(experimentalProvider.notifier).toggleExtensions(false);
-              if (ref
-                      .read(playerSettingsProvider)
-                      .preferredAudioLanguage ==
-                  'hindi') {
-                ref.read(playerSettingsProvider.notifier).updateSettings(
-                      (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
-                    );
-              }
-              Navigator.pop(context);
-              notifier.refresh();
-            },
-          );
-        }
-
-        final extIndex = index - nativeSources.length;
-        final source = extensions[extIndex];
+        final source = extensions[index];
         final isSelected = !isHindiActive && useExtensions && source.id == activeId;
         return ListTile(
           leading: Container(

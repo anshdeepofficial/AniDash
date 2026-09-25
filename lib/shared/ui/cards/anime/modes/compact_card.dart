@@ -79,7 +79,22 @@ class CompactCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AnimeTitle(anime: anime, maxLines: 2, minimal: true),
+                AnimeTitle(
+                  anime: anime,
+                  maxLines: 2,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black87,
+                        offset: Offset(0, 1),
+                        blurRadius: 3,
+                      ),
+                    ],
+                  ),
+                ),
                 Builder(
                   builder: (context) {
                     final epText = formatEpisodeText(

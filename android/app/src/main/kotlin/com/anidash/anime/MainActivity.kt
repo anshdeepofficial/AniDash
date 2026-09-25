@@ -423,14 +423,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (interceptVolumeKeys) {
             when (keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> {
-                    volumeChannel?.invokeMethod("volumeUp", null)
-                    return true
-                }
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    volumeChannel?.invokeMethod("volumeDown", null)
-                    return true
-                }
+                KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> return true
             }
         }
         return super.onKeyDown(keyCode, event)

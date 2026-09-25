@@ -12,8 +12,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
+import 'package:ani_dash/core/services/franchise_service.dart';
+import 'package:ani_dash/features/details/view/widgets/watch_guide_bottom_sheet.dart';
 
-class DetailsContent extends StatelessWidget {
+class DetailsContent extends ConsumerWidget {
   final UniversalMedia anime;
   final bool isLoading;
   final Function(UniversalMedia)? onMediaTap;
@@ -28,7 +30,7 @@ class DetailsContent extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
@@ -51,33 +53,10 @@ class DetailsContent extends StatelessWidget {
           ],
           const SizedBox(height: 24),
           AdditionalInfoWidget(anime: anime),
-          if (anime.relations.any(
-            (relation) => _isLegitimateWatchOrderRelation(anime, relation),
-          )) ...[
-            const SizedBox(height: 24),
-            HorizontalMediaSection<UniversalMediaRelation>(
-              title: 'Watch Order',
-              items:
-                  anime.relations
-                      .where(
-                        (relation) =>
-                            _isLegitimateWatchOrderRelation(anime, relation),
-                      )
-                      .toList()
-                    ..sort(
-                      (a, b) => (a.media.seasonYear ?? 9999).compareTo(
-                        b.media.seasonYear ?? 9999,
-                      ),
-                    ),
-              isLoading: isLoading,
-              itemBuilder:
-                  (context, relation) => MediaCard(
-                    media: relation.media,
-                    badgeText: _formatRelationType(relation.relationType),
-                    onTap: () => onMediaTap?.call(relation.media),
-                  ),
-            ),
-          ],
+          _WatchOrderSection(
+            anime: anime,
+            onMediaTap: onMediaTap,
+          ),
           if (anime.staff.isNotEmpty) ...[
             const SizedBox(height: 24),
             HorizontalMediaSection<UniversalStaff>(
@@ -125,103 +104,343 @@ class DetailsContent extends StatelessWidget {
     );
   }
 
-  bool _isLegitimateWatchOrderRelation(
-    UniversalMedia anime,
-    UniversalMediaRelation relation,
-  ) {
-    final type = relation.relationType.toUpperCase();
-    if (!type.contains('PREQUEL') && !type.contains('SEQUEL')) return false;
-
-    // Check media format - must not be manga, novel, music, or one-shot
-    final format = relation.media.format?.toUpperCase() ?? '';
-    if (format == 'MANGA' ||
-        format == 'NOVEL' ||
-        format == 'ONE_SHOT' ||
-        format == 'MUSIC' ||
-        format == 'MOVIE' ||
-        format == 'OVA' ||
-        format == 'ONA' ||
-        format == 'SPECIAL') {
-      return false;
-    }
-    if (type.contains('SPIN')) return false;
-
-    // Check significant title overlap between base anime and relation
-    final baseTitles =
-        [
-          anime.title.english,
-          anime.title.romaji,
-          anime.title.native,
-        ].whereType<String>().map((s) => s.toLowerCase()).toList();
-
-    final relTitles =
-        [
-          relation.media.title.english,
-          relation.media.title.romaji,
-          relation.media.title.native,
-        ].whereType<String>().map((s) => s.toLowerCase()).toList();
-
-    if (baseTitles.isEmpty || relTitles.isEmpty) return true;
-
-    final stopWords = {
-      'the',
-      'a',
-      'an',
-      'and',
-      'or',
-      'of',
-      'in',
-      'on',
-      'at',
-      'to',
-      'for',
-      'with',
-      'no',
-      'ni',
-      'wa',
-      'wo',
-      'ga',
-      'de',
-      'na',
-      'season',
-      'part',
-      'movie',
-      'tv',
-      'ova',
-      'ona',
-      'special',
-      'act',
-      'chapter',
-      'arc',
-    };
-
-    final baseTokens =
-        baseTitles
-            .expand(
-              (t) =>
-                  t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
-            )
-            .where((w) => w.length >= 2 && !stopWords.contains(w))
-            .toSet();
-
-    if (baseTokens.isEmpty) return true;
-
-    final relTokens =
-        relTitles
-            .expand(
-              (t) =>
-                  t.replaceAll(RegExp(r'[^\w\s]'), ' ').split(RegExp(r'\s+')),
-            )
-            .where((w) => w.length >= 2 && !stopWords.contains(w))
-            .toSet();
-
-    return baseTokens.intersection(relTokens).isNotEmpty;
-  }
-
   String _formatRelationType(String type) {
     if (type.isEmpty) return type;
     final formatted = type.replaceAll('_', ' ');
     return formatted[0].toUpperCase() + formatted.substring(1).toLowerCase();
+  }
+}
+
+class _WatchOrderSection extends ConsumerWidget {
+  final UniversalMedia anime;
+  final Function(UniversalMedia)? onMediaTap;
+
+  const _WatchOrderSection({
+    required this.anime,
+    this.onMediaTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final franchiseAsync = ref.watch(franchiseWatchOrderProvider(anime));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return franchiseAsync.when(
+      data: (franchise) {
+        final mainItems = franchise.mainStory;
+        final extraItems = franchise.optionalExtras;
+        if (mainItems.length <= 1 && extraItems.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Text(
+                  'Watch Order',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${mainItems.length} Story Parts',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: mainItems.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final item = mainItems[index];
+                final isCurrent = item.isCurrent;
+
+                final epCount = item.episodes != null && item.episodes! > 0
+                    ? '${item.episodes} eps'
+                    : null;
+                final yearText = item.year != null ? '${item.year}' : null;
+
+                final metadataParts = [
+                  item.orderLabel,
+                  if (epCount != null) epCount,
+                  if (yearText != null) yearText,
+                ];
+
+                return InkWell(
+                  onTap: () {
+                    WatchGuideBottomSheet.show(
+                      context,
+                      item: item,
+                      onOpenDetails: () => onMediaTap?.call(item.media),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isCurrent
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        width: isCurrent ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Number circle
+                        Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isCurrent
+                                ? colorScheme.primary
+                                : colorScheme.surfaceContainerHigh,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: isCurrent
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Titles and metadata
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.displayTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: isCurrent
+                                      ? FontWeight.bold
+                                      : FontWeight.w600,
+                                  color: isCurrent
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                metadataParts.join(' • '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (isCurrent)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'CURRENT',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 9,
+                              ),
+                            ),
+                          )
+                        else
+                          Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (extraItems.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Text(
+                    'Optional / Extras',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${extraItems.length} Extras',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: extraItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final item = extraItems[index];
+                  final isCurrent = item.isCurrent;
+                  final note = item.placementNote ?? item.format ?? 'Extra';
+
+                  return InkWell(
+                    onTap: () {
+                      WatchGuideBottomSheet.show(
+                        context,
+                        item: item,
+                        onOpenDetails: () => onMediaTap?.call(item.media),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? colorScheme.primaryContainer.withValues(alpha: 0.25)
+                            : colorScheme.surfaceContainerHigh.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isCurrent
+                              ? colorScheme.primary
+                              : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item.isMovie
+                                ? Icons.movie_outlined
+                                : (item.isOvaOrSpecial
+                                    ? Icons.video_library_outlined
+                                    : Icons.play_circle_outline),
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.displayTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: isCurrent
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isCurrent
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  note,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colorScheme.onSurface.withValues(
+                                      alpha: 0.6,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isCurrent)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'CURRENT',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            )
+                          else
+                            Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: colorScheme.onSurface.withValues(alpha: 0.4),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 }
 

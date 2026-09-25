@@ -627,11 +627,51 @@ class AnilistQueries {
       }
     }
   ''';
+
   // Mutation: Delete a MediaListEntry (requires list entry ID)
   static const String deleteMediaListEntryMutation = '''
     mutation DeleteMediaListEntry(\$id: Int) {
       DeleteMediaListEntry(id: \$id) {
         deleted
+      }
+    }
+  ''';
+  // Airing Schedules Query
+  static const String airingSchedulesQuery = '''
+    query (\$greater: Int, \$lesser: Int, \$mediaIds: [Int], \$page: Int, \$perPage: Int) {
+      Page(page: \$page, perPage: \$perPage) {
+        pageInfo {
+          hasNextPage
+          total
+        }
+        airingSchedules(
+          airingAt_greater: \$greater
+          airingAt_lesser: \$lesser
+          mediaId_in: \$mediaIds
+          sort: TIME_DESC
+        ) {
+          id
+          airingAt
+          timeUntilAiring
+          episode
+          mediaId
+          media {
+            id
+            idMal
+            format
+            status
+            title {
+              romaji
+              english
+              native
+              userPreferred
+            }
+            coverImage {
+              large
+              medium
+            }
+          }
+        }
       }
     }
   ''';

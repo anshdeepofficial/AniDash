@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:ani_dash/core/hindi_sources/hindi_icon_resolver.dart';
 
 class HindiSourceModel {
   final String id;
@@ -18,6 +19,7 @@ class HindiSourceModel {
   final int consecutiveFailures;
   final DateTime? lastFailureTime;
   final DateTime? lastTestedTime;
+  final String? configuredLogoUrl;
 
   const HindiSourceModel({
     required this.id,
@@ -37,9 +39,17 @@ class HindiSourceModel {
     this.consecutiveFailures = 0,
     this.lastFailureTime,
     this.lastTestedTime,
+    this.configuredLogoUrl,
   });
 
   String get logoUrl {
+    if (configuredLogoUrl != null && configuredLogoUrl!.trim().isNotEmpty) {
+      return configuredLogoUrl!.trim();
+    }
+    final cached = HindiIconResolver().getCachedIcon(id);
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
     if (baseUrl.isEmpty) return '';
     final cleanUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     return '$cleanUrl/favicon.ico';
@@ -63,6 +73,7 @@ class HindiSourceModel {
     int? consecutiveFailures,
     DateTime? lastFailureTime,
     DateTime? lastTestedTime,
+    String? configuredLogoUrl,
   }) {
     return HindiSourceModel(
       id: id ?? this.id,
@@ -82,6 +93,7 @@ class HindiSourceModel {
       consecutiveFailures: consecutiveFailures ?? this.consecutiveFailures,
       lastFailureTime: lastFailureTime ?? this.lastFailureTime,
       lastTestedTime: lastTestedTime ?? this.lastTestedTime,
+      configuredLogoUrl: configuredLogoUrl ?? this.configuredLogoUrl,
     );
   }
 
@@ -104,6 +116,7 @@ class HindiSourceModel {
       'consecutiveFailures': consecutiveFailures,
       'lastFailureTime': lastFailureTime?.toIso8601String(),
       'lastTestedTime': lastTestedTime?.toIso8601String(),
+      'logoUrl': configuredLogoUrl,
     };
   }
 
@@ -131,6 +144,7 @@ class HindiSourceModel {
       lastTestedTime: map['lastTestedTime'] != null
           ? DateTime.tryParse(map['lastTestedTime'])
           : null,
+      configuredLogoUrl: map['logoUrl'] as String?,
     );
   }
 

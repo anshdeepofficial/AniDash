@@ -12,6 +12,7 @@
       "supportsDownloads": true,
       "supportsMultiAudio": true,
       "baseUrl": "https://animesalt.ac",
+      "logoUrl": "https://animesalt.to/favicon.ico",
       "mirrors": [
         "https://animesalt.ac",
         "https://animesalt.to",
@@ -30,6 +31,7 @@
       "supportsDownloads": false,
       "supportsMultiAudio": true,
       "baseUrl": "https://animixstream.com",
+      "logoUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://animixstream.com&size=128",
       "mirrors": [
         "https://animixstream.com"
       ]
@@ -45,6 +47,7 @@
       "supportsDownloads": true,
       "supportsMultiAudio": true,
       "baseUrl": "https://animedrive.in",
+      "logoUrl": "https://animedrive.cc/wp-content/uploads/2026/07/animedrive-logo-fixed.png",
       "mirrors": [
         "https://animedrive.in"
       ]
@@ -60,6 +63,7 @@
       "supportsDownloads": false,
       "supportsMultiAudio": false,
       "baseUrl": "https://animelok.online",
+      "logoUrl": "",
       "mirrors": [
         "https://animelok.online"
       ]
