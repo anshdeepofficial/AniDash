@@ -157,7 +157,8 @@ class SettingsSheetContent extends ConsumerWidget {
                     ),
                   );
                 },
-              ),ListTile(
+              ),
+              ListTile(
                   leading: const Icon(Icons.dns_rounded),
                   title: const Text("Server"),
                   trailing: Text(
@@ -285,6 +286,19 @@ class SettingsSheetContent extends ConsumerWidget {
                 onChanged: (val) {
                   playerNotifier.updateSettings(
                     (prev) => prev.copyWith(stopAfterCurrentEpisode: val),
+                  );
+                },
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.upcoming_rounded),
+                title: const Text('Next Episode Prompt'),
+                subtitle: const Text(
+                  'Show a floating prompt near the end of an episode to quickly jump to the next one',
+                ),
+                value: playerSettings.showNextEpisodePrompt,
+                onChanged: (val) {
+                  playerNotifier.updateSettings(
+                    (prev) => prev.copyWith(showNextEpisodePrompt: val),
                   );
                 },
               ),

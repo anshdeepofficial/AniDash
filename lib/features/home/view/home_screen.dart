@@ -36,13 +36,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   late final ProviderSubscription<AsyncValue<List<UniversalNews>>>
   _newsListener;
+  late final ProviderSubscription<AuthState> _authListener;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _setupAuthListener();
     _setupNewsListener();
-    Future.microtask(_syncAccountWatchProgress);
+    Future.microtask(() {
+      if (!mounted) return;
+      final auth = ref.read(authProvider);
+      if (auth.isAniListAuthenticated || auth.isMalAuthenticated) {
+        _syncAccountWatchProgress();
+      }
+    });
+  }
+
+  void _setupAuthListener() {
+    _authListener = ref.listenManual(authProvider, (previous, next) {
+      if (!mounted) return;
+      final wasAuthed = (previous?.isAniListAuthenticated ?? false) ||
+          (previous?.isMalAuthenticated ?? false);
+      final isAuthed = next.isAniListAuthenticated || next.isMalAuthenticated;
+      if (!wasAuthed && isAuthed) {
+        AppLogger.i('Auth restored/ready, triggering account sync...');
+        _syncAccountWatchProgress();
+      }
+    });
   }
 
   void _setupNewsListener() {
@@ -86,6 +107,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    _authListener.close();
     _newsListener.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

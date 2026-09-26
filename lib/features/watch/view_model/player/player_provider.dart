@@ -99,12 +99,17 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Timer? _startupTimer;
   String? _activeMediaId;
   int? _activeEpisode;
+  Duration _lastStablePosition = Duration.zero;
 
   Player get player => _player;
   String? get activeMediaId => _activeMediaId;
   int? get activeEpisode => _activeEpisode;
+  Duration get lastStablePosition => _lastStablePosition;
 
   void setActiveSession(String? mediaId, int? episode) {
+    if (_activeMediaId != mediaId || _activeEpisode != episode) {
+      _lastStablePosition = Duration.zero;
+    }
     _activeMediaId = mediaId;
     _activeEpisode = episode;
   }
@@ -201,6 +206,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
         if (pos > Duration.zero) {
           _startupTimer?.cancel();
           _startupTimer = null;
+          _lastStablePosition = pos;
         }
         final target = _pendingSeekTarget;
         final landed =
@@ -287,8 +293,26 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     String? mediaId,
     int? episode,
   }) async {
+    final isSameSession = (mediaId != null &&
+            episode != null &&
+            mediaId == _activeMediaId &&
+            episode == _activeEpisode) ||
+        (mediaId == null && episode == null && _activeMediaId != null);
+
+    // If startAt is explicitly provided, use it. Otherwise, if reopening the same media & episode,
+    // preserve the last stable playback position so we don't restart from beginning on stream recovery/reload.
+    final effectiveStartAt = (startAt != null && startAt > Duration.zero)
+        ? startAt
+        : (isSameSession && _lastStablePosition > Duration.zero
+            ? _lastStablePosition
+            : null);
+
     if (mediaId != null) _activeMediaId = mediaId;
     if (episode != null) _activeEpisode = episode;
+    if (!isSameSession && effectiveStartAt != null) {
+      _lastStablePosition = effectiveStartAt;
+    }
+
     final effectiveHeaders = <String, String>{
       'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -305,8 +329,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     state = state.copyWith(
       isOpening: true,
       clearPlaybackError: true,
-      position: Duration.zero,
-      duration: Duration.zero,
+      position: effectiveStartAt ?? (isSameSession ? _lastStablePosition : Duration.zero),
+      duration: isSameSession ? state.duration : Duration.zero,
     );
     _startupTimer?.cancel();
     _startupTimer = Timer(const Duration(seconds: 25), () {
@@ -341,7 +365,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       }
     } catch (_) {}
     await _player.open(
-      Media(url, httpHeaders: effectiveHeaders, start: startAt),
+      Media(url, httpHeaders: effectiveHeaders, start: effectiveStartAt),
       play: true,
     );
   }
@@ -349,7 +373,17 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Future<void> retry() async {
     final url = _lastUrl;
     if (url == null) return;
-    await open(url, _player.state.position, headers: _lastHeaders);
+    final currentPos = _player.state.position;
+    final pos = currentPos > Duration.zero
+        ? currentPos
+        : (_lastStablePosition > Duration.zero ? _lastStablePosition : null);
+    await open(
+      url,
+      pos,
+      headers: _lastHeaders,
+      mediaId: _activeMediaId,
+      episode: _activeEpisode,
+    );
   }
 
   Future<void> togglePlay() async {
@@ -367,6 +401,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _lastHeaders = null;
     _activeMediaId = null;
     _activeEpisode = null;
+    _lastStablePosition = Duration.zero;
     await _player.stop();
     state = PlayerState.initial();
   }

@@ -20,6 +20,44 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
     _service.load();
   }
 
+  IconData _iconForType(String? type) {
+    switch (type) {
+      case 'sub':
+        return Icons.subtitles_rounded;
+      case 'english_dub':
+        return Icons.record_voice_over_rounded;
+      case 'upcoming_1h':
+      case 'upcoming_2h':
+      case 'upcoming_24h':
+        return Icons.schedule_rounded;
+      case 'continue_watching':
+        return Icons.play_circle_outline_rounded;
+      default:
+        if (type != null && type.contains('update')) {
+          return Icons.system_update_alt_rounded;
+        }
+        return Icons.notifications_rounded;
+    }
+  }
+
+  Color _colorForType(BuildContext context, String? type) {
+    final cs = Theme.of(context).colorScheme;
+    switch (type) {
+      case 'sub':
+        return cs.primary;
+      case 'english_dub':
+        return Colors.deepOrangeAccent;
+      case 'upcoming_1h':
+      case 'upcoming_2h':
+      case 'upcoming_24h':
+        return Colors.amber.shade700;
+      case 'continue_watching':
+        return cs.tertiary;
+      default:
+        return cs.secondary;
+    }
+  }
+
   String _formatTime(DateTime dt) {
     final now = DateTime.now();
     final diff = now.difference(dt);
@@ -57,7 +95,28 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
           IconButton(
             tooltip: 'Clear inbox',
             onPressed: () async {
-              await _service.clear();
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Clear All Notifications?'),
+                  content: const Text(
+                    'This will remove all notifications from your inbox. This action cannot be undone.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Clear All'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await _service.clear();
+              }
             },
             icon: const Icon(Icons.delete_sweep_outlined),
           ),
@@ -67,85 +126,150 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
         valueListenable: _service.itemsNotifier,
         builder: (context, items, _) {
           if (items.isEmpty) {
-            return const Center(child: Text('No notifications yet'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.notifications_off_rounded,
+                    size: 72,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No notifications yet',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Episode releases, updates, and reminders\nwill appear here',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                ],
+              ),
+            );
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
             itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            separatorBuilder: (_, __) => const SizedBox(height: 6),
             itemBuilder: (context, index) {
               final item = items[index];
-              return Card(
-                elevation: 0,
-                child: ListTile(
-                  leading: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        item.isRead
-                            ? Icons.notifications_none_rounded
-                            : Icons.notifications_active_rounded,
-                        color:
-                            item.isRead
-                                ? Theme.of(context).colorScheme.onSurfaceVariant
-                                : Theme.of(context).colorScheme.primary,
-                      ),
-                      if (!item.isRead)
-                        Positioned(
-                          top: -2,
-                          right: -2,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              shape: BoxShape.circle,
-                            ),
+              final typeIcon = _iconForType(item.notificationType);
+              final typeColor = _colorForType(context, item.notificationType);
+
+              return Dismissible(
+                key: ValueKey(item.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.delete_rounded,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+                onDismissed: (_) async {
+                  await _service.delete(item.id);
+                },
+                child: Card(
+                  elevation: 0,
+                  color: item.isRead
+                      ? null
+                      : Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.3),
+                  child: ListTile(
+                    leading: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: typeColor.withValues(alpha: 0.15),
+                          child: Icon(
+                            typeIcon,
+                            size: 22,
+                            color: item.isRead
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant
+                                : typeColor,
                           ),
                         ),
-                    ],
-                  ),
-                  title: Text(
-                    item.title,
-                    style: TextStyle(
-                      fontWeight:
-                          item.isRead ? FontWeight.w500 : FontWeight.w800,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (item.body.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(item.body),
+                        if (!item.isRead)
+                          Positioned(
+                            top: -1,
+                            right: -1,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(context).colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surface,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTime(item.createdAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                    ),
+                    title: Text(
+                      item.title,
+                      style: TextStyle(
+                        fontWeight:
+                            item.isRead ? FontWeight.w500 : FontWeight.w700,
                       ),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    tooltip: 'Delete notification',
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () async {
-                      await _service.delete(item.id);
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (item.body.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            item.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatTime(item.createdAt),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () async {
+                      await _service.markRead(item.id);
+                      if (!context.mounted) return;
+                      if (item.route?.isNotEmpty == true) {
+                        await context.push(item.route!);
+                        if (context.mounted) {
+                          _service.load();
+                        }
+                      }
                     },
                   ),
-                  onTap: () async {
-                    await _service.markRead(item.id);
-                    if (!context.mounted) return;
-                    if (item.route?.isNotEmpty == true) {
-                      await context.push(item.route!);
-                      if (context.mounted) {
-                        _service.load();
-                      }
-                    }
-                  },
                 ),
               );
             },

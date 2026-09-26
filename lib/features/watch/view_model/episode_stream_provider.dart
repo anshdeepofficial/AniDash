@@ -406,6 +406,8 @@ class EpisodeData extends _$EpisodeData {
       url,
       ref.read(playerStateProvider).position,
       headers: state.headers,
+      mediaId: _epList.animeId,
+      episode: state.selectedEpisode,
     );
   }
 
@@ -987,11 +989,17 @@ class EpisodeData extends _$EpisodeData {
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
         var alternateStarted = false;
+        final currentPos = ref.read(playerStateProvider).position;
+        final recoveryStartAt = currentPos > Duration.zero
+            ? currentPos
+            : (_player.lastStablePosition > Duration.zero
+                ? _player.lastStablePosition
+                : startAt);
         for (var index = 1; index < state.sources.length; index++) {
           try {
             await _loadSourceStream(
               index,
-              startAt: startAt,
+              startAt: recoveryStartAt,
               generation: activeGeneration,
             );
             alternateStarted = true;

@@ -426,7 +426,7 @@ class EpisodeReleaseTask {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'AniDash/1.15.7',
+            'User-Agent': 'AniDash',
           },
           body: jsonEncode({
             'query': AnilistQueries.airingSchedulesQuery,
