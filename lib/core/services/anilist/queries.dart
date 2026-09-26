@@ -638,7 +638,7 @@ class AnilistQueries {
   ''';
   // Airing Schedules Query
   static const String airingSchedulesQuery = '''
-    query (\$greater: Int, \$lesser: Int, \$mediaIds: [Int], \$page: Int, \$perPage: Int) {
+    query (\$greater: Int, \$lesser: Int, \$mediaIds: [Int], \$page: Int, \$perPage: Int, \$sort: [AiringSort] = [TIME_DESC]) {
       Page(page: \$page, perPage: \$perPage) {
         pageInfo {
           hasNextPage
@@ -648,7 +648,7 @@ class AnilistQueries {
           airingAt_greater: \$greater
           airingAt_lesser: \$lesser
           mediaId_in: \$mediaIds
-          sort: TIME_DESC
+          sort: \$sort
         ) {
           id
           airingAt

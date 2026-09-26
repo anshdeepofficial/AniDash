@@ -11,7 +11,6 @@ import 'package:ani_dash/helpers/navigation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/services/franchise_service.dart';
 import 'package:ani_dash/features/details/view/widgets/watch_guide_bottom_sheet.dart';
 
@@ -542,7 +541,7 @@ class AvailableLanguagesCard extends ConsumerStatefulWidget {
 class _AvailableLanguagesCardState
     extends ConsumerState<AvailableLanguagesCard> {
   String? _lookupKey;
-  Future<({bool sub, bool dub, bool hindi})>? _availability;
+  Future<({bool sub, bool dub})>? _availability;
 
   @override
   Widget build(BuildContext context) {
@@ -561,7 +560,7 @@ class _AvailableLanguagesCardState
       _availability = _checkAvailability(firstEpisode);
     }
 
-    return FutureBuilder<({bool sub, bool dub, bool hindi})>(
+    return FutureBuilder<({bool sub, bool dub})>(
       future: _availability,
       builder: (context, snapshot) {
         final result = snapshot.data;
@@ -605,12 +604,6 @@ class _AvailableLanguagesCardState
                 available: result?.dub,
                 loading: loading,
               ),
-              const SizedBox(width: 8),
-              _AudioBadge(
-                label: 'HINDI',
-                available: result?.hindi,
-                loading: loading,
-              ),
             ],
           ),
         );
@@ -618,27 +611,13 @@ class _AvailableLanguagesCardState
     );
   }
 
-  Future<({bool sub, bool dub, bool hindi})> _checkAvailability(
+  Future<({bool sub, bool dub})> _checkAvailability(
     dynamic episode,
   ) async {
     final regular = await ref
         .read(episodeDataProvider.notifier)
         .checkLanguageAvailability(episode);
-    final title =
-        widget.anime.title.english ??
-        widget.anime.title.romaji ??
-        widget.anime.title.native ??
-        '';
-    final count = await ref
-        .read(hindiSourceManagerProvider.notifier)
-        .getEpisodeCount(
-          animeTitle: title,
-          romajiTitle: widget.anime.title.romaji,
-          anilistId: int.tryParse(widget.anime.id),
-          malId: int.tryParse(widget.anime.idMal ?? ''),
-          year: widget.anime.seasonYear,
-        );
-    return (sub: regular.sub, dub: regular.dub, hindi: (count ?? 0) > 0);
+    return (sub: regular.sub, dub: regular.dub);
   }
 }
 

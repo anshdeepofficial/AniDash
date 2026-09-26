@@ -24,7 +24,6 @@ import 'package:ani_dash/features/extensions/view/extensions_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/about_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/account_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/anime_sources_settings_screen.dart';
-import 'package:ani_dash/features/settings/view/screens/hindi_sources_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/download_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/experimental_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/player_settings_screen.dart';
@@ -247,10 +246,6 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'anime-sources',
           contentBuilder: (_, _) => const AnimeSourcesSettingsScreen(),
-        ),
-        AnimatedGoRoute(
-          path: 'hindi-sources',
-          contentBuilder: (_, _) => const HindiSourcesScreen(),
         ),
         AnimatedGoRoute(
           path: 'downloads',

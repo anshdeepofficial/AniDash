@@ -269,17 +269,27 @@ class JustAnimeProvider extends AnimeProvider {
       if (payload.containsKey('sub') || payload.containsKey('dub')) {
         if (requestedAudio == 'dub') {
           raw = payload['dub'] as Map<String, dynamic>?;
-          if (raw != null) {
+          if (raw != null && (raw['sources'] as List?)?.isNotEmpty == true) {
             actualAudio = 'dub';
           } else {
-            return null;
+            raw = (payload['sub'] ?? payload['hsub']) as Map<String, dynamic>?;
+            if (raw != null) {
+              actualAudio = 'sub';
+            } else {
+              return null;
+            }
           }
         } else {
           raw = (payload['sub'] ?? payload['hsub']) as Map<String, dynamic>?;
-          if (raw != null) {
+          if (raw != null && (raw['sources'] as List?)?.isNotEmpty == true) {
             actualAudio = 'sub';
           } else {
-            return null;
+            raw = payload['dub'] as Map<String, dynamic>?;
+            if (raw != null) {
+              actualAudio = 'dub';
+            } else {
+              return null;
+            }
           }
         }
       } else {

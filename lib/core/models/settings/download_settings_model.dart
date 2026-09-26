@@ -8,7 +8,7 @@ class DownloadSettingsModel {
   final int speedLimitKBps;
   final bool wifiOnly;
   final bool rememberDownloadPreferences;
-  final String preferredLanguage; // 'sub', 'dub', 'hindi'
+  final String preferredLanguage; // 'sub', 'dub'
   final String preferredQuality; // '1080p', '720p', '480p', '360p'
 
   DownloadSettingsModel({

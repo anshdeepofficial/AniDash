@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:ani_dash/core/models/anime/source_model.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/controls_overlay.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/player_gesture_handler.dart';
@@ -457,17 +456,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
   void _openAudio() {
     final current = ref.read(playerSettingsProvider).preferredAudioLanguage;
-    final episodeState = ref.read(episodeListProvider);
-    final selectedEpisode =
-        ref.read(episodeDataProvider).selectedEpisode ?? 1;
-    final availability = ref
-        .read(hindiSourceManagerProvider.notifier)
-        .getEpisodeCount(
-          animeTitle: episodeState.animeTitle ?? '',
-          anilistId: int.tryParse(episodeState.mediaId ?? ''),
-        )
-        .then((count) => count != null && count >= selectedEpisode)
-        .timeout(const Duration(seconds: 8), onTimeout: () => false);
     _sheet(
       SafeArea(
         child: Padding(
@@ -499,46 +487,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
                     }
                   },
                 ),
-              FutureBuilder<bool>(
-                future: availability,
-                initialData: current == 'hindi' ? true : null,
-                builder: (context, snapshot) {
-                  final available = snapshot.data == true;
-                  return ListTile(
-                    enabled: available,
-                    leading: snapshot.connectionState ==
-                                ConnectionState.waiting &&
-                            snapshot.data == null
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            current == 'hindi'
-                                ? Icons.radio_button_checked_rounded
-                                : Icons.radio_button_off_rounded,
-                          ),
-                    title: const Text('Hindi'),
-                    subtitle: Text(
-                      available
-                          ? 'Hindi audio available'
-                          : snapshot.connectionState == ConnectionState.waiting
-                              ? 'Checking availability…'
-                              : 'Unavailable for this episode',
-                    ),
-                    onTap: available
-                        ? () {
-                            Navigator.pop(context);
-                            if (current != 'hindi') {
-                              ref
-                                  .read(episodeDataProvider.notifier)
-                                  .switchAudioLanguage('hindi');
-                            }
-                          }
-                        : null,
-                  );
-                },
-              ),
             ],
           ),
         ),

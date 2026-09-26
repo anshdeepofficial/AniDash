@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:ani_dash/core/models/settings/notification_settings_model.dart';
-import 'package:ani_dash/core/models/settings/player_model.dart';
 import 'package:ani_dash/core/services/notification_inbox_service.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,7 +68,7 @@ void main() {
         notificationType: 'episode_release',
         mediaId: '21',
         episodeNumber: 5,
-        language: 'hindi',
+        language: 'dub',
       );
 
       final list = await inboxService.load();
@@ -81,7 +79,7 @@ void main() {
       expect(list.first.notificationType, 'episode_release');
       expect(list.first.mediaId, '21');
       expect(list.first.episodeNumber, 5);
-      expect(list.first.language, 'hindi');
+      expect(list.first.language, 'dub');
       expect(list.first.isRead, false);
 
       await inboxService.markRead('test_1');
@@ -89,7 +87,7 @@ void main() {
       expect(updatedList.first.isRead, true);
       expect(updatedList.first.mediaId, '21');
       expect(updatedList.first.episodeNumber, 5);
-      expect(updatedList.first.language, 'hindi');
+      expect(updatedList.first.language, 'dub');
       expect(updatedList.first.notificationType, 'episode_release');
     });
   });
@@ -179,48 +177,6 @@ void main() {
       expect(emittedDubNotifications.length, 1);
     });
 
-    test('Hindi Dub: previous 7 -> current 8 emits notification, repeated 8 emits 0 duplicates', () {
-      final mockPrefs = <String, int>{'last_known_hindi_ep_100': 7};
-      final emittedHindiNotifications = <int>[];
-
-      void runHindiDetectionCheck(int latestHindi) {
-        final previousHindi = mockPrefs['last_known_hindi_ep_100'];
-        if (previousHindi != null && latestHindi > previousHindi) {
-          emittedHindiNotifications.add(latestHindi);
-        }
-        mockPrefs['last_known_hindi_ep_100'] = latestHindi;
-      }
-
-      runHindiDetectionCheck(8);
-      expect(emittedHindiNotifications, [8]);
-
-      runHindiDetectionCheck(8);
-      expect(emittedHindiNotifications.length, 1);
-    });
-
-    test('Two Hindi providers reporting same episode results in exactly ONE notification', () {
-      // Simulate two providers: AnimeSalt reporting Ep 8, AnimeDrive reporting Ep 8
-      final provider1Count = 8;
-      final provider2Count = 8;
-
-      final enabledCounts = [provider1Count, provider2Count];
-      int? maxHindi;
-      for (final count in enabledCounts) {
-        if (maxHindi == null || count > maxHindi) {
-          maxHindi = count;
-        }
-      }
-
-      final emittedAlerts = <int>[];
-      final previousHindi = 7;
-      if (maxHindi != null && maxHindi > previousHindi) {
-        emittedAlerts.add(maxHindi);
-      }
-
-      expect(maxHindi, 8);
-      expect(emittedAlerts, [8], reason: 'Both providers resolved together generate exactly 1 notification');
-    });
-
     test('Notification wording rules: caught-up vs behind user', () {
       String generateBody({required int currentEp, required int latestReleased}) {
         if (currentEp >= latestReleased - 1) {
@@ -280,47 +236,6 @@ void main() {
     });
   });
 
-  group('Hindi Fallback & Canonical Provider Persistence', () {
-    test('Playback fallback preserves global Hindi preference', () {
-      final userSettings = PlayerModel(
-        preferredAudioLanguage: 'hindi',
-        preferredHindiProvider: 'animesalt',
-        hindiFallbackAudio: 'dub',
-      );
-
-      // Simulate episode 5 having no Hindi stream:
-      // The resolver falls back to English Dub for this episode only.
-      final fallbackTrack = userSettings.hindiFallbackAudio == 'dub' ? 'English DUB' : 'Japanese SUB';
-      expect(fallbackTrack, 'English DUB');
-
-      // Crucially, userSettings.preferredAudioLanguage remains untouched!
-      expect(userSettings.preferredAudioLanguage, 'hindi', reason: 'Global preference must not be overwritten');
-      expect(userSettings.preferredHindiProvider, 'animesalt');
-    });
-
-    test('Canonical Provider Persistence: AnimeSalt vs HiAnime switching', () {
-      // 1. Select AnimeSalt
-      final animeSaltState = PlayerModel(
-        preferredAudioLanguage: 'hindi',
-        preferredHindiProvider: 'animesalt',
-      );
-      final jsonSalt = animeSaltState.toJson();
-      final restoredSalt = PlayerModel.fromJson(jsonSalt);
-
-      expect(restoredSalt.preferredAudioLanguage, 'hindi');
-      expect(restoredSalt.preferredHindiProvider, 'animesalt');
-
-      // 2. Select HiAnime
-      final hiAnimeState = restoredSalt.copyWith(
-        preferredAudioLanguage: 'sub',
-      );
-      final jsonHiAnime = hiAnimeState.toJson();
-      final restoredHiAnime = PlayerModel.fromJson(jsonHiAnime);
-
-      expect(restoredHiAnime.preferredAudioLanguage, 'sub');
-      expect(restoredHiAnime.preferredAudioLanguage != 'hindi', isTrue, reason: 'Hindi is inactive when HiAnime is selected');
-    });
-  });
 
   group('Double-Tap Seek Calculation & Clamping', () {
     Duration calculateSeekTarget({
@@ -799,6 +714,56 @@ void main() {
       final list = [bAnime, aAnime]..sort(AnimeWatchProgressEntry.compareByRecency);
 
       expect(list.map((e) => e.animeTitle).toList(), ['Attack on Titan', 'Bleach']);
+    });
+  });
+
+  group('Upcoming Episode Countdown & Alarm Scheduling Tests', () {
+    test('Exact alarm IDs are unique and deterministic for 24h, 2h, 1h, and release', () {
+      const mediaId = 12345;
+      const episodeNumber = 7;
+
+      final id24h = ((mediaId.hashCode ^ episodeNumber) * 31 + 24) & 0x7FFFFFFF;
+      final id2h = ((mediaId.hashCode ^ episodeNumber) * 31 + 2) & 0x7FFFFFFF;
+      final id1h = ((mediaId.hashCode ^ episodeNumber) * 31 + 1) & 0x7FFFFFFF;
+      final idRelease = ((mediaId.hashCode ^ episodeNumber) * 31 + 0) & 0x7FFFFFFF;
+
+      final idSet = {id24h, id2h, id1h, idRelease};
+      expect(idSet.length, 4, reason: 'All 4 alarm IDs must be completely unique');
+    });
+
+    test('Countdown classification maps correctly to 2h, 1h, 24h and release windows', () {
+      String classifyCountdown(int secondsRemaining) {
+        if (secondsRemaining <= 0) {
+          return 'release';
+        } else if (secondsRemaining <= 3600) {
+          return '1h';
+        } else if (secondsRemaining <= 7200) {
+          return '2h';
+        } else if (secondsRemaining <= 86400) {
+          return '24h';
+        } else {
+          return 'future';
+        }
+      }
+
+      // Exactly 2 hours left (7200 seconds)
+      expect(classifyCountdown(7200), '2h');
+      expect(classifyCountdown(5400), '2h'); // 1.5 hours
+
+      // Exactly 1 hour left (3600 seconds)
+      expect(classifyCountdown(3600), '1h');
+      expect(classifyCountdown(1800), '1h'); // 30 minutes
+
+      // Exactly 24 hours left (86400 seconds)
+      expect(classifyCountdown(86400), '24h');
+      expect(classifyCountdown(43200), '24h'); // 12 hours
+
+      // Released
+      expect(classifyCountdown(0), 'release');
+      expect(classifyCountdown(-60), 'release');
+
+      // More than 24 hours in the future
+      expect(classifyCountdown(90000), 'future');
     });
   });
 }

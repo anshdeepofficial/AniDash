@@ -32,8 +32,6 @@ import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/next_episode_prompt_provider.dart';
 import 'package:ani_dash/core/utils/extractors.dart' as extractor;
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_cache.dart';
 import 'package:ani_dash/helpers/matcher.dart';
 
 part 'episode_stream_provider.g.dart';
@@ -209,17 +207,10 @@ class EpisodeData extends _$EpisodeData {
 
     AppLogger.section('Loading Episode $ep');
     final playerSettings = ref.read(playerSettingsProvider);
-    final audioLang = playerSettings.preferredAudioLanguage;
     final preferDub = playerSettings.preferDub;
     ServerData? currentServer = state.selectedServer;
 
-    if (audioLang == 'hindi') {
-      currentServer = ServerData(
-        id: 'hindi_auto',
-        name: 'Hindi (Multi-Audio)',
-        isDub: false,
-      );
-    } else if (currentServer != null && currentServer.isDub != preferDub) {
+    if (currentServer != null && currentServer.isDub != preferDub) {
       final matching =
           state.servers.firstWhereOrNull(
             (s) =>
@@ -302,10 +293,6 @@ class EpisodeData extends _$EpisodeData {
       animeId: targetMediaId,
       episode: episodeNumber,
     );
-    HindiSourceCache.instance.clearStreamCache(
-      animeId: targetMediaId,
-      episodeNumber: episodeNumber,
-    );
     AppLogger.i(
       'Cleared episode stream cache for $targetMediaId Ep $episodeNumber',
     );
@@ -368,22 +355,6 @@ class EpisodeData extends _$EpisodeData {
     ref
         .read(playerSettingsProvider.notifier)
         .setPreferredAudioLanguage(language);
-
-    if (language == 'hindi') {
-      AppLogger.i('Switching audio track to: HINDI');
-      state = state.copyWith(
-        selectedServer: ServerData(
-          id: 'hindi_auto',
-          name: 'Hindi (Multi-Audio)',
-          isDub: false,
-        ),
-      );
-      await _playCurrent(
-        ref.read(playerStateProvider).position,
-        generation: generation,
-      );
-      return;
-    }
 
     final isDub = language == 'dub';
     final current = state.selectedServer;
@@ -599,13 +570,7 @@ class EpisodeData extends _$EpisodeData {
       }
 
       Source? matchedSource;
-      if (language == 'hindi') {
-        matchedSource = data.sources.firstWhereOrNull(
-          (s) =>
-              s.quality?.toLowerCase().contains('hindi') == true ||
-              s.url?.toLowerCase().contains('hindi') == true,
-        );
-      } else if (language == 'dub') {
+      if (language == 'dub') {
         matchedSource = data.sources.firstWhereOrNull((s) => s.isDub);
         matchedSource ??=
             preferredServer?.isDub == true ? data.sources.firstOrNull : null;
@@ -746,13 +711,7 @@ class EpisodeData extends _$EpisodeData {
         }
 
         Source? source;
-        if (targetLang == 'hindi') {
-          source = data.sources.firstWhereOrNull(
-            (s) =>
-                s.quality?.toLowerCase().contains('hindi') == true ||
-                s.url?.toLowerCase().contains('hindi') == true,
-          );
-        } else if (targetLang == 'dub') {
+        if (targetLang == 'dub') {
           source = data.sources.firstWhereOrNull((s) => s.isDub);
           source ??=
               preferredServer?.isDub == true ? data.sources.firstOrNull : null;
@@ -892,11 +851,6 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<void> _fetchServers(int epNum, [int? generation]) async {
-    final isHindiActive =
-        ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-    if (isHindiActive) {
-      return;
-    }
 
     final cacheKey =
         '${_epList.mediaId ?? _epList.animeId ?? "unknown"}_$epNum';
@@ -1324,16 +1278,11 @@ class EpisodeData extends _$EpisodeData {
     if (activeGeneration != _loadGeneration) return null;
 
     final playerSettings = ref.read(playerSettingsProvider);
-    final isHindiRequested = playerSettings.preferredAudioLanguage == 'hindi';
-
-    final isDubRequested =
-        isHindiRequested
-            ? (playerSettings.hindiFallbackAudio == 'dub')
-            : (server?.isDub ?? playerSettings.preferDub);
+    final isDubRequested = server?.isDub ?? playerSettings.preferDub;
     final effectiveMediaKey = _epList.mediaId ?? _epList.animeId ?? 'unknown';
     final effectiveAnimeKey = _epList.animeId ?? 'unknown';
     final cacheKey =
-        '${effectiveMediaKey}_${effectiveAnimeKey}_${ep.number}_${ep.id}_${server?.id}_${isHindiRequested ? "hindi" : (isDubRequested ? "dub" : "sub")}';
+        '${effectiveMediaKey}_${effectiveAnimeKey}_${ep.number}_${ep.id}_${server?.id}_${isDubRequested ? "dub" : "sub"}';
     final cached = _sourceCache[cacheKey];
     if (cached != null && !cached.isExpired && cached.data.sources.isNotEmpty) {
       AppLogger.success(
@@ -1347,53 +1296,6 @@ class EpisodeData extends _$EpisodeData {
         _sourceCache[cacheKey] = _CachedSourceEntry(model);
       }
       return model;
-    }
-
-    if (isHindiRequested) {
-      final epNum = ep.number ?? 1;
-      final animeTitle = _epList.animeTitle ?? '';
-      final animeId = _epList.animeId;
-      final anilistId =
-          int.tryParse(_epList.mediaId ?? '') ?? int.tryParse(animeId ?? '');
-      final manualProvider = playerSettings.preferredHindiProvider;
-
-      AppLogger.section('[Hindi] Resolving stream for $animeTitle Ep $epNum');
-      try {
-        final hindiManager = ref.read(hindiSourceManagerProvider.notifier);
-        final hindiStream = await hindiManager.resolveEpisode(
-          animeTitle: animeTitle,
-          episodeNumber: epNum,
-          animeId: animeId,
-          anilistId: anilistId,
-          manualProviderId: manualProvider,
-        );
-
-        if (hindiStream != null && hindiStream.sources.isNotEmpty) {
-          AppLogger.success(
-            '[Hindi] Playable Hindi stream resolved successfully!',
-          );
-          return saveAndReturn(hindiStream);
-        }
-      } catch (e) {
-        AppLogger.w('[Hindi] Hindi source resolution failed: $e');
-      }
-
-      final fallbackLang = playerSettings.hindiFallbackAudio;
-      final fallbackLabel =
-          fallbackLang == 'sub' ? 'Japanese SUB' : 'English DUB';
-      AppLogger.w(
-        '[Hindi] All Hindi providers failed for Ep $epNum. Falling back to $fallbackLabel.',
-      );
-
-      state = state.copyWith(
-        languageNotice:
-            'Hindi is unavailable for this episode. Playing $fallbackLabel.',
-        selectedServer: ServerData(
-          id: server?.id ?? 'auto',
-          name: fallbackLabel,
-          isDub: fallbackLang == 'dub',
-        ),
-      );
     }
 
     AppLogger.d(

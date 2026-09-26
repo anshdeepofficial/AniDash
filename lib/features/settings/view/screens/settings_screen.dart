@@ -101,13 +101,6 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/settings/extensions'),
                 ),
                 NormalSettingsItem(
-                  icon: Icon(Icons.language_rounded, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Hindi Sources',
-                  description: 'Manage Hindi providers, priority & testing',
-                  onTap: () => context.push('/settings/hindi-sources'),
-                ),
-                NormalSettingsItem(
                   icon: Icon(Iconsax.video_play, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   title: 'Video Player',

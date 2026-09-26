@@ -90,11 +90,6 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
   ) {
     return [
       IconButton(
-        onPressed: () => context.push('/settings/hindi-sources'),
-        icon: const Icon(Icons.language_rounded),
-        tooltip: 'Hindi Sources',
-      ),
-      IconButton(
         onPressed:
             () => _showAddRepoDialog(context, tabController, onRepoSaved),
         icon: const Icon(Iconsax.add),

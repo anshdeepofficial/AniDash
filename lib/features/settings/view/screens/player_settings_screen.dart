@@ -54,9 +54,7 @@ class PlayerSettingsScreen extends ConsumerWidget {
                   accent: colorScheme.primary,
                   title: 'Preferred Audio Track',
                   description:
-                      playerSettings.preferredAudioLanguage == 'hindi'
-                          ? 'Hindi'
-                          : (playerSettings.preferredAudioLanguage == 'sub'
+                      (playerSettings.preferredAudioLanguage == 'sub'
                               ? 'Japanese (SUB)'
                               : 'English (DUB)'),
                   value: playerSettings.preferredAudioLanguage,
@@ -69,10 +67,6 @@ class PlayerSettingsScreen extends ConsumerWidget {
                       value: 'dub',
                       child: Text('English (DUB)'),
                     ),
-                    DropdownMenuItem(
-                      value: 'hindi',
-                      child: Text('Hindi'),
-                    ),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -80,39 +74,6 @@ class PlayerSettingsScreen extends ConsumerWidget {
                     }
                   },
                 ),
-                if (playerSettings.preferredAudioLanguage == 'hindi') ...[
-                  DropdownSettingsItem(
-                    icon: Icon(Iconsax.radar, color: colorScheme.primary),
-                    accent: colorScheme.primary,
-                    title: 'Hindi Fallback Audio',
-                    description:
-                        'When Hindi is unavailable: ${playerSettings.hindiFallbackAudio == "sub" ? "Japanese (SUB)" : "English (DUB)"}',
-                    value: playerSettings.hindiFallbackAudio,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'dub',
-                        child: Text('Play English DUB'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'sub',
-                        child: Text('Play Japanese SUB'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        playerNotifier.setHindiFallbackAudio(value);
-                      }
-                    },
-                  ),
-                  NormalSettingsItem(
-                    icon: Icon(Icons.language_rounded, color: colorScheme.primary),
-                    accent: colorScheme.primary,
-                    title: 'Manage Hindi Sources',
-                    description:
-                        'Configure providers, priority ordering & connection test',
-                    onTap: () => context.push('/settings/hindi-sources'),
-                  ),
-                ],
               ],
             ),
             SettingsSection(

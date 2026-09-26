@@ -71,7 +71,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
               icon: Icon(Iconsax.translate, color: colors.primary),
               accent: colors.primary,
               title: 'Dub Releases',
-              description: 'English and Hindi dub releases for relevant titles',
+              description: 'English dub releases for relevant titles',
               value: settings.enableDubReleases,
               onChanged:
                   (value) => notifier.updateSettings(

@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/services/franchise_service.dart';
-import 'package:ani_dash/core/hindi_sources/models/hindi_source_model.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_icon_resolver.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -151,42 +149,6 @@ void main() {
     });
   });
 
-  group('Hindi Source Icon Resolver Tests', () {
-    test('Resolves configured logoUrl directly if provided', () {
-      const source = HindiSourceModel(
-        id: 'animesalt',
-        name: 'AnimeSalt',
-        baseUrl: 'https://animesalt.to',
-        configuredLogoUrl: 'https://animesalt.to/favicon.ico',
-      );
-
-      expect(source.logoUrl, 'https://animesalt.to/favicon.ico');
-    });
-
-    test('AnimixStream uses high-res Google favicon PNG rather than raw SVG', () {
-      const source = HindiSourceModel(
-        id: 'animixstream',
-        name: 'AnimixStream',
-        baseUrl: 'https://animixstream.com',
-        configuredLogoUrl:
-            'https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://animixstream.com&size=128',
-      );
-
-      expect(source.logoUrl, contains('gstatic.com/faviconV2'));
-      expect(source.logoUrl, contains('size=128'));
-    });
-
-    test('Returns resolved configured icon when resolveIcon is called', () async {
-      final resolver = HindiIconResolver();
-      final icon = await resolver.resolveIcon(
-        sourceId: 'custom_source',
-        baseUrl: 'https://custom.org',
-        configuredLogoUrl: 'https://custom.org/logo.png',
-      );
-      expect(icon, 'https://custom.org/logo.png');
-      expect(resolver.getCachedIcon('custom_source'), 'https://custom.org/logo.png');
-    });
-  });
 
   group('Source Deduplication in Extensions Selector', () {
     test('Deduplicates duplicate entries by id or name', () {

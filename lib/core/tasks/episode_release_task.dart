@@ -7,7 +7,6 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/anilist/queries.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 import 'package:ani_dash/core/registery/sources/anime/aniwatch/aniwatch.dart';
 import 'package:ani_dash/core/registery/sources/anime/aniwatch/hianime.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
@@ -119,38 +118,38 @@ class EpisodeReleaseTask {
       );
 
       // -------------------------------------------------------------
-      // 1. SUB Releases (via real AniList AiringSchedule)
+      // 1. SUB Releases (Past releases within window)
       // -------------------------------------------------------------
       if (enableSubReleases) {
         try {
-          final schedules = await _fetchAniListAiringSchedules(
+          final pastSchedules = await _fetchAniListAiringSchedules(
             startWindow: startWindow,
             endWindow: nowEpoch,
             mediaIds: relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
           );
-          schedulesReturned = schedules.length;
+          schedulesReturned += pastSchedules.length;
           AppLogger.i(
-            '[NotificationWorker] AniList schedules returned = $schedulesReturned',
+            '[NotificationWorker] AniList past schedules returned = ${pastSchedules.length}',
           );
 
           // Filter for user's relevant anime if user has watch progress entries
-          final List<Map<String, dynamic>> targetSchedules;
+          final List<Map<String, dynamic>> targetPastSchedules;
           if (relevantMediaIds.isNotEmpty) {
-            targetSchedules = schedules.where((s) {
+            targetPastSchedules = pastSchedules.where((s) {
               final mId = s['mediaId'] as int?;
               return mId != null && relevantMediaIds.contains(mId);
             }).toList();
           } else {
             // If user has no watch progress yet, only evaluate first 5 most recent
-            targetSchedules = schedules.take(5).toList();
+            targetPastSchedules = pastSchedules.take(5).toList();
           }
 
-          relevantCount += targetSchedules.length;
+          relevantCount += targetPastSchedules.length;
           AppLogger.i(
-            '[NotificationWorker] relevant releases = ${targetSchedules.length}',
+            '[NotificationWorker] relevant past releases = ${targetPastSchedules.length}',
           );
 
-          for (final s in targetSchedules) {
+          for (final s in targetPastSchedules) {
             final mediaId = s['mediaId'] as int;
             final epNum = s['episode'] as int;
             final mediaObj = s['media'] as Map<String, dynamic>? ?? {};
@@ -190,7 +189,127 @@ class EpisodeReleaseTask {
             }
           }
         } catch (e) {
-          AppLogger.w('AniList airingSchedules check failed: $e');
+          AppLogger.w('AniList past airingSchedules check failed: $e');
+        }
+
+        // -------------------------------------------------------------
+        // 1B. Upcoming Episodes (Exact Alarms & Countdown Notifications)
+        // -------------------------------------------------------------
+        try {
+          final upcomingSchedules = await _fetchAniListAiringSchedules(
+            startWindow: nowEpoch,
+            endWindow: nowEpoch + (7 * 86400),
+            mediaIds: relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
+            sort: ['TIME_ASC'],
+          );
+          schedulesReturned += upcomingSchedules.length;
+          AppLogger.i(
+            '[NotificationWorker] AniList upcoming schedules returned = ${upcomingSchedules.length}',
+          );
+
+          final List<Map<String, dynamic>> targetUpcomingSchedules;
+          if (relevantMediaIds.isNotEmpty) {
+            targetUpcomingSchedules = upcomingSchedules.where((s) {
+              final mId = s['mediaId'] as int?;
+              return mId != null && relevantMediaIds.contains(mId);
+            }).toList();
+          } else {
+            targetUpcomingSchedules = upcomingSchedules.take(5).toList();
+          }
+
+          relevantCount += targetUpcomingSchedules.length;
+
+          for (final s in targetUpcomingSchedules) {
+            final mediaId = s['mediaId'] as int;
+            final epNum = s['episode'] as int;
+            final airingAt = s['airingAt'] as int? ?? 0;
+            if (airingAt <= 0) continue;
+
+            final mediaObj = s['media'] as Map<String, dynamic>? ?? {};
+            final titleObj = mediaObj['title'] as Map<String, dynamic>? ?? {};
+            final animeTitle = titleObj['english'] as String? ??
+                titleObj['romaji'] as String? ??
+                titleObj['userPreferred'] as String? ??
+                mediaTitlesById[mediaId] ??
+                'Anime';
+
+            // 1. Register Exact Alarms with Android AlarmManager
+            await NotificationService().scheduleUpcomingEpisodeAlerts(
+              mediaId: mediaId,
+              animeTitle: animeTitle,
+              episodeNumber: epNum,
+              airingAtEpoch: airingAt,
+            );
+
+            // 2. Real-time / Polling countdown checks
+            final secondsUntilAiring = airingAt - nowEpoch;
+
+            // 1-Hour window (<= 3600 seconds)
+            if (secondsUntilAiring <= 3600 && secondsUntilAiring > 0) {
+              final key1h = 'notif_1h_${mediaId}_$epNum';
+              if (!(pref.getBool(key1h) ?? false)) {
+                sentCount++;
+                await NotificationService().showEpisodeReleaseNotification(
+                  animeTitle: animeTitle,
+                  episodeNumber: epNum,
+                  isDub: false,
+                  mediaId: mediaId.toString(),
+                  customTitle: 'Upcoming: $animeTitle • Ep $epNum',
+                  customBody:
+                      'Episode $epNum releases in 1 hour!',
+                  audioType: 'upcoming_1h',
+                  dedupeKey: key1h,
+                );
+                await pref.setBool(key1h, true);
+              } else {
+                duplicateSuppressed++;
+              }
+            }
+            // 2-Hour window (<= 7200 seconds and > 3600 seconds)
+            else if (secondsUntilAiring <= 7200 && secondsUntilAiring > 3600) {
+              final key2h = 'notif_2h_${mediaId}_$epNum';
+              if (!(pref.getBool(key2h) ?? false)) {
+                sentCount++;
+                await NotificationService().showEpisodeReleaseNotification(
+                  animeTitle: animeTitle,
+                  episodeNumber: epNum,
+                  isDub: false,
+                  mediaId: mediaId.toString(),
+                  customTitle: 'Upcoming: $animeTitle • Ep $epNum',
+                  customBody:
+                      'Episode $epNum releases in 2 hours!',
+                  audioType: 'upcoming_2h',
+                  dedupeKey: key2h,
+                );
+                await pref.setBool(key2h, true);
+              } else {
+                duplicateSuppressed++;
+              }
+            }
+            // 24-Hour window (<= 86400 seconds and > 7200 seconds)
+            else if (secondsUntilAiring <= 86400 && secondsUntilAiring > 7200) {
+              final key24h = 'notif_24h_${mediaId}_$epNum';
+              if (!(pref.getBool(key24h) ?? false)) {
+                sentCount++;
+                await NotificationService().showEpisodeReleaseNotification(
+                  animeTitle: animeTitle,
+                  episodeNumber: epNum,
+                  isDub: false,
+                  mediaId: mediaId.toString(),
+                  customTitle: 'Upcoming: $animeTitle • Ep $epNum',
+                  customBody:
+                      'Episode $epNum releases tomorrow (in 24 hours)!',
+                  audioType: 'upcoming_24h',
+                  dedupeKey: key24h,
+                );
+                await pref.setBool(key24h, true);
+              } else {
+                duplicateSuppressed++;
+              }
+            }
+          }
+        } catch (e) {
+          AppLogger.w('AniList upcoming airingSchedules check failed: $e');
         }
       }
 
@@ -227,54 +346,6 @@ class EpisodeReleaseTask {
                 duplicateSuppressed++;
               }
               await pref.setInt(lastDubKey, latestEnglishDubEp);
-            }
-          } catch (_) {}
-        }
-      }
-
-      // -------------------------------------------------------------
-      // 3. Hindi DUB Releases (strictly via HindiSourceManager)
-      // -------------------------------------------------------------
-      if (enableDubReleases) {
-        final hindiManager = HindiSourceManagerNotifier();
-        var hindiInitialized = false;
-
-        for (final entry in relevantEntries.where((e) => e.status == 'watching')) {
-          final anilistId = int.tryParse(entry.animeId);
-          try {
-            if (!hindiInitialized) {
-              await hindiManager.init();
-              hindiInitialized = true;
-            }
-            final maxHindiEp = await _fetchHindiDubCount(
-              hindiManager,
-              entry.animeTitle,
-              anilistId,
-            );
-
-            if (maxHindiEp != null && maxHindiEp > 0) {
-              final lastHindiKey = 'last_known_hindi_ep_${entry.animeId}';
-              final previousHindi = pref.getInt(lastHindiKey);
-
-              if (previousHindi != null && maxHindiEp > previousHindi) {
-                sentCount++;
-                AppLogger.i(
-                  '[NotificationWorker] sent = Hindi DUB ${entry.animeTitle} Ep $maxHindiEp',
-                );
-                await NotificationService().showEpisodeReleaseNotification(
-                  animeTitle: entry.animeTitle,
-                  episodeNumber: maxHindiEp,
-                  isDub: true,
-                  mediaId: entry.animeId,
-                  customTitle: 'New Hindi Dub Available',
-                  customBody:
-                      '${entry.animeTitle} Episode $maxHindiEp is now available in Hindi Dub!',
-                  audioType: 'hindi_dub',
-                );
-              } else if (previousHindi != null) {
-                duplicateSuppressed++;
-              }
-              await pref.setInt(lastHindiKey, maxHindiEp);
             }
           } catch (_) {}
         }
@@ -347,6 +418,7 @@ class EpisodeReleaseTask {
     required int startWindow,
     required int endWindow,
     List<int>? mediaIds,
+    List<String>? sort,
   }) async {
     final response = await http
         .post(
@@ -354,7 +426,7 @@ class EpisodeReleaseTask {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'AniDash/1.15.4',
+            'User-Agent': 'AniDash/1.15.7',
           },
           body: jsonEncode({
             'query': AnilistQueries.airingSchedulesQuery,
@@ -364,6 +436,7 @@ class EpisodeReleaseTask {
               'mediaIds': mediaIds,
               'page': 1,
               'perPage': 50,
+              if (sort != null) 'sort': sort,
             },
           }),
         )
@@ -414,34 +487,4 @@ class EpisodeReleaseTask {
     } catch (_) {}
 
     return null;
-  }
-
-  /// Resolves Hindi Dub episode availability strictly via Hindi providers
-  static Future<int?> _fetchHindiDubCount(
-    HindiSourceManagerNotifier hindiManager,
-    String title,
-    int? anilistId,
-  ) async {
-    final enabledSources = hindiManager.getSources().where((s) => s.enabled);
-    int? maxHindi;
-    for (final src in enabledSources) {
-      final prov = hindiManager.getProvider(src.id);
-      if (prov != null) {
-        try {
-          final provAnimeId = await prov
-              .findAnime(title: title, anilistId: anilistId)
-              .timeout(const Duration(seconds: 10));
-          if (provAnimeId != null) {
-            final count = await prov
-                .getEpisodeCount(provAnimeId)
-                .timeout(const Duration(seconds: 10));
-            if (count != null && (maxHindi == null || count > maxHindi)) {
-              maxHindi = count;
-            }
-          }
-        } catch (_) {}
-      }
-    }
-    return maxHindi;
-  }
-}
+  }}

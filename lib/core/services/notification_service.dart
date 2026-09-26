@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/services/notification_inbox_service.dart';
 
@@ -59,13 +61,13 @@ class NotificationService {
       await Workmanager().registerPeriodicTask(
         notificationCheckTask,
         notificationCheckTask,
-        frequency: const Duration(minutes: 60),
+        frequency: const Duration(minutes: 15),
         existingWorkPolicy:
             forceReplace ? ExistingWorkPolicy.replace : ExistingWorkPolicy.keep,
         constraints: Constraints(networkType: NetworkType.connected),
       );
       AppLogger.i(
-        '[NotificationWorker] Registered unique periodic task "$notificationCheckTask" (frequency: 60m, policy: ${forceReplace ? "replace" : "keep"})',
+        '[NotificationWorker] Registered unique periodic task "$notificationCheckTask" (frequency: 15m, policy: ${forceReplace ? "replace" : "keep"})',
       );
     } catch (e) {
       AppLogger.w('Could not register periodic notification worker: $e');
@@ -76,7 +78,35 @@ class NotificationService {
   static const String _largeIconName = '@drawable/ic_notification_large';
   static const Color _brandColor = Color(0xFF4CAF50);
 
+  static bool _timeZoneInitialized = false;
+
+  static void _setupTimeZone() {
+    if (_timeZoneInitialized) return;
+    try {
+      tz.initializeTimeZones();
+      final timeZoneName = DateTime.now().timeZoneName;
+      if (tz.timeZoneDatabase.locations.containsKey(timeZoneName)) {
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+        _timeZoneInitialized = true;
+        return;
+      }
+      final offset = DateTime.now().timeZoneOffset;
+      for (final loc in tz.timeZoneDatabase.locations.values) {
+        if (loc.currentTimeZone.offset == offset.inMilliseconds) {
+          tz.setLocalLocation(loc);
+          _timeZoneInitialized = true;
+          return;
+        }
+      }
+      tz.setLocalLocation(tz.getLocation('UTC'));
+      _timeZoneInitialized = true;
+    } catch (e) {
+      AppLogger.w('Timezone initialization error: $e');
+    }
+  }
+
   Future<void> initialize({bool isBackground = false}) async {
+    _setupTimeZone();
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings(_iconName);
 
@@ -152,11 +182,12 @@ class NotificationService {
 
     await _createNotificationChannels();
     if (!isBackground) {
-      await flutterLocalNotificationsPlugin
+      final androidPlugin = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
+          >();
+      await androidPlugin?.requestNotificationsPermission();
+      await androidPlugin?.requestExactAlarmsPermission();
     }
   }
 
@@ -180,7 +211,7 @@ class NotificationService {
       'AniDash_episodes',
       'Episode Releases',
       description: 'Notifications when new Sub or Dub episodes are released',
-      importance: Importance.high,
+      importance: Importance.max,
       playSound: true,
       enableVibration: true,
     );
@@ -292,6 +323,7 @@ class NotificationService {
       color: color ?? _brandColor,
       actions: actions,
       styleInformation: styleInformation,
+      visibility: NotificationVisibility.public,
     );
   }
 
@@ -434,11 +466,7 @@ class NotificationService {
     String? audioType,
     String? dedupeKey,
   }) async {
-    final title = customTitle ?? (audioType == 'hindi_dub'
-        ? 'New Hindi Dub Available'
-        : (isDub || audioType == 'english_dub'
-            ? 'New English Dub Episode'
-            : 'New SUB Episode'));
+    final title = customTitle ?? (isDub || audioType == 'english_dub' ? 'New English Dub Episode' : 'New SUB Episode');
     final body = customBody ??
         '$animeTitle Episode $episodeNumber is now available.';
     final effectiveDedupeKey = dedupeKey ??
@@ -454,7 +482,7 @@ class NotificationService {
       notificationType: audioType ?? (isDub ? 'dub' : 'sub'),
       mediaId: mediaId,
       episodeNumber: episodeNumber,
-      language: audioType == 'hindi_dub' ? 'hi' : (isDub || audioType == 'english_dub' ? 'en' : 'ja'),
+      language: (isDub || audioType == 'english_dub' ? 'en' : 'ja'),
       systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
@@ -465,6 +493,8 @@ class NotificationService {
         channelName: 'Episode Releases',
         channelDescription:
             'Notifications when new Sub or Dub episodes are released',
+        importance: Importance.max,
+        priority: Priority.max,
       ),
     );
 
@@ -475,6 +505,148 @@ class NotificationService {
       platformChannelSpecifics,
       payload: mediaId != null ? 'details:$mediaId?tab=episodes' : null,
     );
+  }
+
+  /// Schedules exact Android alarms for upcoming episodes (24h, 2h, 1h, and exact release).
+  /// These alarms are registered directly with Android AlarmManager, so they wake up the device
+  /// and trigger notifications even if AniDash is closed or terminated.
+  Future<void> scheduleUpcomingEpisodeAlerts({
+    required int mediaId,
+    required String animeTitle,
+    required int episodeNumber,
+    required int airingAtEpoch,
+  }) async {
+    if (!Platform.isAndroid) return;
+    _setupTimeZone();
+    await ensureSoundChannelsCreated();
+
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final timeUntilAiring = airingAtEpoch - nowEpoch;
+    if (timeUntilAiring <= 0) return;
+
+    final pref = await SharedPreferences.getInstance();
+
+    final details = NotificationDetails(
+      android: _buildAndroidDetails(
+        channelBaseId: 'AniDash_episodes',
+        channelName: 'Episode Releases',
+        channelDescription:
+            'Notifications when new Sub or Dub episodes are released',
+        importance: Importance.max,
+        priority: Priority.max,
+      ),
+    );
+
+    // 1. 24-hour countdown alert (airingAt - 86400)
+    final alert24hEpoch = airingAtEpoch - 86400;
+    if (alert24hEpoch > nowEpoch &&
+        !(pref.getBool('notif_24h_${mediaId}_$episodeNumber') ?? false)) {
+      final scheduled24h = tz.TZDateTime.fromMillisecondsSinceEpoch(
+        tz.local,
+        alert24hEpoch * 1000,
+      );
+      final id24h =
+          ((mediaId.hashCode ^ episodeNumber) * 31 + 24) & 0x7FFFFFFF;
+      try {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id24h,
+          'Upcoming: $animeTitle • Ep $episodeNumber',
+          'Episode $episodeNumber releases tomorrow (in 24 hours)!',
+          scheduled24h,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'details:$mediaId?tab=episodes',
+        );
+        AppLogger.i(
+          '[NotificationService] Scheduled 24h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled24h.toIso8601String()}',
+        );
+      } catch (e) {
+        AppLogger.w('Failed to schedule 24h alarm: $e');
+      }
+    }
+
+    // 2. 2-hour countdown alert (airingAt - 7200)
+    final alert2hEpoch = airingAtEpoch - 7200;
+    if (alert2hEpoch > nowEpoch &&
+        !(pref.getBool('notif_2h_${mediaId}_$episodeNumber') ?? false)) {
+      final scheduled2h = tz.TZDateTime.fromMillisecondsSinceEpoch(
+        tz.local,
+        alert2hEpoch * 1000,
+      );
+      final id2h =
+          ((mediaId.hashCode ^ episodeNumber) * 31 + 2) & 0x7FFFFFFF;
+      try {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id2h,
+          'Upcoming: $animeTitle • Ep $episodeNumber',
+          'Episode $episodeNumber releases in 2 hours!',
+          scheduled2h,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'details:$mediaId?tab=episodes',
+        );
+        AppLogger.i(
+          '[NotificationService] Scheduled 2h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled2h.toIso8601String()}',
+        );
+      } catch (e) {
+        AppLogger.w('Failed to schedule 2h alarm: $e');
+      }
+    }
+
+    // 3. 1-hour countdown alert (airingAt - 3600)
+    final alert1hEpoch = airingAtEpoch - 3600;
+    if (alert1hEpoch > nowEpoch &&
+        !(pref.getBool('notif_1h_${mediaId}_$episodeNumber') ?? false)) {
+      final scheduled1h = tz.TZDateTime.fromMillisecondsSinceEpoch(
+        tz.local,
+        alert1hEpoch * 1000,
+      );
+      final id1h =
+          ((mediaId.hashCode ^ episodeNumber) * 31 + 1) & 0x7FFFFFFF;
+      try {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id1h,
+          'Upcoming: $animeTitle • Ep $episodeNumber',
+          'Episode $episodeNumber releases in 1 hour!',
+          scheduled1h,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'details:$mediaId?tab=episodes',
+        );
+        AppLogger.i(
+          '[NotificationService] Scheduled 1h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled1h.toIso8601String()}',
+        );
+      } catch (e) {
+        AppLogger.w('Failed to schedule 1h alarm: $e');
+      }
+    }
+
+    // 4. Exact release alert (airingAt)
+    if (airingAtEpoch > nowEpoch &&
+        !(pref.getBool('sub_release_${mediaId}_$episodeNumber') ?? false)) {
+      final scheduledRelease = tz.TZDateTime.fromMillisecondsSinceEpoch(
+        tz.local,
+        airingAtEpoch * 1000,
+      );
+      final idRelease =
+          ((mediaId.hashCode ^ episodeNumber) * 31 + 0) & 0x7FFFFFFF;
+      try {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          idRelease,
+          '$animeTitle • Ep $episodeNumber Released',
+          'Episode $episodeNumber is now officially available to watch on AniDash.',
+          scheduledRelease,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'details:$mediaId?tab=episodes',
+        );
+        AppLogger.i(
+          '[NotificationService] Scheduled exact release alarm for $animeTitle Ep $episodeNumber at ${scheduledRelease.toIso8601String()}',
+        );
+      } catch (e) {
+        AppLogger.w('Failed to schedule exact release alarm: $e');
+      }
+    }
   }
 
   Future<void> showContinueWatchingNotification({

@@ -40,14 +40,7 @@ class PlayerSettingsNotifier extends Notifier<PlayerModel> {
   }
 
   void setPreferredAudioLanguage(String language) {
-    updateSettings((prev) => prev.copyWith(preferredAudioLanguage: language));
-  }
-
-  void setPreferredHindiProvider(String? providerId) {
-    updateSettings((prev) => prev.copyWith(preferredHindiProvider: providerId));
-  }
-
-  void setHindiFallbackAudio(String fallback) {
-    updateSettings((prev) => prev.copyWith(hindiFallbackAudio: fallback));
+    final clean = language == 'hindi' ? 'sub' : language;
+    updateSettings((prev) => prev.copyWith(preferredAudioLanguage: clean));
   }
 }

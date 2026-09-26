@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.15.6+90
+version: 1.15.7+91
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -90,6 +90,7 @@ dependencies:
   xpath_selector_html_parser: ^3.0.1
   get: ^4.7.2
   timeago: ^3.7.1
+  timezone: ^0.10.1
 
 dependency_overrides:
   collection: ^1.19.1
@@ -112,9 +113,6 @@ flutter:
     - assets/icons/anidash_logo_dark.png
     - assets/icons/anidash_logo_light.png
     - assets/sounds/
-    - assets/sources/
-    - assets/provider_icons/
-
 flutter_launcher_icons:
   android: true
   image_path: "assets/icons/anidash_logo.png"

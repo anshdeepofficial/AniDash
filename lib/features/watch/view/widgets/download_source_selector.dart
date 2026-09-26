@@ -55,9 +55,7 @@ class _DownloadSourceSelectorState
 
   late String _selectedLanguage;
   late String _selectedQuality;
-  bool _rememberChoice = false;
-  bool _hasHindi = false;
-  bool _hasDub = true;
+  bool _rememberChoice = false;  bool _hasDub = true;
 
   @override
   void initState() {
@@ -83,23 +81,11 @@ class _DownloadSourceSelectorState
       if (!mounted) return;
 
       if (data != null && data.sources.isNotEmpty) {
-        final hasHindi =
-            data.sources.any(
-              (s) =>
-                  s.quality?.toLowerCase().contains('hindi') == true ||
-                  s.url?.toLowerCase().contains('hindi') == true,
-            ) ||
-            data.tracks.any(
-              (t) => t.lang?.toLowerCase().contains('hin') == true,
-            );
-
         final hasDub = data.sources.any((s) => s.isDub);
 
         setState(() {
           _sources = data.sources;
-          _subtitles = data.tracks;
-          _hasHindi = hasHindi;
-          _hasDub = hasDub;
+          _subtitles = data.tracks;          _hasDub = hasDub;
           _loading = false;
         });
       } else {
@@ -166,14 +152,7 @@ class _DownloadSourceSelectorState
     Source? matchedSource;
 
     if (_sources.isNotEmpty) {
-      if (_selectedLanguage == 'hindi') {
-        matchedSource = _sources.firstWhere(
-          (s) =>
-              s.quality?.toLowerCase().contains('hindi') == true ||
-              s.url?.toLowerCase().contains('hindi') == true,
-          orElse: () => _sources.first,
-        );
-      } else if (_selectedLanguage == 'dub') {
+      if (_selectedLanguage == 'dub') {
         matchedSource = _sources.firstWhere(
           (s) => s.isDub,
           orElse: () => _sources.first,
@@ -429,13 +408,6 @@ class _DownloadSourceSelectorState
                     isSelected: _selectedLanguage == 'sub',
                     onTap: () => setState(() => _selectedLanguage = 'sub'),
                   ),
-                  if (_hasHindi)
-                    _LanguageChip(
-                      label: 'Hindi',
-                      icon: Iconsax.language_square,
-                      isSelected: _selectedLanguage == 'hindi',
-                      onTap: () => setState(() => _selectedLanguage = 'hindi'),
-                    ),
                 ],
               ),
               const SizedBox(height: 22),

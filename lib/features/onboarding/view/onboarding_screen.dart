@@ -20,10 +20,6 @@ import 'package:ani_dash/shared/providers/permissions_provider.dart';
 import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/ui_notifier.dart';
 import 'package:ani_dash/shared/providers/update_provider.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
-import 'package:ani_dash/shared/ui/hindi_provider_icon.dart';
-import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -420,18 +416,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final registry = ref.read(animeSourceRegistryProvider);
     final animeSources = preferredOrder.where(registry.has).toList();
     final providerStatus = ref.watch(providerStatusProvider);
-    final hindiSources =
-        ref
-            .watch(hindiSourceManagerProvider)
-            .where(
-              (source) =>
-                  source.enabled &&
-                  source.status != 'experimental' &&
-                  source.isHealthy != false,
-            )
-            .toList();
-    final playerSettings = ref.watch(playerSettingsProvider);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -448,7 +432,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
                   child: Text(
-                    'EXTENSIONS & CANONICAL',
+                    'CANONICAL SOURCES',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -484,51 +468,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     );
                   }),
-                ],
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                  child: Text(
-                    'HINDI SOURCES',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-                for (final source in hindiSources) ...[
-                  Builder(builder: (context) {
-                    final selected =
-                        playerSettings.preferredHindiProvider == source.id ||
-                        (playerSettings.preferredHindiProvider == null &&
-                            source.id ==
-                                HindiSourcePreferences.instance
-                                    .getPreferredProvider());
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: SelectableSettingsItem(
-                        leading: HindiProviderIcon(source: source, size: 28, borderRadius: 6),
-                        iconColor: Colors.green,
-                        accent: Colors.green,
-                        title: source.name.toUpperCase(),
-                        description: 'HINDI  •  ${source.status.toUpperCase()}',
-                        isInSelectionMode: true,
-                        isSelected: selected,
-                        onTap: () {
-                          final notifier = ref.read(
-                            playerSettingsProvider.notifier,
-                          );
-                          notifier.setPreferredHindiProvider(source.id);
-                          HindiSourcePreferences.instance
-                              .setPreferredProvider(source.id);
-                        },
-                      ),
-                    );
-                  }),
-                ],
-              ],
+                ],              ],
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Center(child: Text('Error: $e')),

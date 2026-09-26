@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
-import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
@@ -92,12 +91,7 @@ class AnimeSourcesSettingsScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final provider = animeSources[index];
                     final statusInfo = statusData[provider];
-                    final status = statusInfo?['status'] as String?;
-                    final isHindiActive =
-                        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-                    final isSelected =
-                        !isHindiActive &&
-                        selectedAnimeSource?.providerName ==
+                    final status = statusInfo?['status'] as String?;                    final isSelected = selectedAnimeSource?.providerName ==
                         provider.toLowerCase();
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
@@ -117,14 +111,6 @@ class AnimeSourcesSettingsScreen extends ConsumerWidget {
                           ref
                               .read(experimentalProvider.notifier)
                               .toggleExtensions(false);
-                          if (ref
-                                  .read(playerSettingsProvider)
-                                  .preferredAudioLanguage ==
-                              'hindi') {
-                            ref
-                                .read(playerSettingsProvider.notifier)
-                                .setPreferredAudioLanguage('sub');
-                          }
                         },
                       ),
                     );

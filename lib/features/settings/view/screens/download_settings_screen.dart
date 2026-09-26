@@ -191,10 +191,6 @@ class DownloadSettingsScreen extends ConsumerWidget {
                       value: 'dub',
                       child: Text('English (Dub)'),
                     ),
-                    DropdownMenuItem(
-                      value: 'hindi',
-                      child: Text('Hindi (Dub)'),
-                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {

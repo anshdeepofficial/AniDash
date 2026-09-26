@@ -31,10 +31,7 @@ import 'package:go_router/go_router.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:ani_dash/shared/providers/tracker/media_tracker_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_preferences.dart';
 import 'package:ani_dash/core/services/franchise_service.dart';
-import 'package:ani_dash/shared/ui/hindi_provider_icon.dart';
 
 enum EpisodeViewMode { list, compact, grid, block, banner }
 
@@ -84,44 +81,13 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
   bool _isSelecting = false;
-  int? _hindiEpisodeCount;
-
   @override
   void initState() {
     super.initState();
     _selectionNotifier = _getEpisodesSelectionNotifier(widget.mediaId);
     _selectionNotifier.addListener(_onSelectionChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchHindiEpisodeCount();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {    });
   }
-
-  Future<void> _fetchHindiEpisodeCount() async {
-    final audio = ref.read(playerSettingsProvider).preferredAudioLanguage;
-    if (audio != 'hindi') {
-      if (_hindiEpisodeCount != null && mounted) {
-        setState(() => _hindiEpisodeCount = null);
-      }
-      return;
-    }
-    try {
-      final title = (widget.mediaTitle.english ??
-              widget.mediaTitle.romaji ??
-              widget.mediaTitle.native) ??
-          '';
-      final count = await ref
-          .read(hindiSourceManagerProvider.notifier)
-          .getEpisodeCount(
-            animeTitle: title,
-            romajiTitle: widget.mediaTitle.romaji,
-            anilistId: int.tryParse(widget.mediaId),
-          );
-      if (mounted && count != null) {
-        setState(() => _hindiEpisodeCount = count);
-      }
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     _selectionNotifier.removeListener(_onSelectionChanged);
@@ -535,22 +501,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                       children: [
                         Text(
                           () {
-                            final playerSettings =
-                                ref.watch(playerSettingsProvider);
-                            if (playerSettings.preferredAudioLanguage == 'hindi') {
-                              final preferred =
-                                  playerSettings.preferredHindiProvider ??
-                                  HindiSourcePreferences.instance
-                                      .getPreferredProvider();
-                              final hindiSources =
-                                  ref.watch(hindiSourceManagerProvider);
-                              final matchedSource =
-                                  hindiSources.firstWhereOrNull(
-                                    (s) => s.id == preferred,
-                                  ) ??
-                                  hindiSources.firstWhereOrNull((s) => s.enabled);
-                              return 'MATCHED ( by ${matchedSource?.name ?? "Hindi"} )';
-                            }
+
                             final sourceName =
                                 ref.watch(experimentalProvider).useExtensions
                                     ? ref.watch(sourceProvider).activeAnimeSource?.name
@@ -1267,14 +1218,6 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           _navigateToWatch(ep, allEpisodes, animeIdForSource ?? '');
         }
       }
-
-      final isHindiActive =
-          ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-      final isHindiUnavailable = isHindiActive &&
-          _hindiEpisodeCount != null &&
-          _hindiEpisodeCount! > 0 &&
-          epNum > _hindiEpisodeCount!;
-
       final Widget itemWidget = switch (viewMode) {
         EpisodeViewMode.grid => EpisodeGridItem(
             episode: ep,
@@ -1371,40 +1314,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             isSelected: isSelected,
             isSelectionMode: _isSelectionMode,
           ),
-      };
-
-      if (isHindiUnavailable) {
-        return Opacity(
-          opacity: 0.45,
-          child: Stack(
-            children: [
-              itemWidget,
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade900.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Hindi Soon',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-
-      return itemWidget;
+      };      return itemWidget;
     }
 
     if (viewMode == EpisodeViewMode.grid) {
@@ -1536,14 +1446,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     final isNative =
                         nativeKey != null &&
                         ref.watch(animeSourceRegistryProvider).has(nativeKey);
-                    final isHindiActive =
-                        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-                    final initialIndex = isHindiActive
-                        ? 1
-                        : (useExtensions && !isNative ? 2 : 0);
+                    final initialIndex = (useExtensions && !isNative) ? 1 : 0;
 
                     return DefaultTabController(
-                      length: 3,
+                      length: 2,
                       initialIndex: initialIndex,
                       child: Column(
                         children: [
@@ -1600,7 +1506,6 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                           const TabBar(
                             tabs: [
                               Tab(text: 'Built-in Sources'),
-                              Tab(text: 'Hindi Sources'),
                               Tab(text: 'Extensions'),
                             ],
                           ),
@@ -1608,12 +1513,6 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                             child: TabBarView(
                               children: [
                                 _buildCanonicalSourceList(
-                                  ref,
-                                  scrollController,
-                                  notifier,
-                                  searchQuery,
-                                ),
-                                _buildHindiSourceList(
                                   ref,
                                   scrollController,
                                   notifier,
@@ -1648,10 +1547,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     String query,
   ) {
     final registry = ref.watch(animeSourceRegistryProvider);
-    final activeKey = ref.watch(selectedProviderKeyProvider)?.toLowerCase();
-    final isHindiActive =
-        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-    final useExtensions = ref.watch(experimentalProvider).useExtensions;
+    final activeKey = ref.watch(selectedProviderKeyProvider)?.toLowerCase();    final useExtensions = ref.watch(experimentalProvider).useExtensions;
 
     final candidates = [
       (
@@ -1682,7 +1578,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       itemCount: candidates.length,
       itemBuilder: (context, index) {
         final item = candidates[index];
-        final isSelected = !isHindiActive && !useExtensions && activeKey == item.key;
+        final isSelected = !useExtensions && activeKey == item.key;
         return ListTile(
           leading: Container(
             width: 40,
@@ -1709,11 +1605,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           onTap: () {
             ref.read(selectedProviderKeyProvider.notifier).select(item.key);
             ref.read(experimentalProvider.notifier).toggleExtensions(false);
-            if (ref.read(playerSettingsProvider).preferredAudioLanguage == 'hindi') {
-              ref.read(playerSettingsProvider.notifier).updateSettings(
-                    (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
-                  );
-            }
+
             Navigator.pop(context);
             notifier.refresh();
           },
@@ -1745,11 +1637,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             if (query.isEmpty) return true;
             return (s.name ?? '').toLowerCase().contains(query.toLowerCase());
           }).toList()
-          ..sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
-
-    final isHindiActive =
-        ref.watch(playerSettingsProvider).preferredAudioLanguage == 'hindi';
-    final useExtensions = ref.watch(experimentalProvider).useExtensions;
+          ..sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));    final useExtensions = ref.watch(experimentalProvider).useExtensions;
     final activeId =
         sourceState.activeAdultAnimeSource?.id ??
         sourceState.activeAnimeSource?.id;
@@ -1771,7 +1659,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       itemCount: extensions.length,
       itemBuilder: (context, index) {
         final source = extensions[index];
-        final isSelected = !isHindiActive && useExtensions && source.id == activeId;
+        final isSelected = useExtensions && source.id == activeId;
         return ListTile(
           leading: Container(
             width: 40,
@@ -1810,90 +1698,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
             ref.read(selectedProviderKeyProvider.notifier).clear();
             ref.read(sourceProvider.notifier).setActiveSource(source);
             ref.read(experimentalProvider.notifier).toggleExtensions(true);
-            if (ref.read(playerSettingsProvider).preferredAudioLanguage ==
-                'hindi') {
-              ref.read(playerSettingsProvider.notifier).updateSettings(
-                    (prev) => prev.copyWith(preferredAudioLanguage: 'sub'),
-                  );
-            }
+
             Navigator.pop(context);
             notifier.refresh();
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildHindiSourceList(
-    WidgetRef ref,
-    ScrollController scrollController,
-    DetailsPageNotifier notifier,
-    String query,
-  ) {
-    final hindiSources = ref.watch(hindiSourceManagerProvider);
-    final enabledSources = hindiSources.where((s) => s.enabled).toList();
-    final sources = enabledSources.where((s) {
-      if (query.isEmpty) return true;
-      return s.name.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    final currentAudio =
-        ref.watch(playerSettingsProvider).preferredAudioLanguage;
-    final isHindiActive = currentAudio == 'hindi';
-    final preferredProvider =
-        HindiSourcePreferences.instance.getPreferredProvider();
-
-    if (sources.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            'No enabled Hindi sources found.\nEnable them in Settings → Hindi Sources.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      itemCount: sources.length,
-      itemBuilder: (context, index) {
-        final source = sources[index];
-        final isSelected = isHindiActive &&
-            (preferredProvider == source.id ||
-                (preferredProvider == 'auto' && index == 0));
-
-        return ListTile(
-          leading: HindiProviderIcon(
-            source: source,
-            size: 36,
-            borderRadius: 8,
-          ),
-          title: Text(source.name),
-          subtitle: Text(
-            '${source.status.toUpperCase()} • ${(source.lastLatencyMs ?? 0) > 0 ? "${source.lastLatencyMs}ms" : "Multi-Audio HLS"}',
-          ),
-          trailing: isSelected
-              ? Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              : null,
-          onTap: () async {
-            ref.read(playerSettingsProvider.notifier).updateSettings(
-                  (prev) => prev.copyWith(
-                    preferredAudioLanguage: 'hindi',
-                    preferredHindiProvider: source.id,
-                  ),
-                );
-            await HindiSourcePreferences.instance
-                .setPreferredProvider(source.id);
-            if (context.mounted) {
-              Navigator.pop(context);
-              notifier.refresh();
-              _fetchHindiEpisodeCount();
-            }
           },
         );
       },

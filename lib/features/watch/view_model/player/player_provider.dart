@@ -146,35 +146,22 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Highly optimized, rock-solid buffering for smooth continuous playback on any connection
+    // Highly optimized, rock-solid buffering for instant playback and smooth seeking
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
-      'cache-secs': '180', // 180s forward cache window
-      'demuxer-readahead-secs': '60', // 60s continuous forward readahead
-      'cache-pause': 'yes', // Gracefully pause on buffer underrun to keep audio/video in sync
-      'cache-pause-wait': '2', // Buffer 2 seconds before resuming, preventing rapid stutter loops
-      'cache-pause-initial': 'yes', // Ensure 2s healthy initial buffer before playing frame 0
+      'demuxer-readahead-secs': '30',
       'stream-lavf-o':
-          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5', // Auto-reconnect on cellular/Wi-Fi switches
-      'network-timeout':
-          '20', // 20s network timeout prevents premature drops
-      'demuxer-lavf-probesize': '2097152', // 2MB probe for reliable HLS & multi-track detection
-      'demuxer-lavf-buffersize': '2097152', // 2MB socket buffer for smooth throughput
-      'demuxer-lavf-analyzeduration': '1.5', // 1.5s analyze duration for accurate timestamps
+          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
+      'network-timeout': '15',
       'force-seekable': 'yes',
-      'hr-seek':
-          'default', // Precise seek if in cache, instant keyframe if over network
+      'hr-seek': 'default',
+      'hr-seek-framedrop': 'yes',
       'correct-pts': 'yes',
-      'vd-lavc-show-all': 'no',
-      'vd-lavc-dr': 'no', // Safe rendering on Android
-      'vd-lavc-fast': 'yes', // Fast decoding optimizations
-      'video-sync': 'audio',
-      // hls-bitrate omitted: enables mpv adaptive bitrate (ABR) streaming.
-      // Automatically scales up to 1080p on fast Wi-Fi and smoothly adapts without freezing on mobile data.
+      'vd-lavc-fast': 'yes',
     };
 
     final platform = _player.platform as dynamic;
@@ -281,33 +268,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       }),
     );
 
-    _subs.add(
-      stream.tracks.listen((tracks) async {
-        final audioLang = ref.read(playerSettingsProvider).preferredAudioLanguage;
-        if (audioLang == 'hindi' && tracks.audio.isNotEmpty) {
-          final hindiTrack = tracks.audio.firstWhereOrNull((t) {
-            final lang = (t.language ?? '').toLowerCase();
-            final title = (t.title ?? '').toLowerCase();
-            return lang == 'hi' ||
-                   lang == 'hin' ||
-                   lang.contains('hindi') ||
-                   title.contains('hindi') ||
-                   title.contains('hin');
-          });
 
-          if (hindiTrack != null && _player.state.track.audio != hindiTrack) {
-            AppLogger.success(
-              '[Player] Explicitly selected Hindi audio track: ${hindiTrack.title ?? hindiTrack.language ?? hindiTrack.id}',
-            );
-            await _player.setAudioTrack(hindiTrack);
-          } else if (tracks.audio.length > 1 && hindiTrack == null) {
-            AppLogger.w(
-              '[Player] Multi-audio stream has ${tracks.audio.length} tracks, but none match Hindi language metadata',
-            );
-          }
-        }
-      }),
-    );
   }
 
   void _dispose() {
@@ -369,17 +330,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
               ?.value ??
           '';
       await platform.setProperty('user-agent', ua);
-      await platform.setProperty('referrer', ref);
-      final forwardedHeaders = effectiveHeaders.entries
-          .where(
-            (entry) =>
-                entry.key.toLowerCase() != 'user-agent' &&
-                entry.key.toLowerCase() != 'referer',
-          )
+      if (ref.isNotEmpty) {
+        await platform.setProperty('referrer', ref);
+      }
+      final allHeaderFields = effectiveHeaders.entries
           .map((entry) => '${entry.key}: ${entry.value}')
           .join(',');
-      if (forwardedHeaders.isNotEmpty) {
-        await platform.setProperty('http-header-fields', forwardedHeaders);
+      if (allHeaderFields.isNotEmpty) {
+        await platform.setProperty('http-header-fields', allHeaderFields);
       }
     } catch (_) {}
     await _player.open(

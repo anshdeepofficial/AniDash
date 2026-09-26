@@ -7,8 +7,6 @@ import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart'
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/orientation_lock_provider.dart';
-import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
-import 'package:ani_dash/core/hindi_sources/hindi_source_manager.dart';
 
 class TopControls extends ConsumerWidget {
   final VoidCallback onInteraction;
@@ -335,15 +333,6 @@ class TopControls extends ConsumerWidget {
   }
 
   String _getSourceName(WidgetRef ref) {
-    final settings = ref.watch(playerSettingsProvider);
-    if (settings.preferredAudioLanguage == 'hindi') {
-      final id = settings.preferredHindiProvider;
-      final sources = ref.watch(hindiSourceManagerProvider);
-      for (final source in sources) {
-        if (source.id == id) return source.name;
-      }
-      return 'Hindi Auto';
-    }
     return ref.watch(selectedAnimeProvider)?.providerName ?? 'AniDash';
   }
 }

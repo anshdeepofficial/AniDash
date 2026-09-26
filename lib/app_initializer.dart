@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:ani_dash/core/tasks/episode_release_task.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -59,6 +61,7 @@ class AppInitializer {
     try {
       await NotificationService().initialize();
       await NotificationService().registerPeriodicNotificationWorker();
+      unawaited(EpisodeReleaseTask.performCheck());
       AppLogger.success('Notification service initialized');
     } catch (e, st) {
       AppLogger.fail('Notification service initialization failed');
