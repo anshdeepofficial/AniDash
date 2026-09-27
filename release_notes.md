@@ -17,6 +17,9 @@
 - Quality changes re-arm the stall watchdog and preserve source-specific headers.
 - Existing v1.15.8 stable-position recovery remains intact.
 
+## 🛠️ Build Compatibility
+- Pinned FlexColorScheme 8.3.1, the Flutter 3.35-compatible release, so the Android release build uses the updated AppBarThemeData and BottomAppBarThemeData APIs.
+
 ## 🧪 Validation
 - Added regression tests for mixed-case/duplicate provider headers and fallback Referer generation.
 - Android release build runs the stream-header regression test before producing signed split APKs.
