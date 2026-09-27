@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/utils/stream_headers.dart';
 
 part 'player_provider.g.dart';
 
@@ -151,22 +152,31 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Highly optimized, rock-solid buffering for instant playback and smooth seeking
+    // Keep a healthy forward buffer so bursty HLS/CDN delivery does not turn
+    // into a 1-2 second play/buffer loop on otherwise fast connections.
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
       'cache': 'yes',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
-      'demuxer-readahead-secs': '30',
+      'cache-secs': '180',
+      'demuxer-readahead-secs': '60',
+      'cache-pause': 'yes',
+      'cache-pause-wait': '2',
+      'cache-pause-initial': 'yes',
       'stream-lavf-o':
           'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
-      'network-timeout': '15',
+      'network-timeout': '20',
+      'demuxer-lavf-probesize': '2097152',
+      'demuxer-lavf-buffersize': '2097152',
+      'demuxer-lavf-analyzeduration': '1.5',
       'force-seekable': 'yes',
       'hr-seek': 'default',
       'hr-seek-framedrop': 'yes',
       'correct-pts': 'yes',
       'vd-lavc-fast': 'yes',
+      'video-sync': 'audio',
     };
 
     final platform = _player.platform as dynamic;
@@ -313,17 +323,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       _lastStablePosition = effectiveStartAt;
     }
 
-    final effectiveHeaders = <String, String>{
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      ...?headers,
-    };
-    if (effectiveHeaders['Referer']?.isNotEmpty != true) {
-      final uri = Uri.tryParse(url);
-      if (uri != null && uri.scheme.startsWith('http')) {
-        effectiveHeaders['Referer'] = '${uri.scheme}://${uri.host}/';
-      }
-    }
+    final effectiveHeaders = normalizeStreamHeaders(url, headers);
     _lastUrl = url;
     _lastHeaders = effectiveHeaders;
     state = state.copyWith(
@@ -357,11 +357,18 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       if (ref.isNotEmpty) {
         await platform.setProperty('referrer', ref);
       }
-      final allHeaderFields = effectiveHeaders.entries
+      // User-Agent and Referer already use MPV's dedicated properties above.
+      // Forwarding them again can create conflicting HLS segment headers.
+      final forwardedHeaders = effectiveHeaders.entries
+          .where(
+            (entry) =>
+                entry.key.toLowerCase() != 'user-agent' &&
+                entry.key.toLowerCase() != 'referer',
+          )
           .map((entry) => '${entry.key}: ${entry.value}')
           .join(',');
-      if (allHeaderFields.isNotEmpty) {
-        await platform.setProperty('http-header-fields', allHeaderFields);
+      if (forwardedHeaders.isNotEmpty) {
+        await platform.setProperty('http-header-fields', forwardedHeaders);
       }
     } catch (_) {}
     await _player.open(

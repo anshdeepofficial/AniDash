@@ -18,6 +18,10 @@ on:
         required: false
         default: true
         type: boolean
+  push:
+    branches: [main]
+    paths:
+      - ".github/android_release_request"
 
 permissions:
   contents: write
@@ -67,6 +71,8 @@ jobs:
           }
           EOF
       - run: flutter pub get
+      - name: Run playback regression tests
+        run: flutter test test/unit/stream_headers_test.dart
       - run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
       - uses: actions/upload-artifact@v4
         with:
@@ -74,7 +80,7 @@ jobs:
           path: build/app/outputs/flutter-apk/*.apk
 
   build-linux:
-    if: github.event_name == 'push' || github.event.inputs.build_linux == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_linux == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +117,7 @@ jobs:
           path: ShonenX-Linux.zip
 
   build-windows:
-    if: github.event_name == 'push' || github.event.inputs.build_windows == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_windows == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -200,28 +206,30 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Generate Changelog
-        id: changelog
+      - name: Resolve Release Metadata
+        id: release_meta
+        shell: bash
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          git log ${PREVIOUS_TAG:+$PREVIOUS_TAG..}HEAD --pretty=format:'%s' > all_commits.txt
-          TAG_NAME=${GITHUB_REF_NAME}
-          {
-            echo "notes<<EOF"
-            if [[ "$TAG_NAME" == *"debug"* ]]; then echo -e "> [!WARNING]\n> **DEBUG BUILD**";
-            elif [[ "$TAG_NAME" == *"beta"* ]]; then echo -e "> [!IMPORTANT]\n> **BETA RELEASE**";
-            elif [[ "$TAG_NAME" == *"alpha"* ]]; then echo -e "> [!CAUTION]\n> **ALPHA RELEASE**";
-            elif [[ "$TAG_NAME" == *"hotfix"* ]]; then echo -e "> [!NOTE]\n> **HOTFIX RELEASE**"; fi
-            echo -e "\n## Changelog"
-            grep -iE "^(feat|fix|perf|refactor|chore)" all_commits.txt | sed "s/^/- /" || echo "No specific changes tracked."
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
+          TAG="v$VERSION"
+          NOTES_FILE="release_notes_v${VERSION}.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            NOTES_FILE="release_notes.md"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: AniDash ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: ${{ steps.release_meta.outputs.notes_file }}
+          make_latest: true
           files: |
             artifacts/**/*.apk
             artifacts/**/*.zip
             artifacts/**/*.exe
-          body: ${{ steps.changelog.outputs.notes }}
           token: ${{ secrets.GITHUB_TOKEN }}
