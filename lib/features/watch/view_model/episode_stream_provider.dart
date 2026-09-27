@@ -402,10 +402,14 @@ class EpisodeData extends _$EpisodeData {
       state.qualityOptions[idx]['quality'],
     );
     state = state.copyWith(selectedQualityIdx: idx);
+    // Use the per-quality headers stored in the quality option map.
+    // Falling back to global state.headers only if the entry doesn't carry its own.
+    final qualityHeaders = state.qualityOptions[idx]['headers'] as Map<String, String>?
+        ?? state.headers?.cast<String, String>();
     _player.open(
       url,
       ref.read(playerStateProvider).position,
-      headers: state.headers,
+      headers: qualityHeaders,
       mediaId: _epList.animeId,
       episode: state.selectedEpisode,
     );
@@ -986,6 +990,34 @@ class EpisodeData extends _$EpisodeData {
           provider: _effectiveProvider?.providerName,
         );
         if (activeGeneration != _loadGeneration) return;
+
+        // ── Register stall watchdog callback ────────────────────────────────
+        // When MPV's 8-second stall detector fires (buffering>8s, no pos advance),
+        // immediately try the next available source URL from the current server.
+        _player.setStallCallback((stalledAt) async {
+          if (activeGeneration != _loadGeneration) return;
+          AppLogger.w(
+            'Stall recovery triggered at ${stalledAt.inSeconds}s — '
+            'trying alternate source URLs (${state.sources.length} available)',
+          );
+          final sources = state.sources;
+          for (var i = 1; i < sources.length; i++) {
+            try {
+              await _loadSourceStream(
+                i,
+                startAt: stalledAt,
+                generation: activeGeneration,
+              );
+              AppLogger.success(
+                'Stall recovery: switched to source[$i] successfully',
+              );
+              return;
+            } catch (_) {}
+          }
+          // All alternate sources failed — clear stall flag so user can retry manually
+          AppLogger.e('Stall recovery: all alternate sources exhausted');
+          _player.setStallCallback(null);
+        });
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
         var alternateStarted = false;
@@ -1154,15 +1186,22 @@ class EpisodeData extends _$EpisodeData {
       final primarySrc = state.sources[sourceIdx];
       final streamHeaders = {...?state.headers, ...?primarySrc.headers};
 
-      allQualities.add({'quality': 'Auto', 'url': primarySrc.url});
+      allQualities.add({
+        'quality': 'Auto',
+        'url': primarySrc.url,
+        'headers': streamHeaders, // primary source headers
+      });
 
       for (final src in state.sources) {
         if (src.url != null &&
             src.url!.isNotEmpty &&
             src.url != primarySrc.url) {
+          // Each source gets its own merged headers (global + source-specific)
+          final srcHeaders = {...?state.headers, ...?src.headers};
           allQualities.add({
             'quality': src.quality ?? 'Default',
             'url': src.url,
+            'headers': srcHeaders,
           });
         }
       }
