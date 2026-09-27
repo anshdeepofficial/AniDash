@@ -68,55 +68,77 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           set -euo pipefail
+          export LC_ALL=C
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           echo "cmake.dir=$ANDROID_HOME/cmake/3.18.1" >> android/local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.0.12077973" >> android/local.properties
 
-          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ]; then
-            echo "::error::Android release signing secrets are incomplete."
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is missing."
+            exit 1
+          fi
+          if [ -z "$ANDROID_STORE_PASSWORD" ]; then
+            echo "::error::ANDROID_STORE_PASSWORD is missing."
             exit 1
           fi
 
           SECRET=$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | sed -E 's#^data:[^,]*;base64,##' | tr -d '\r\n ')
           printf '%s' "$SECRET" | base64 --decode > /tmp/anidash-keystore-first 2>/dev/null || true
 
-          validate_keystore() {
+          validate_store() {
             local file="$1"
             [ -s "$file" ] &&
-            keytool -list               -keystore "$file"               -storepass "$ANDROID_STORE_PASSWORD"               -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1
+            keytool -list -keystore "$file" -storepass "$ANDROID_STORE_PASSWORD" >/dev/null 2>&1
           }
 
-          if validate_keystore /tmp/anidash-keystore-first; then
+          if validate_store /tmp/anidash-keystore-first; then
             cp /tmp/anidash-keystore-first android/app/upload-keystore.jks
             echo "Android keystore validated after normal Base64 decode."
           else
             tr -d '\r\n ' < /tmp/anidash-keystore-first | base64 --decode > /tmp/anidash-keystore-second 2>/dev/null || true
-            if validate_keystore /tmp/anidash-keystore-second; then
+            if validate_store /tmp/anidash-keystore-second; then
               cp /tmp/anidash-keystore-second android/app/upload-keystore.jks
               echo "Android keystore validated after double Base64 decode."
             else
-              echo "::error::Configured Android keystore is not valid after normal or double Base64 decoding."
+              echo "::error::ANDROID_KEYSTORE_BASE64 or ANDROID_STORE_PASSWORD is invalid."
               exit 1
             fi
           fi
 
+          RESOLVED_ALIAS="$ANDROID_KEY_ALIAS"
+          if [ -n "$RESOLVED_ALIAS" ] && ! keytool -list -keystore android/app/upload-keystore.jks -storepass "$ANDROID_STORE_PASSWORD" -alias "$RESOLVED_ALIAS" >/dev/null 2>&1; then
+            RESOLVED_ALIAS=""
+          fi
+
+          if [ -z "$RESOLVED_ALIAS" ]; then
+            RESOLVED_ALIAS=$(keytool -list -v               -keystore android/app/upload-keystore.jks               -storepass "$ANDROID_STORE_PASSWORD" 2>/dev/null |
+              awk -F': ' '/Alias name:/{alias=$2} /Entry type: PrivateKeyEntry/{print alias; exit}')
+          fi
+
+          if [ -z "$RESOLVED_ALIAS" ]; then
+            echo "::error::No PrivateKeyEntry alias could be found in the configured keystore."
+            exit 1
+          fi
+
+          RESOLVED_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_STORE_PASSWORD}"
+
+          mkdir -p /tmp/anidash-signcheck
+          printf 'AniDash signing check' > /tmp/anidash-signcheck/payload.txt
+          (cd /tmp/anidash-signcheck && jar cf check.jar payload.txt)
+          if ! jarsigner             -keystore android/app/upload-keystore.jks             -storepass "$ANDROID_STORE_PASSWORD"             -keypass "$RESOLVED_KEY_PASSWORD"             /tmp/anidash-signcheck/check.jar             "$RESOLVED_ALIAS" >/dev/null 2>&1; then
+            echo "::error::The configured private-key password is missing or invalid."
+            exit 1
+          fi
+
           cat <<EOF > android/key.properties
           storePassword=$ANDROID_STORE_PASSWORD
-          keyPassword=${ANDROID_KEY_PASSWORD:-$ANDROID_STORE_PASSWORD}
-          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$RESOLVED_KEY_PASSWORD
+          keyAlias=$RESOLVED_ALIAS
           storeFile=upload-keystore.jks
           EOF
-          rm -f /tmp/anidash-keystore-first /tmp/anidash-keystore-second
-          cat <<EOF > keys.json
-          {
-            "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
-            "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
-            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
-            "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
-            "API_URL": "${{ secrets.API_URL }}",
-            "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"
-          }
-          EOF
+          rm -rf /tmp/anidash-keystore-first /tmp/anidash-keystore-second /tmp/anidash-signcheck
+          echo "Android release signing key validated successfully."
+
       - run: flutter pub get
       - name: Run playback regression tests
         run: flutter test test/unit/stream_headers_test.dart
