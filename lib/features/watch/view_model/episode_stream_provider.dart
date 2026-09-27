@@ -157,10 +157,6 @@ class EpisodeDataState {
 @Riverpod(keepAlive: true)
 class EpisodeData extends _$EpisodeData {
   int _loadGeneration = 0;
-  Timer? _stallWatchdog;
-  Duration _watchdogPosition = Duration.zero;
-  DateTime? _bufferingSince;
-  bool _stallRecoveryInProgress = false;
   EpisodeListState get _epList => ref.read(episodeListProvider);
   ExperimentalFeaturesModel get _exp => ref.read(experimentalProvider);
   AnimeProvider? get _provider => ref.read(selectedAnimeProvider);
@@ -193,10 +189,7 @@ class EpisodeData extends _$EpisodeData {
   }
 
   @override
-  EpisodeDataState build() {
-    ref.onDispose(() => _stallWatchdog?.cancel());
-    return const EpisodeDataState();
-  }
+  EpisodeDataState build() => const EpisodeDataState();
 
   Future<void> loadEpisode({
     required int ep,
@@ -210,8 +203,6 @@ class EpisodeData extends _$EpisodeData {
     }
 
     final generation = ++_loadGeneration;
-    _stallWatchdog?.cancel();
-    _bufferingSince = null;
     _player.setActiveSession(mediaId ?? _epList.animeId, ep);
 
     AppLogger.section('Loading Episode $ep');
@@ -420,8 +411,9 @@ class EpisodeData extends _$EpisodeData {
     state = state.copyWith(selectedQualityIdx: idx);
     // Use the per-quality headers stored in the quality option map.
     // Falling back to global state.headers only if the entry doesn't carry its own.
-    final qualityHeaders = state.qualityOptions[idx]['headers'] as Map<String, String>?
-        ?? state.headers?.cast<String, String>();
+    final qualityHeaders =
+        state.qualityOptions[idx]['headers'] as Map<String, String>? ??
+        state.headers?.cast<String, String>();
     _player.open(
       url,
       ref.read(playerStateProvider).position,
@@ -429,7 +421,6 @@ class EpisodeData extends _$EpisodeData {
       mediaId: _epList.animeId,
       episode: state.selectedEpisode,
     );
-    _armStallWatchdog(_loadGeneration);
   }
 
   Future<void> changeSubtitle(int idx) async {
@@ -837,9 +828,6 @@ class EpisodeData extends _$EpisodeData {
 
   void reset() {
     _loadGeneration++;
-    _stallWatchdog?.cancel();
-    _bufferingSince = null;
-    _stallRecoveryInProgress = false;
     state = const EpisodeDataState();
   }
 
@@ -864,11 +852,12 @@ class EpisodeData extends _$EpisodeData {
       return [];
     }
 
-    final effectiveId = isJustAnime
-        ? _justAnimeId
-        : ((int.tryParse(_epList.animeId ?? '') != null)
-            ? _epList.animeId
-            : (_epList.mediaId ?? _epList.animeId));
+    final effectiveId =
+        isJustAnime
+            ? _justAnimeId
+            : ((int.tryParse(_epList.animeId ?? '') != null)
+                ? _epList.animeId
+                : (_epList.mediaId ?? _epList.animeId));
 
     return (await provider?.getSupportedServers(
           metadata: {'id': effectiveId, 'epNumber': ep.number, 'epId': ep.id},
@@ -877,7 +866,6 @@ class EpisodeData extends _$EpisodeData {
   }
 
   Future<void> _fetchServers(int epNum, [int? generation]) async {
-
     final cacheKey =
         '${_epList.mediaId ?? _epList.animeId ?? "unknown"}_$epNum';
     final cached = _serverListCache[cacheKey];
@@ -1010,71 +998,27 @@ class EpisodeData extends _$EpisodeData {
           provider: _effectiveProvider?.providerName,
         );
         if (activeGeneration != _loadGeneration) return;
-
-        // ── Register stall watchdog callback ────────────────────────────────
-        // When MPV's 8-second stall detector fires (buffering>8s, no pos advance),
-        // immediately try the next available source URL from the current server.
-        _player.setStallCallback((stalledAt) async {
-          if (activeGeneration != _loadGeneration) return;
-          final playerState = ref.read(playerStateProvider);
-          if (playerState.isOpening ||
-              state.states.contains(EpisodeStreamState.SOURCE_LOADING) ||
-              state.states.contains(EpisodeStreamState.QUALITY_LOADING) ||
-              _stallRecoveryInProgress) {
-            return;
-          }
-          _stallRecoveryInProgress = true;
-          try {
-            AppLogger.w(
-              'Stall recovery triggered at ${stalledAt.inSeconds}s — '
-              'trying alternate source URLs (${state.sources.length} available)',
-            );
-            final sources = state.sources;
-            for (var i = 1; i < sources.length; i++) {
-              try {
-                await _loadSourceStream(
-                  i,
-                  startAt: stalledAt,
-                  generation: activeGeneration,
-                );
-                AppLogger.success(
-                  'Stall recovery: switched to source[$i] successfully',
-                );
-                return;
-              } catch (_) {}
-            }
-            // All alternate sources exhausted — try next available server with matching audio type (DUB/SUB)
-            final servers = state.servers;
-            final currentServer = state.selectedServer;
-            final preferDub = ref.read(playerSettingsProvider).preferDub;
-            final targetDub = currentServer?.isDub ?? preferDub;
-            if (servers.length > 1) {
-              for (var s = 0; s < servers.length; s++) {
-                if (servers[s].id != currentServer?.id && servers[s].isDub == targetDub) {
-                  try {
-                    AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id} (Dub: ${servers[s].isDub})');
-                    await changeServer(servers[s]);
-                    return;
-                  } catch (_) {}
-                }
-              }
-            }
-            AppLogger.e('Stall recovery: all alternate sources and servers exhausted');
-          } finally {
-            Future.delayed(const Duration(seconds: 15), () {
-              _stallRecoveryInProgress = false;
-            });
-          }
-        });
       } catch (primaryError) {
+        final livePlayerState = ref.read(playerStateProvider);
+        if (livePlayerState.isPlaying ||
+            livePlayerState.position > startAt + const Duration(seconds: 1)) {
+          // Some hosts complete their open command late even though frames are
+          // already flowing. Treating that late completion as failure caused
+          // a needless source reopen and playback jumping back to the intro.
+          AppLogger.w(
+            'Ignoring late stream-open failure because playback already started: $primaryError',
+          );
+          return;
+        }
         AppLogger.w('Primary stream stalled; trying alternate stream');
         var alternateStarted = false;
         final currentPos = ref.read(playerStateProvider).position;
-        final recoveryStartAt = currentPos > Duration.zero
-            ? currentPos
-            : (_player.lastStablePosition > Duration.zero
-                ? _player.lastStablePosition
-                : startAt);
+        final recoveryStartAt =
+            currentPos > Duration.zero
+                ? currentPos
+                : (_player.lastStablePosition > Duration.zero
+                    ? _player.lastStablePosition
+                    : startAt);
         for (var index = 1; index < state.sources.length; index++) {
           try {
             await _loadSourceStream(
@@ -1094,7 +1038,8 @@ class EpisodeData extends _$EpisodeData {
             state.selectedServer?.id == 'megaplay' ? 'zokoanime' : 'megaplay';
 
         // Try alternate JustAnime server if primary stalled
-        if (_isNativeProvider && _effectiveProvider?.providerName == 'justanime') {
+        if (_isNativeProvider &&
+            _effectiveProvider?.providerName == 'justanime') {
           try {
             fallback = await _effectiveProvider!
                 .getSources(
@@ -1126,7 +1071,8 @@ class EpisodeData extends _$EpisodeData {
             (s) => s.id == altServer && s.isDub == (category == 'dub'),
           );
           state = state.copyWith(
-            selectedServer: matchingServer ?? state.selectedServer?.copyWith(id: altServer),
+            selectedServer:
+                matchingServer ?? state.selectedServer?.copyWith(id: altServer),
             sources: fallback.sources,
             subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
             headers: fallback.headers?.cast<String, String>(),
@@ -1139,16 +1085,19 @@ class EpisodeData extends _$EpisodeData {
           return;
         }
 
-        // Only offer SUB after every available DUB stream/server failed.
+        // A DUB request must remain a DUB request. Slow or temporarily failing
+        // DUB servers must never silently change the user's audio preference.
         if (state.selectedServer?.isDub == true && _effectiveProvider != null) {
-          final targetId = (_effectiveProvider?.providerName == 'justanime')
-              ? _justAnimeId
-              : (_epList.animeId ?? '');
+          final targetId =
+              (_effectiveProvider?.providerName == 'justanime')
+                  ? _justAnimeId
+                  : (_epList.animeId ?? '');
 
           // 1. Try all other available DUB servers first!
-          final altDubServers = state.servers
-              .where((s) => s.isDub && s.id != state.selectedServer?.id)
-              .toList();
+          final altDubServers =
+              state.servers
+                  .where((s) => s.isDub && s.id != state.selectedServer?.id)
+                  .toList();
           for (final altDub in altDubServers) {
             try {
               final dubFallback = await _effectiveProvider!
@@ -1159,7 +1108,9 @@ class EpisodeData extends _$EpisodeData {
                     'dub',
                   )
                   .timeout(const Duration(seconds: 10));
-              if (dubFallback.sources.any((s) => s.isDub)) {
+              // The response came from an explicitly DUB server. Some source
+              // adapters do not annotate every returned URL with isDub.
+              if (dubFallback.sources.isNotEmpty) {
                 if (activeGeneration != _loadGeneration) return;
                 ref
                     .read(aniSkipProvider.notifier)
@@ -1181,38 +1132,6 @@ class EpisodeData extends _$EpisodeData {
                 return;
               }
             } catch (_) {}
-          }
-
-          // 2. Only if ALL DUB servers failed, fall back to Japanese SUB with notice
-          final subFallback = await _effectiveProvider!
-              .getSources(
-                targetId,
-                epModel.id ?? epNum.toString(),
-                state.selectedServer?.id,
-                'sub',
-              )
-              .timeout(const Duration(seconds: 10));
-          if (subFallback.sources.any((source) => !source.isDub)) {
-            if (activeGeneration != _loadGeneration) return;
-            ref
-                .read(aniSkipProvider.notifier)
-                .setFallbackFromSource(
-                  intro: subFallback.intro,
-                  outro: subFallback.outro,
-                );
-            state = state.copyWith(
-              sources: subFallback.sources,
-              subtitles: [Subtitle(lang: 'None'), ...subFallback.tracks],
-              headers: subFallback.headers?.cast<String, String>(),
-              languageNotice:
-                  'The English DUB stream could not be loaded for this episode. Japanese SUB is playing.',
-            );
-            await _loadSourceStream(
-              0,
-              startAt: recoveryStartAt,
-              generation: activeGeneration,
-            );
-            return;
           }
         }
         rethrow;
@@ -1236,9 +1155,10 @@ class EpisodeData extends _$EpisodeData {
     EpisodeDataModel episode,
   ) async {
     final provider = _effectiveProvider;
-    final animeId = (provider?.providerName == 'justanime')
-        ? _justAnimeId
-        : (_epList.animeId ?? _justAnimeId);
+    final animeId =
+        (provider?.providerName == 'justanime')
+            ? _justAnimeId
+            : (_epList.animeId ?? _justAnimeId);
     if (provider == null || animeId.isEmpty) {
       return (sub: true, dub: false);
     }
@@ -1249,9 +1169,10 @@ class EpisodeData extends _$EpisodeData {
         final result = await provider
             .getSources(animeId, episodeId, null, audio)
             .timeout(const Duration(seconds: 10));
-        return audio == 'dub'
-            ? result.sources.any((source) => source.isDub)
-            : result.sources.any((source) => !source.isDub);
+        // This response was requested from a concrete audio category. Several
+        // adapters omit isDub on otherwise valid DUB URLs, so availability is
+        // determined by a playable response, not that optional annotation.
+        return result.sources.isNotEmpty;
       } catch (_) {
         return false;
       }
@@ -1336,13 +1257,16 @@ class EpisodeData extends _$EpisodeData {
       // Always hand the original HLS URL to mpv. Saving a live playlist as a
       // local file freezes its segment window and breaks relative segment URLs;
       // after the cached entries run out mpv stalls and reopens near startAt.
-      final playbackUrl = allQualities[qIdx]['url'] as String;
+      final selectedOption = allQualities[qIdx];
+      final playbackUrl = selectedOption['url'] as String;
+      final playbackHeaders =
+          selectedOption['headers'] as Map<String, String>? ?? streamHeaders;
 
       await _player
           .open(
             playbackUrl,
             startAt,
-            headers: streamHeaders,
+            headers: playbackHeaders,
             mediaId: _epList.animeId,
             episode: state.selectedEpisode,
           )
@@ -1363,8 +1287,6 @@ class EpisodeData extends _$EpisodeData {
         selectedSourceIdx: sourceIdx,
         selectedQualityIdx: qIdx,
       );
-
-      _armStallWatchdog(activeGeneration);
 
       // Light pre-fetch next episode metadata / stream after initial playback is rolling
       if (ref.read(playerSettingsProvider).prefetchNextEpisode) {
@@ -1387,10 +1309,7 @@ class EpisodeData extends _$EpisodeData {
                     'headers': streamHeaders,
                   },
                   ...extracted.map(
-                    (quality) => {
-                      ...quality,
-                      'headers': streamHeaders,
-                    },
+                    (quality) => {...quality, 'headers': streamHeaders},
                   ),
                   ...state.qualityOptions.where((q) => q['quality'] != 'Auto'),
                 ];
@@ -1416,113 +1335,6 @@ class EpisodeData extends _$EpisodeData {
       }
     } finally {
       state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
-    }
-  }
-
-
-  void _armStallWatchdog(int generation) {
-    _stallWatchdog?.cancel();
-    _watchdogPosition = ref.read(playerStateProvider).position;
-    _bufferingSince = null;
-
-    _stallWatchdog = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (generation != _loadGeneration) {
-        timer.cancel();
-        return;
-      }
-
-      final playerState = ref.read(playerStateProvider);
-      if (playerState.isOpening ||
-          playerState.isSeeking ||
-          (!playerState.isPlaying && !playerState.isBuffering)) {
-        _watchdogPosition = playerState.position;
-        _bufferingSince = null;
-        return;
-      }
-
-      final advanced =
-          playerState.position - _watchdogPosition >=
-          const Duration(milliseconds: 750);
-      if (advanced) {
-        _watchdogPosition = playerState.position;
-        _bufferingSince = null;
-        return;
-      }
-
-      if (!playerState.isBuffering) {
-        _bufferingSince = null;
-        return;
-      }
-
-      _bufferingSince ??= DateTime.now();
-      if (DateTime.now().difference(_bufferingSince!) >=
-              const Duration(seconds: 8) &&
-          !_stallRecoveryInProgress) {
-        unawaited(_recoverFromSustainedStall(generation));
-      }
-    });
-  }
-
-  Future<void> _recoverFromSustainedStall(int observedGeneration) async {
-    if (_stallRecoveryInProgress || observedGeneration != _loadGeneration) {
-      return;
-    }
-
-    _stallRecoveryInProgress = true;
-    final currentPosition = ref.read(playerStateProvider).position;
-    final recoveryPosition = currentPosition > Duration.zero
-        ? currentPosition
-        : _player.lastStablePosition;
-
-    try {
-      final currentSourceIdx = state.selectedSourceIdx ?? 0;
-      if (currentSourceIdx + 1 < state.sources.length) {
-        final nextGeneration = ++_loadGeneration;
-        AppLogger.w(
-          'Playback stalled for 8s; switching to alternate stream source.',
-        );
-        await _loadSourceStream(
-          currentSourceIdx + 1,
-          startAt: recoveryPosition,
-          generation: nextGeneration,
-        );
-        return;
-      }
-
-      final currentServer = state.selectedServer;
-      final alternateServer = currentServer == null
-          ? null
-          : state.servers.firstWhereOrNull(
-              (server) =>
-                  server.isDub == currentServer.isDub &&
-                  (server.id != currentServer.id ||
-                      server.name != currentServer.name),
-            );
-
-      if (alternateServer != null) {
-        final nextGeneration = ++_loadGeneration;
-        AppLogger.w(
-          'Playback stalled for 8s; switching server to ${alternateServer.name ?? alternateServer.id}.',
-        );
-        state = state.copyWith(selectedServer: alternateServer);
-        await _playCurrent(
-          recoveryPosition,
-          generation: nextGeneration,
-        );
-        return;
-      }
-
-      AppLogger.w(
-        'Playback stalled for 8s with no alternate source/server; reconnecting current stream.',
-      );
-      await _player.retry();
-      _armStallWatchdog(_loadGeneration);
-    } catch (error, stack) {
-      AppLogger.e('Automatic stall recovery failed', error, stack);
-    } finally {
-      _bufferingSince = null;
-      _watchdogPosition = ref.read(playerStateProvider).position;
-      _stallRecoveryInProgress = false;
     }
   }
 
@@ -1566,11 +1378,12 @@ class EpisodeData extends _$EpisodeData {
         provider?.providerName == 'justanime' ||
         activeExt.contains('justanime');
 
-    final effectiveAnimeId = (isJustAnime &&
-            _epList.mediaId != null &&
-            int.tryParse(_epList.mediaId!) != null)
-        ? _epList.mediaId!
-        : (int.tryParse(_epList.animeId ?? '') != null)
+    final effectiveAnimeId =
+        (isJustAnime &&
+                _epList.mediaId != null &&
+                int.tryParse(_epList.mediaId!) != null)
+            ? _epList.mediaId!
+            : (int.tryParse(_epList.animeId ?? '') != null)
             ? _epList.animeId!
             : (_epList.mediaId ?? _epList.animeId ?? '');
 
@@ -1790,11 +1603,12 @@ class EpisodeData extends _$EpisodeData {
         AppLogger.w('Trying provider for stream: $altKey');
 
         final searchCacheKey = '$altKey:$cleanTitle';
-        String? altMatchId = (altKey == 'justanime' &&
-                _epList.mediaId != null &&
-                int.tryParse(_epList.mediaId!) != null)
-            ? _epList.mediaId
-            : _animeSearchMatchCache[searchCacheKey];
+        String? altMatchId =
+            (altKey == 'justanime' &&
+                    _epList.mediaId != null &&
+                    int.tryParse(_epList.mediaId!) != null)
+                ? _epList.mediaId
+                : _animeSearchMatchCache[searchCacheKey];
         if (altMatchId == null) {
           final altSearch = await altProvider
               .getSearch(
@@ -1838,20 +1652,13 @@ class EpisodeData extends _$EpisodeData {
               (e) => e.number == ep.number,
             );
             resolvedEpId =
-                targetEp?.id ??
-                altEpsList?.firstOrNull?.id ??
-                resolvedEpId;
+                targetEp?.id ?? altEpsList?.firstOrNull?.id ?? resolvedEpId;
           } catch (_) {}
         }
 
         if (activeGeneration != _loadGeneration) return null;
         final altSources = await altProvider
-            .getSources(
-              altMatchId,
-              resolvedEpId,
-              null,
-              category,
-            )
+            .getSources(altMatchId, resolvedEpId, null, category)
             .timeout(const Duration(seconds: 12));
         if (activeGeneration != _loadGeneration) return null;
         if (altSources.sources.isNotEmpty) {

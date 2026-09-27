@@ -42,6 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _setAppOpenStatus(true);
     _setupAuthListener();
     _setupNewsListener();
     Future.microtask(() {
@@ -56,7 +57,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _setupAuthListener() {
     _authListener = ref.listenManual(authProvider, (previous, next) {
       if (!mounted) return;
-      final wasAuthed = (previous?.isAniListAuthenticated ?? false) ||
+      final wasAuthed =
+          (previous?.isAniListAuthenticated ?? false) ||
           (previous?.isMalAuthenticated ?? false);
       final isAuthed = next.isAniListAuthenticated || next.isMalAuthenticated;
       if (!wasAuthed && isAuthed) {
@@ -107,6 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    _setAppOpenStatus(false);
     _authListener.close();
     _newsListener.close();
     WidgetsBinding.instance.removeObserver(this);
@@ -191,8 +194,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   (i == targetProgress && entry.progress == 0 ? 0 : 1440),
               durationInSeconds: existing?.durationInSeconds ?? 1440,
               isCompleted: i < targetProgress,
-              watchedAt: existing?.watchedAt ??
-                  DateTime.fromMillisecondsSinceEpoch(0),
+              watchedAt:
+                  existing?.watchedAt ?? DateTime.fromMillisecondsSinceEpoch(0),
             );
           }
         }
@@ -212,7 +215,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   animeCover: cover,
                   totalEpisodes: media.episodes ?? 0,
                   episodesProgress: episodesMap,
-                  lastUpdated: local?.lastUpdated ??
+                  lastUpdated:
+                      local?.lastUpdated ??
                       DateTime.fromMillisecondsSinceEpoch(0),
                   lastPlayedAt: local?.lastPlayedAt,
                   currentEpisode: targetProgress,

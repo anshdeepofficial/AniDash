@@ -54,7 +54,10 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
     bool isAdult = false,
     bool force = false,
   }) async {
-    if (_repo == null || dur <= 0 || pos <= 0 || (!force && pos == _lastSavedPos)) {
+    if (_repo == null ||
+        dur <= 0 ||
+        pos <= 0 ||
+        (!force && pos == _lastSavedPos)) {
       return epThumb;
     }
 
@@ -84,15 +87,19 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
       }
 
       final isCompleted = dur > 0 ? (pos / dur >= 0.90) : false;
-      final isSpecialOrMovie = (animeFormat?.toUpperCase() == 'SPECIAL' ||
-              animeFormat?.toUpperCase() == 'MOVIE' ||
-              animeFormat?.toUpperCase() == 'OVA') ||
-          (totalEps <= 1);
-      final isAnimeFinished =
-          (totalEps > 0 && epNum >= totalEps && isCompleted) ||
-              (isSpecialOrMovie && isCompleted);
+      final normalizedFormat = animeFormat?.toUpperCase();
+      final isOneShot =
+          normalizedFormat == 'SPECIAL' ||
+          normalizedFormat == 'MOVIE' ||
+          normalizedFormat == 'OVA';
+      // Provider episode totals can be partial (especially for ongoing shows).
+      // Never hide an episodic series from Continue Watching merely because
+      // the current episode equals a temporarily reported total.
+      final isAnimeFinished = isOneShot && isCompleted;
       if (isAnimeFinished) {
         entry = entry.copyWith(status: 'completed');
+      } else {
+        entry = entry.copyWith(status: 'watching');
       }
 
       final now = DateTime.now();
@@ -106,10 +113,7 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
         watchedAt: now,
       );
 
-      entry = entry.copyWith(
-        lastPlayedAt: now,
-        lastUpdated: now,
-      );
+      entry = entry.copyWith(lastPlayedAt: now, lastUpdated: now);
 
       await _repo!.saveProgress(entry);
       await _repo!.updateEpisodeProgress(

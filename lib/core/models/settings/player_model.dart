@@ -38,10 +38,10 @@ class PlayerModel {
     this.mpvSettings = const {},
     this.showManualSkip = true,
     this.manualSkipDuration = 85,
-  }) : preferredAudioLanguage = preferredAudioLanguage != null &&
-            preferredAudioLanguage != 'hindi'
-            ? preferredAudioLanguage
-            : (preferDub != null ? (preferDub ? 'dub' : 'sub') : 'sub');
+  }) : preferredAudioLanguage =
+           preferredAudioLanguage == 'dub'
+               ? 'dub'
+               : (preferDub == true ? 'dub' : 'sub');
 
   /// 100% backward-compatible getter for existing code paths
   bool get preferDub => preferredAudioLanguage == 'dub';
@@ -66,7 +66,8 @@ class PlayerModel {
     bool? showManualSkip,
     int? manualSkipDuration,
   }) {
-    final newAudioLang = preferredAudioLanguage ??
+    final newAudioLang =
+        preferredAudioLanguage ??
         (preferDub != null
             ? (preferDub ? 'dub' : 'sub')
             : this.preferredAudioLanguage);
@@ -76,8 +77,7 @@ class PlayerModel {
       enableAniSkip: enableAniSkip ?? this.enableAniSkip,
       enableAutoSkip: enableAutoSkip ?? this.enableAutoSkip,
       skipFillerEpisodes: skipFillerEpisodes ?? this.skipFillerEpisodes,
-      preferredAudioLanguage:
-          newAudioLang == 'hindi' ? 'sub' : newAudioLang,
+      preferredAudioLanguage: newAudioLang == 'dub' ? 'dub' : 'sub',
       seekDuration: seekDuration ?? this.seekDuration,
       autoHideDuration: autoHideDuration ?? this.autoHideDuration,
       lockAutoHideDuration: lockAutoHideDuration ?? this.lockAutoHideDuration,
@@ -88,8 +88,7 @@ class PlayerModel {
           showNextEpisodePrompt ?? this.showNextEpisodePrompt,
       stopAfterCurrentEpisode:
           stopAfterCurrentEpisode ?? this.stopAfterCurrentEpisode,
-      defaultPlaybackSpeed:
-          defaultPlaybackSpeed ?? this.defaultPlaybackSpeed,
+      defaultPlaybackSpeed: defaultPlaybackSpeed ?? this.defaultPlaybackSpeed,
       mpvSettings: mpvSettings ?? this.mpvSettings,
       showManualSkip: showManualSkip ?? this.showManualSkip,
       manualSkipDuration: manualSkipDuration ?? this.manualSkipDuration,
@@ -122,11 +121,10 @@ class PlayerModel {
   factory PlayerModel.fromMap(Map<String, dynamic> map) {
     final rawPrefLang = map['preferredAudioLanguage'] as String?;
     final rawPreferDub = map['preferDub'] as bool?;
-    var audioLang = rawPrefLang ??
+    var audioLang =
+        rawPrefLang ??
         (rawPreferDub != null ? (rawPreferDub ? 'dub' : 'sub') : 'sub');
-    if (audioLang == 'hindi') {
-      audioLang = 'sub';
-    }
+    audioLang = audioLang == 'dub' ? 'dub' : 'sub';
 
     return PlayerModel(
       defaultQuality: map['defaultQuality'] ?? 'Auto',

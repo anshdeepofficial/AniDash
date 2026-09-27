@@ -79,6 +79,8 @@ class AnimeWatchProgressEntry {
   }
 
   bool get isCompletedOrFinished {
+    // If status is 'watching', user is actively watching/rewatching this anime — never hide from Continue Watching!
+    if (status.toLowerCase() == 'watching') return false;
     if (status.toLowerCase() == 'completed') return true;
 
     final effectiveTotal = totalEpisodes > 0

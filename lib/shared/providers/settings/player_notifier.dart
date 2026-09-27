@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:ani_dash/core/models/settings/player_model.dart';
 import 'package:ani_dash/main.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 
 final playerSettingsProvider =
     NotifierProvider<PlayerSettingsNotifier, PlayerModel>(
@@ -40,7 +43,8 @@ class PlayerSettingsNotifier extends Notifier<PlayerModel> {
   }
 
   void setPreferredAudioLanguage(String language) {
-    final clean = language == 'hindi' ? 'sub' : language;
+    final clean = language == 'dub' ? 'dub' : 'sub';
     updateSettings((prev) => prev.copyWith(preferredAudioLanguage: clean));
+    unawaited(NotificationService().reconcileScheduledReleaseAlerts());
   }
 }

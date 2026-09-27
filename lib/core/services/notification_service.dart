@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -55,7 +56,9 @@ class NotificationService {
       StreamController<String>.broadcast();
   Stream<String> get onNotificationRoute => notificationRouteController.stream;
 
-  Future<void> registerPeriodicNotificationWorker({bool forceReplace = true}) async {
+  Future<void> registerPeriodicNotificationWorker({
+    bool forceReplace = false,
+  }) async {
     if (!Platform.isAndroid) return;
     try {
       await Workmanager().registerPeriodicTask(
@@ -75,7 +78,6 @@ class NotificationService {
   }
 
   static const String _iconName = 'ic_notification';
-  static const String _largeIconName = 'ic_notification_large';
   static const Color _brandColor = Color(0xFF4CAF50);
 
   static bool _timeZoneInitialized = false;
@@ -102,6 +104,50 @@ class NotificationService {
       _timeZoneInitialized = true;
     } catch (e) {
       AppLogger.w('Timezone initialization error: $e');
+    }
+  }
+
+  Future<bool> _isCategoryEnabled(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('notification_settings_data');
+      if (raw == null || raw.isEmpty) return true;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      return data[key] as bool? ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<bool> _prefersEnglishDub() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('player_settings_data');
+      if (raw == null || raw.isEmpty) return false;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final language = data['preferredAudioLanguage'] as String?;
+      return language == 'dub' ||
+          (language == null && (data['preferDub'] as bool? ?? false));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> reconcileScheduledReleaseAlerts() async {
+    final allowSub =
+        await _isCategoryEnabled('enableSubReleases') &&
+        !await _prefersEnglishDub();
+    if (allowSub) return;
+    try {
+      final pending =
+          await flutterLocalNotificationsPlugin.pendingNotificationRequests();
+      for (final request in pending) {
+        if (request.payload?.startsWith('details:') == true) {
+          await flutterLocalNotificationsPlugin.cancel(request.id);
+        }
+      }
+    } catch (e) {
+      AppLogger.w('Could not reconcile scheduled release alerts: $e');
     }
   }
 
@@ -159,19 +205,36 @@ class NotificationService {
           _instance.playbackActionController.add(response.actionId!);
         } else if (response.payload != null && response.payload!.isNotEmpty) {
           final payload = response.payload!;
-          if (payload.startsWith('details:') || payload.startsWith('/details/')) {
-            final mediaId = payload.replaceFirst('details:', '').replaceFirst('/details/', '').trim();
-            final targetRoute = mediaId.contains('?')
-                ? (mediaId.startsWith('/') ? mediaId : '/details/$mediaId')
-                : '/details/$mediaId?tab=episodes';
-            unawaited(NotificationInboxService().markReadByRouteOrMedia(targetRoute, mediaId));
+          if (payload.startsWith('details:') ||
+              payload.startsWith('/details/')) {
+            final mediaId =
+                payload
+                    .replaceFirst('details:', '')
+                    .replaceFirst('/details/', '')
+                    .trim();
+            final targetRoute =
+                mediaId.contains('?')
+                    ? (mediaId.startsWith('/') ? mediaId : '/details/$mediaId')
+                    : '/details/$mediaId?tab=episodes';
+            unawaited(
+              NotificationInboxService().markReadByRouteOrMedia(
+                targetRoute,
+                mediaId,
+              ),
+            );
             _instance.notificationRouteController.add(targetRoute);
           } else if (payload.startsWith('route:')) {
             final route = payload.replaceFirst('route:', '').trim();
-            unawaited(NotificationInboxService().markReadByRouteOrMedia(route, null));
+            unawaited(
+              NotificationInboxService().markReadByRouteOrMedia(route, null),
+            );
             _instance.notificationRouteController.add(route);
-          } else if (payload == '/downloads' || payload == '/news' || payload == '/watchlist') {
-            unawaited(NotificationInboxService().markReadByRouteOrMedia(payload, null));
+          } else if (payload == '/downloads' ||
+              payload == '/news' ||
+              payload == '/watchlist') {
+            unawaited(
+              NotificationInboxService().markReadByRouteOrMedia(payload, null),
+            );
             _instance.notificationRouteController.add(payload);
           }
         }
@@ -182,13 +245,15 @@ class NotificationService {
 
     await _createNotificationChannels();
     if (!isBackground) {
-      final androidPlugin = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
+      final androidPlugin =
+          flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
       await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.requestExactAlarmsPermission();
     }
+    await reconcileScheduledReleaseAlerts();
   }
 
   Future<void> ensureSoundChannelsCreated([String? ignoredSoundId]) async {
@@ -220,7 +285,7 @@ class NotificationService {
       'AniDash_updates',
       'App Updates',
       description: 'Notifications when a new AniDash version is available',
-      importance: Importance.high,
+      importance: Importance.max,
       playSound: true,
       enableVibration: true,
     );
@@ -302,8 +367,8 @@ class NotificationService {
     required String channelBaseId,
     required String channelName,
     required String channelDescription,
-    Importance importance = Importance.high,
-    Priority priority = Priority.high,
+    Importance importance = Importance.max,
+    Priority priority = Priority.max,
     bool playSound = true,
     bool enableVibration = true,
     List<AndroidNotificationAction>? actions,
@@ -319,11 +384,12 @@ class NotificationService {
       playSound: playSound,
       enableVibration: enableVibration,
       icon: _iconName,
-      largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
       color: color ?? _brandColor,
       actions: actions,
       styleInformation: styleInformation,
       visibility: NotificationVisibility.public,
+      channelShowBadge: true,
+      showWhen: true,
     );
   }
 
@@ -359,13 +425,11 @@ class NotificationService {
               priority: Priority.max,
               playSound: true,
               enableVibration: true,
-              icon: '@mipmap/ic_launcher',
+              icon: _iconName,
               color: _brandColor,
-              styleInformation: styleInformation ??
-                  BigTextStyleInformation(
-                    body,
-                    contentTitle: title,
-                  ),
+              styleInformation:
+                  styleInformation ??
+                  BigTextStyleInformation(body, contentTitle: title),
               visibility: NotificationVisibility.public,
             ),
           );
@@ -413,6 +477,7 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    if (!await _isCategoryEnabled('enableNews')) return;
     const notifId = 1000;
     await NotificationInboxService().add(
       title: title,
@@ -423,10 +488,7 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
-    final styleInfo = BigTextStyleInformation(
-      body,
-      contentTitle: title,
-    );
+    final styleInfo = BigTextStyleInformation(body, contentTitle: title);
 
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
@@ -456,6 +518,7 @@ class NotificationService {
     required int episodeNumber,
     required double progress,
   }) async {
+    if (!await _isCategoryEnabled('enableDownloads')) return;
     final percent = (progress * 100).clamp(0, 100).toInt();
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -470,7 +533,6 @@ class NotificationService {
           maxProgress: 100,
           progress: percent,
           icon: _iconName,
-          largeIcon: const DrawableResourceAndroidBitmap(_largeIconName),
           color: _brandColor,
         );
 
@@ -491,6 +553,7 @@ class NotificationService {
     required String animeTitle,
     required int episodeNumber,
   }) async {
+    if (!await _isCategoryEnabled('enableDownloads')) return;
     await NotificationInboxService().add(
       title: 'Download Complete',
       body: '$animeTitle - Episode $episodeNumber is ready offline',
@@ -507,7 +570,6 @@ class NotificationService {
           priority: Priority.high,
           ongoing: false,
           icon: _iconName,
-          largeIcon: DrawableResourceAndroidBitmap(_largeIconName),
           color: _brandColor,
         );
 
@@ -533,13 +595,27 @@ class NotificationService {
     String? audioType,
     String? dedupeKey,
   }) async {
-    final title = customTitle ?? (isDub || audioType == 'english_dub' ? 'New English Dub Episode' : 'New SUB Episode');
-    final body = customBody ??
-        '$animeTitle Episode $episodeNumber is now available.';
-    final effectiveDedupeKey = dedupeKey ??
+    final isDubRelease =
+        isDub ||
+        audioType == 'english_dub' ||
+        (audioType?.contains('dub') ?? false);
+    if (isDubRelease != await _prefersEnglishDub()) return;
+    if (!await _isCategoryEnabled(
+      isDubRelease ? 'enableDubReleases' : 'enableSubReleases',
+    )) {
+      return;
+    }
+    final title =
+        customTitle ?? (isDubRelease ? 'New Dub Episode' : 'New SUB Episode');
+    final body =
+        customBody ?? '$animeTitle Episode $episodeNumber is now available.';
+    final effectiveDedupeKey =
+        dedupeKey ??
         'release:${mediaId ?? animeTitle}:$episodeNumber:${audioType ?? (isDub ? "dub" : "sub")}';
     final notifId =
-        (mediaId ?? animeTitle).hashCode ^ episodeNumber ^ (audioType ?? '').hashCode;
+        (mediaId ?? animeTitle).hashCode ^
+        episodeNumber ^
+        (audioType ?? '').hashCode;
 
     await NotificationInboxService().add(
       title: title,
@@ -549,7 +625,7 @@ class NotificationService {
       notificationType: audioType ?? (isDub ? 'dub' : 'sub'),
       mediaId: mediaId,
       episodeNumber: episodeNumber,
-      language: (isDub || audioType == 'english_dub' ? 'en' : 'ja'),
+      language: isDubRelease ? 'en' : 'ja',
       systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();
@@ -557,7 +633,7 @@ class NotificationService {
     final styleInfo = BigTextStyleInformation(
       body,
       contentTitle: title,
-      summaryText: isDub || audioType == 'english_dub' ? 'English Dub' : 'Sub',
+      summaryText: isDubRelease ? 'English Dub' : 'Japanese Sub',
     );
 
     final platformChannelSpecifics = NotificationDetails(
@@ -580,7 +656,8 @@ class NotificationService {
       payload: mediaId != null ? 'details:$mediaId?tab=episodes' : null,
       channelBaseId: 'AniDash_episodes',
       channelName: 'Episode Releases',
-      channelDescription: 'Notifications when new Sub or Dub episodes are released',
+      channelDescription:
+          'Notifications when new Sub or Dub episodes are released',
       styleInformation: styleInfo,
     );
   }
@@ -595,6 +672,8 @@ class NotificationService {
     required int airingAtEpoch,
   }) async {
     if (!Platform.isAndroid) return;
+    if (!await _isCategoryEnabled('enableSubReleases')) return;
+    if (await _prefersEnglishDub()) return;
     _setupTimeZone();
     await ensureSoundChannelsCreated();
 
@@ -623,8 +702,7 @@ class NotificationService {
         tz.local,
         alert24hEpoch * 1000,
       );
-      final id24h =
-          ((mediaId.hashCode ^ episodeNumber) * 31 + 24) & 0x7FFFFFFF;
+      final id24h = ((mediaId.hashCode ^ episodeNumber) * 31 + 24) & 0x7FFFFFFF;
       await _safeZonedSchedule(
         id: id24h,
         title: 'Upcoming: $animeTitle • Ep $episodeNumber',
@@ -643,8 +721,7 @@ class NotificationService {
         tz.local,
         alert2hEpoch * 1000,
       );
-      final id2h =
-          ((mediaId.hashCode ^ episodeNumber) * 31 + 2) & 0x7FFFFFFF;
+      final id2h = ((mediaId.hashCode ^ episodeNumber) * 31 + 2) & 0x7FFFFFFF;
       await _safeZonedSchedule(
         id: id2h,
         title: 'Upcoming: $animeTitle • Ep $episodeNumber',
@@ -663,8 +740,7 @@ class NotificationService {
         tz.local,
         alert1hEpoch * 1000,
       );
-      final id1h =
-          ((mediaId.hashCode ^ episodeNumber) * 31 + 1) & 0x7FFFFFFF;
+      final id1h = ((mediaId.hashCode ^ episodeNumber) * 31 + 1) & 0x7FFFFFFF;
       await _safeZonedSchedule(
         id: id1h,
         title: 'Upcoming: $animeTitle • Ep $episodeNumber',
@@ -687,7 +763,8 @@ class NotificationService {
       await _safeZonedSchedule(
         id: idRelease,
         title: '$animeTitle • Ep $episodeNumber Released',
-        body: 'Episode $episodeNumber is now officially available to watch on AniDash.',
+        body:
+            'Episode $episodeNumber is now officially available to watch on AniDash.',
         scheduledDate: scheduledRelease,
         notificationDetails: details,
         payload: 'details:$mediaId?tab=episodes',
@@ -713,7 +790,9 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         payload: payload,
       );
-      AppLogger.i('[NotificationService] Exact alarm scheduled: $title at ${scheduledDate.toIso8601String()}');
+      AppLogger.i(
+        '[NotificationService] Exact alarm scheduled: $title at ${scheduledDate.toIso8601String()}',
+      );
     } catch (_) {
       try {
         await flutterLocalNotificationsPlugin.zonedSchedule(
@@ -725,7 +804,9 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           payload: payload,
         );
-        AppLogger.i('[NotificationService] Inexact alarm scheduled (fallback): $title at ${scheduledDate.toIso8601String()}');
+        AppLogger.i(
+          '[NotificationService] Inexact alarm scheduled (fallback): $title at ${scheduledDate.toIso8601String()}',
+        );
       } catch (e2) {
         AppLogger.w('Failed to schedule alarm: $e2');
       }
@@ -738,8 +819,10 @@ class NotificationService {
     String? mediaId,
     String? customBody,
   }) async {
+    if (!await _isCategoryEnabled('enableContinueWatching')) return;
     final title = 'Continue Watching $animeTitle';
-    final body = customBody ??
+    final body =
+        customBody ??
         'You stopped at Episode $episodeNumber. Continue where you left off.';
     final effectiveDedupeKey =
         'continue:${mediaId ?? animeTitle}:$episodeNumber';
@@ -757,10 +840,7 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
-    final styleInfo = BigTextStyleInformation(
-      body,
-      contentTitle: title,
-    );
+    final styleInfo = BigTextStyleInformation(body, contentTitle: title);
 
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
@@ -852,7 +932,8 @@ class NotificationService {
       payload: 'update:$version',
       channelBaseId: 'AniDash_updates',
       channelName: 'App Updates',
-      channelDescription: 'Notifications when a new AniDash version is available',
+      channelDescription:
+          'Notifications when a new AniDash version is available',
       styleInformation: styleInfo,
     );
   }

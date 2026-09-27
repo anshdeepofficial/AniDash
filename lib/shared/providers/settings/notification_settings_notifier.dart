@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/settings/notification_settings_model.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/main.dart';
 
 final notificationSettingsProvider =
@@ -28,5 +30,6 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettingsModel> {
   ) {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, jsonEncode(state.toJson()));
+    unawaited(NotificationService().reconcileScheduledReleaseAlerts());
   }
 }

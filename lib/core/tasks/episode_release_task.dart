@@ -36,8 +36,7 @@ class NotificationCheckResult {
 }
 
 class EpisodeReleaseTask {
-  static const String keyLastCheck =
-      'lastSuccessfulEpisodeNotificationCheckAt';
+  static const String keyLastCheck = 'lastSuccessfulEpisodeNotificationCheckAt';
 
   Future<NotificationCheckResult> run() => performCheck(isManual: true);
 
@@ -69,6 +68,22 @@ class EpisodeReleaseTask {
               decoded['enableContinueWatching'] as bool? ?? true;
         } catch (_) {}
       }
+
+      var prefersEnglishDub = false;
+      try {
+        final rawPlayerSettings = pref.getString('player_settings_data');
+        if (rawPlayerSettings != null && rawPlayerSettings.isNotEmpty) {
+          final playerSettings =
+              jsonDecode(rawPlayerSettings) as Map<String, dynamic>;
+          final language = playerSettings['preferredAudioLanguage'] as String?;
+          prefersEnglishDub =
+              language == 'dub' ||
+              (language == null &&
+                  (playerSettings['preferDub'] as bool? ?? false));
+        }
+      } catch (_) {}
+      enableDubReleases = enableDubReleases && prefersEnglishDub;
+      enableSubReleases = enableSubReleases && !prefersEnglishDub;
 
       await NotificationService().initialize(isBackground: !isManual);
 
@@ -116,12 +131,10 @@ class EpisodeReleaseTask {
       }
 
       final allProgress = box?.values.toList() ?? [];
-      final relevantEntries = allProgress.where((e) {
-        if (e.isCompletedOrFinished || e.status.toLowerCase() == 'completed') {
-          return false;
-        }
-        return e.status == 'watching' || e.currentEpisode > 0;
-      }).toList();
+      final relevantEntries =
+          allProgress.where((e) {
+            return e.hasAnyWatchProgress || e.currentEpisode > 0;
+          }).toList();
 
       for (final e in relevantEntries) {
         final id = int.tryParse(e.animeId);
@@ -139,7 +152,10 @@ class EpisodeReleaseTask {
         startWindow = nowEpoch - (48 * 3600);
       } else {
         // Look back at least 24 hours (up to 7 days) — deduplication keys prevent re-notifying
-        startWindow = (lastCheckEpoch - (24 * 3600)).clamp(nowEpoch - (7 * 86400), nowEpoch - 60);
+        startWindow = (lastCheckEpoch - (24 * 3600)).clamp(
+          nowEpoch - (7 * 86400),
+          nowEpoch - 60,
+        );
       }
 
       AppLogger.i(
@@ -154,7 +170,8 @@ class EpisodeReleaseTask {
           final pastSchedules = await _fetchAniListAiringSchedules(
             startWindow: startWindow,
             endWindow: nowEpoch,
-            mediaIds: relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
+            mediaIds:
+                relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
           );
           schedulesReturned += pastSchedules.length;
           AppLogger.i(
@@ -164,13 +181,13 @@ class EpisodeReleaseTask {
           // Filter for user's relevant anime if user has watch progress entries
           final List<Map<String, dynamic>> targetPastSchedules;
           if (relevantMediaIds.isNotEmpty) {
-            targetPastSchedules = pastSchedules.where((s) {
-              final mId = s['mediaId'] as int?;
-              return mId != null && relevantMediaIds.contains(mId);
-            }).toList();
+            targetPastSchedules =
+                pastSchedules.where((s) {
+                  final mId = s['mediaId'] as int?;
+                  return mId != null && relevantMediaIds.contains(mId);
+                }).toList();
           } else {
-            // If user has no watch progress yet, evaluate top 10 most recent
-            targetPastSchedules = pastSchedules.take(10).toList();
+            targetPastSchedules = const [];
           }
 
           relevantCount += targetPastSchedules.length;
@@ -183,7 +200,8 @@ class EpisodeReleaseTask {
             final epNum = s['episode'] as int;
             final mediaObj = s['media'] as Map<String, dynamic>? ?? {};
             final titleObj = mediaObj['title'] as Map<String, dynamic>? ?? {};
-            final animeTitle = titleObj['english'] as String? ??
+            final animeTitle =
+                titleObj['english'] as String? ??
                 titleObj['romaji'] as String? ??
                 titleObj['userPreferred'] as String? ??
                 mediaTitlesById[mediaId] ??
@@ -199,9 +217,7 @@ class EpisodeReleaseTask {
               );
             } else {
               sentCount++;
-              AppLogger.i(
-                '[NotificationWorker] sent = $animeTitle Ep $epNum',
-              );
+              AppLogger.i('[NotificationWorker] sent = $animeTitle Ep $epNum');
 
               await NotificationService().showEpisodeReleaseNotification(
                 animeTitle: animeTitle,
@@ -228,7 +244,8 @@ class EpisodeReleaseTask {
           final upcomingSchedules = await _fetchAniListAiringSchedules(
             startWindow: nowEpoch,
             endWindow: nowEpoch + (7 * 86400),
-            mediaIds: relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
+            mediaIds:
+                relevantMediaIds.isNotEmpty ? relevantMediaIds.toList() : null,
             sort: ['TIME_ASC'],
           );
           schedulesReturned += upcomingSchedules.length;
@@ -238,12 +255,13 @@ class EpisodeReleaseTask {
 
           final List<Map<String, dynamic>> targetUpcomingSchedules;
           if (relevantMediaIds.isNotEmpty) {
-            targetUpcomingSchedules = upcomingSchedules.where((s) {
-              final mId = s['mediaId'] as int?;
-              return mId != null && relevantMediaIds.contains(mId);
-            }).toList();
+            targetUpcomingSchedules =
+                upcomingSchedules.where((s) {
+                  final mId = s['mediaId'] as int?;
+                  return mId != null && relevantMediaIds.contains(mId);
+                }).toList();
           } else {
-            targetUpcomingSchedules = upcomingSchedules.take(5).toList();
+            targetUpcomingSchedules = const [];
           }
 
           relevantCount += targetUpcomingSchedules.length;
@@ -256,7 +274,8 @@ class EpisodeReleaseTask {
 
             final mediaObj = s['media'] as Map<String, dynamic>? ?? {};
             final titleObj = mediaObj['title'] as Map<String, dynamic>? ?? {};
-            final animeTitle = titleObj['english'] as String? ??
+            final animeTitle =
+                titleObj['english'] as String? ??
                 titleObj['romaji'] as String? ??
                 titleObj['userPreferred'] as String? ??
                 mediaTitlesById[mediaId] ??
@@ -284,8 +303,7 @@ class EpisodeReleaseTask {
                   isDub: false,
                   mediaId: mediaId.toString(),
                   customTitle: 'Upcoming: $animeTitle • Ep $epNum',
-                  customBody:
-                      'Episode $epNum releases in 1 hour!',
+                  customBody: 'Episode $epNum releases in 1 hour!',
                   audioType: 'upcoming_1h',
                   dedupeKey: key1h,
                 );
@@ -305,8 +323,7 @@ class EpisodeReleaseTask {
                   isDub: false,
                   mediaId: mediaId.toString(),
                   customTitle: 'Upcoming: $animeTitle • Ep $epNum',
-                  customBody:
-                      'Episode $epNum releases in 2 hours!',
+                  customBody: 'Episode $epNum releases in 2 hours!',
                   audioType: 'upcoming_2h',
                   dedupeKey: key2h,
                 );
@@ -326,8 +343,7 @@ class EpisodeReleaseTask {
                   isDub: false,
                   mediaId: mediaId.toString(),
                   customTitle: 'Upcoming: $animeTitle • Ep $epNum',
-                  customBody:
-                      'Episode $epNum releases tomorrow (in 24 hours)!',
+                  customBody: 'Episode $epNum releases tomorrow (in 24 hours)!',
                   audioType: 'upcoming_24h',
                   dedupeKey: key24h,
                 );
@@ -346,13 +362,13 @@ class EpisodeReleaseTask {
       // 2. English DUB Releases (via extension sources)
       // -------------------------------------------------------------
       if (enableDubReleases) {
-        for (final entry in relevantEntries.where((e) => e.status == 'watching')) {
+        for (final entry in relevantEntries) {
           try {
-            final latestEnglishDubEp =
-                await _fetchEnglishDubCount(entry.animeTitle);
+            final latestEnglishDubEp = await _fetchEnglishDubCount(
+              entry.animeTitle,
+            );
             if (latestEnglishDubEp != null && latestEnglishDubEp > 0) {
-              final lastDubKey =
-                  'last_known_english_dub_ep_${entry.animeId}';
+              final lastDubKey = 'last_known_english_dub_ep_${entry.animeId}';
               final previousEnglishDub = pref.getInt(lastDubKey);
 
               if (previousEnglishDub != null &&
@@ -389,7 +405,8 @@ class EpisodeReleaseTask {
               entry.status.toLowerCase() == 'completed') {
             continue;
           }
-          final currentEpProgress = entry.episodesProgress[entry.currentEpisode];
+          final currentEpProgress =
+              entry.episodesProgress[entry.currentEpisode];
           if (currentEpProgress?.isCompleted == true) {
             continue;
           }
@@ -484,7 +501,9 @@ class EpisodeReleaseTask {
         .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
-      throw HttpException('AniList AiringSchedule status ${response.statusCode}');
+      throw HttpException(
+        'AniList AiringSchedule status ${response.statusCode}',
+      );
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -528,4 +547,5 @@ class EpisodeReleaseTask {
     } catch (_) {}
 
     return null;
-  }}
+  }
+}

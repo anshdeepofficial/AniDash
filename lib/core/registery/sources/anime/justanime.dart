@@ -490,10 +490,10 @@ class JustAnimeProvider extends AnimeProvider {
     // Start candidate #1 (Momo/Megaplay) immediately
     spawnNext();
 
-    // Hedge with candidate #2 after 1800ms if candidate #1 hasn't resolved
+    // Hedge with candidate #2 after 900ms if candidate #1 hasn't resolved
     Timer? hedgeTimer;
     if (endpoints.length > 1) {
-      hedgeTimer = Timer(const Duration(milliseconds: 1800), () {
+      hedgeTimer = Timer(const Duration(milliseconds: 900), () {
         if (!isDone && inFlight < 2 && nextIndex < endpoints.length) {
           spawnNext();
         }

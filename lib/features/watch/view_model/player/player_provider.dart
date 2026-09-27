@@ -98,12 +98,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   Duration? _pendingSeekTarget;
   Timer? _seekTimeout;
   Timer? _startupTimer;
-  Timer? _stallWatchdog;
-  Duration _stallWatchdogLastPos = Duration.zero;
   String? _activeMediaId;
   int? _activeEpisode;
   Duration _lastStablePosition = Duration.zero;
-  bool _isStallRecovering = false;
 
   Player get player => _player;
   String? get activeMediaId => _activeMediaId;
@@ -140,12 +137,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
+      64 * 1024 * 1024,
       128 * 1024 * 1024,
-      512 * 1024 * 1024,
     );
     final backBufferBytes = (effectiveBufferBytes ~/ 4).clamp(
+      16 * 1024 * 1024,
       32 * 1024 * 1024,
-      128 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -165,32 +162,32 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
       // ── Cache / buffer sizing ─────────────────────────────────────────────
       'cache': 'yes',
-      'cache-secs': '300',              // 5-minute forward cache window
+      'cache-secs': '90',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
-      'demuxer-readahead-secs': '120',  // 120s continuous forward readahead (100s+ buffer)
+      'demuxer-readahead-secs': '45',
 
       // ── Instant playback + underrun protection ────────────────────────────
-      'cache-pause': 'yes',             // Pause gracefully on underrun
-      'cache-pause-wait': '2',          // Buffer 2s before resuming after an underrun
-      'cache-pause-initial': 'no',      // Start IMMEDIATELY on frame 0, never stall at start
+      'cache-pause': 'yes', // Pause gracefully on underrun
+      'cache-pause-wait': '3',
+      'cache-pause-initial': 'yes',
 
       // ── Network & Reconnect ───────────────────────────────────────────────
-      'stream-lavf-o':
-          'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
-      'network-timeout': '20',          // 20s network timeout prevents premature drops
+      'stream-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
+      'network-timeout': '30',
 
-      // ── FFmpeg demuxer / HLS probe ────────────────────────────────────────
-      'demuxer-lavf-probesize': '1048576',       // 1MB probe for instant stream detection
-      'demuxer-lavf-buffersize': '2097152',      // 2MB socket read buffer
-      'demuxer-lavf-analyzeduration': '1.0',     // 1.0s fast stream analysis
+      // ── FFmpeg demuxer / HLS probe (tuned for ultra-fast <10s startup) ──
+      'demuxer-lavf-probesize': '1048576',
+      'demuxer-lavf-buffersize': '1048576',
+      'demuxer-lavf-analyzeduration': '1.0',
 
       // ── Seeking & sync ────────────────────────────────────────────────────
       'force-seekable': 'yes',
-      'hr-seek': 'default',             // Precise seek if in cache, keyframe if over network
+      'hr-seek':
+          'default', // Precise seek if in cache, keyframe if over network
       'correct-pts': 'yes',
-      'video-sync': 'audio',            // Audio-locked sync; prevents A/V drift
+      'video-sync': 'audio', // Audio-locked sync; prevents A/V drift
     };
 
     final platform = _player.platform as dynamic;
@@ -268,39 +265,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _subs.add(
       stream.buffering.listen((buf) {
         state = state.copyWith(isBuffering: buf);
-        if (buf) {
-          // Start stall watchdog: if we're still buffering after 8s
-          // and position hasn't advanced, the stream is truly stalled.
-          _stallWatchdogLastPos = _player.state.position;
-          _stallWatchdog ??= Timer(const Duration(seconds: 8), () {
-            _stallWatchdog = null;
-            if (!state.isBuffering) return; // recovered on its own
-            if (_isStallRecovering) return; // already recovering
-            if (state.isOpening) return; // do not interrupt initial video startup
-            final currentPos = _player.state.position;
-            // Only fire if position genuinely hasn't advanced (not just slow seeking)
-            final posAdvanced = (currentPos - _stallWatchdogLastPos).abs() >
-                const Duration(milliseconds: 500);
-            if (!posAdvanced && state.isBuffering) {
-              AppLogger.w(
-                'Stall watchdog fired: buffering >8s, pos unchanged. '
-                'Notifying for alternate stream recovery at ${currentPos.inSeconds}s',
-              );
-              _isStallRecovering = true;
-              try {
-                _onStall?.call(currentPos);
-              } finally {
-                Timer(const Duration(seconds: 10), () {
-                  _isStallRecovering = false;
-                });
-              }
-            }
-          });
-        } else {
+        if (!buf) {
           // Buffer recovered — cancel watchdog
-          _stallWatchdog?.cancel();
-          _stallWatchdog = null;
-          _isStallRecovering = false;
         }
       }),
     );
@@ -311,14 +277,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           _startupTimer?.cancel();
           _startupTimer = null;
           // Clear stall state when playback actually resumes
-          _stallWatchdog?.cancel();
-          _stallWatchdog = null;
-          _isStallRecovering = false;
         }
-        state = state.copyWith(
-          isPlaying: play,
-          isOpening: play ? false : null,
-        );
+        state = state.copyWith(isPlaying: play, isOpening: play ? false : null);
       }),
     );
 
@@ -337,17 +297,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     );
   }
 
-  // Callback set by episode_stream_provider to receive stall notifications
-  void Function(Duration position)? _onStall;
-
-  void setStallCallback(void Function(Duration position)? callback) {
-    _onStall = callback;
-  }
-
   void _dispose() {
     _seekTimeout?.cancel();
     _startupTimer?.cancel();
-    _stallWatchdog?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
@@ -361,7 +313,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     String? mediaId,
     int? episode,
   }) async {
-    final isSameSession = (mediaId != null &&
+    final isSameSession =
+        (mediaId != null &&
             episode != null &&
             mediaId == _activeMediaId &&
             episode == _activeEpisode) ||
@@ -369,11 +322,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     // If startAt is explicitly provided, use it. Otherwise, if reopening the same media & episode,
     // preserve the last stable playback position so we don't restart from beginning on stream recovery/reload.
-    final effectiveStartAt = (startAt != null && startAt > Duration.zero)
-        ? startAt
-        : (isSameSession && _lastStablePosition > Duration.zero
-            ? _lastStablePosition
-            : null);
+    final effectiveStartAt =
+        (startAt != null && startAt > Duration.zero)
+            ? startAt
+            : (isSameSession && _lastStablePosition > Duration.zero
+                ? _lastStablePosition
+                : null);
 
     if (mediaId != null) _activeMediaId = mediaId;
     if (episode != null) _activeEpisode = episode;
@@ -387,7 +341,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     state = state.copyWith(
       isOpening: true,
       clearPlaybackError: true,
-      position: effectiveStartAt ?? (isSameSession ? _lastStablePosition : Duration.zero),
+      position:
+          effectiveStartAt ??
+          (isSameSession ? _lastStablePosition : Duration.zero),
       duration: isSameSession ? state.duration : Duration.zero,
     );
     _startupTimer?.cancel();
@@ -401,41 +357,36 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     });
     try {
       final platform = _player.platform as dynamic;
-      // ── Step 1: UA and Referer via MPV dedicated properties ───────────────
-      final ua = effectiveHeaders.entries
+      // ── Set UA, Referer, and http-header-fields concurrently in 1 roundtrip ──
+      final ua =
+          effectiveHeaders.entries
               .firstWhereOrNull(
                 (entry) => entry.key.toLowerCase() == 'user-agent',
               )
               ?.value ??
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-      final refValue = effectiveHeaders.entries
+      final refValue =
+          effectiveHeaders.entries
               .firstWhereOrNull((entry) => entry.key.toLowerCase() == 'referer')
               ?.value ??
           '';
-      await platform.setProperty('user-agent', ua);
-      if (refValue.isNotEmpty) {
-        await platform.setProperty('referrer', refValue);
-      }
-
-      // ── Step 2: http-header-fields WITHOUT UA / Referer ─────────────────
-      // Sending these in http-header-fields on top of the dedicated properties
-      // causes duplicate headers that break HLS auth on many CDNs.
       const dedicatedHeaders = {'user-agent', 'referer', 'referrer'};
       final forwardedHeaders = effectiveHeaders.entries
           .where((e) => !dedicatedHeaders.contains(e.key.toLowerCase()))
           .map((e) => '${e.key}: ${e.value}')
           .join(',');
-      if (forwardedHeaders.isNotEmpty) {
-        await platform.setProperty('http-header-fields', forwardedHeaders);
-      }
 
-      // ── Step 3: Stream-ready readahead & instant startup ─────────────────
-      // Never pause on frame 0 — start playing immediately.
-      // Background readahead aggressively buffers 120s ahead into RAM.
-      await platform.setProperty('cache-pause-initial', 'no');
-      await platform.setProperty('cache-pause-wait', '2');
-      await platform.setProperty('demuxer-readahead-secs', '120');
-      await platform.setProperty('cache-secs', '300');
+      final headerFutures = <Future>[];
+      headerFutures.add(platform.setProperty('user-agent', ua));
+      if (refValue.isNotEmpty) {
+        headerFutures.add(platform.setProperty('referrer', refValue));
+      }
+      if (forwardedHeaders.isNotEmpty) {
+        headerFutures.add(
+          platform.setProperty('http-header-fields', forwardedHeaders),
+        );
+      }
+      await Future.wait(headerFutures);
     } catch (_) {}
     await _player.open(
       Media(url, httpHeaders: effectiveHeaders, start: effectiveStartAt),
@@ -447,9 +398,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     final url = _lastUrl;
     if (url == null) return;
     final currentPos = _player.state.position;
-    final pos = currentPos > Duration.zero
-        ? currentPos
-        : (_lastStablePosition > Duration.zero ? _lastStablePosition : null);
+    final pos =
+        currentPos > Duration.zero
+            ? currentPos
+            : (_lastStablePosition > Duration.zero
+                ? _lastStablePosition
+                : null);
     await open(
       url,
       pos,

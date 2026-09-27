@@ -11,11 +11,10 @@ import 'package:ani_dash/main.dart';
 import 'package:ani_dash/core/repositories/interfaces/watch_progress_repository_interface.dart';
 import 'package:ani_dash/shared/providers/incognito_provider.dart';
 
-final watchProgressRepositoryProvider = Provider<WatchProgressRepositoryInterface>((
-  ref,
-) {
-  return WatchProgressRepository();
-});
+final watchProgressRepositoryProvider =
+    Provider<WatchProgressRepositoryInterface>((ref) {
+      return WatchProgressRepository();
+    });
 
 final watchProgressStreamProvider =
     StreamProvider.autoDispose<List<AnimeWatchProgressEntry>>((ref) {
@@ -83,13 +82,19 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   Future<void> migrateFromHive() async {
     try {
       final isarCount = isar.isarAnimeWatchProgress.countSync();
-      if (sharedPrefs.getBool('migrated_watch_progress_isar') == true && isarCount > 0) return;
+      if (sharedPrefs.getBool('migrated_watch_progress_isar') == true &&
+          isarCount > 0) {
+        return;
+      }
 
       AppLogger.i('Starting migration of watch progress to Isar...');
 
-      final box = Hive.isBoxOpen('anime_watch_progress')
-          ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
-          : await Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress');
+      final box =
+          Hive.isBoxOpen('anime_watch_progress')
+              ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
+              : await Hive.openBox<AnimeWatchProgressEntry>(
+                'anime_watch_progress',
+              );
 
       if (box.isEmpty) {
         await sharedPrefs.setBool('migrated_watch_progress_isar', true);
@@ -97,24 +102,24 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       }
 
       final entries = box.values.toList();
-      final isarEntries = entries
-          .map(
-            (e) => IsarAnimeWatchProgress(
-              id: fastHash(e.animeId),
-              animeId: e.animeId,
-              animeTitle: e.animeTitle,
-              animeFormat: e.animeFormat,
-              animeCover: e.animeCover,
-              totalEpisodes: e.totalEpisodes,
-              lastUpdated: e.lastUpdated,
-              currentEpisode: e.currentEpisode,
-              status: e.status,
-              episodesProgress: e.episodesProgress.values
-                  .map(_toIsarProgress)
-                  .toList(),
-            ),
-          )
-          .toList();
+      final isarEntries =
+          entries
+              .map(
+                (e) => IsarAnimeWatchProgress(
+                  id: fastHash(e.animeId),
+                  animeId: e.animeId,
+                  animeTitle: e.animeTitle,
+                  animeFormat: e.animeFormat,
+                  animeCover: e.animeCover,
+                  totalEpisodes: e.totalEpisodes,
+                  lastUpdated: e.lastUpdated,
+                  currentEpisode: e.currentEpisode,
+                  status: e.status,
+                  episodesProgress:
+                      e.episodesProgress.values.map(_toIsarProgress).toList(),
+                ),
+              )
+              .toList();
 
       await isar.writeTxn(() async {
         await isar.isarAnimeWatchProgress.putAll(isarEntries);
@@ -135,7 +140,8 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   }
 
   Future<void> markAdultAnimeId(String animeId) async {
-    final adultIds = (sharedPrefs.getStringList('adult_anime_ids') ?? []).toSet();
+    final adultIds =
+        (sharedPrefs.getStringList('adult_anime_ids') ?? []).toSet();
     if (!adultIds.contains(animeId)) {
       adultIds.add(animeId);
       await sharedPrefs.setStringList('adult_anime_ids', adultIds.toList());
@@ -181,9 +187,8 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         lastUpdated: entry.lastUpdated,
         currentEpisode: entry.currentEpisode,
         status: entry.status,
-        episodesProgress: entry.episodesProgress.values
-            .map(_toIsarProgress)
-            .toList(),
+        episodesProgress:
+            entry.episodesProgress.values.map(_toIsarProgress).toList(),
       );
 
       await isar.writeTxn(() async {
@@ -192,24 +197,34 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
 
       // Dual-write to Hive to prevent data loss
       try {
-        final box = Hive.isBoxOpen('anime_watch_progress')
-            ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
-            : await Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress');
+        final box =
+            Hive.isBoxOpen('anime_watch_progress')
+                ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
+                : await Hive.openBox<AnimeWatchProgressEntry>(
+                  'anime_watch_progress',
+                );
         await box.put(entry.animeId, entry);
       } catch (_) {}
 
       // Cache to SharedPreferences for background notification worker
       try {
-        final currentTracked = sharedPrefs.getString('cached_tracked_anime_map');
-        final map = currentTracked != null && currentTracked.isNotEmpty
-            ? (jsonDecode(currentTracked) as Map<String, dynamic>)
-            : <String, dynamic>{};
-        if (entry.isCompletedOrFinished || entry.status.toLowerCase() == 'completed') {
+        final currentTracked = sharedPrefs.getString(
+          'cached_tracked_anime_map',
+        );
+        final map =
+            currentTracked != null && currentTracked.isNotEmpty
+                ? (jsonDecode(currentTracked) as Map<String, dynamic>)
+                : <String, dynamic>{};
+        if (entry.isCompletedOrFinished ||
+            entry.status.toLowerCase() == 'completed') {
           map.remove(entry.animeId);
         } else {
           map[entry.animeId] = entry.animeTitle;
         }
-        await sharedPrefs.setString('cached_tracked_anime_map', jsonEncode(map));
+        await sharedPrefs.setString(
+          'cached_tracked_anime_map',
+          jsonEncode(map),
+        );
       } catch (_) {}
 
       AppLogger.d(
@@ -270,14 +285,16 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     final isarEntries = isar.isarAnimeWatchProgress.where().findAllSync();
     if (isarEntries.isEmpty) {
       try {
-        final box = Hive.isBoxOpen('anime_watch_progress')
-            ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
-            : null;
+        final box =
+            Hive.isBoxOpen('anime_watch_progress')
+                ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
+                : null;
         if (box != null && box.isNotEmpty) {
-          final hiveList = box.values.map((e) {
-            final lastPlayed = _getLastPlayed(e.animeId) ?? e.lastPlayedAt;
-            return e.copyWith(lastPlayedAt: lastPlayed);
-          }).toList();
+          final hiveList =
+              box.values.map((e) {
+                final lastPlayed = _getLastPlayed(e.animeId) ?? e.lastPlayedAt;
+                return e.copyWith(lastPlayedAt: lastPlayed);
+              }).toList();
           migrateFromHive();
           return hiveList;
         }
@@ -316,8 +333,6 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
   }) async {
     var entry = getProgress(animeId);
     final now = DateTime.now();
-    final existingLastPlayed = entry?.lastPlayedAt ?? _getLastPlayed(animeId);
-    final effectiveLastPlayed = isLocalPlayback ? now : existingLastPlayed;
 
     entry ??= AnimeWatchProgressEntry(
       animeId: animeId,
@@ -326,7 +341,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       animeCover: '',
       totalEpisodes: 0,
       lastUpdated: now,
-      lastPlayedAt: effectiveLastPlayed,
+      lastPlayedAt: now,
       currentEpisode: episodeProgress.episodeNumber,
       episodesProgress: {},
     );
@@ -342,23 +357,26 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       episodeThumbnail: episodeProgress.episodeThumbnail ?? existingThumb,
     );
 
-    final isEpCompleted = episodeProgress.isCompleted ||
+    final isEpCompleted =
+        episodeProgress.isCompleted ||
         ((episodeProgress.durationInSeconds ?? 0) > 0 &&
             (episodeProgress.progressInSeconds ?? 0) /
                     episodeProgress.durationInSeconds! >=
                 0.90);
-    final isAllWatched = entry.totalEpisodes > 0 &&
-        episodeProgress.episodeNumber >= entry.totalEpisodes &&
-        isEpCompleted;
+    final format = entry.animeFormat?.toUpperCase();
+    final isOneShot =
+        format == 'MOVIE' || format == 'SPECIAL' || format == 'OVA';
+    final isAllWatched = isOneShot && isEpCompleted;
 
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
       lastUpdated: now,
-      lastPlayedAt: effectiveLastPlayed,
+      lastPlayedAt: now,
       currentEpisode: episodeProgress.episodeNumber,
-      status: isAllWatched ? 'completed' : entry.status,
+      status: isAllWatched ? 'completed' : 'watching',
     );
 
+    await _setLastPlayed(animeId, now);
     await saveProgress(updatedEntry);
   }
 
@@ -370,12 +388,16 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     String? animeCover,
     String? animeFormat,
   }) async {
+    final now = DateTime.now();
     final entry = getProgress(animeId);
     if (entry != null) {
       final updated = entry.copyWith(
         currentEpisode: currentEpisode,
-        lastPlayedAt: entry.lastPlayedAt,
+        lastPlayedAt: now,
+        lastUpdated: now,
+        status: 'watching',
       );
+      await _setLastPlayed(animeId, now);
       await saveProgress(updated);
     } else if (animeTitle != null && animeTitle.isNotEmpty) {
       final newEntry = AnimeWatchProgressEntry(
@@ -384,8 +406,9 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         animeFormat: animeFormat,
         animeCover: animeCover ?? '',
         totalEpisodes: 0,
-        lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
-        lastPlayedAt: null,
+        lastUpdated: now,
+        lastPlayedAt: now,
+        status: 'watching',
         currentEpisode: currentEpisode,
         episodesProgress: {
           currentEpisode: EpisodeProgress(
@@ -395,10 +418,11 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
             progressInSeconds: 0,
             durationInSeconds: 1440,
             isCompleted: false,
-            watchedAt: DateTime.fromMillisecondsSinceEpoch(0),
+            watchedAt: now,
           ),
         },
       );
+      await _setLastPlayed(animeId, now);
       await saveProgress(newEntry);
     }
   }
@@ -436,13 +460,15 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         episodeTitle: existing?.episodeTitle ?? 'Episode $i',
         episodeThumbnail: existing?.episodeThumbnail,
         isCompleted: true,
-        watchedAt: existing?.watchedAt ?? DateTime.fromMillisecondsSinceEpoch(0),
+        watchedAt:
+            existing?.watchedAt ?? DateTime.fromMillisecondsSinceEpoch(0),
       );
     }
 
-    final effectiveTotal = (totalEpisodes != null && totalEpisodes > 0)
-        ? totalEpisodes
-        : entry.totalEpisodes;
+    final effectiveTotal =
+        (totalEpisodes != null && totalEpisodes > 0)
+            ? totalEpisodes
+            : entry.totalEpisodes;
     final isAllWatched =
         effectiveTotal > 0 && upToEpisodeNumber >= effectiveTotal;
 
@@ -478,7 +504,10 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       if (currentTracked != null && currentTracked.isNotEmpty) {
         final map = jsonDecode(currentTracked) as Map<String, dynamic>;
         map.remove(animeId);
-        await sharedPrefs.setString('cached_tracked_anime_map', jsonEncode(map));
+        await sharedPrefs.setString(
+          'cached_tracked_anime_map',
+          jsonEncode(map),
+        );
       }
     } catch (_) {}
     AppLogger.d('Deleted progress for anime: $animeId');

@@ -205,12 +205,14 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
     final (pos, dur, buf) = ref.watch(
       playerStateProvider.select((p) => (p.position, p.duration, p.buffer)),
     );
-    final max = dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1.0;
-    final value = (_draggedValue ?? pos.inMilliseconds.toDouble()).clamp(
-      0,
-      max,
-    );
-    final buffer = buf.inMilliseconds.toDouble().clamp(0, max);
+    final hasDuration = dur.inMilliseconds > 0;
+    final max = hasDuration ? dur.inMilliseconds.toDouble() : 1.0;
+    final value =
+        hasDuration
+            ? (_draggedValue ?? pos.inMilliseconds.toDouble()).clamp(0, max)
+            : 0.0;
+    final buffer =
+        hasDuration ? buf.inMilliseconds.toDouble().clamp(0, max) : 0.0;
     final isDragging = _draggedValue != null;
 
     return LayoutBuilder(
@@ -219,6 +221,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
           behavior: HitTestBehavior.opaque,
           onHorizontalDragStart: (details) => widget.onInteraction(),
           onHorizontalDragUpdate: (details) {
+            if (!hasDuration) return;
             final percent = (details.localPosition.dx / constraints.maxWidth)
                 .clamp(0.0, 1.0);
             setState(() {
@@ -237,6 +240,7 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
             }
           },
           onTapDown: (details) {
+            if (!hasDuration) return;
             final percent = (details.localPosition.dx / constraints.maxWidth)
                 .clamp(0.0, 1.0);
             ref
@@ -453,7 +457,8 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
       playerStateProvider.select((p) => (p.position, p.duration)),
     );
 
-    final remaining = dur > pos ? dur - pos : Duration.zero;
+    final hasDuration = dur > Duration.zero;
+    final remaining = hasDuration && dur > pos ? dur - pos : Duration.zero;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -483,7 +488,9 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
               ),
               TextSpan(
                 text:
-                    _showRemainingTime
+                    !hasDuration
+                        ? '--:--'
+                        : _showRemainingTime
                         ? '-${formatDuration(remaining)}'
                         : formatDuration(dur),
                 style: TextStyle(
@@ -507,7 +514,6 @@ class _BottomControlsState extends ConsumerState<BottomControls> {
 class _ToolbarIcon extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
-
 
   const _ToolbarIcon({required this.icon, this.onTap});
 

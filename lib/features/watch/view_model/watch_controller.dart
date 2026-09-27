@@ -19,6 +19,7 @@ import 'package:ani_dash/features/watch/view_model/watch_progress_notifier.dart'
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/sync_settings_notifier.dart';
+import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
 import 'package:ani_dash/features/watch/view_model/next_episode_prompt_provider.dart';
 
 part 'watch_controller.g.dart';
@@ -236,7 +237,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _isPlayerReady = false;
     _epNum = initialEpisode;
 
-    // Immediately update currentEpisode in repository so Continue Watching is updated on tap
+    // Immediately restore if previously dismissed and update repository so Continue Watching jumps to #1
+    ref
+        .read(continueWatchingDismissedProvider.notifier)
+        .restoreIfWatched(mediaId);
     ref
         .read(watchProgressRepositoryProvider)
         .updateCurrentEpisode(
@@ -248,7 +252,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         );
 
     final playerNotifier = ref.read(playerStateProvider.notifier);
-    final isAlreadyLoaded = !forceRefetch &&
+    final isAlreadyLoaded =
+        !forceRefetch &&
         playerNotifier.isCurrentEpisodeLoaded(
           mediaId: mediaId,
           episode: initialEpisode,
@@ -307,7 +312,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       if (savedSeconds > 0 &&
           !(savedDuration > 0 && savedSeconds >= savedDuration - 20)) {
         startAt = Duration(seconds: savedSeconds);
-        AppLogger.i('Resuming episode $initialEpisode at ${startAt.inSeconds}s');
+        AppLogger.i(
+          'Resuming episode $initialEpisode at ${startAt.inSeconds}s',
+        );
       }
     }
 
@@ -347,9 +354,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       // Halt playback if "Stop after this episode" is enabled.
       if (ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
         AppLogger.i('Stop After This Episode active: Halting auto-advance.');
-        ref.read(playerSettingsProvider.notifier).updateSettings(
-          (s) => s.copyWith(stopAfterCurrentEpisode: false),
-        );
+        ref
+            .read(playerSettingsProvider.notifier)
+            .updateSettings((s) => s.copyWith(stopAfterCurrentEpisode: false));
         ref.read(playerStateProvider.notifier).pause();
         return;
       }
@@ -542,7 +549,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     if (newThumb != null) _epThumb = newThumb;
   }
 
-  Future<void> saveProgressManual({bool takeScreenshot = false, bool force = false}) async {
+  Future<void> saveProgressManual({
+    bool takeScreenshot = false,
+    bool force = false,
+  }) async {
     if (_isDisposed) return;
     await _triggerSave(takeScreenshot: takeScreenshot, force: force);
   }
