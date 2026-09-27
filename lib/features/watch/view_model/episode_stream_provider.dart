@@ -228,9 +228,16 @@ class EpisodeData extends _$EpisodeData {
           ) ??
           state.servers.firstWhereOrNull((s) => s.isDub == preferDub);
       currentServer = matching ?? currentServer.copyWith(isDub: preferDub);
-    } else if (currentServer == null && state.servers.isNotEmpty) {
-      currentServer = state.servers.firstWhereOrNull(
-        (s) => s.isDub == preferDub,
+    } else if (currentServer == null) {
+      if (state.servers.isNotEmpty) {
+        currentServer = state.servers.firstWhereOrNull(
+          (s) => s.isDub == preferDub,
+        );
+      }
+      currentServer ??= ServerData(
+        id: preferDub ? 'anineko' : 'megaplay',
+        name: preferDub ? 'Neko (DUB)' : 'Momo (HLS)',
+        isDub: preferDub,
       );
     }
 
@@ -1027,14 +1034,16 @@ class EpisodeData extends _$EpisodeData {
               return;
             } catch (_) {}
           }
-          // All alternate sources exhausted — try next available server
+          // All alternate sources exhausted — try next available server with matching audio type (DUB/SUB)
           final servers = state.servers;
           final currentServer = state.selectedServer;
+          final preferDub = ref.read(playerSettingsProvider).preferDub;
+          final targetDub = currentServer?.isDub ?? preferDub;
           if (servers.length > 1) {
             for (var s = 0; s < servers.length; s++) {
-              if (servers[s].id != currentServer?.id) {
+              if (servers[s].id != currentServer?.id && servers[s].isDub == targetDub) {
                 try {
-                  AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id}');
+                  AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id} (Dub: ${servers[s].isDub})');
                   await changeServer(servers[s]);
                   return;
                 } catch (_) {}
@@ -1117,6 +1126,46 @@ class EpisodeData extends _$EpisodeData {
           final targetId = (_effectiveProvider?.providerName == 'justanime')
               ? _justAnimeId
               : (_epList.animeId ?? '');
+
+          // 1. Try all other available DUB servers first!
+          final altDubServers = state.servers
+              .where((s) => s.isDub && s.id != state.selectedServer?.id)
+              .toList();
+          for (final altDub in altDubServers) {
+            try {
+              final dubFallback = await _effectiveProvider!
+                  .getSources(
+                    targetId,
+                    epModel.id ?? epNum.toString(),
+                    altDub.id,
+                    'dub',
+                  )
+                  .timeout(const Duration(seconds: 10));
+              if (dubFallback.sources.any((s) => s.isDub)) {
+                if (activeGeneration != _loadGeneration) return;
+                ref
+                    .read(aniSkipProvider.notifier)
+                    .setFallbackFromSource(
+                      intro: dubFallback.intro,
+                      outro: dubFallback.outro,
+                    );
+                state = state.copyWith(
+                  selectedServer: altDub,
+                  sources: dubFallback.sources,
+                  subtitles: [Subtitle(lang: 'None'), ...dubFallback.tracks],
+                  headers: dubFallback.headers?.cast<String, String>(),
+                );
+                await _loadSourceStream(
+                  0,
+                  startAt: recoveryStartAt,
+                  generation: activeGeneration,
+                );
+                return;
+              }
+            } catch (_) {}
+          }
+
+          // 2. Only if ALL DUB servers failed, fall back to Japanese SUB with notice
           final subFallback = await _effectiveProvider!
               .getSources(
                 targetId,

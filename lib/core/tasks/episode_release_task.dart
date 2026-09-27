@@ -117,6 +117,9 @@ class EpisodeReleaseTask {
 
       final allProgress = box?.values.toList() ?? [];
       final relevantEntries = allProgress.where((e) {
+        if (e.isCompletedOrFinished || e.status.toLowerCase() == 'completed') {
+          return false;
+        }
         return e.status == 'watching' || e.currentEpisode > 0;
       }).toList();
 
@@ -381,8 +384,20 @@ class EpisodeReleaseTask {
       // 4. Continue Watching Reminders (cooldown of 7 days)
       // -------------------------------------------------------------
       if (enableContinueWatching) {
-        for (final entry in relevantEntries.where((e) => e.status == 'watching')) {
-          final lastWatched = entry.lastUpdated;
+        for (final entry in relevantEntries) {
+          if (entry.isCompletedOrFinished ||
+              entry.status.toLowerCase() == 'completed') {
+            continue;
+          }
+          final currentEpProgress = entry.episodesProgress[entry.currentEpisode];
+          if (currentEpProgress?.isCompleted == true) {
+            continue;
+          }
+          if (entry.totalEpisodes > 0 &&
+              entry.currentEpisode >= entry.totalEpisodes) {
+            continue;
+          }
+          final lastWatched = entry.lastUpdated ?? entry.lastPlayedAt;
           if (lastWatched != null &&
               DateTime.now().difference(lastWatched).inDays >= 2) {
             final reminderKey =

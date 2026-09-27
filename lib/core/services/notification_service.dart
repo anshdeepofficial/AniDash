@@ -327,6 +327,63 @@ class NotificationService {
     );
   }
 
+  Future<void> _safeShow(
+    int id,
+    String title,
+    String body,
+    NotificationDetails details, {
+    String? payload,
+    String? channelBaseId,
+    String? channelName,
+    String? channelDescription,
+    StyleInformation? styleInformation,
+  }) async {
+    try {
+      await flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        details,
+        payload: payload,
+      );
+    } catch (e, st) {
+      AppLogger.w('Failed to show system notification (trying fallback): $e');
+      if (Platform.isAndroid && channelBaseId != null) {
+        try {
+          final fallbackDetails = NotificationDetails(
+            android: AndroidNotificationDetails(
+              channelBaseId,
+              channelName ?? 'AniDash Notifications',
+              channelDescription: channelDescription ?? 'AniDash Alerts',
+              importance: Importance.max,
+              priority: Priority.max,
+              playSound: true,
+              enableVibration: true,
+              icon: '@mipmap/ic_launcher',
+              color: _brandColor,
+              styleInformation: styleInformation ??
+                  BigTextStyleInformation(
+                    body,
+                    contentTitle: title,
+                  ),
+              visibility: NotificationVisibility.public,
+            ),
+          );
+          await flutterLocalNotificationsPlugin.show(
+            id,
+            title,
+            body,
+            fallbackDetails,
+            payload: payload,
+          );
+          AppLogger.success('Fallback system notification posted successfully');
+        } catch (e2) {
+          AppLogger.e('Fallback system notification also failed: $e2', e2, st);
+        }
+      }
+    }
+  }
+
   Future<void> showTestNotification({String? title, String? body}) async {
     await ensureSoundChannelsCreated();
 
@@ -366,20 +423,30 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
+    final styleInfo = BigTextStyleInformation(
+      body,
+      contentTitle: title,
+    );
+
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_news',
         channelName: 'AniDash News',
         channelDescription: 'Notifications for latest anime news',
+        styleInformation: styleInfo,
       ),
     );
 
-    await flutterLocalNotificationsPlugin.show(
+    await _safeShow(
       notifId,
       title,
       body,
       platformChannelSpecifics,
       payload: payload,
+      channelBaseId: 'AniDash_news',
+      channelName: 'AniDash News',
+      channelDescription: 'Notifications for latest anime news',
+      styleInformation: styleInfo,
     );
   }
 
@@ -487,6 +554,12 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
+    final styleInfo = BigTextStyleInformation(
+      body,
+      contentTitle: title,
+      summaryText: isDub || audioType == 'english_dub' ? 'English Dub' : 'Sub',
+    );
+
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_episodes',
@@ -495,15 +568,20 @@ class NotificationService {
             'Notifications when new Sub or Dub episodes are released',
         importance: Importance.max,
         priority: Priority.max,
+        styleInformation: styleInfo,
       ),
     );
 
-    await flutterLocalNotificationsPlugin.show(
+    await _safeShow(
       notifId,
       title,
       body,
       platformChannelSpecifics,
       payload: mediaId != null ? 'details:$mediaId?tab=episodes' : null,
+      channelBaseId: 'AniDash_episodes',
+      channelName: 'Episode Releases',
+      channelDescription: 'Notifications when new Sub or Dub episodes are released',
+      styleInformation: styleInfo,
     );
   }
 
@@ -679,6 +757,11 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
+    final styleInfo = BigTextStyleInformation(
+      body,
+      contentTitle: title,
+    );
+
     final platformChannelSpecifics = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_reminders',
@@ -686,15 +769,20 @@ class NotificationService {
         channelDescription: 'Reminders to continue watching your paused anime',
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
+        styleInformation: styleInfo,
       ),
     );
 
-    await flutterLocalNotificationsPlugin.show(
+    await _safeShow(
       notifId,
       title,
       body,
       platformChannelSpecifics,
       payload: mediaId != null ? 'details:$mediaId?tab=episodes' : '/watchlist',
+      channelBaseId: 'AniDash_reminders',
+      channelName: 'Continue Watching Reminders',
+      channelDescription: 'Reminders to continue watching your paused anime',
+      styleInformation: styleInfo,
     );
   }
 
@@ -721,17 +809,19 @@ class NotificationService {
     );
     await ensureSoundChannelsCreated();
 
+    const styleInfo = BigTextStyleInformation(
+      'A new version has been released on GitHub. Tap to update or snooze.',
+      contentTitle: 'AniDash Update Available',
+      summaryText: 'New version available',
+    );
+
     final details = NotificationDetails(
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_updates',
         channelName: 'App Updates',
         channelDescription:
             'Notifications when a new AniDash version is available',
-        styleInformation: const BigTextStyleInformation(
-          'A new version has been released on GitHub. Tap to update or snooze.',
-          contentTitle: 'AniDash Update Available',
-          summaryText: 'New version available',
-        ),
+        styleInformation: styleInfo,
         actions: const <AndroidNotificationAction>[
           AndroidNotificationAction(
             'update_now',
@@ -754,12 +844,16 @@ class NotificationService {
         ],
       ),
     );
-    await flutterLocalNotificationsPlugin.show(
-      1901,
+    await _safeShow(
+      notifId,
       'AniDash v$version is available',
       'A new version has been released on GitHub. Tap to update or snooze.',
       details,
       payload: 'update:$version',
+      channelBaseId: 'AniDash_updates',
+      channelName: 'App Updates',
+      channelDescription: 'Notifications when a new AniDash version is available',
+      styleInformation: styleInfo,
     );
   }
 

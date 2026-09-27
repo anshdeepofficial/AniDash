@@ -272,24 +272,16 @@ class JustAnimeProvider extends AnimeProvider {
           if (raw != null && (raw['sources'] as List?)?.isNotEmpty == true) {
             actualAudio = 'dub';
           } else {
-            raw = (payload['sub'] ?? payload['hsub']) as Map<String, dynamic>?;
-            if (raw != null) {
-              actualAudio = 'sub';
-            } else {
-              return null;
-            }
+            // When DUB was requested, do NOT silently fall back to SUB for this endpoint!
+            // Return null so candidate endpoints (Zoko, AniNeko, Gigi) that actually have DUB can be tried!
+            return null;
           }
         } else {
           raw = (payload['sub'] ?? payload['hsub']) as Map<String, dynamic>?;
           if (raw != null && (raw['sources'] as List?)?.isNotEmpty == true) {
             actualAudio = 'sub';
           } else {
-            raw = payload['dub'] as Map<String, dynamic>?;
-            if (raw != null) {
-              actualAudio = 'dub';
-            } else {
-              return null;
-            }
+            return null;
           }
         }
       } else {
@@ -428,12 +420,19 @@ class JustAnimeProvider extends AnimeProvider {
       endpoints.add('/watch/$animeId/episode/$episode/animegg');
     }
 
-    // Default priority order: Momo (Megaplay - has exact intro/outro timestamps) > Zoko (ZokoAnime) > Gigi (AnimeGG) > Neko (AniNeko)
+    // Priority order tuned for audio type:
     final priorityEndpoints = [
-      '/watch/$animeId/episode/$episode/megaplay',
-      '/watch/$animeId/episode/$episode/zokoanime',
-      '/watch/$animeId/episode/$episode/animegg',
-      '/watch/$animeId/episode/$episode/anineko/$requestedAudio',
+      if (requestedAudio == 'dub') ...[
+        '/watch/$animeId/episode/$episode/anineko/dub',
+        '/watch/$animeId/episode/$episode/zokoanime',
+        '/watch/$animeId/episode/$episode/megaplay',
+        '/watch/$animeId/episode/$episode/animegg',
+      ] else ...[
+        '/watch/$animeId/episode/$episode/megaplay',
+        '/watch/$animeId/episode/$episode/zokoanime',
+        '/watch/$animeId/episode/$episode/animegg',
+        '/watch/$animeId/episode/$episode/anineko/sub',
+      ],
     ];
     for (final ep in priorityEndpoints) {
       if (!endpoints.contains(ep)) {
@@ -521,6 +520,12 @@ class JustAnimeProvider extends AnimeProvider {
         );
       }
       return resolvedModel;
+    }
+
+    if (requestedAudio == 'dub') {
+      try {
+        return await getSources(animeId, episodeId, serverName, 'sub');
+      } catch (_) {}
     }
 
     throw Exception('No playable JustAnime source found for episode $episode');

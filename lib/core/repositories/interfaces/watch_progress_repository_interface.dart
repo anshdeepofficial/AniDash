@@ -22,6 +22,7 @@ abstract class WatchProgressRepositoryInterface {
     required String animeCover,
     required String animeFormat,
     required int upToEpisodeNumber,
+    int? totalEpisodes,
   });
   Future<void> deleteProgress(String animeId);
   Future<void> deleteEpisodeProgress(String animeId, int episodeNumber);

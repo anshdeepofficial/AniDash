@@ -163,24 +163,26 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       );
     }
 
+    final totalEps = (widget.anime?.episodes != null && widget.anime!.episodes! > 0)
+        ? widget.anime!.episodes!
+        : (currentEntry?.totalEpisodes ?? 0);
     final updatedEntry = (currentEntry ??
             AnimeWatchProgressEntry(
               animeId: animeId,
               animeTitle: animeTitle,
               animeCover: widget.mediaCover,
               animeFormat: widget.mediaFormat,
-              totalEpisodes: _selectedEpisodes.length,
+              totalEpisodes: totalEps,
             ))
         .copyWith(
           episodesProgress: episodesMap,
+          totalEpisodes: totalEps > 0 ? totalEps : null,
           lastUpdated: DateTime.now(),
           currentEpisode: _selectedEpisodes.reduce((a, b) => a > b ? a : b),
         );
 
     final maxEp = _selectedEpisodes.reduce((a, b) => a > b ? a : b);
-    final isAllWatched = updatedEntry.totalEpisodes > 0 &&
-        maxEp >= updatedEntry.totalEpisodes &&
-        watched;
+    final isAllWatched = totalEps > 0 && maxEp >= totalEps && watched;
     final finalUpdatedEntry = updatedEntry.copyWith(
       status: isAllWatched ? 'completed' : (watched ? 'watching' : updatedEntry.status),
     );
@@ -1920,12 +1922,16 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                     'Marks all previous episodes as watched',
                   ),
                   onTap: () async {
+                    final totalEps = (widget.anime?.episodes != null && widget.anime!.episodes! > 0)
+                        ? widget.anime!.episodes!
+                        : ref.read(episodeListProvider).episodes.length;
                     await repo.markPreviousEpisodesWatched(
                       animeId: widget.mediaId,
                       animeTitle: animeTitle,
                       animeCover: widget.mediaCover,
                       animeFormat: widget.mediaFormat,
                       upToEpisodeNumber: epNum,
+                      totalEpisodes: totalEps > 0 ? totalEps : null,
                     );
                     ref
                         .read(watchSyncProvider.notifier)

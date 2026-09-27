@@ -204,7 +204,11 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         final map = currentTracked != null && currentTracked.isNotEmpty
             ? (jsonDecode(currentTracked) as Map<String, dynamic>)
             : <String, dynamic>{};
-        map[entry.animeId] = entry.animeTitle;
+        if (entry.isCompletedOrFinished || entry.status.toLowerCase() == 'completed') {
+          map.remove(entry.animeId);
+        } else {
+          map[entry.animeId] = entry.animeTitle;
+        }
         await sharedPrefs.setString('cached_tracked_anime_map', jsonEncode(map));
       } catch (_) {}
 
@@ -406,6 +410,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     required String animeCover,
     required String animeFormat,
     required int upToEpisodeNumber,
+    int? totalEpisodes,
   }) async {
     var entry = getProgress(animeId);
     entry ??= AnimeWatchProgressEntry(
@@ -413,7 +418,7 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       animeTitle: animeTitle,
       animeFormat: animeFormat,
       animeCover: animeCover,
-      totalEpisodes: 0,
+      totalEpisodes: totalEpisodes ?? 0,
       lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
       lastPlayedAt: null,
       currentEpisode: upToEpisodeNumber,
@@ -435,11 +440,15 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       );
     }
 
+    final effectiveTotal = (totalEpisodes != null && totalEpisodes > 0)
+        ? totalEpisodes
+        : entry.totalEpisodes;
     final isAllWatched =
-        entry.totalEpisodes > 0 && upToEpisodeNumber >= entry.totalEpisodes;
+        effectiveTotal > 0 && upToEpisodeNumber >= effectiveTotal;
 
     final updatedEntry = entry.copyWith(
       episodesProgress: updatedEpisodes,
+      totalEpisodes: effectiveTotal > 0 ? effectiveTotal : entry.totalEpisodes,
       lastPlayedAt: entry.lastPlayedAt,
       currentEpisode: upToEpisodeNumber,
       status: isAllWatched ? 'completed' : entry.status,
@@ -462,6 +471,14 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
       if (Hive.isBoxOpen('anime_watch_progress')) {
         final box = Hive.box<AnimeWatchProgressEntry>('anime_watch_progress');
         await box.delete(animeId);
+      }
+    } catch (_) {}
+    try {
+      final currentTracked = sharedPrefs.getString('cached_tracked_anime_map');
+      if (currentTracked != null && currentTracked.isNotEmpty) {
+        final map = jsonDecode(currentTracked) as Map<String, dynamic>;
+        map.remove(animeId);
+        await sharedPrefs.setString('cached_tracked_anime_map', jsonEncode(map));
       }
     } catch (_) {}
     AppLogger.d('Deleted progress for anime: $animeId');
