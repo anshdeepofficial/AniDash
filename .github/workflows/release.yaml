@@ -45,14 +45,20 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.35.7"
-      - uses: android-actions/setup-android@v3
-        with:
-          ndk-version: 29.0.14033849
+      - name: Configure Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.18.1"
       - name: Configure Android Build
         run: |
-          yes | sdkmanager "cmake;3.18.1"
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           echo "cmake.dir=$ANDROID_HOME/cmake/3.18.1" >> android/local.properties
+          echo "ndk.dir=$ANDROID_HOME/ndk/27.0.12077973" >> android/local.properties
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
           cat <<EOF > android/key.properties
           storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
