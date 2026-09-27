@@ -1,40 +1,27 @@
-# AniDash v1.15.6
+# AniDash v1.15.9 - Streaming Stability Hotfix
 
-AniDash v1.15.6 delivers a comprehensive stability, playback, and visual polish pass across the entire app.
+## 🎬 Playback & Buffering
+- Restored the proven long-form MPV buffering profile that was reduced in v1.15.7.
+- Restored a 180-second cache window, 60-second forward readahead, 2-second underrun recovery buffer, and larger FFmpeg probe/socket buffers.
+- Increased the network timeout back to 20 seconds so transient CDN or cellular/Wi-Fi jitter does not prematurely starve playback.
+- Added sustained-stall recovery: if playback remains buffered without meaningful progress for 8 seconds, AniDash first tries an alternate stream, then an alternate server, while preserving the current timestamp.
 
-### 🌟 What's New & Fixed in v1.15.6
+## 🌐 Stream Headers & HLS Reliability
+- Added case-insensitive normalization for `Referer` / `referrer`, `User-Agent`, `Origin`, and `Cookie`.
+- Removed duplicate User-Agent/Referer forwarding through MPV's generic `http-header-fields` path.
+- Quality options now retain the headers that belong to their own source URL instead of reusing the primary source's headers.
+- HLS master playlists and their media segments now receive consistent provider headers, reducing 403/throttling/reconnect loops on protected CDNs.
 
-#### 🚀 Onboarding & Source Selection
-- **Official Brand Logo**: Restored the high-resolution AniDash app logo on the fresh-install welcome screen.
-- **Categorized Source Selection**: Clearly divided sources into **Extensions & Canonical** and **Hindi Sources** sections.
-- **Independent Provider Persistence**: Global canonical and Hindi source selections are now preserved independently across reboots and source fallbacks.
-- **High-Resolution Provider Icons**: Added dedicated brand icons for AnimeSalt, AnimixStream, AnimeDrive, and AnimeLok across Onboarding, Details, and Settings.
+## 🔄 Recovery & Resume
+- Alternate-stream and alternate-server recovery now resumes from the latest stable playback position instead of falling back to the original start position.
+- Quality changes re-arm the stall watchdog and preserve source-specific headers.
+- Existing v1.15.8 stable-position recovery remains intact.
 
-#### 🎬 Video Player & Playback Engine
-- **JustAnime Momo (Megaplay) Server Priority**: Default streaming server prioritizes Momo with full Intro and Outro skip support.
-- **Strict Media Matching & Season Isolation**: Enforced zero-tolerance title matching to prevent mismatched seasons or spin-offs (e.g., Re:ZERO, MHA, Iruma-kun).
-- **Fail-Closed Playback**: Hindi providers fail closed safely to canonical sources instead of playing incorrect episodes or seasons.
-- **Optimized Slow-Connection Buffering**: Enhanced media_kit cache buffer and readahead settings for seamless playback on constrained network connections.
-- **Jump-to-Time Parsing**: Improved input parsing and formatting to intuitively accept raw digits (`607`, `0607` -> `06:07`, `1234` -> `12:34`).
+## 🛠️ Build Compatibility
+- Pinned FlexColorScheme 8.3.1, the Flutter 3.35-compatible release, so the Android release build uses the updated AppBarThemeData and BottomAppBarThemeData APIs.
 
-#### 🔔 Notification Pipeline & Inbox
-- **Zero-Latency Reactive Badge**: The home notification bell badge updates synchronously (`0ms`) without requiring a manual pull-to-refresh.
-- **Granular Threshold Tracking**: Distinct deduplication tracking for 24-hour, 1-hour, and Released notifications.
-- **Automatic Read Reconciliation**: Opening an anime from notifications or watching the latest episode immediately marks the corresponding notifications as read.
+## 🧪 Validation
+- Added regression tests for mixed-case/duplicate provider headers and fallback Referer generation.
+- Android release build runs the stream-header regression test before producing signed split APKs.
 
-#### 🧭 Franchise & Watch Order Hierarchy
-- **Chronological Franchise Traversal**: Recursive graph resolution correctly links prequels and sequels across multi-season anime (e.g., *Welcome to Demon School! Iruma-kun* S1–S4).
-- **Accurate Season Chips**: Explicit labeling for final arcs and seasons (e.g., *My Hero Academia: Final Season* / Season 8).
-- **Refined Extras & Specials**: Clean separation of OVAs/specials from main canon storylines with expandable lists.
-
-#### 📊 Continue Watching & Progress Sync
-- **Instant Completion Removal**: Fully watched anime (e.g., episode 1/1, 2/2, 12/12) are instantly removed from Continue Watching without latency.
-- **Sync Protection**: Remote cloud/tracker synchronizations preserve local completion states and prevent re-adding completed media.
-
----
-
-**Release Details:**
-- **Package**: `com.anidash.anime`
-- **Version Name**: `1.15.6`
-- **Version Code**: `90`
-- **Build Artifact**: `AniDash-v1.15.6-Universal.apk`
+**Version:** 1.15.9 (93)

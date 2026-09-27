@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/utils/stream_headers.dart';
 
 part 'player_provider.g.dart';
 
@@ -191,6 +192,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'correct-pts': 'yes',
       'video-sync': 'audio',            // Audio-locked sync; prevents A/V drift on slow segments
       'vd-lavc-fast': 'yes',
+      'video-sync': 'audio',
     };
 
     final platform = _player.platform as dynamic;
@@ -374,17 +376,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       _lastStablePosition = effectiveStartAt;
     }
 
-    final effectiveHeaders = <String, String>{
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      ...?headers,
-    };
-    if (effectiveHeaders['Referer']?.isNotEmpty != true) {
-      final uri = Uri.tryParse(url);
-      if (uri != null && uri.scheme.startsWith('http')) {
-        effectiveHeaders['Referer'] = '${uri.scheme}://${uri.host}/';
-      }
-    }
+    final effectiveHeaders = normalizeStreamHeaders(url, headers);
     _lastUrl = url;
     _lastHeaders = effectiveHeaders;
     state = state.copyWith(
@@ -424,12 +416,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       // Sending these in http-header-fields on top of the dedicated properties
       // causes duplicate headers that break HLS auth on many CDNs.
       const dedicatedHeaders = {'user-agent', 'referer', 'origin'};
-      final allHeaderFields = effectiveHeaders.entries
+      final forwardedHeaders = effectiveHeaders.entries
           .where((e) => !dedicatedHeaders.contains(e.key.toLowerCase()))
           .map((e) => '${e.key}: ${e.value}')
           .join(',');
-      if (allHeaderFields.isNotEmpty) {
-        await platform.setProperty('http-header-fields', allHeaderFields);
+      if (forwardedHeaders.isNotEmpty) {
+        await platform.setProperty('http-header-fields', forwardedHeaders);
       }
 
       // ── Step 3: Adaptive speed probe — tune MPV for network conditions ───

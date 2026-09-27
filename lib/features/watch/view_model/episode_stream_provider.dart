@@ -157,6 +157,10 @@ class EpisodeDataState {
 @Riverpod(keepAlive: true)
 class EpisodeData extends _$EpisodeData {
   int _loadGeneration = 0;
+  Timer? _stallWatchdog;
+  Duration _watchdogPosition = Duration.zero;
+  DateTime? _bufferingSince;
+  bool _stallRecoveryInProgress = false;
   EpisodeListState get _epList => ref.read(episodeListProvider);
   ExperimentalFeaturesModel get _exp => ref.read(experimentalProvider);
   AnimeProvider? get _provider => ref.read(selectedAnimeProvider);
@@ -189,7 +193,10 @@ class EpisodeData extends _$EpisodeData {
   }
 
   @override
-  EpisodeDataState build() => const EpisodeDataState();
+  EpisodeDataState build() {
+    ref.onDispose(() => _stallWatchdog?.cancel());
+    return const EpisodeDataState();
+  }
 
   Future<void> loadEpisode({
     required int ep,
@@ -203,6 +210,8 @@ class EpisodeData extends _$EpisodeData {
     }
 
     final generation = ++_loadGeneration;
+    _stallWatchdog?.cancel();
+    _bufferingSince = null;
     _player.setActiveSession(mediaId ?? _epList.animeId, ep);
 
     AppLogger.section('Loading Episode $ep');
@@ -413,6 +422,7 @@ class EpisodeData extends _$EpisodeData {
       mediaId: _epList.animeId,
       episode: state.selectedEpisode,
     );
+    _armStallWatchdog(_loadGeneration);
   }
 
   Future<void> changeSubtitle(int idx) async {
@@ -820,6 +830,9 @@ class EpisodeData extends _$EpisodeData {
 
   void reset() {
     _loadGeneration++;
+    _stallWatchdog?.cancel();
+    _bufferingSince = null;
+    _stallRecoveryInProgress = false;
     state = const EpisodeDataState();
   }
 
@@ -1081,7 +1094,7 @@ class EpisodeData extends _$EpisodeData {
           );
           await _loadSourceStream(
             0,
-            startAt: startAt,
+            startAt: recoveryStartAt,
             generation: activeGeneration,
           );
           return;
@@ -1117,7 +1130,7 @@ class EpisodeData extends _$EpisodeData {
             );
             await _loadSourceStream(
               0,
-              startAt: startAt,
+              startAt: recoveryStartAt,
               generation: activeGeneration,
             );
             return;
@@ -1272,6 +1285,8 @@ class EpisodeData extends _$EpisodeData {
         selectedQualityIdx: qIdx,
       );
 
+      _armStallWatchdog(activeGeneration);
+
       // Light pre-fetch next episode metadata / stream after initial playback is rolling
       if (ref.read(playerSettingsProvider).prefetchNextEpisode) {
         Future.delayed(const Duration(seconds: 4), () {
@@ -1287,8 +1302,17 @@ class EpisodeData extends _$EpisodeData {
             .then((extracted) {
               if (extracted.isNotEmpty) {
                 final merged = [
-                  {'quality': 'Auto', 'url': primarySrc.url},
-                  ...extracted,
+                  {
+                    'quality': 'Auto',
+                    'url': primarySrc.url,
+                    'headers': streamHeaders,
+                  },
+                  ...extracted.map(
+                    (quality) => {
+                      ...quality,
+                      'headers': streamHeaders,
+                    },
+                  ),
                   ...state.qualityOptions.where((q) => q['quality'] != 'Auto'),
                 ];
                 final seenUrls = <String>{};
@@ -1313,6 +1337,113 @@ class EpisodeData extends _$EpisodeData {
       }
     } finally {
       state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
+    }
+  }
+
+
+  void _armStallWatchdog(int generation) {
+    _stallWatchdog?.cancel();
+    _watchdogPosition = ref.read(playerStateProvider).position;
+    _bufferingSince = null;
+
+    _stallWatchdog = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (generation != _loadGeneration) {
+        timer.cancel();
+        return;
+      }
+
+      final playerState = ref.read(playerStateProvider);
+      if (playerState.isOpening ||
+          playerState.isSeeking ||
+          (!playerState.isPlaying && !playerState.isBuffering)) {
+        _watchdogPosition = playerState.position;
+        _bufferingSince = null;
+        return;
+      }
+
+      final advanced =
+          playerState.position - _watchdogPosition >=
+          const Duration(milliseconds: 750);
+      if (advanced) {
+        _watchdogPosition = playerState.position;
+        _bufferingSince = null;
+        return;
+      }
+
+      if (!playerState.isBuffering) {
+        _bufferingSince = null;
+        return;
+      }
+
+      _bufferingSince ??= DateTime.now();
+      if (DateTime.now().difference(_bufferingSince!) >=
+              const Duration(seconds: 8) &&
+          !_stallRecoveryInProgress) {
+        unawaited(_recoverFromSustainedStall(generation));
+      }
+    });
+  }
+
+  Future<void> _recoverFromSustainedStall(int observedGeneration) async {
+    if (_stallRecoveryInProgress || observedGeneration != _loadGeneration) {
+      return;
+    }
+
+    _stallRecoveryInProgress = true;
+    final currentPosition = ref.read(playerStateProvider).position;
+    final recoveryPosition = currentPosition > Duration.zero
+        ? currentPosition
+        : _player.lastStablePosition;
+
+    try {
+      final currentSourceIdx = state.selectedSourceIdx ?? 0;
+      if (currentSourceIdx + 1 < state.sources.length) {
+        final nextGeneration = ++_loadGeneration;
+        AppLogger.w(
+          'Playback stalled for 8s; switching to alternate stream source.',
+        );
+        await _loadSourceStream(
+          currentSourceIdx + 1,
+          startAt: recoveryPosition,
+          generation: nextGeneration,
+        );
+        return;
+      }
+
+      final currentServer = state.selectedServer;
+      final alternateServer = currentServer == null
+          ? null
+          : state.servers.firstWhereOrNull(
+              (server) =>
+                  server.isDub == currentServer.isDub &&
+                  (server.id != currentServer.id ||
+                      server.name != currentServer.name),
+            );
+
+      if (alternateServer != null) {
+        final nextGeneration = ++_loadGeneration;
+        AppLogger.w(
+          'Playback stalled for 8s; switching server to ${alternateServer.name ?? alternateServer.id}.',
+        );
+        state = state.copyWith(selectedServer: alternateServer);
+        await _playCurrent(
+          recoveryPosition,
+          generation: nextGeneration,
+        );
+        return;
+      }
+
+      AppLogger.w(
+        'Playback stalled for 8s with no alternate source/server; reconnecting current stream.',
+      );
+      await _player.retry();
+      _armStallWatchdog(_loadGeneration);
+    } catch (error, stack) {
+      AppLogger.e('Automatic stall recovery failed', error, stack);
+    } finally {
+      _bufferingSince = null;
+      _watchdogPosition = ref.read(playerStateProvider).position;
+      _stallRecoveryInProgress = false;
     }
   }
 

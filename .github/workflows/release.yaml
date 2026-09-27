@@ -18,6 +18,10 @@ on:
         required: false
         default: true
         type: boolean
+  push:
+    branches: [main]
+    paths:
+      - ".github/android_release_request"
 
 permissions:
   contents: write
@@ -41,40 +45,115 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.35.7"
-      - uses: android-actions/setup-android@v3
-        with:
-          ndk-version: 29.0.14033849
-      - name: Configure Android Build
+      - name: Configure Android SDK
         run: |
-          yes | sdkmanager "cmake;3.18.1"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $SDK_ROOT" >&2
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.18.1"
+      - name: Configure Android Build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           echo "cmake.dir=$ANDROID_HOME/cmake/3.18.1" >> android/local.properties
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "ndk.dir=$ANDROID_HOME/ndk/27.0.12077973" >> android/local.properties
+
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is missing."
+            exit 1
+          fi
+          if [ -z "$ANDROID_STORE_PASSWORD" ]; then
+            echo "::error::ANDROID_STORE_PASSWORD is missing."
+            exit 1
+          fi
+
+          SECRET=$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | sed -E 's#^data:[^,]*;base64,##' | tr -d '\r\n ')
+          printf '%s' "$SECRET" | base64 --decode > /tmp/anidash-keystore-first 2>/dev/null || true
+
+          validate_store() {
+            local file="$1"
+            [ -s "$file" ] &&
+            keytool -list -keystore "$file" -storepass "$ANDROID_STORE_PASSWORD" >/dev/null 2>&1
+          }
+
+          if validate_store /tmp/anidash-keystore-first; then
+            cp /tmp/anidash-keystore-first android/app/upload-keystore.jks
+            echo "Android keystore validated after normal Base64 decode."
+          else
+            tr -d '\r\n ' < /tmp/anidash-keystore-first | base64 --decode > /tmp/anidash-keystore-second 2>/dev/null || true
+            if validate_store /tmp/anidash-keystore-second; then
+              cp /tmp/anidash-keystore-second android/app/upload-keystore.jks
+              echo "Android keystore validated after double Base64 decode."
+            else
+              echo "::error::ANDROID_KEYSTORE_BASE64 or ANDROID_STORE_PASSWORD is invalid."
+              exit 1
+            fi
+          fi
+
+          RESOLVED_ALIAS="$ANDROID_KEY_ALIAS"
+          if [ -n "$RESOLVED_ALIAS" ] && ! keytool -list -keystore android/app/upload-keystore.jks -storepass "$ANDROID_STORE_PASSWORD" -alias "$RESOLVED_ALIAS" >/dev/null 2>&1; then
+            RESOLVED_ALIAS=""
+          fi
+
+          if [ -z "$RESOLVED_ALIAS" ]; then
+            RESOLVED_ALIAS=$(keytool -list -v               -keystore android/app/upload-keystore.jks               -storepass "$ANDROID_STORE_PASSWORD" 2>/dev/null |
+              awk -F': ' '/Alias name:/{alias=$2} /Entry type: PrivateKeyEntry/{print alias; exit}')
+          fi
+
+          if [ -z "$RESOLVED_ALIAS" ]; then
+            echo "::error::No PrivateKeyEntry alias could be found in the configured keystore."
+            exit 1
+          fi
+
+          RESOLVED_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_STORE_PASSWORD}"
+
+          mkdir -p /tmp/anidash-signcheck
+          printf 'AniDash signing check' > /tmp/anidash-signcheck/payload.txt
+          (cd /tmp/anidash-signcheck && jar cf check.jar payload.txt)
+          if ! jarsigner             -keystore android/app/upload-keystore.jks             -storepass "$ANDROID_STORE_PASSWORD"             -keypass "$RESOLVED_KEY_PASSWORD"             /tmp/anidash-signcheck/check.jar             "$RESOLVED_ALIAS" >/dev/null 2>&1; then
+            echo "::error::The configured private-key password is missing or invalid."
+            exit 1
+          fi
+
           cat <<EOF > android/key.properties
-          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=$RESOLVED_KEY_PASSWORD
+          keyAlias=$RESOLVED_ALIAS
           storeFile=upload-keystore.jks
           EOF
-          cat <<EOF > keys.json
-          {
-            "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
-            "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
-            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
-            "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
-            "API_URL": "${{ secrets.API_URL }}",
-            "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"
-          }
-          EOF
+          rm -rf /tmp/anidash-keystore-first /tmp/anidash-keystore-second /tmp/anidash-signcheck
+          echo "Android release signing key validated successfully."
+
       - run: flutter pub get
-      - run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
+      - name: Run playback regression tests
+        run: flutter test test/unit/stream_headers_test.dart
+      - name: Build signed universal APK
+        run: |
+          flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
+          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
+          mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/AniDash-v${VERSION}-Universal.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apks
           path: build/app/outputs/flutter-apk/*.apk
 
   build-linux:
-    if: github.event_name == 'push' || github.event.inputs.build_linux == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_linux == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +190,7 @@ jobs:
           path: ShonenX-Linux.zip
 
   build-windows:
-    if: github.event_name == 'push' || github.event.inputs.build_windows == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_windows == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -192,7 +271,11 @@ jobs:
   publish-release:
     needs: [build-android, build-linux, build-windows]
     runs-on: ubuntu-latest
-    if: always()
+    if: >
+      always() &&
+      (needs.build-android.result == 'success' ||
+       needs.build-linux.result == 'success' ||
+       needs.build-windows.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -200,28 +283,30 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Generate Changelog
-        id: changelog
+      - name: Resolve Release Metadata
+        id: release_meta
+        shell: bash
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          git log ${PREVIOUS_TAG:+$PREVIOUS_TAG..}HEAD --pretty=format:'%s' > all_commits.txt
-          TAG_NAME=${GITHUB_REF_NAME}
-          {
-            echo "notes<<EOF"
-            if [[ "$TAG_NAME" == *"debug"* ]]; then echo -e "> [!WARNING]\n> **DEBUG BUILD**";
-            elif [[ "$TAG_NAME" == *"beta"* ]]; then echo -e "> [!IMPORTANT]\n> **BETA RELEASE**";
-            elif [[ "$TAG_NAME" == *"alpha"* ]]; then echo -e "> [!CAUTION]\n> **ALPHA RELEASE**";
-            elif [[ "$TAG_NAME" == *"hotfix"* ]]; then echo -e "> [!NOTE]\n> **HOTFIX RELEASE**"; fi
-            echo -e "\n## Changelog"
-            grep -iE "^(feat|fix|perf|refactor|chore)" all_commits.txt | sed "s/^/- /" || echo "No specific changes tracked."
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
+          TAG="v$VERSION"
+          NOTES_FILE="release_notes_v${VERSION}.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            NOTES_FILE="release_notes.md"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: AniDash ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          body_path: ${{ steps.release_meta.outputs.notes_file }}
+          make_latest: true
           files: |
             artifacts/**/*.apk
             artifacts/**/*.zip
             artifacts/**/*.exe
-          body: ${{ steps.changelog.outputs.notes }}
           token: ${{ secrets.GITHUB_TOKEN }}
