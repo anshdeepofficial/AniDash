@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:hive_ce/hive.dart';
+import 'package:ani_dash/hive/hive_registrar.g.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,10 +72,37 @@ class EpisodeReleaseTask {
 
       await NotificationService().initialize(isBackground: !isManual);
 
-      // Open Hive box for local watch progress
+      final relevantMediaIds = <int>{};
+      final mediaTitlesById = <int, String>{};
+
+      // 1. SharedPreferences cache (most reliable across background isolates without DB locks)
+      try {
+        final cachedTracked = pref.getString('cached_tracked_anime_map');
+        if (cachedTracked != null && cachedTracked.isNotEmpty) {
+          final decoded = jsonDecode(cachedTracked) as Map<String, dynamic>;
+          for (final entry in decoded.entries) {
+            final id = int.tryParse(entry.key);
+            if (id != null) {
+              relevantMediaIds.add(id);
+              mediaTitlesById[id] = entry.value.toString();
+            }
+          }
+        }
+        final lastPlayedRaw = pref.getString('anime_last_played_at_map');
+        if (lastPlayedRaw != null && lastPlayedRaw.isNotEmpty) {
+          final decoded = jsonDecode(lastPlayedRaw) as Map<String, dynamic>;
+          for (final key in decoded.keys) {
+            final id = int.tryParse(key);
+            if (id != null) relevantMediaIds.add(id);
+          }
+        }
+      } catch (_) {}
+
+      // 2. Open Hive box for local watch progress (with adapter registration)
       try {
         final appDir = await getApplicationSupportDirectory();
         Hive.init(p.join(appDir.path, 'AniDash', 'appdata'));
+        Hive.registerAdapters();
         if (!Hive.isBoxOpen('anime_watch_progress')) {
           await Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress');
         }
@@ -92,8 +120,6 @@ class EpisodeReleaseTask {
         return e.status == 'watching' || e.currentEpisode > 0;
       }).toList();
 
-      final relevantMediaIds = <int>{};
-      final mediaTitlesById = <int, String>{};
       for (final e in relevantEntries) {
         final id = int.tryParse(e.animeId);
         if (id != null) {
@@ -102,19 +128,19 @@ class EpisodeReleaseTask {
         }
       }
 
-      // Check last successful check time
+      // Check last successful check time — scan past 24 to 48 hours to never miss releases
       final lastCheckEpoch = pref.getInt(keyLastCheck);
       final int startWindow;
       if (lastCheckEpoch == null) {
-        // Initial / first-run sync: reasonable 24-hour window
-        startWindow = nowEpoch - (24 * 3600);
+        // Initial run: 48-hour window
+        startWindow = nowEpoch - (48 * 3600);
       } else {
-        // Reconcile between last successful check and now, bounded up to 7 days
-        startWindow = (lastCheckEpoch).clamp(nowEpoch - (7 * 86400), nowEpoch - 60);
+        // Look back at least 24 hours (up to 7 days) — deduplication keys prevent re-notifying
+        startWindow = (lastCheckEpoch - (24 * 3600)).clamp(nowEpoch - (7 * 86400), nowEpoch - 60);
       }
 
       AppLogger.i(
-        '[NotificationWorker] last check = ${DateTime.fromMillisecondsSinceEpoch(startWindow * 1000).toIso8601String()}',
+        '[NotificationWorker] scanning window: ${DateTime.fromMillisecondsSinceEpoch(startWindow * 1000).toIso8601String()} to now (${relevantMediaIds.length} tracked anime)',
       );
 
       // -------------------------------------------------------------
@@ -140,8 +166,8 @@ class EpisodeReleaseTask {
               return mId != null && relevantMediaIds.contains(mId);
             }).toList();
           } else {
-            // If user has no watch progress yet, only evaluate first 5 most recent
-            targetPastSchedules = pastSchedules.take(5).toList();
+            // If user has no watch progress yet, evaluate top 10 most recent
+            targetPastSchedules = pastSchedules.take(10).toList();
           }
 
           relevantCount += targetPastSchedules.length;

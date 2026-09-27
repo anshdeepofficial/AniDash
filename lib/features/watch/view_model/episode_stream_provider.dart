@@ -1027,9 +1027,21 @@ class EpisodeData extends _$EpisodeData {
               return;
             } catch (_) {}
           }
-          // All alternate sources failed — clear stall flag so user can retry manually
-          AppLogger.e('Stall recovery: all alternate sources exhausted');
-          _player.setStallCallback(null);
+          // All alternate sources exhausted — try next available server
+          final servers = state.servers;
+          final currentServer = state.selectedServer;
+          if (servers.length > 1) {
+            for (var s = 0; s < servers.length; s++) {
+              if (servers[s].id != currentServer?.id) {
+                try {
+                  AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id}');
+                  await changeServer(servers[s]);
+                  return;
+                } catch (_) {}
+              }
+            }
+          }
+          AppLogger.e('Stall recovery: all alternate sources and servers exhausted');
         });
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');

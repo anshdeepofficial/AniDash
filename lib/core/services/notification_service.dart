@@ -55,7 +55,7 @@ class NotificationService {
       StreamController<String>.broadcast();
   Stream<String> get onNotificationRoute => notificationRouteController.stream;
 
-  Future<void> registerPeriodicNotificationWorker({bool forceReplace = false}) async {
+  Future<void> registerPeriodicNotificationWorker({bool forceReplace = true}) async {
     if (!Platform.isAndroid) return;
     try {
       await Workmanager().registerPeriodicTask(
@@ -74,8 +74,8 @@ class NotificationService {
     }
   }
 
-  static const String _iconName = '@drawable/ic_notification';
-  static const String _largeIconName = '@drawable/ic_notification_large';
+  static const String _iconName = 'ic_notification';
+  static const String _largeIconName = 'ic_notification_large';
   static const Color _brandColor = Color(0xFF4CAF50);
 
   static bool _timeZoneInitialized = false;
@@ -547,22 +547,14 @@ class NotificationService {
       );
       final id24h =
           ((mediaId.hashCode ^ episodeNumber) * 31 + 24) & 0x7FFFFFFF;
-      try {
-        await flutterLocalNotificationsPlugin.zonedSchedule(
-          id24h,
-          'Upcoming: $animeTitle • Ep $episodeNumber',
-          'Episode $episodeNumber releases tomorrow (in 24 hours)!',
-          scheduled24h,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          payload: 'details:$mediaId?tab=episodes',
-        );
-        AppLogger.i(
-          '[NotificationService] Scheduled 24h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled24h.toIso8601String()}',
-        );
-      } catch (e) {
-        AppLogger.w('Failed to schedule 24h alarm: $e');
-      }
+      await _safeZonedSchedule(
+        id: id24h,
+        title: 'Upcoming: $animeTitle • Ep $episodeNumber',
+        body: 'Episode $episodeNumber releases tomorrow (in 24 hours)!',
+        scheduledDate: scheduled24h,
+        notificationDetails: details,
+        payload: 'details:$mediaId?tab=episodes',
+      );
     }
 
     // 2. 2-hour countdown alert (airingAt - 7200)
@@ -575,22 +567,14 @@ class NotificationService {
       );
       final id2h =
           ((mediaId.hashCode ^ episodeNumber) * 31 + 2) & 0x7FFFFFFF;
-      try {
-        await flutterLocalNotificationsPlugin.zonedSchedule(
-          id2h,
-          'Upcoming: $animeTitle • Ep $episodeNumber',
-          'Episode $episodeNumber releases in 2 hours!',
-          scheduled2h,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          payload: 'details:$mediaId?tab=episodes',
-        );
-        AppLogger.i(
-          '[NotificationService] Scheduled 2h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled2h.toIso8601String()}',
-        );
-      } catch (e) {
-        AppLogger.w('Failed to schedule 2h alarm: $e');
-      }
+      await _safeZonedSchedule(
+        id: id2h,
+        title: 'Upcoming: $animeTitle • Ep $episodeNumber',
+        body: 'Episode $episodeNumber releases in 2 hours!',
+        scheduledDate: scheduled2h,
+        notificationDetails: details,
+        payload: 'details:$mediaId?tab=episodes',
+      );
     }
 
     // 3. 1-hour countdown alert (airingAt - 3600)
@@ -603,22 +587,14 @@ class NotificationService {
       );
       final id1h =
           ((mediaId.hashCode ^ episodeNumber) * 31 + 1) & 0x7FFFFFFF;
-      try {
-        await flutterLocalNotificationsPlugin.zonedSchedule(
-          id1h,
-          'Upcoming: $animeTitle • Ep $episodeNumber',
-          'Episode $episodeNumber releases in 1 hour!',
-          scheduled1h,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          payload: 'details:$mediaId?tab=episodes',
-        );
-        AppLogger.i(
-          '[NotificationService] Scheduled 1h exact alarm for $animeTitle Ep $episodeNumber at ${scheduled1h.toIso8601String()}',
-        );
-      } catch (e) {
-        AppLogger.w('Failed to schedule 1h alarm: $e');
-      }
+      await _safeZonedSchedule(
+        id: id1h,
+        title: 'Upcoming: $animeTitle • Ep $episodeNumber',
+        body: 'Episode $episodeNumber releases in 1 hour!',
+        scheduledDate: scheduled1h,
+        notificationDetails: details,
+        payload: 'details:$mediaId?tab=episodes',
+      );
     }
 
     // 4. Exact release alert (airingAt)
@@ -630,21 +606,50 @@ class NotificationService {
       );
       final idRelease =
           ((mediaId.hashCode ^ episodeNumber) * 31 + 0) & 0x7FFFFFFF;
+      await _safeZonedSchedule(
+        id: idRelease,
+        title: '$animeTitle • Ep $episodeNumber Released',
+        body: 'Episode $episodeNumber is now officially available to watch on AniDash.',
+        scheduledDate: scheduledRelease,
+        notificationDetails: details,
+        payload: 'details:$mediaId?tab=episodes',
+      );
+    }
+  }
+
+  Future<void> _safeZonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required NotificationDetails notificationDetails,
+    String? payload,
+  }) async {
+    try {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+      AppLogger.i('[NotificationService] Exact alarm scheduled: $title at ${scheduledDate.toIso8601String()}');
+    } catch (_) {
       try {
         await flutterLocalNotificationsPlugin.zonedSchedule(
-          idRelease,
-          '$animeTitle • Ep $episodeNumber Released',
-          'Episode $episodeNumber is now officially available to watch on AniDash.',
-          scheduledRelease,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          payload: 'details:$mediaId?tab=episodes',
+          id,
+          title,
+          body,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: payload,
         );
-        AppLogger.i(
-          '[NotificationService] Scheduled exact release alarm for $animeTitle Ep $episodeNumber at ${scheduledRelease.toIso8601String()}',
-        );
-      } catch (e) {
-        AppLogger.w('Failed to schedule exact release alarm: $e');
+        AppLogger.i('[NotificationService] Inexact alarm scheduled (fallback): $title at ${scheduledDate.toIso8601String()}');
+      } catch (e2) {
+        AppLogger.w('Failed to schedule alarm: $e2');
       }
     }
   }

@@ -7,7 +7,7 @@ description: >
 
 publish_to: "none"
 
-version: 1.15.9+93
+version: 1.15.10+94
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -35,7 +35,7 @@ dependencies:
   encrypt: ^5.0.3
   file_picker: ^11.0.3
   flex_color_picker: any
-  flex_color_scheme: 8.3.1
+  flex_color_scheme: any
 
   flutter:
     sdk: flutter

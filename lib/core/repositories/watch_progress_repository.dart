@@ -198,6 +198,16 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
         await box.put(entry.animeId, entry);
       } catch (_) {}
 
+      // Cache to SharedPreferences for background notification worker
+      try {
+        final currentTracked = sharedPrefs.getString('cached_tracked_anime_map');
+        final map = currentTracked != null && currentTracked.isNotEmpty
+            ? (jsonDecode(currentTracked) as Map<String, dynamic>)
+            : <String, dynamic>{};
+        map[entry.animeId] = entry.animeTitle;
+        await sharedPrefs.setString('cached_tracked_anime_map', jsonEncode(map));
+      } catch (_) {}
+
       AppLogger.d(
         'Saved progress for anime: ${entry.animeTitle} (${entry.animeId})',
       );

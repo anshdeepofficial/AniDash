@@ -19,7 +19,7 @@ class UpdateScheduler {
 
   static Future<void> apply(
     UpdateSettingsModel settings, {
-    bool forceReplace = false,
+    bool forceReplace = true,
   }) async {
     if (!Platform.isAndroid) return;
     if (!settings.autoCheckEnabled) {
