@@ -61,17 +61,52 @@ jobs:
             "ndk;27.0.12077973" \
             "cmake;3.18.1"
       - name: Configure Android Build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
+          set -euo pipefail
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           echo "cmake.dir=$ANDROID_HOME/cmake/3.18.1" >> android/local.properties
           echo "ndk.dir=$ANDROID_HOME/ndk/27.0.12077973" >> android/local.properties
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ]; then
+            echo "::error::Android release signing secrets are incomplete."
+            exit 1
+          fi
+
+          SECRET=$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | sed -E 's#^data:[^,]*;base64,##' | tr -d '\r\n ')
+          printf '%s' "$SECRET" | base64 --decode > /tmp/anidash-keystore-first 2>/dev/null || true
+
+          validate_keystore() {
+            local file="$1"
+            [ -s "$file" ] &&
+            keytool -list               -keystore "$file"               -storepass "$ANDROID_STORE_PASSWORD"               -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1
+          }
+
+          if validate_keystore /tmp/anidash-keystore-first; then
+            cp /tmp/anidash-keystore-first android/app/upload-keystore.jks
+            echo "Android keystore validated after normal Base64 decode."
+          else
+            tr -d '\r\n ' < /tmp/anidash-keystore-first | base64 --decode > /tmp/anidash-keystore-second 2>/dev/null || true
+            if validate_keystore /tmp/anidash-keystore-second; then
+              cp /tmp/anidash-keystore-second android/app/upload-keystore.jks
+              echo "Android keystore validated after double Base64 decode."
+            else
+              echo "::error::Configured Android keystore is not valid after normal or double Base64 decoding."
+              exit 1
+            fi
+          fi
+
           cat <<EOF > android/key.properties
-          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=${ANDROID_KEY_PASSWORD:-$ANDROID_STORE_PASSWORD}
+          keyAlias=$ANDROID_KEY_ALIAS
           storeFile=upload-keystore.jks
           EOF
+          rm -f /tmp/anidash-keystore-first /tmp/anidash-keystore-second
           cat <<EOF > keys.json
           {
             "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
@@ -85,7 +120,11 @@ jobs:
       - run: flutter pub get
       - name: Run playback regression tests
         run: flutter test test/unit/stream_headers_test.dart
-      - run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
+      - name: Build signed universal APK
+        run: |
+          flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
+          VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
+          mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/AniDash-v${VERSION}-Universal.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apks
@@ -210,7 +249,11 @@ jobs:
   publish-release:
     needs: [build-android, build-linux, build-windows]
     runs-on: ubuntu-latest
-    if: always()
+    if: >
+      always() &&
+      (needs.build-android.result == 'success' ||
+       needs.build-linux.result == 'success' ||
+       needs.build-windows.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
