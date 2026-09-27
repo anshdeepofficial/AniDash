@@ -420,16 +420,14 @@ class JustAnimeProvider extends AnimeProvider {
       endpoints.add('/watch/$animeId/episode/$episode/animegg');
     }
 
-    // Priority order tuned for audio type:
+    // Priority order tuned for high-speed & reliable playback (Megaplay & Zoko first):
     final priorityEndpoints = [
+      '/watch/$animeId/episode/$episode/megaplay',
+      '/watch/$animeId/episode/$episode/zokoanime',
       if (requestedAudio == 'dub') ...[
-        '/watch/$animeId/episode/$episode/anineko/dub',
-        '/watch/$animeId/episode/$episode/zokoanime',
-        '/watch/$animeId/episode/$episode/megaplay',
         '/watch/$animeId/episode/$episode/animegg',
+        '/watch/$animeId/episode/$episode/anineko/dub',
       ] else ...[
-        '/watch/$animeId/episode/$episode/megaplay',
-        '/watch/$animeId/episode/$episode/zokoanime',
         '/watch/$animeId/episode/$episode/animegg',
         '/watch/$animeId/episode/$episode/anineko/sub',
       ],
@@ -522,13 +520,7 @@ class JustAnimeProvider extends AnimeProvider {
       return resolvedModel;
     }
 
-    if (requestedAudio == 'dub') {
-      try {
-        return await getSources(animeId, episodeId, serverName, 'sub');
-      } catch (_) {}
-    }
-
-    throw Exception('No playable JustAnime source found for episode $episode');
+    throw Exception('No playable JustAnime source found for episode $episode ($requestedAudio)');
   }
 
   @override

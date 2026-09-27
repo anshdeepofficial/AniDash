@@ -235,8 +235,8 @@ class EpisodeData extends _$EpisodeData {
         );
       }
       currentServer ??= ServerData(
-        id: preferDub ? 'anineko' : 'megaplay',
-        name: preferDub ? 'Neko (DUB)' : 'Momo (HLS)',
+        id: 'megaplay',
+        name: preferDub ? 'Momo (DUB)' : 'Momo (HLS)',
         isDub: preferDub,
       );
     }
@@ -1016,41 +1016,55 @@ class EpisodeData extends _$EpisodeData {
         // immediately try the next available source URL from the current server.
         _player.setStallCallback((stalledAt) async {
           if (activeGeneration != _loadGeneration) return;
-          AppLogger.w(
-            'Stall recovery triggered at ${stalledAt.inSeconds}s — '
-            'trying alternate source URLs (${state.sources.length} available)',
-          );
-          final sources = state.sources;
-          for (var i = 1; i < sources.length; i++) {
-            try {
-              await _loadSourceStream(
-                i,
-                startAt: stalledAt,
-                generation: activeGeneration,
-              );
-              AppLogger.success(
-                'Stall recovery: switched to source[$i] successfully',
-              );
-              return;
-            } catch (_) {}
+          final playerState = ref.read(playerStateProvider);
+          if (playerState.isOpening ||
+              state.states.contains(EpisodeStreamState.SOURCE_LOADING) ||
+              state.states.contains(EpisodeStreamState.QUALITY_LOADING) ||
+              _stallRecoveryInProgress) {
+            return;
           }
-          // All alternate sources exhausted — try next available server with matching audio type (DUB/SUB)
-          final servers = state.servers;
-          final currentServer = state.selectedServer;
-          final preferDub = ref.read(playerSettingsProvider).preferDub;
-          final targetDub = currentServer?.isDub ?? preferDub;
-          if (servers.length > 1) {
-            for (var s = 0; s < servers.length; s++) {
-              if (servers[s].id != currentServer?.id && servers[s].isDub == targetDub) {
-                try {
-                  AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id} (Dub: ${servers[s].isDub})');
-                  await changeServer(servers[s]);
-                  return;
-                } catch (_) {}
+          _stallRecoveryInProgress = true;
+          try {
+            AppLogger.w(
+              'Stall recovery triggered at ${stalledAt.inSeconds}s — '
+              'trying alternate source URLs (${state.sources.length} available)',
+            );
+            final sources = state.sources;
+            for (var i = 1; i < sources.length; i++) {
+              try {
+                await _loadSourceStream(
+                  i,
+                  startAt: stalledAt,
+                  generation: activeGeneration,
+                );
+                AppLogger.success(
+                  'Stall recovery: switched to source[$i] successfully',
+                );
+                return;
+              } catch (_) {}
+            }
+            // All alternate sources exhausted — try next available server with matching audio type (DUB/SUB)
+            final servers = state.servers;
+            final currentServer = state.selectedServer;
+            final preferDub = ref.read(playerSettingsProvider).preferDub;
+            final targetDub = currentServer?.isDub ?? preferDub;
+            if (servers.length > 1) {
+              for (var s = 0; s < servers.length; s++) {
+                if (servers[s].id != currentServer?.id && servers[s].isDub == targetDub) {
+                  try {
+                    AppLogger.i('Stall recovery: trying alternate server ${servers[s].name ?? servers[s].id} (Dub: ${servers[s].isDub})');
+                    await changeServer(servers[s]);
+                    return;
+                  } catch (_) {}
+                }
               }
             }
+            AppLogger.e('Stall recovery: all alternate sources and servers exhausted');
+          } finally {
+            Future.delayed(const Duration(seconds: 15), () {
+              _stallRecoveryInProgress = false;
+            });
           }
-          AppLogger.e('Stall recovery: all alternate sources and servers exhausted');
         });
       } catch (primaryError) {
         AppLogger.w('Primary stream stalled; trying alternate stream');
@@ -1076,11 +1090,11 @@ class EpisodeData extends _$EpisodeData {
 
         final category = state.selectedServer?.isDub == true ? 'dub' : 'sub';
         BaseSourcesModel? fallback;
+        final altServer =
+            state.selectedServer?.id == 'megaplay' ? 'zokoanime' : 'megaplay';
 
         // Try alternate JustAnime server if primary stalled
         if (_isNativeProvider && _effectiveProvider?.providerName == 'justanime') {
-          final altServer =
-              state.selectedServer?.id == 'megaplay' ? 'zokoanime' : 'megaplay';
           try {
             fallback = await _effectiveProvider!
                 .getSources(
@@ -1108,7 +1122,11 @@ class EpisodeData extends _$EpisodeData {
                 intro: fallback.intro,
                 outro: fallback.outro,
               );
+          final matchingServer = state.servers.firstWhereOrNull(
+            (s) => s.id == altServer && s.isDub == (category == 'dub'),
+          );
           state = state.copyWith(
+            selectedServer: matchingServer ?? state.selectedServer?.copyWith(id: altServer),
             sources: fallback.sources,
             subtitles: [Subtitle(lang: 'None'), ...fallback.tracks],
             headers: fallback.headers?.cast<String, String>(),

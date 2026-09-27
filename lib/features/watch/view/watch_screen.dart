@@ -216,8 +216,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                     .read(episodeDataProvider.notifier)
                     .changeServer(
                       ServerData(
-                        id: 'anineko',
-                        name: 'AniNeko (HLS)',
+                        id: 'megaplay',
+                        name: 'Momo (HLS)',
                         isDub: false,
                       ),
                     ),

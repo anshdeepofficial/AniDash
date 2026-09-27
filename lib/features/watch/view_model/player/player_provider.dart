@@ -275,7 +275,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           _stallWatchdog ??= Timer(const Duration(seconds: 8), () {
             _stallWatchdog = null;
             if (!state.isBuffering) return; // recovered on its own
-            if (_isStallRecovering) return;  // already recovering
+            if (_isStallRecovering) return; // already recovering
+            if (state.isOpening) return; // do not interrupt initial video startup
             final currentPos = _player.state.position;
             // Only fire if position genuinely hasn't advanced (not just slow seeking)
             final posAdvanced = (currentPos - _stallWatchdogLastPos).abs() >
@@ -416,10 +417,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
         await platform.setProperty('referrer', refValue);
       }
 
-      // ── Step 2: http-header-fields WITHOUT UA / Referer / Origin ─────────
+      // ── Step 2: http-header-fields WITHOUT UA / Referer ─────────────────
       // Sending these in http-header-fields on top of the dedicated properties
       // causes duplicate headers that break HLS auth on many CDNs.
-      const dedicatedHeaders = {'user-agent', 'referer', 'origin'};
+      const dedicatedHeaders = {'user-agent', 'referer', 'referrer'};
       final forwardedHeaders = effectiveHeaders.entries
           .where((e) => !dedicatedHeaders.contains(e.key.toLowerCase()))
           .map((e) => '${e.key}: ${e.value}')
