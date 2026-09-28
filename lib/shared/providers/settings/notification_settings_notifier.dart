@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ani_dash/core/models/settings/notification_settings_model.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
@@ -25,11 +24,11 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettingsModel> {
     return const NotificationSettingsModel();
   }
 
-  void updateSettings(
+  Future<void> updateSettings(
     NotificationSettingsModel Function(NotificationSettingsModel) updater,
-  ) {
+  ) async {
     state = updater(state);
-    sharedPrefs.setString(_prefsKey, jsonEncode(state.toJson()));
-    unawaited(NotificationService().reconcileScheduledReleaseAlerts());
+    await sharedPrefs.setString(_prefsKey, jsonEncode(state.toJson()));
+    await NotificationService().reconcileScheduledReleaseAlerts();
   }
 }

@@ -110,6 +110,7 @@ class NotificationService {
   Future<bool> _isCategoryEnabled(String key) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       final raw = prefs.getString('notification_settings_data');
       if (raw == null || raw.isEmpty) return true;
       final data = jsonDecode(raw) as Map<String, dynamic>;
@@ -122,6 +123,7 @@ class NotificationService {
   Future<bool> _prefersEnglishDub() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       final raw = prefs.getString('player_settings_data');
       if (raw == null || raw.isEmpty) return false;
       final data = jsonDecode(raw) as Map<String, dynamic>;

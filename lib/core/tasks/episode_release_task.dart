@@ -13,6 +13,13 @@ import 'package:ani_dash/core/registery/sources/anime/aniwatch/hianime.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 
+const int releaseNotificationEpisodeWindow = 12;
+
+bool isReleaseWithinWatchWindow(int currentEpisode, int releaseEpisode) {
+  final distance = releaseEpisode - currentEpisode;
+  return distance > 0 && distance <= releaseNotificationEpisodeWindow;
+}
+
 class NotificationCheckResult {
   final bool success;
   final int schedulesReturned;
@@ -53,6 +60,7 @@ class EpisodeReleaseTask {
 
     try {
       final pref = await SharedPreferences.getInstance();
+      await pref.reload();
       final notifJson = pref.getString('notification_settings_data');
 
       bool enableSubReleases = true;
@@ -89,6 +97,7 @@ class EpisodeReleaseTask {
 
       final relevantMediaIds = <int>{};
       final mediaTitlesById = <int, String>{};
+      final currentEpisodeByMediaId = <int, int>{};
 
       // 1. SharedPreferences cache (most reliable across background isolates without DB locks)
       try {
@@ -141,6 +150,7 @@ class EpisodeReleaseTask {
         if (id != null) {
           relevantMediaIds.add(id);
           mediaTitlesById[id] = e.animeTitle;
+          currentEpisodeByMediaId[id] = e.currentEpisode;
         }
       }
 
@@ -184,7 +194,16 @@ class EpisodeReleaseTask {
             targetPastSchedules =
                 pastSchedules.where((s) {
                   final mId = s['mediaId'] as int?;
-                  return mId != null && relevantMediaIds.contains(mId);
+                  final releasedEpisode = s['episode'] as int?;
+                  final currentEpisode =
+                      mId == null ? null : currentEpisodeByMediaId[mId];
+                  return mId != null &&
+                      releasedEpisode != null &&
+                      currentEpisode != null &&
+                      isReleaseWithinWatchWindow(
+                        currentEpisode,
+                        releasedEpisode,
+                      );
                 }).toList();
           } else {
             targetPastSchedules = const [];
@@ -258,7 +277,16 @@ class EpisodeReleaseTask {
             targetUpcomingSchedules =
                 upcomingSchedules.where((s) {
                   final mId = s['mediaId'] as int?;
-                  return mId != null && relevantMediaIds.contains(mId);
+                  final upcomingEpisode = s['episode'] as int?;
+                  final currentEpisode =
+                      mId == null ? null : currentEpisodeByMediaId[mId];
+                  return mId != null &&
+                      upcomingEpisode != null &&
+                      currentEpisode != null &&
+                      isReleaseWithinWatchWindow(
+                        currentEpisode,
+                        upcomingEpisode,
+                      );
                 }).toList();
           } else {
             targetUpcomingSchedules = const [];
@@ -372,7 +400,11 @@ class EpisodeReleaseTask {
               final previousEnglishDub = pref.getInt(lastDubKey);
 
               if (previousEnglishDub != null &&
-                  latestEnglishDubEp > previousEnglishDub) {
+                  latestEnglishDubEp > previousEnglishDub &&
+                  isReleaseWithinWatchWindow(
+                    entry.currentEpisode,
+                    latestEnglishDubEp,
+                  )) {
                 sentCount++;
                 AppLogger.i(
                   '[NotificationWorker] sent = English DUB ${entry.animeTitle} Ep $latestEnglishDubEp',

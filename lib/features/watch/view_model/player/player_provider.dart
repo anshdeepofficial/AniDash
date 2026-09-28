@@ -152,25 +152,24 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // High-performance 100s+ readahead buffer engine:
-    // - cache-pause-initial: no -> Video starts playing IMMEDIATELY without lag
-    // - demuxer-readahead-secs: 120 -> Demuxer buffers 120 seconds ahead continuously
-    // - cache-secs: 300 -> 5-minute forward cache window
-    // - cache-pause: yes + cache-pause-wait: 2 -> Seamless stall handling if buffer drains
+    // Keep a rolling 100+ second forward window where the host bitrate and the
+    // byte budget permit it. MPV may stop earlier at demuxer-max-bytes, which is
+    // intentional protection for lower-memory Android devices.
     final fastProperties = <String, String>{
       'hwdec': 'auto-safe',
 
       // ── Cache / buffer sizing ─────────────────────────────────────────────
       'cache': 'yes',
-      'cache-secs': '90',
+      'cache-secs': '110',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
-      'demuxer-readahead-secs': '45',
+      'demuxer-readahead-secs': '100',
+      'demuxer-hysteresis-secs': '20',
 
       // ── Instant playback + underrun protection ────────────────────────────
       'cache-pause': 'yes', // Pause gracefully on underrun
-      'cache-pause-wait': '3',
+      'cache-pause-wait': '4',
       'cache-pause-initial': 'yes',
 
       // ── Network & Reconnect ───────────────────────────────────────────────

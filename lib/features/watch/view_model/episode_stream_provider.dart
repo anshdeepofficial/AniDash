@@ -1262,15 +1262,18 @@ class EpisodeData extends _$EpisodeData {
       final playbackHeaders =
           selectedOption['headers'] as Map<String, String>? ?? streamHeaders;
 
-      await _player
-          .open(
-            playbackUrl,
-            startAt,
-            headers: playbackHeaders,
-            mediaId: _epList.animeId,
-            episode: state.selectedEpisode,
-          )
-          .timeout(const Duration(seconds: 15));
+      // Do not time out Player.open and immediately open an alternate URL.
+      // The first MPV open keeps running after Future.timeout; starting a
+      // second open creates two competing loads and the late completion can
+      // jump playback back to the episode start. MPV's own network timeout and
+      // the visible startup watchdog handle a genuinely stalled connection.
+      await _player.open(
+        playbackUrl,
+        startAt,
+        headers: playbackHeaders,
+        mediaId: _epList.animeId,
+        episode: state.selectedEpisode,
+      );
 
       if (activeGeneration != _loadGeneration) return;
 
