@@ -169,7 +169,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
       // ── Instant playback + underrun protection ────────────────────────────
       'cache-pause': 'yes', // Pause gracefully on underrun
-      'cache-pause-wait': '4',
+      // Start after a small safety buffer; continue filling the 100-second
+      // rolling cache in the background once frames begin rendering.
+      'cache-pause-wait': '2',
       'cache-pause-initial': 'yes',
 
       // ── Network & Reconnect ───────────────────────────────────────────────

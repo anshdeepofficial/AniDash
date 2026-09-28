@@ -122,34 +122,36 @@ extension DownloadItemLogic on DownloadItem {
   bool get hasError => error != null;
 
   double get progressPercentage {
-    if (hasByteSize) {
-      return (progress / size!).clamp(0.0, 1.0);
-    } else if (hasSegmentCount) {
+    // HLS progress is counted in segments even when [size] contains the
+    // current best byte-size estimate. Keep the units consistent.
+    if (hasSegmentCount) {
       return (progress / totalSegments!).clamp(0.0, 1.0);
+    } else if (hasByteSize) {
+      return (progress / size!).clamp(0.0, 1.0);
     }
     return 0.0;
   }
 
   String getProgressText() {
-    if (hasByteSize) {
+    if (hasSegmentCount) {
+      final percent = (progressPercentage * 100).round().clamp(0, 100);
+      if (downloadedBytes != null && downloadedBytes! > 0) {
+        final currentMB = (downloadedBytes! / 1024 / 1024).toStringAsFixed(1);
+        if (hasByteSize) {
+          final totalMB = (size! / 1024 / 1024).toStringAsFixed(1);
+          final approximate = state == DownloadStatus.downloaded ? '' : '~';
+          return '$currentMB / $approximate$totalMB MB ($percent%)';
+        }
+        return '$currentMB MB ($percent%)';
+      }
+      return '$percent%';
+    } else if (hasByteSize) {
       final currentMB = (progress / 1024 / 1024).toStringAsFixed(1);
       final totalMB = (size! / 1024 / 1024).toStringAsFixed(1);
       return '$currentMB / $totalMB MB';
     } else if (downloadedBytes != null && downloadedBytes! > 0) {
       final currentMB = (downloadedBytes! / 1024 / 1024).toStringAsFixed(1);
-      if (hasSegmentCount && progress > 0) {
-        final estTotal = (downloadedBytes! /
-                progress *
-                totalSegments! /
-                1024 /
-                1024)
-            .toStringAsFixed(1);
-        return '$currentMB / $estTotal MB';
-      }
       return '$currentMB MB';
-    } else if (hasSegmentCount) {
-      final percent = ((progress / totalSegments!) * 100).toStringAsFixed(0);
-      return '$percent%';
     }
     return 'Downloading...';
   }

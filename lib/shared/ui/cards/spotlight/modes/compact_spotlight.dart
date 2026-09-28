@@ -21,9 +21,10 @@ class CompactSpotlight extends StatelessWidget {
     if (anime == null) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    final imageUrl = anime!.bannerImage?.isNotEmpty == true
-        ? anime!.bannerImage!
-        : (anime!.coverImage.large ?? anime!.coverImage.medium ?? '');
+    final imageUrl =
+        anime!.bannerImage?.isNotEmpty == true
+            ? anime!.bannerImage!
+            : (anime!.coverImage.large ?? anime!.coverImage.medium ?? '');
 
     return GestureDetector(
       onTap: () => onTap?.call(anime!),
@@ -79,7 +80,7 @@ class CompactSpotlight extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${anime!.episodes ?? "?"} EP',
+                  '${anime!.episodes ?? "?"} Episodes',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.white70,
                   ),

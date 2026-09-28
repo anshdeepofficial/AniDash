@@ -52,7 +52,8 @@ class JustAnimeProvider extends AnimeProvider {
     if (page == 1) {
       final cached = _searchCache[searchKey];
       if (cached != null &&
-          DateTime.now().difference(cached.time) < const Duration(minutes: 30)) {
+          DateTime.now().difference(cached.time) <
+              const Duration(minutes: 30)) {
         return cached.page;
       }
     }
@@ -209,7 +210,8 @@ class JustAnimeProvider extends AnimeProvider {
     return BaseEpisodeModel(episodes: episodes, totalEpisodes: episodes.length);
   }
 
-  static final Map<String, ({DateTime time, BaseSourcesModel data})> _sourcesCache = {};
+  static final Map<String, ({DateTime time, BaseSourcesModel data})>
+  _sourcesCache = {};
 
   static void clearCache({String? animeId, int? episode}) {
     if (animeId == null) {
@@ -374,7 +376,8 @@ class JustAnimeProvider extends AnimeProvider {
       Intro? intro;
       final subPayload = payload['sub'] as Map<String, dynamic>?;
       final dubPayload = payload['dub'] as Map<String, dynamic>?;
-      final rawIntro = raw['intro'] ??
+      final rawIntro =
+          raw['intro'] ??
           payload['intro'] ??
           subPayload?['intro'] ??
           dubPayload?['intro'];
@@ -387,7 +390,8 @@ class JustAnimeProvider extends AnimeProvider {
       }
 
       Intro? outro;
-      final rawOutro = raw['outro'] ??
+      final rawOutro =
+          raw['outro'] ??
           payload['outro'] ??
           subPayload?['outro'] ??
           dubPayload?['outro'];
@@ -451,49 +455,59 @@ class JustAnimeProvider extends AnimeProvider {
       final ep = endpoints[nextIndex++];
       inFlight++;
 
-      request(ep).timeout(const Duration(seconds: 12)).then((payload) {
-        final model = parseSource(ep, payload);
-        if (model != null) {
-          if (model.intro != null && discoveredIntro == null) {
-            discoveredIntro = model.intro;
-          }
-          if (model.outro != null && discoveredOutro == null) {
-            discoveredOutro = model.outro;
-          }
-        }
-        if (model != null && model.sources.isNotEmpty && !isDone) {
-          isDone = true;
-          final finalModel = BaseSourcesModel(
-            sources: model.sources,
-            tracks: model.tracks,
-            headers: model.headers,
-            intro: model.intro ?? discoveredIntro,
-            outro: model.outro ?? discoveredOutro,
-          );
-          _sourcesCache[cacheKey] = (time: DateTime.now(), data: finalModel);
-          if (!completer.isCompleted) completer.complete(finalModel);
-          return;
-        }
-        throw Exception('Empty or unplayable source');
-      }).catchError((_) {
-        failedCount++;
-        inFlight--;
-        if (failedCount >= endpoints.length && !isDone) {
-          isDone = true;
-          if (!completer.isCompleted) completer.complete(null);
-        } else if (!isDone && nextIndex < endpoints.length && inFlight < 2) {
-          spawnNext();
-        }
-      });
+      request(ep)
+          .timeout(const Duration(seconds: 12))
+          .then((payload) {
+            final model = parseSource(ep, payload);
+            if (model != null) {
+              if (model.intro != null && discoveredIntro == null) {
+                discoveredIntro = model.intro;
+              }
+              if (model.outro != null && discoveredOutro == null) {
+                discoveredOutro = model.outro;
+              }
+            }
+            if (model != null && model.sources.isNotEmpty && !isDone) {
+              isDone = true;
+              final finalModel = BaseSourcesModel(
+                sources: model.sources,
+                tracks: model.tracks,
+                headers: model.headers,
+                intro: model.intro ?? discoveredIntro,
+                outro: model.outro ?? discoveredOutro,
+              );
+              _sourcesCache[cacheKey] = (
+                time: DateTime.now(),
+                data: finalModel,
+              );
+              if (!completer.isCompleted) completer.complete(finalModel);
+              return;
+            }
+            throw Exception('Empty or unplayable source');
+          })
+          .catchError((_) {
+            failedCount++;
+            inFlight--;
+            if (failedCount >= endpoints.length && !isDone) {
+              isDone = true;
+              if (!completer.isCompleted) completer.complete(null);
+            } else if (!isDone &&
+                nextIndex < endpoints.length &&
+                inFlight < 2) {
+              spawnNext();
+            }
+          });
     }
 
     // Start candidate #1 (Momo/Megaplay) immediately
     spawnNext();
 
-    // Hedge with candidate #2 after 900ms if candidate #1 hasn't resolved
+    // Hedge quickly with candidate #2 if the preferred host is slow. This
+    // keeps a healthy primary uncontested while avoiding a long cold-start
+    // penalty when its DNS, TLS, or extraction endpoint is delayed.
     Timer? hedgeTimer;
     if (endpoints.length > 1) {
-      hedgeTimer = Timer(const Duration(milliseconds: 900), () {
+      hedgeTimer = Timer(const Duration(milliseconds: 400), () {
         if (!isDone && inFlight < 2 && nextIndex < endpoints.length) {
           spawnNext();
         }
@@ -520,7 +534,9 @@ class JustAnimeProvider extends AnimeProvider {
       return resolvedModel;
     }
 
-    throw Exception('No playable JustAnime source found for episode $episode ($requestedAudio)');
+    throw Exception(
+      'No playable JustAnime source found for episode $episode ($requestedAudio)',
+    );
   }
 
   @override

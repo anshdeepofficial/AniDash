@@ -40,6 +40,9 @@ class NotificationService {
   NotificationService._internal();
 
   static const notificationCheckTask = 'anidash_notification_check';
+  static const notificationBootstrapTask =
+      'anidash_notification_check_bootstrap';
+  static const notificationWorkerTag = 'anidash_notifications';
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -57,7 +60,7 @@ class NotificationService {
   Stream<String> get onNotificationRoute => notificationRouteController.stream;
 
   Future<void> registerPeriodicNotificationWorker({
-    bool forceReplace = false,
+    bool forceReplace = true,
   }) async {
     if (!Platform.isAndroid) return;
     try {
@@ -65,12 +68,37 @@ class NotificationService {
         notificationCheckTask,
         notificationCheckTask,
         frequency: const Duration(minutes: 15),
+        flexInterval: const Duration(minutes: 5),
+        tag: notificationWorkerTag,
         existingWorkPolicy:
             forceReplace ? ExistingWorkPolicy.replace : ExistingWorkPolicy.keep,
         constraints: Constraints(networkType: NetworkType.connected),
+        backoffPolicy: BackoffPolicy.exponential,
+        backoffPolicyDelay: const Duration(seconds: 30),
+      );
+
+      // Periodic WorkManager jobs are deliberately inexact. This one-off job
+      // verifies the callback and notification pipeline immediately after the
+      // app registers (or repairs) the periodic worker.
+      await Workmanager().registerOneOffTask(
+        notificationBootstrapTask,
+        notificationBootstrapTask,
+        tag: notificationWorkerTag,
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+        initialDelay: const Duration(seconds: 10),
+        constraints: Constraints(networkType: NetworkType.connected),
+        backoffPolicy: BackoffPolicy.exponential,
+        backoffPolicyDelay: const Duration(seconds: 30),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        'notification_worker_registered_at',
+        DateTime.now().millisecondsSinceEpoch,
       );
       AppLogger.i(
-        '[NotificationWorker] Registered unique periodic task "$notificationCheckTask" (frequency: 15m, policy: ${forceReplace ? "replace" : "keep"})',
+        '[NotificationWorker] Registered periodic + bootstrap workers '
+        '(frequency: 15m, policy: ${forceReplace ? "replace" : "keep"})',
       );
     } catch (e) {
       AppLogger.w('Could not register periodic notification worker: $e');

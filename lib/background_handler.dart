@@ -18,20 +18,37 @@ import 'package:workmanager/workmanager.dart';
 void callbackDispatcher() {
   DartPluginRegistrant.ensureInitialized();
   Workmanager().executeTask((task, inputData) async {
-    WidgetsFlutterBinding.ensureInitialized();
-    AppLogger.i('[BackgroundHandler] Workmanager running task: $task');
-    if (task == updateCheckTask || task == '${updateCheckTask}_immediate') {
-      return await _checkForAppUpdate(inputData);
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+      AppLogger.i('[BackgroundHandler] Workmanager running task: $task');
+      if (task == updateCheckTask || task == '${updateCheckTask}_immediate') {
+        return await _checkForAppUpdate(inputData);
+      }
+      if (task == "sync_tracking_task") {
+        return await SyncTrackingTask.performSync(inputData);
+      }
+      if (task == NotificationService.notificationCheckTask ||
+          task == NotificationService.notificationBootstrapTask) {
+        final releaseResult = await EpisodeReleaseTask.performCheck();
+        final newsResult = await NewsBackgroundTask.performUpdate();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(
+          'notification_worker_last_run_at',
+          DateTime.now().millisecondsSinceEpoch,
+        );
+        await prefs.setBool(
+          'notification_worker_last_run_success',
+          releaseResult.success && newsResult,
+        );
+        return releaseResult.success && newsResult;
+      }
+      final releaseResult = await EpisodeReleaseTask.performCheck();
+      final newsResult = await NewsBackgroundTask.performUpdate();
+      return releaseResult.success && newsResult;
+    } catch (e, st) {
+      AppLogger.e('[BackgroundHandler] Task failed: $task', e, st);
+      return false;
     }
-    if (task == "sync_tracking_task") {
-      return await SyncTrackingTask.performSync(inputData);
-    }
-    if (task == NotificationService.notificationCheckTask) {
-      await EpisodeReleaseTask.performCheck();
-      return await NewsBackgroundTask.performUpdate();
-    }
-    await EpisodeReleaseTask.performCheck();
-    return await NewsBackgroundTask.performUpdate();
   });
 }
 

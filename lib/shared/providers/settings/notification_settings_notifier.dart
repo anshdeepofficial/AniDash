@@ -30,5 +30,6 @@ class NotificationSettingsNotifier extends Notifier<NotificationSettingsModel> {
     state = updater(state);
     await sharedPrefs.setString(_prefsKey, jsonEncode(state.toJson()));
     await NotificationService().reconcileScheduledReleaseAlerts();
+    await NotificationService().registerPeriodicNotificationWorker();
   }
 }

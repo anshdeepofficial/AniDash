@@ -390,6 +390,7 @@ Future<DownloadItem> _processM3U8(
   const workerCount = 16;
   int completed = 0;
   int downloadedBytesTotal = 0;
+  int? estimatedTotalBytes;
   DateTime lastLog = DateTime.now();
 
   for (var s in segments) {
@@ -423,6 +424,15 @@ Future<DownloadItem> _processM3U8(
       await throttler.throttle(data.length);
 
       if (DateTime.now().difference(lastLog).inMilliseconds > 300) {
+        // Do not invent a total before there is a useful sample. Once enough
+        // segments are present, expose a clearly approximate total; completion
+        // replaces it with the exact merged-file size.
+        final sampleThreshold = (segments.length * 0.1).ceil().clamp(5, 12);
+        if (completed >= sampleThreshold) {
+          estimatedTotalBytes =
+              (downloadedBytesTotal / completed * segments.length).round();
+          currentItem = currentItem.copyWith(size: estimatedTotalBytes);
+        }
         task.port.send(
           currentItem.copyWith(
             progress: completed,
@@ -504,7 +514,7 @@ Future<DownloadItem> _processM3U8(
     state: DownloadStatus.downloaded,
     size: totalSize,
     downloadedBytes: totalSize,
-    progress: totalSize,
+    progress: segments.length,
     durationSeconds: segments.fold<int>(
       0,
       (total, segment) => total + segment.duration.ceil(),

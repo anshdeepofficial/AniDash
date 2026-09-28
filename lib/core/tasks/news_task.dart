@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:ani_dash/core/models/universal/universal_news.dart';
 import 'package:ani_dash/core/services/anime_news_network_service.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/hive/hive_adapters.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsBackgroundTask {
@@ -12,6 +13,9 @@ class NewsBackgroundTask {
     try {
       final appDir = await getApplicationSupportDirectory();
       Hive.init(p.join(appDir.path, 'AniDash', 'appdata'));
+      if (!Hive.isAdapterRegistered(16)) {
+        Hive.registerAdapter(UniversalNewsAdapter());
+      }
 
       final cacheBox = await Hive.openBox<UniversalNews>('news_cache');
       final readBox = await Hive.openBox<String>('news_read_status');
@@ -37,24 +41,25 @@ class NewsBackgroundTask {
       if (freshNews.isNotEmpty) {
         final oldUrls = cacheBox.values.map((e) => e.url).toSet();
 
-        final newItems = freshNews
-            .where((e) => !oldUrls.contains(e.url))
-            .toList();
+        final newItems =
+            freshNews.where((e) => !oldUrls.contains(e.url)).toList();
 
         if (newItems.isNotEmpty) {
           final count = newItems.length;
-          final message = count == 1
-              ? 'New: ${newItems.first.title}'
-              : '$count New Anime Articles Available!';
+          final message =
+              count == 1
+                  ? 'New: ${newItems.first.title}'
+                  : '$count New Anime Articles Available!';
 
           await NotificationService().showNewsNotification(
             title: 'AniDash News',
             body: message,
           );
 
-          final mergedNews = freshNews.map((news) {
-            return news.copyWith(isRead: readBox.containsKey(news.url));
-          }).toList();
+          final mergedNews =
+              freshNews.map((news) {
+                return news.copyWith(isRead: readBox.containsKey(news.url));
+              }).toList();
 
           await cacheBox.clear();
           await cacheBox.addAll(mergedNews);

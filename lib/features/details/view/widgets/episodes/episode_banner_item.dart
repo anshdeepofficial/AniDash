@@ -397,7 +397,10 @@ class EpisodeBannerItem extends StatelessWidget {
 
     switch (download.state) {
       case DownloadStatus.downloading:
-        final progress = download.progress;
+        final progress = (download.progressPercentage * 100).round().clamp(
+          0,
+          100,
+        );
         text = 'Downloading $progress%';
         color = Colors.blueAccent;
         icon = Icons.downloading;

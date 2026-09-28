@@ -1519,7 +1519,10 @@ class EpisodeData extends _$EpisodeData {
             : (ep.number?.toString() ?? '');
 
     final effectiveProvider = _effectiveProvider;
-    if (effectiveProvider != null) {
+    // JustAnime was already attempted above with its complete hedged server
+    // strategy. Repeating the identical provider call here adds another full
+    // timeout window without increasing the chance of finding a source.
+    if (effectiveProvider != null && !isJustAnime) {
       try {
         final res = await effectiveProvider
             .getSources(effectiveAnimeId, targetEpId, server?.id, category)
@@ -1571,6 +1574,7 @@ class EpisodeData extends _$EpisodeData {
       ep,
       category,
       generation: activeGeneration,
+      excludedProviderKeys: isJustAnime ? const {'justanime'} : const {},
     );
     return saveAndReturn(fallback);
   }
@@ -1579,6 +1583,7 @@ class EpisodeData extends _$EpisodeData {
     EpisodeDataModel ep,
     String category, {
     int? generation,
+    Set<String> excludedProviderKeys = const {},
   }) async {
     final activeGeneration = generation ?? _loadGeneration;
     if (activeGeneration != _loadGeneration) return null;
@@ -1676,7 +1681,9 @@ class EpisodeData extends _$EpisodeData {
 
     // 1. If JustAnime is the active provider, strictly prioritize JustAnime
     // and never let unselected fallbacks preempt it.
-    if (currentKey == 'justanime' && registry.has('justanime')) {
+    if (currentKey == 'justanime' &&
+        !excludedProviderKeys.contains('justanime') &&
+        registry.has('justanime')) {
       final justResult = await resolveFromKey('justanime');
       if (justResult != null && justResult.sources.isNotEmpty) {
         return justResult;
@@ -1685,8 +1692,16 @@ class EpisodeData extends _$EpisodeData {
 
     // 2. Fallback order for remaining candidates
     final candidateKeys = [
-      if (registry.has('justanime') && currentKey != 'justanime') 'justanime',
-      ...registry.keys.where((k) => k != currentKey && k != 'justanime'),
+      if (registry.has('justanime') &&
+          currentKey != 'justanime' &&
+          !excludedProviderKeys.contains('justanime'))
+        'justanime',
+      ...registry.keys.where(
+        (k) =>
+            k != currentKey &&
+            k != 'justanime' &&
+            !excludedProviderKeys.contains(k),
+      ),
     ];
 
     if (candidateKeys.isEmpty) return null;
