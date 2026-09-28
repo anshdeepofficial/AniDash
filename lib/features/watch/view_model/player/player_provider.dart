@@ -101,6 +101,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   String? _activeMediaId;
   int? _activeEpisode;
   Duration _lastStablePosition = Duration.zero;
+  bool _automaticRetryInFlight = false;
 
   Player get player => _player;
   String? get activeMediaId => _activeMediaId;
@@ -137,12 +138,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
-      64 * 1024 * 1024,
-      128 * 1024 * 1024,
+      32 * 1024 * 1024,
+      96 * 1024 * 1024,
     );
     final backBufferBytes = (effectiveBufferBytes ~/ 4).clamp(
-      16 * 1024 * 1024,
-      32 * 1024 * 1024,
+      8 * 1024 * 1024,
+      24 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -156,7 +157,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     // byte budget permit it. MPV may stop earlier at demuxer-max-bytes, which is
     // intentional protection for lower-memory Android devices.
     final fastProperties = <String, String>{
-      'hwdec': 'auto-safe',
+      // Online providers regularly return streams with device-problematic
+      // H.264/HEVC profiles. A stable software baseline is preferable to
+      // black/pixelated frames or a decoder reset that restarts the episode.
+      'hwdec': 'no',
 
       // ── Cache / buffer sizing ─────────────────────────────────────────────
       'cache': 'yes',
@@ -165,17 +169,29 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
       'demuxer-readahead-secs': '100',
-      'demuxer-hysteresis-secs': '20',
+      // Keep refilling continuously. A large hysteresis let the cache drain
+      // to ~20 seconds before networking resumed, which caused visible stalls
+      // on fluctuating mobile connections.
+      'demuxer-hysteresis-secs': '0',
 
       // ── Instant playback + underrun protection ────────────────────────────
       'cache-pause': 'yes', // Pause gracefully on underrun
       // Start after a small safety buffer; continue filling the 100-second
       // rolling cache in the background once frames begin rendering.
-      'cache-pause-wait': '2',
+      // Keep startup and recovery responsive. The rolling cache continues
+      // filling in the background; waiting eight seconds after every brief
+      // underrun made fast networks feel frozen.
+      // Five seconds is still inside the requested sub-10-second startup but
+      // prevents a 1080p HLS stream from immediately draining a tiny buffer
+      // and entering a play-two-seconds/buffer loop.
+      'cache-pause-wait': '5',
       'cache-pause-initial': 'yes',
 
       // ── Network & Reconnect ───────────────────────────────────────────────
-      'stream-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
+      // Let FFmpeg recover transient stream failures quickly. Keep the option
+      // format deliberately simple because MPV rejects malformed AVOption
+      // lists as a whole.
+      'stream-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=2',
       'network-timeout': '30',
 
       // ── FFmpeg demuxer / HLS probe (tuned for ultra-fast <10s startup) ──
@@ -195,21 +211,27 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     for (final entry in fastProperties.entries) {
       try {
         platform.setProperty(entry.key, entry.value);
-      } catch (_) {}
+      } catch (error) {
+        AppLogger.d('MPV option ${entry.key} was not accepted: $error');
+      }
     }
 
     // Apply user custom MPV settings
     for (final entry in mpvSettings.entries) {
-      if (entry.key == 'vo') continue;
+      // Keep the safe online-decoder baseline. A stale custom hwdec setting
+      // must not silently re-enable the crash-prone path.
+      if (entry.key == 'vo' || entry.key == 'hwdec') continue;
       try {
         platform.setProperty(entry.key, entry.value);
-      } catch (_) {}
+      } catch (error) {
+        AppLogger.d('Custom MPV option ${entry.key} was not accepted: $error');
+      }
     }
 
     videoController = VideoController(
       _player,
       configuration: const VideoControllerConfiguration(
-        enableHardwareAcceleration: true,
+        enableHardwareAcceleration: false,
       ),
     );
 
@@ -248,14 +270,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.duration.listen((dur) {
-        if (dur > Duration.zero) {
-          _startupTimer?.cancel();
-          _startupTimer = null;
-        }
-        state = state.copyWith(
-          duration: dur,
-          isOpening: dur > Duration.zero ? false : null,
-        );
+        // A parsed manifest is not proof that a frame rendered. Keep the
+        // startup watchdog alive until playback/position actually advances.
+        state = state.copyWith(duration: dur);
       }),
     );
 
@@ -274,12 +291,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.playing.listen((play) {
-        if (play) {
-          _startupTimer?.cancel();
-          _startupTimer = null;
-          // Clear stall state when playback actually resumes
-        }
-        state = state.copyWith(isPlaying: play, isOpening: play ? false : null);
+        // MPV can report `playing` as soon as it accepts a manifest, before
+        // a frame has rendered. Position advancement is the only reliable
+        // startup signal, so the watchdog is cancelled there instead.
+        state = state.copyWith(isPlaying: play);
       }),
     );
 
@@ -293,9 +308,60 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     _subs.add(
       stream.error.listen((error) {
-        AppLogger.w('Player stream warning/error: $error');
+        // MPV can emit a recoverable stream warning while HLS continues to
+        // advance. Retrying immediately in that situation interrupts healthy
+        // playback and is the root cause of the visible 2-second/restart loop.
+        if (!_automaticRetryInFlight) {
+          _automaticRetryInFlight = true;
+          unawaited(_handleStreamError(error));
+        }
       }),
     );
+  }
+
+  Future<void> _handleStreamError(Object error) async {
+    final urlAtError = _lastUrl;
+    final positionAtError = _player.state.position;
+    try {
+      // HLS commonly emits a transient segment warning while MPV reconnects.
+      // Escalating after 1.5 seconds caused the source manager to reopen media
+      // during ordinary buffering, producing the exact play-2s/restart loop.
+      await Future<void>.delayed(const Duration(seconds: 12));
+      if (urlAtError == null || urlAtError != _lastUrl) return;
+
+      var currentPosition = _player.state.position;
+      if (currentPosition > positionAtError + const Duration(seconds: 1)) {
+        AppLogger.d('Ignoring recoverable player stream warning: $error');
+        return;
+      }
+
+      // If MPV is visibly buffering, let its configured reconnect/cache path
+      // finish before considering another server. Switching while buffering
+      // discards the cache and is worse on weak connections.
+      if (_player.state.buffering) {
+        await Future<void>.delayed(const Duration(seconds: 12));
+        if (urlAtError != _lastUrl) return;
+        currentPosition = _player.state.position;
+        if (currentPosition > positionAtError + const Duration(seconds: 1)) {
+          AppLogger.d('Stream recovered after extended buffering: $error');
+          return;
+        }
+      }
+
+      AppLogger.w('Player stream failure after recovery grace period: $error');
+      _startupTimer?.cancel();
+      _startupTimer = null;
+      // Do not reopen the same URL here. The episode provider owns one
+      // serialized, language-preserving server failover. Reopening here was
+      // racing that provider and sending playback back to the start.
+      state = state.copyWith(
+        isOpening: false,
+        isBuffering: false,
+        playbackError: 'Playback failed: $error',
+      );
+    } finally {
+      _automaticRetryInFlight = false;
+    }
   }
 
   void _dispose() {
@@ -315,11 +381,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     int? episode,
   }) async {
     final isSameSession =
-        (mediaId != null &&
-            episode != null &&
-            mediaId == _activeMediaId &&
-            episode == _activeEpisode) ||
-        (mediaId == null && episode == null && _activeMediaId != null);
+        mediaId != null &&
+        episode != null &&
+        mediaId == _activeMediaId &&
+        episode == _activeEpisode;
 
     // If startAt is explicitly provided, use it. Otherwise, if reopening the same media & episode,
     // preserve the last stable playback position so we don't restart from beginning on stream recovery/reload.
@@ -330,8 +395,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
                 ? _lastStablePosition
                 : null);
 
-    if (mediaId != null) _activeMediaId = mediaId;
-    if (episode != null) _activeEpisode = episode;
+    _activeMediaId = mediaId;
+    _activeEpisode = episode;
     if (!isSameSession && effectiveStartAt != null) {
       _lastStablePosition = effectiveStartAt;
     }
@@ -388,7 +453,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
         );
       }
       await Future.wait(headerFutures);
-    } catch (_) {}
+    } catch (error) {
+      AppLogger.w('Could not apply stream headers before playback: $error');
+    }
     await _player.open(
       Media(url, httpHeaders: effectiveHeaders, start: effectiveStartAt),
       play: true,

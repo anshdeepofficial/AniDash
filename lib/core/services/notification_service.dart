@@ -77,21 +77,31 @@ class NotificationService {
         backoffPolicyDelay: const Duration(seconds: 30),
       );
 
-      // Periodic WorkManager jobs are deliberately inexact. This one-off job
-      // verifies the callback and notification pipeline immediately after the
-      // app registers (or repairs) the periodic worker.
-      await Workmanager().registerOneOffTask(
-        notificationBootstrapTask,
-        notificationBootstrapTask,
-        tag: notificationWorkerTag,
-        existingWorkPolicy: ExistingWorkPolicy.replace,
-        initialDelay: const Duration(seconds: 10),
-        constraints: Constraints(networkType: NetworkType.connected),
-        backoffPolicy: BackoffPolicy.exponential,
-        backoffPolicyDelay: const Duration(seconds: 30),
-      );
-
       final prefs = await SharedPreferences.getInstance();
+      final lastBootstrap =
+          prefs.getInt('notification_worker_bootstrap_at') ?? 0;
+      final bootstrapDue =
+          forceReplace ||
+          DateTime.now().millisecondsSinceEpoch - lastBootstrap >=
+              const Duration(hours: 12).inMilliseconds;
+      // A one-off verification is useful after explicit settings changes, but
+      // must not fire every app launch and replay missed notifications.
+      if (bootstrapDue) {
+        await Workmanager().registerOneOffTask(
+          notificationBootstrapTask,
+          notificationBootstrapTask,
+          tag: notificationWorkerTag,
+          existingWorkPolicy: ExistingWorkPolicy.replace,
+          initialDelay: const Duration(seconds: 10),
+          constraints: Constraints(networkType: NetworkType.connected),
+          backoffPolicy: BackoffPolicy.exponential,
+          backoffPolicyDelay: const Duration(seconds: 30),
+        );
+        await prefs.setInt(
+          'notification_worker_bootstrap_at',
+          DateTime.now().millisecondsSinceEpoch,
+        );
+      }
       await prefs.setInt(
         'notification_worker_registered_at',
         DateTime.now().millisecondsSinceEpoch,

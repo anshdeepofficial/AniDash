@@ -7,9 +7,10 @@ import 'package:ani_dash/core/utils/app_logger.dart';
 abstract class BaseOAuthService {
   bool get isDesktop => Platform.isWindows || Platform.isLinux;
 
-  String get redirectUri => isDesktop
-      ? 'http://localhost:43824/success?code=1337'
-      : 'shonenx://callback';
+  String get redirectUri =>
+      isDesktop
+          ? 'http://localhost:43824/success?code=1337'
+          : 'shonenx://callback';
 
   String get callbackUrlScheme =>
       isDesktop ? 'http://localhost:43824' : 'shonenx';
@@ -25,7 +26,14 @@ abstract class BaseOAuthService {
         options: FlutterWebAuth2Options(useWebview: !isDesktop),
       );
       AppLogger.i('Authentication callback received.');
-      return Uri.parse(result).queryParameters;
+      final callback = Uri.parse(result);
+      final parameters = <String, String>{...callback.queryParameters};
+      // OAuth implicit/public-client flows return tokens in the URL fragment.
+      // FlutterWebAuth gives us the complete callback, so merge both forms.
+      if (callback.fragment.isNotEmpty) {
+        parameters.addAll(Uri.splitQueryString(callback.fragment));
+      }
+      return parameters;
     } catch (e, st) {
       AppLogger.e('Error during web authentication', e, st);
       return null;

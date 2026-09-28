@@ -48,6 +48,15 @@ class DownloadsNotifier extends _$DownloadsNotifier {
       await _repository.init();
       final downloads = _repository.getDownloads();
       state = state.copyWith(downloads: downloads);
+      // Isolates do not survive process death. Resume only tasks that were
+      // actively queued/downloading; paused and failed jobs remain user-owned.
+      for (final item in downloads.where(
+        (item) =>
+            item.state == DownloadStatus.queued ||
+            item.state == DownloadStatus.downloading,
+      )) {
+        unawaited(_service.startDownload(item));
+      }
     } catch (e, st) {
       AppLogger.e("Failed to load downloads", e, st);
       state = state.copyWith(error: e);

@@ -28,19 +28,103 @@ class DownloadService {
   final List<DownloadItem> _queue = [];
   final Map<String, Isolate> _isolates = {};
   final Map<String, SendPort> _ports = {};
+  final Map<String, ReceivePort> _receivePorts = {};
+  final Map<String, StreamSubscription<dynamic>> _receiveSubscriptions = {};
+  final Map<String, DownloadItem> _waitingForWifi = {};
+  final Map<String, DateTime> _lastProgressNotification = {};
+  final Map<String, int> _lastNotifiedPercent = {};
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _networkRetryTimer;
 
-  DownloadService(this.ref, this._notifier);
+  DownloadService(this.ref, this._notifier) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      r,
+    ) async {
+      if (r.contains(ConnectivityResult.none) || _waitingForWifi.isEmpty) {
+        return;
+      }
+      if (_settings.wifiOnly && !r.contains(ConnectivityResult.wifi)) return;
+      if (!await _hasInternetAccess()) return;
+      final pending = _waitingForWifi.values.toList(growable: false);
+      _waitingForWifi.clear();
+      for (final item in pending) {
+        unawaited(startDownload(item));
+      }
+    });
+    ref.onDispose(dispose);
+  }
 
   DownloadSettingsModel get _settings => ref.read(downloadSettingsProvider);
+
+  Future<bool> _hasInternetAccess() async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client
+          .getUrl(
+            Uri.parse('https://connectivitycheck.gstatic.com/generate_204'),
+          )
+          .timeout(const Duration(seconds: 5));
+      final response = await request.close().timeout(
+        const Duration(seconds: 5),
+      );
+      await response.drain<void>();
+      return response.statusCode >= 200 && response.statusCode < 400;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  void _scheduleNetworkRetry() {
+    _networkRetryTimer ??= Timer(const Duration(seconds: 10), () async {
+      _networkRetryTimer = null;
+      if (_waitingForWifi.isEmpty) return;
+      final connectivity = await Connectivity().checkConnectivity();
+      if (_settings.wifiOnly &&
+          !connectivity.contains(ConnectivityResult.wifi)) {
+        _scheduleNetworkRetry();
+        return;
+      }
+      if (!await _hasInternetAccess()) {
+        _scheduleNetworkRetry();
+        return;
+      }
+      final pending = _waitingForWifi.values.toList(growable: false);
+      _waitingForWifi.clear();
+      for (final pendingItem in pending) {
+        unawaited(startDownload(pendingItem));
+      }
+    });
+  }
 
   Future<void> startDownload(DownloadItem item) async {
     if (_settings.wifiOnly) {
       try {
         final connectivity = await Connectivity().checkConnectivity();
         if (!connectivity.contains(ConnectivityResult.wifi)) {
-          return _fail(item, 'Waiting for Wi-Fi (Wi-Fi only enabled)');
+          _waitingForWifi[item.id] = item;
+          _notifier.updateDownloadState(
+            item.copyWith(
+              state: DownloadStatus.queued,
+              error: 'Waiting for Wi-Fi (Wi-Fi only enabled)',
+            ),
+          );
+          return;
         }
       } catch (_) {}
+    }
+
+    if (!await _hasInternetAccess()) {
+      _waitingForWifi[item.id] = item;
+      _notifier.updateDownloadState(
+        item.copyWith(
+          state: DownloadStatus.queued,
+          error: 'Waiting for an active internet connection',
+        ),
+      );
+      _scheduleNetworkRetry();
+      return;
     }
 
     if (!await ref
@@ -57,11 +141,17 @@ class DownloadService {
           customDir.createSync(recursive: true);
         } catch (_) {}
       }
-      basePath = customDir.existsSync()
-          ? customDir.path
-          : (await StorageProvider.getDefaultDirectory())!.path;
+      final fallback = await StorageProvider.getDefaultDirectory();
+      if (!customDir.existsSync() && fallback == null) {
+        return _fail(item, 'No writable download directory is available');
+      }
+      basePath = customDir.existsSync() ? customDir.path : fallback!.path;
     } else {
-      basePath = (await StorageProvider.getDefaultDirectory())!.path;
+      final directory = await StorageProvider.getDefaultDirectory();
+      if (directory == null) {
+        return _fail(item, 'No writable download directory is available');
+      }
+      basePath = directory.path;
     }
 
     final itemPath = item.filePath;
@@ -69,9 +159,8 @@ class DownloadService {
     if (p.isAbsolute(itemPath)) {
       finalPath = itemPath;
     } else {
-      final cleanTitle = item.animeTitle
-          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
-          .trim();
+      final cleanTitle =
+          item.animeTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
       String targetDir;
       if (_settings.folderStructure == 'Anime/Episode') {
         targetDir = p.join(
@@ -93,14 +182,19 @@ class DownloadService {
     final queuedItem = item.copyWith(
       state: DownloadStatus.queued,
       filePath: finalPath,
+      clearError: true,
     );
 
     _notifier.updateDownloadState(queuedItem);
-    _queue.add(queuedItem);
+    if (!_queue.any((queued) => queued.id == queuedItem.id) &&
+        !_isolates.containsKey(queuedItem.id)) {
+      _queue.add(queuedItem);
+    }
     _processQueue();
   }
 
   void pauseDownload(DownloadItem item) {
+    _waitingForWifi.remove(item.id);
     if (_isolates.containsKey(item.id)) {
       _ports[item.id]?.send('cancel');
       _isolates[item.id]?.kill(priority: Isolate.immediate);
@@ -136,8 +230,9 @@ class DownloadService {
 
   Future<void> _spawnIsolate(DownloadItem item) async {
     final receivePort = ReceivePort();
+    _receivePorts[item.id] = receivePort;
     _notifier.updateDownloadState(
-      item.copyWith(state: DownloadStatus.downloading),
+      item.copyWith(state: DownloadStatus.downloading, clearError: true),
     );
 
     try {
@@ -149,7 +244,7 @@ class DownloadService {
       _isolates[item.id] = isolate;
       _processQueue();
 
-      receivePort.listen((msg) {
+      _receiveSubscriptions[item.id] = receivePort.listen((msg) {
         if (msg is SendPort) {
           _ports[item.id] = msg;
         } else if (msg is DownloadItem) {
@@ -163,12 +258,20 @@ class DownloadService {
             );
             _cleanup(item.id);
           } else if (msg.state == DownloadStatus.downloading) {
-            NotificationService().showDownloadProgressNotification(
-              id: notifId,
-              animeTitle: msg.animeTitle,
-              episodeNumber: msg.episodeNumber,
-              progress: msg.progressPercentage,
-            );
+            final now = DateTime.now();
+            final percent = (msg.progressPercentage * 100).round();
+            final lastAt = _lastProgressNotification[item.id];
+            if (_lastNotifiedPercent[item.id] != percent &&
+                (lastAt == null || now.difference(lastAt).inSeconds >= 1)) {
+              _lastProgressNotification[item.id] = now;
+              _lastNotifiedPercent[item.id] = percent;
+              NotificationService().showDownloadProgressNotification(
+                id: notifId,
+                animeTitle: msg.animeTitle,
+                episodeNumber: msg.episodeNumber,
+                progress: msg.progressPercentage,
+              );
+            }
           }
         } else if (msg is String) {
           if (msg.startsWith('err:')) _fail(item, msg.substring(4));
@@ -185,7 +288,29 @@ class DownloadService {
   void _cleanup(String id) {
     _isolates.remove(id);
     _ports.remove(id);
+    _receiveSubscriptions.remove(id)?.cancel();
+    _receivePorts.remove(id)?.close();
+    _lastProgressNotification.remove(id);
+    _lastNotifiedPercent.remove(id);
     _processQueue();
+  }
+
+  void dispose() {
+    _networkRetryTimer?.cancel();
+    _connectivitySubscription?.cancel();
+    for (final isolate in _isolates.values) {
+      isolate.kill(priority: Isolate.immediate);
+    }
+    for (final subscription in _receiveSubscriptions.values) {
+      subscription.cancel();
+    }
+    for (final port in _receivePorts.values) {
+      port.close();
+    }
+    _isolates.clear();
+    _ports.clear();
+    _receiveSubscriptions.clear();
+    _receivePorts.clear();
   }
 
   void _fail(DownloadItem item, String reason) {
@@ -214,10 +339,11 @@ Future<void> _downloadWorker(_TaskConfig task) async {
     if (msg == 'cancel') isCancelled = true;
   });
 
-  final ioClient = HttpClient()
-    ..maxConnectionsPerHost = 32
-    ..connectionTimeout = const Duration(seconds: 15)
-    ..idleTimeout = const Duration(seconds: 30);
+  final ioClient =
+      HttpClient()
+        ..maxConnectionsPerHost = 12
+        ..connectionTimeout = const Duration(seconds: 15)
+        ..idleTimeout = const Duration(seconds: 30);
   final client = IOClient(ioClient);
   final item = task.item;
   final isM3U8 = item.isM3U8;
@@ -262,6 +388,7 @@ Future<DownloadItem> _downloadSubtitleSidecars(
   if (item.subtitles == null || item.subtitles!.isEmpty) return item;
   final localized = <dynamic>[];
   var index = 0;
+  var failures = 0;
   for (final raw in item.subtitles!) {
     try {
       final map = Map<String, dynamic>.from(
@@ -272,6 +399,7 @@ Future<DownloadItem> _downloadSubtitleSidecars(
       final bytes = await _fetch(url, item.headers, client);
       if (bytes == null) {
         localized.add(raw);
+        failures++;
         continue;
       }
       final uri = Uri.tryParse(url);
@@ -293,9 +421,16 @@ Future<DownloadItem> _downloadSubtitleSidecars(
       index++;
     } catch (_) {
       localized.add(raw);
+      failures++;
     }
   }
-  return item.copyWith(subtitles: localized);
+  return item.copyWith(
+    subtitles: localized,
+    error:
+        failures == 0
+            ? null
+            : '$failures offline subtitle file(s) could not be downloaded',
+  );
 }
 
 Future<DownloadItem> _processFile(
@@ -387,7 +522,9 @@ Future<DownloadItem> _processM3U8(
 
   // HLS segments are small. Keep enough requests in flight to saturate fast
   // Wi-Fi while capping concurrency to avoid provider throttling.
-  const workerCount = 16;
+  // Six concurrent segments saturate typical mobile/Wi-Fi links without
+  // provoking CDN throttling or starving the active video player.
+  const workerCount = 6;
   int completed = 0;
   int downloadedBytesTotal = 0;
   int? estimatedTotalBytes;

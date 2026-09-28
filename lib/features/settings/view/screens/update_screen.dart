@@ -51,6 +51,7 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
         UpdateType.stable,
         releaseNotes: updateInfo.releaseNotes,
         apkDownloadUrl: updateInfo.downloadUrl,
+        apkSha256: updateInfo.sha256,
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

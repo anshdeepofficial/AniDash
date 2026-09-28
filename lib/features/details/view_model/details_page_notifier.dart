@@ -6,6 +6,7 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
+import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/shared/providers/anime_repo_provider.dart';
 import 'package:ani_dash/shared/providers/anilist_service_provider.dart';
 import 'package:ani_dash/shared/providers/anime_match_service.dart';
@@ -82,6 +83,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
         error: null,
       );
       ref.read(episodeListProvider.notifier).reset();
+      ref.read(episodeDataProvider.notifier).reset();
       await fetchDetails();
       if (!ref.mounted) return;
       final enrichedMedia = state.details.value ?? media;
@@ -91,6 +93,15 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
   Future<void> fetchDetails() async {
     final currentData = state.details.value;
+    final knownMalId = int.tryParse(currentData?.idMal ?? '');
+    // Start the independent MAL enrichment alongside AniList so a slow or
+    // unavailable primary API does not leave About blank for tens of seconds.
+    final jikanFuture =
+        knownMalId == null
+            ? null
+            : JikanService()
+                .getFullDetails(knownMalId)
+                .timeout(const Duration(seconds: 12), onTimeout: () => null);
 
     try {
       final anilistId = int.tryParse(currentData?.id ?? animeId);
@@ -107,15 +118,16 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
         }
       }
       if (fresh == null && currentData != null) {
-        var malId = int.tryParse(currentData.idMal ?? '');
+        var malId = knownMalId;
         final title =
             currentData.title.english ??
             currentData.title.romaji ??
             currentData.title.userPreferred;
         if (title.isNotEmpty) {
           try {
-            final anilistSearch =
-                await ref.read(anilistServiceProvider).searchAnime(title);
+            final anilistSearch = await ref
+                .read(anilistServiceProvider)
+                .searchAnime(title);
             if (anilistSearch.isNotEmpty) {
               final matchedId = int.tryParse(anilistSearch.first.id);
               if (matchedId != null) {
@@ -133,7 +145,15 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
               matches.isEmpty ? null : int.tryParse(matches.first.idMal ?? '');
         }
         if (fresh == null && malId != null) {
-          final jikan = await JikanService().getFullDetails(malId);
+          final jikan =
+              malId == knownMalId && jikanFuture != null
+                  ? await jikanFuture
+                  : await JikanService()
+                      .getFullDetails(malId)
+                      .timeout(
+                        const Duration(seconds: 12),
+                        onTimeout: () => null,
+                      );
           if (jikan != null) {
             fresh = _mergeJikanDetails(currentData, malId, jikan);
           }
@@ -150,11 +170,37 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
             .timeout(const Duration(seconds: 15));
       }
 
+      // AniList list responses occasionally arrive without the full about
+      // payload. Fill those gaps from Jikan instead of treating a partial
+      // object as complete and leaving the About tab blank.
+      if (fresh != null) {
+        final needsEnrichment =
+            fresh.description?.trim().isEmpty != false ||
+            fresh.staff.isEmpty ||
+            fresh.studios.isEmpty;
+        final malId = int.tryParse(fresh.idMal ?? currentData?.idMal ?? '');
+        if (needsEnrichment && malId != null) {
+          final jikan =
+              malId == knownMalId && jikanFuture != null
+                  ? await jikanFuture
+                  : await JikanService()
+                      .getFullDetails(malId)
+                      .timeout(
+                        const Duration(seconds: 12),
+                        onTimeout: () => null,
+                      );
+          if (jikan != null) {
+            fresh = _mergeJikanDetails(fresh, malId, jikan);
+          }
+        }
+      }
+
       if (!ref.mounted) return;
 
       if (fresh != null) {
         var characters = fresh.characters;
-        if (characters.isEmpty && (currentData?.characters.isNotEmpty ?? false)) {
+        if (characters.isEmpty &&
+            (currentData?.characters.isNotEmpty ?? false)) {
           characters = currentData!.characters;
         }
         if (characters.isEmpty) {
@@ -181,9 +227,6 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
           details: AsyncData(enriched),
           isLoadingDetails: false,
         );
-        if (state.animeIdForSource == null && !state.isSearchingMatch) {
-          _fetchEpisodes(enriched.title);
-        }
       } else if (currentData != null) {
         var enriched = currentData;
         if (enriched.characters.isEmpty) {
@@ -220,8 +263,9 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     ({
       Map<String, dynamic> details,
       List<dynamic> staff,
-      List<dynamic> characters
-    }) jikan,
+      List<dynamic> characters,
+    })
+    jikan,
   ) {
     final data = jikan.details;
     final studios =
@@ -372,10 +416,12 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
     return rawCharacters
         .map((item) => Map<String, dynamic>.from(item as Map? ?? {}))
         .map((item) {
-          final charMap =
-              Map<String, dynamic>.from(item['character'] as Map? ?? {});
-          final images =
-              Map<String, dynamic>.from(charMap['images'] as Map? ?? {});
+          final charMap = Map<String, dynamic>.from(
+            item['character'] as Map? ?? {},
+          );
+          final images = Map<String, dynamic>.from(
+            charMap['images'] as Map? ?? {},
+          );
           final jpg = Map<String, dynamic>.from(images['jpg'] as Map? ?? {});
           return UniversalCharacter(
             id: (charMap['mal_id'] as num?)?.toInt() ?? 0,
@@ -552,8 +598,9 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
     String selectedRange = state.selectedRange;
     if (selectedRange == 'All' && ranges.length > 2) {
-      final progress =
-          ref.read(watchProgressRepositoryProvider).getProgress(animeId);
+      final progress = ref
+          .read(watchProgressRepositoryProvider)
+          .getProgress(animeId);
       final currentEp = progress?.currentEpisode;
       if (currentEp != null && currentEp > 0) {
         for (final r in ranges) {

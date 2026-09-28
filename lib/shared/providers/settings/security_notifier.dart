@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ani_dash/main.dart';
 
 class SecurityState {
@@ -66,12 +68,10 @@ class SecurityState {
   Map<String, dynamic> toMap() {
     return {
       'appLockEnabled': appLockEnabled,
-      'appLockPinHash': appLockPinHash,
       'appLockBiometrics': appLockBiometrics,
       'appLockType': appLockType,
       'appLockDelaySeconds': appLockDelaySeconds,
       'hentaiLockEnabled': hentaiLockEnabled,
-      'hentaiLockPinHash': hentaiLockPinHash,
       'hentaiLockBiometrics': hentaiLockBiometrics,
       'recentAppsPrivacy': recentAppsPrivacy,
       'screenshotPrivacy': screenshotPrivacy,
@@ -109,6 +109,14 @@ final securityProvider = NotifierProvider<SecurityNotifier, SecurityState>(
 class SecurityNotifier extends Notifier<SecurityState> {
   static const _prefsKey = 'ani_security_settings';
   static const _channel = MethodChannel('shonenx/security');
+  static const _appCredentialKey = 'ani_app_lock_credential';
+  static const _adultCredentialKey = 'ani_adult_lock_credential';
+  static const _iterations = 30000;
+  static const _storage = FlutterSecureStorage();
+  int _appFailures = 0;
+  int _adultFailures = 0;
+  DateTime? _appLockedUntil;
+  DateTime? _adultLockedUntil;
 
   @override
   SecurityState build() {
@@ -116,27 +124,91 @@ class SecurityNotifier extends Notifier<SecurityState> {
     final initial =
         raw != null ? SecurityState.fromJson(raw) : const SecurityState();
     _applySecureFlag(initial.screenshotPrivacy);
+    Future.microtask(_loadSecureCredentials);
     return initial;
   }
 
   String hashPin(String pin) {
-    return sha256.convert(utf8.encode(pin)).toString();
+    final random = Random.secure();
+    final salt = List<int>.generate(16, (_) => random.nextInt(256));
+    return _deriveCredential(pin, salt);
+  }
+
+  String _deriveCredential(String pin, List<int> salt) {
+    final mac = Hmac(sha256, utf8.encode(pin));
+    var block = mac.convert(<int>[...salt, 0, 0, 0, 1]).bytes;
+    final derived = List<int>.from(block);
+    for (var i = 1; i < _iterations; i++) {
+      block = mac.convert(block).bytes;
+      for (var j = 0; j < derived.length; j++) {
+        derived[j] ^= block[j];
+      }
+    }
+    return 'pbkdf2-sha256\$$_iterations\$${base64UrlEncode(salt)}\$${base64UrlEncode(derived)}';
+  }
+
+  bool _verifyCredential(String pin, String stored) {
+    if (!stored.startsWith('pbkdf2-sha256\$')) {
+      return sha256.convert(utf8.encode(pin)).toString() == stored;
+    }
+    final parts = stored.split('\$');
+    if (parts.length != 4) return false;
+    final salt = base64Url.decode(parts[2]);
+    final candidate = _deriveCredential(pin, salt);
+    if (candidate.length != stored.length) return false;
+    var difference = 0;
+    for (var i = 0; i < candidate.length; i++) {
+      difference |= candidate.codeUnitAt(i) ^ stored.codeUnitAt(i);
+    }
+    return difference == 0;
+  }
+
+  Future<void> _loadSecureCredentials() async {
+    final app = await _storage.read(key: _appCredentialKey);
+    final adult = await _storage.read(key: _adultCredentialKey);
+    if (app != null || adult != null) {
+      state = state.copyWith(
+        appLockPinHash: app ?? state.appLockPinHash,
+        hentaiLockPinHash: adult ?? state.hentaiLockPinHash,
+      );
+    }
+    // Migrate legacy credentials out of ordinary preferences.
+    if (app == null && state.appLockPinHash != null) {
+      await _storage.write(key: _appCredentialKey, value: state.appLockPinHash);
+    }
+    if (adult == null && state.hentaiLockPinHash != null) {
+      await _storage.write(
+        key: _adultCredentialKey,
+        value: state.hentaiLockPinHash,
+      );
+    }
+    _save();
   }
 
   bool verifyAppPin(String pin) {
-    if (state.appLockPinHash == null) return true;
-    final match = hashPin(pin) == state.appLockPinHash;
+    if (_appLockedUntil?.isAfter(DateTime.now()) == true) return false;
+    if (state.appLockPinHash == null) return !state.appLockEnabled;
+    final match = _verifyCredential(pin, state.appLockPinHash!);
     if (match) {
+      _appFailures = 0;
       state = state.copyWith(isAppUnlocked: true);
+    } else if (++_appFailures >= 5) {
+      _appFailures = 0;
+      _appLockedUntil = DateTime.now().add(const Duration(seconds: 30));
     }
     return match;
   }
 
   bool verifyHentaiPin(String pin) {
-    if (state.hentaiLockPinHash == null) return true;
-    final match = hashPin(pin) == state.hentaiLockPinHash;
+    if (_adultLockedUntil?.isAfter(DateTime.now()) == true) return false;
+    if (state.hentaiLockPinHash == null) return !state.hentaiLockEnabled;
+    final match = _verifyCredential(pin, state.hentaiLockPinHash!);
     if (match) {
+      _adultFailures = 0;
       state = state.copyWith(isHentaiUnlocked: true);
+    } else if (++_adultFailures >= 5) {
+      _adultFailures = 0;
+      _adultLockedUntil = DateTime.now().add(const Duration(seconds: 30));
     }
     return match;
   }
@@ -163,6 +235,9 @@ class SecurityNotifier extends Notifier<SecurityState> {
 
   void setAppLock(bool enabled, [String? pin]) {
     final pinHash = pin != null ? hashPin(pin) : state.appLockPinHash;
+    if (pinHash != null) {
+      _storage.write(key: _appCredentialKey, value: pinHash);
+    }
     state = state.copyWith(
       appLockEnabled: enabled,
       appLockPinHash: pinHash,
@@ -173,6 +248,9 @@ class SecurityNotifier extends Notifier<SecurityState> {
 
   void setHentaiLock(bool enabled, [String? pin]) {
     final pinHash = pin != null ? hashPin(pin) : state.hentaiLockPinHash;
+    if (pinHash != null) {
+      _storage.write(key: _adultCredentialKey, value: pinHash);
+    }
     state = state.copyWith(
       hentaiLockEnabled: enabled,
       hentaiLockPinHash: pinHash,
@@ -187,9 +265,11 @@ class SecurityNotifier extends Notifier<SecurityState> {
   }
 
   void setAppLockType(String type, String credential) {
+    final credentialHash = hashPin(credential);
+    _storage.write(key: _appCredentialKey, value: credentialHash);
     state = state.copyWith(
       appLockType: type,
-      appLockPinHash: hashPin(credential),
+      appLockPinHash: credentialHash,
       isAppUnlocked: true,
     );
     _save();

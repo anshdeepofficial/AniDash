@@ -4,6 +4,8 @@ import 'package:ani_dash/features/downloads/model/download_status.dart';
 class DownloadItem {
   final String id;
   final String animeTitle;
+  final String? animeId;
+  final int? totalEpisodes;
   final String episodeTitle;
   final int episodeNumber;
   final String thumbnail;
@@ -31,6 +33,8 @@ class DownloadItem {
     this.quality = 'Default',
     required this.downloadUrl,
     required this.animeTitle,
+    this.animeId,
+    this.totalEpisodes,
     required this.episodeTitle,
     required this.episodeNumber,
     required this.thumbnail,
@@ -57,6 +61,8 @@ class DownloadItem {
   DownloadItem copyWith({
     String? id,
     String? animeTitle,
+    String? animeId,
+    int? totalEpisodes,
     String? episodeTitle,
     int? episodeNumber,
     String? thumbnail,
@@ -70,6 +76,7 @@ class DownloadItem {
     int? speed,
     Duration? eta,
     dynamic error,
+    bool clearError = false,
     String? contentType,
     int? totalSegments,
     int? downloadedBytes,
@@ -81,6 +88,8 @@ class DownloadItem {
     return DownloadItem(
       id: id ?? this.id,
       animeTitle: animeTitle ?? this.animeTitle,
+      animeId: animeId ?? this.animeId,
+      totalEpisodes: totalEpisodes ?? this.totalEpisodes,
       episodeTitle: episodeTitle ?? this.episodeTitle,
       episodeNumber: episodeNumber ?? this.episodeNumber,
       thumbnail: thumbnail ?? this.thumbnail,
@@ -93,7 +102,7 @@ class DownloadItem {
       headers: headers ?? this.headers,
       speed: speed ?? this.speed,
       eta: eta ?? this.eta,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
       contentType: contentType ?? this.contentType,
       totalSegments: totalSegments ?? this.totalSegments,
       downloadedBytes: downloadedBytes ?? this.downloadedBytes,

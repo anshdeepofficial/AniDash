@@ -23,7 +23,7 @@ String? formatEpisodeText({
     }
   } else if (hasTotal) {
     if (compact) {
-      return uppercase ? '$totalEpisodes EPS' : '${totalEpisodes}ep';
+      return uppercase ? '$totalEpisodes EPS' : '$totalEpisodes EP';
     } else {
       return '$totalEpisodes Episodes';
     }

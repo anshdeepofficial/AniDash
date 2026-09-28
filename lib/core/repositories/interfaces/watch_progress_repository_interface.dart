@@ -31,4 +31,5 @@ abstract class WatchProgressRepositoryInterface {
   Stream<List<AnimeWatchProgressEntry>> watchAllProgress();
   Stream<AnimeWatchProgressEntry?> watchProgress(String animeId);
   Future<void> migrateFromHive();
+  Future<void> replaceAllProgress(Iterable<AnimeWatchProgressEntry> entries);
 }

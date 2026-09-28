@@ -57,12 +57,12 @@ class MyApp extends ConsumerWidget {
       builder: (ColorScheme? lightDynamic, ColorScheme? darkDynamic) {
         final ColorScheme? lightScheme =
             (theme.useDynamicColors && lightDynamic != null)
-            ? lightDynamic
-            : null;
+                ? lightDynamic
+                : null;
         final ColorScheme? darkScheme =
             (theme.useDynamicColors && darkDynamic != null)
-            ? darkDynamic
-            : null;
+                ? darkDynamic
+                : null;
 
         final lightTheme = FlexThemeData.light(
           colorScheme: lightScheme,
@@ -86,16 +86,18 @@ class MyApp extends ConsumerWidget {
           canvasColor: theme.amoled ? Colors.black : null,
         );
 
-        final themeMode = theme.themeMode == 'light'
-            ? ThemeMode.light
-            : theme.themeMode == 'dark'
-            ? ThemeMode.dark
-            : ThemeMode.system;
+        final themeMode =
+            theme.themeMode == 'light'
+                ? ThemeMode.light
+                : theme.themeMode == 'dark'
+                ? ThemeMode.dark
+                : ThemeMode.system;
 
         return MaterialApp.router(
           debugShowCheckedModeBanner: false,
           scaffoldMessengerKey: scaffoldMessengerKey,
           routerConfig: routerConfig,
+          supportedLocales: const [Locale('en')],
           builder: (context, child) {
             final mediaQuery = MediaQuery.of(context);
             final scaledSize = mediaQuery.size / scale;
@@ -104,7 +106,11 @@ class MyApp extends ConsumerWidget {
                 textScaler: TextScaler.linear(scale),
                 size: scaledSize,
               ),
-              child: SecurityGate(child: child!),
+              child: Semantics(
+                container: true,
+                label: 'AniDash application',
+                child: SecurityGate(child: child!),
+              ),
             );
           },
           theme: lightTheme,
@@ -116,11 +122,7 @@ class MyApp extends ConsumerWidget {
   }
 }
 
-void showAppSnackBar(
-  String title,
-  String message, {
-  ContentType? type,
-}) {
+void showAppSnackBar(String title, String message, {ContentType? type}) {
   type ??= ContentType.success;
   final messenger = scaffoldMessengerKey.currentState;
   if (messenger != null) {

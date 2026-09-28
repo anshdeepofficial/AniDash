@@ -33,11 +33,12 @@ class _DefaultSpotlightState extends State<DefaultSpotlight> {
     final colorScheme = theme.colorScheme;
     final borderRadius = BorderRadius.circular(28.0);
 
-    final imageUrl = widget.anime!.bannerImage?.isNotEmpty == true
-        ? widget.anime!.bannerImage!
-        : (widget.anime!.coverImage.large ??
-              widget.anime!.coverImage.medium ??
-              '');
+    final imageUrl =
+        widget.anime!.bannerImage?.isNotEmpty == true
+            ? widget.anime!.bannerImage!
+            : (widget.anime!.coverImage.large ??
+                widget.anime!.coverImage.medium ??
+                '');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -109,9 +110,10 @@ class _DefaultSpotlightState extends State<DefaultSpotlight> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AnimatedSlide(
-                          offset: _isHovered
-                              ? const Offset(0, 0)
-                              : const Offset(0, 0.05),
+                          offset:
+                              _isHovered
+                                  ? const Offset(0, 0)
+                                  : const Offset(0, 0.05),
                           duration: const Duration(milliseconds: 400),
                           curve: Curves.easeOutBack,
                           child: Text(
@@ -151,7 +153,11 @@ class _DefaultSpotlightState extends State<DefaultSpotlight> {
                             _SpotlightChip(
                               icon: Iconsax.video_play,
                               label:
-                                  '${widget.anime?.episodes ?? "?"} Episodes',
+                                  widget.anime?.episodes != null
+                                      ? '${widget.anime!.episodes} Episodes'
+                                      : (widget.anime?.status == 'RELEASING'
+                                          ? 'Ongoing'
+                                          : 'Episodes TBA'),
                             ),
                             if (widget.anime?.duration != null)
                               _SpotlightChip(

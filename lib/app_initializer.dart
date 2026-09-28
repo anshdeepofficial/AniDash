@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
-import 'package:ani_dash/core/tasks/episode_release_task.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -60,8 +59,11 @@ class AppInitializer {
     await _initializeMediaKit();
     try {
       await NotificationService().initialize();
-      await NotificationService().registerPeriodicNotificationWorker();
-      unawaited(EpisodeReleaseTask.performCheck());
+      // Keep the existing periodic worker: replacing it on every launch and
+      // immediately checking again causes delayed alerts to burst together.
+      await NotificationService().registerPeriodicNotificationWorker(
+        forceReplace: false,
+      );
       AppLogger.success('Notification service initialized');
     } catch (e, st) {
       AppLogger.fail('Notification service initialization failed');
@@ -69,9 +71,10 @@ class AppInitializer {
     }
     try {
       final jsonString = sharedPrefs.getString('update_settings_data');
-      final settings = jsonString != null
-          ? UpdateSettingsModel.fromJson(jsonString)
-          : const UpdateSettingsModel(fullDay: true);
+      final settings =
+          jsonString != null
+              ? UpdateSettingsModel.fromJson(jsonString)
+              : const UpdateSettingsModel(fullDay: true);
       await UpdateScheduler.apply(settings);
       AppLogger.success('Update scheduler registered at startup');
     } catch (e) {
@@ -88,9 +91,10 @@ class AppInitializer {
       );
       try {
         final info = await PackageInfo.fromPlatform();
-        final fullVersion = info.buildNumber.isNotEmpty
-            ? '${info.version}+${info.buildNumber}'
-            : info.version;
+        final fullVersion =
+            info.buildNumber.isNotEmpty
+                ? '${info.version}+${info.buildNumber}'
+                : info.version;
         await sharedPrefs.setString('app_version', fullVersion);
         final diskPrefs = await SharedPreferences.getInstance();
         await diskPrefs.setString('app_version', fullVersion);
@@ -146,23 +150,25 @@ class AppInitializer {
       final boxesToOpen = <String, Future<void> Function()>{
         'theme_settings': () => Hive.openBox<ThemeModel>('theme_settings'),
         'themedata': () => Hive.openBox('themedata'),
-        'subtitle_appearance': () =>
-            Hive.openBox<SubtitleAppearanceModel>('subtitle_appearance'),
+        'subtitle_appearance':
+            () => Hive.openBox<SubtitleAppearanceModel>('subtitle_appearance'),
         'home_page': () => Hive.openBox<HomePageModel>('home_page'),
         'ui_settings': () => Hive.openBox<UiSettings>('ui_settings'),
         'selected_provider': () => Hive.openBox<String>('selected_provider'),
         'player_settings': () => Hive.openBox<PlayerModel>('player_settings'),
-        'anime_watch_progress': () =>
-            Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress'),
-        'experimental_features': () =>
-            Hive.openBox<ExperimentalFeaturesModel>('experimental_features'),
+        'anime_watch_progress':
+            () => Hive.openBox<AnimeWatchProgressEntry>('anime_watch_progress'),
+        'experimental_features':
+            () => Hive.openBox<ExperimentalFeaturesModel>(
+              'experimental_features',
+            ),
         'downloads': () => Hive.openBox<DownloadItem>('downloads'),
         'settings': () => Hive.openBox('settings'),
         'onboard': () => Hive.openBox('onboard'),
-        'download_settings': () =>
-            Hive.openBox<DownloadSettingsModel>('download_settings'),
-        'content_settings': () =>
-            Hive.openBox<ContentSettingsModel>('content_settings'),
+        'download_settings':
+            () => Hive.openBox<DownloadSettingsModel>('download_settings'),
+        'content_settings':
+            () => Hive.openBox<ContentSettingsModel>('content_settings'),
         'news_cache': () => Hive.openBox<UniversalNews>('news_cache'),
         'news_read_status': () => Hive.openBox<String>('news_read_status'),
         'home_layout': () => Hive.openBox('home_layout'),

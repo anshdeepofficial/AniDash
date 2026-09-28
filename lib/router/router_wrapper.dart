@@ -108,6 +108,11 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // This shell stays mounted while changing tabs, unlike HomeScreen. Keep a
+    // single truthful app-visibility flag for background notification tasks.
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setBool('is_app_open', true),
+    );
     Future.microtask(
       () => ref.read(initializationProvider.notifier).initialize(),
     );
@@ -128,13 +133,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
         _checkForScheduledUpdate(isAppOpen: true, force: true);
       }
     });
-    _notificationRouteSubscription = NotificationService().onNotificationRoute.listen((
-      route,
-    ) {
-      if (mounted) {
-        context.push(route);
-      }
-    });
+    _notificationRouteSubscription = NotificationService().onNotificationRoute
+        .listen((route) {
+          if (mounted) {
+            context.push(route);
+          }
+        });
     _updateSettingsSub = ref.listenManual(updateSettingsProvider, (prev, next) {
       _startPeriodicForegroundUpdateCheck();
     });
@@ -155,6 +159,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
   @override
   void dispose() {
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setBool('is_app_open', false),
+    );
     _foregroundUpdateTimer?.cancel();
     _updateSettingsSub?.close();
     _updateTapSubscription?.cancel();
@@ -167,6 +174,10 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    SharedPreferences.getInstance().then(
+      (prefs) =>
+          prefs.setBool('is_app_open', state == AppLifecycleState.resumed),
+    );
     if (state == AppLifecycleState.resumed) {
       _checkForScheduledUpdate(isAppOpen: true);
       _startPeriodicForegroundUpdateCheck();
@@ -275,6 +286,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
             UpdateType.stable,
             releaseNotes: updateInfo.releaseNotes,
             apkDownloadUrl: updateInfo.downloadUrl,
+            apkSha256: updateInfo.sha256,
           );
         } finally {
           _updateSheetVisible = false;
@@ -341,8 +353,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     super.didUpdateWidget(oldWidget);
     final uiSettings = ref.read(uiSettingsProvider);
     final visibleItems = _getVisibleNavItems(uiSettings);
-    final targetPage = _pageIndexForBranch(widget.navigationShell.currentIndex, visibleItems);
-    if (_pageController.hasClients && _pageController.page?.round() != targetPage) {
+    final targetPage = _pageIndexForBranch(
+      widget.navigationShell.currentIndex,
+      visibleItems,
+    );
+    if (_pageController.hasClients &&
+        _pageController.page?.round() != targetPage) {
       _pageController.jumpToPage(targetPage);
     }
   }
@@ -382,9 +398,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       widget.navigationShell.currentIndex,
       visibleNavItems,
     );
-    if (_pageController.hasClients && _pageController.page?.round() != currentTargetPage) {
+    if (_pageController.hasClients &&
+        _pageController.page?.round() != currentTargetPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _pageController.hasClients && _pageController.page?.round() != currentTargetPage) {
+        if (mounted &&
+            _pageController.hasClients &&
+            _pageController.page?.round() != currentTargetPage) {
           _pageController.jumpToPage(currentTargetPage);
         }
       });
@@ -446,15 +465,17 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
                 child:
                     isWide
                         ? _SideNav(
-                            shell: widget.navigationShell,
-                            items: visibleNavItems,
-                            onTabSelected: (branch) => _onNavTap(branch, visibleNavItems),
-                          )
+                          shell: widget.navigationShell,
+                          items: visibleNavItems,
+                          onTabSelected:
+                              (branch) => _onNavTap(branch, visibleNavItems),
+                        )
                         : _BottomNav(
-                            shell: widget.navigationShell,
-                            items: visibleNavItems,
-                            onTabSelected: (branch) => _onNavTap(branch, visibleNavItems),
-                          ),
+                          shell: widget.navigationShell,
+                          items: visibleNavItems,
+                          onTabSelected:
+                              (branch) => _onNavTap(branch, visibleNavItems),
+                        ),
               ),
             ),
           ],

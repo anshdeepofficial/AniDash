@@ -80,7 +80,10 @@ class CompactSpotlight extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${anime!.episodes ?? "?"} Episodes',
+                  formatEpisodeText(anime: anime) ??
+                      (anime!.status == 'RELEASING'
+                          ? 'Ongoing'
+                          : 'Episodes TBA'),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.white70,
                   ),

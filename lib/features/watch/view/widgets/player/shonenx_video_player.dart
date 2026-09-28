@@ -72,7 +72,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   int _doubleTapPairCount = 0;
   Duration _doubleTapAnchor = Duration.zero;
 
-
   bool _isDraggingSeek = false;
   Duration _dragStartPos = Duration.zero;
   Duration _dragTargetPos = Duration.zero;
@@ -290,8 +289,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
   }
 
-
-
   void _onLongPressStart() {
     if (ref.read(playerUIControllerProvider).isLocked) return;
     ref
@@ -429,9 +426,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
     final seconds = _doubleTapPairCount * 10;
     final signed = isForward ? seconds : -seconds;
-    final maxMs = player.duration.inMilliseconds > 0
-        ? player.duration.inMilliseconds
-        : 24 * 60 * 60 * 1000;
+    final maxMs =
+        player.duration.inMilliseconds > 0
+            ? player.duration.inMilliseconds
+            : 24 * 60 * 60 * 1000;
     final targetMs = (_doubleTapAnchor.inMilliseconds + signed * 1000).clamp(
       0,
       maxMs,
@@ -538,14 +536,24 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final episodesLoading = ref.watch(
       episodeListProvider.select((e) => e.isLoading),
     );
+    // Background server/quality discovery must never cover a video that is
+    // already playing. Only a real underrun, seek, or initial open owns the
+    // central loading indicator.
     final isBusy =
         state.isBuffering ||
         state.isSeeking ||
-        state.isOpening ||
-        episodesLoading ||
-        episodeStreamState.contains(EpisodeStreamState.SOURCE_LOADING) ||
-        episodeStreamState.contains(EpisodeStreamState.SERVER_LOADING) ||
-        episodeStreamState.contains(EpisodeStreamState.QUALITY_LOADING);
+        (!state.isPlaying &&
+            (state.isOpening ||
+                episodesLoading ||
+                episodeStreamState.contains(
+                  EpisodeStreamState.SOURCE_LOADING,
+                ) ||
+                episodeStreamState.contains(
+                  EpisodeStreamState.SERVER_LOADING,
+                ) ||
+                episodeStreamState.contains(
+                  EpisodeStreamState.QUALITY_LOADING,
+                )));
 
     Widget videoView = Video(
       controller: notifier.videoController,
@@ -595,157 +603,154 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               videoView,
 
               if (isPiP)
-                const Positioned.fill(
-                  child: PiPControlsOverlay(),
-                )
+                const Positioned.fill(child: PiPControlsOverlay())
               else ...[
                 // Gesture Layer (Background)
                 Positioned.fill(
-                child: PlayerGestureHandler(
-                  onDoubleTapDown: _onDoubleTap,
-                  onTap: () {
-                    if (_isDraggingSeek) return;
-                    widget.onPanelCloseRequest?.call();
-                    uiController.toggleVisibility();
-                  },
+                  child: PlayerGestureHandler(
+                    onDoubleTapDown: _onDoubleTap,
+                    onTap: () {
+                      if (_isDraggingSeek) return;
+                      widget.onPanelCloseRequest?.call();
+                      uiController.toggleVisibility();
+                    },
 
-                  onLongPressStart: _onLongPressStart,
-                  onLongPressUpdate: _onLongPressUpdate,
-                  onLongPressEnd: _onLongPressEnd,
-                  onVerticalDragStart: _onVerticalDragStart,
-                  onVerticalDragUpdate: _onVerticalDragUpdate,
-                  onVerticalDragEnd: _onVerticalDragEnd,
-                  onHorizontalDragStart: _onHorizontalDragStart,
-                  onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                  onHorizontalDragEnd: _onHorizontalDragEnd,
-                  onEpisodesPressed: widget.onEpisodesPressed,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-
-              // Controls & UI Layer (Foreground)
-              ControlsOverlay(
-                visible: uiState.isVisible,
-                locked: uiState.isLocked,
-                onLockPressed: uiController.toggleLock,
-                onRestartHide: uiController.restartHideTimer,
-                onEpisodesPressed: widget.onEpisodesPressed,
-                onSettingsPressed: _openSettings,
-                onQualityPressed: _openQuality,
-                onSourcePressed: _openSource,
-                onServerPressed: _openServer,
-                onAudioPressed: _openAudio,
-                onSubtitlePressed: _openSubtitle,
-                onFullScreenPressed: _toggleFullScreen,
-                localTitle: widget.localTitle,
-                isLocal: widget.localFilePath != null,
-              ),
-
-              if (state.playbackError != null)
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          state.playbackError!,
-                          style: const TextStyle(color: Colors.white),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: notifier.retry,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                    onLongPressStart: _onLongPressStart,
+                    onLongPressUpdate: _onLongPressUpdate,
+                    onLongPressEnd: _onLongPressEnd,
+                    onVerticalDragStart: _onVerticalDragStart,
+                    onVerticalDragUpdate: _onVerticalDragUpdate,
+                    onVerticalDragEnd: _onVerticalDragEnd,
+                    onHorizontalDragStart: _onHorizontalDragStart,
+                    onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                    onHorizontalDragEnd: _onHorizontalDragEnd,
+                    onEpisodesPressed: widget.onEpisodesPressed,
+                    child: Container(color: Colors.transparent),
                   ),
-                )
-              else if (isBusy)
-                Center(
-                  child: IgnorePointer(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const FetchingProgressBadge(isEpisode: false),
-                        if (state.isOpening) ...[
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Starting video…',
-                            style: TextStyle(color: Colors.white70),
+                ),
+
+                // Controls & UI Layer (Foreground)
+                ControlsOverlay(
+                  visible: uiState.isVisible,
+                  locked: uiState.isLocked,
+                  onLockPressed: uiController.toggleLock,
+                  onRestartHide: uiController.restartHideTimer,
+                  onEpisodesPressed: widget.onEpisodesPressed,
+                  onSettingsPressed: _openSettings,
+                  onQualityPressed: _openQuality,
+                  onSourcePressed: _openSource,
+                  onServerPressed: _openServer,
+                  onAudioPressed: _openAudio,
+                  onSubtitlePressed: _openSubtitle,
+                  onFullScreenPressed: _toggleFullScreen,
+                  localTitle: widget.localTitle,
+                  isLocal: widget.localFilePath != null,
+                ),
+
+                if (state.playbackError != null)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            state.playbackError!,
+                            style: const TextStyle(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: notifier.retry,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
                           ),
                         ],
-                      ],
+                      ),
+                    ),
+                  )
+                else if (isBusy)
+                  Center(
+                    child: IgnorePointer(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const FetchingProgressBadge(isEpisode: false),
+                          if (state.isOpening) ...[
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Starting video…',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
 
-              // Horizontal swipe and rapid double-tap seek indicator
-              if (_isDraggingSeek)
-                SeekFeedbackOverlay(
-                  targetPosition: _dragTargetPos,
-                  totalDuration: ref.read(playerStateProvider).duration,
-                  diffDuration: _dragDiff,
-                  isForward: _isDragSeekForward,
-                ),
+                // Horizontal swipe and rapid double-tap seek indicator
+                if (_isDraggingSeek)
+                  SeekFeedbackOverlay(
+                    targetPosition: _dragTargetPos,
+                    totalDuration: ref.read(playerStateProvider).duration,
+                    diffDuration: _dragDiff,
+                    isForward: _isDragSeekForward,
+                  ),
 
+                // Speed Indicator
+                if (_isSpeeding)
+                  SpeedIndicatorOverlay(currentSpeed: _lastSpeed),
 
-
-              // Speed Indicator
-              if (_isSpeeding) SpeedIndicatorOverlay(currentSpeed: _lastSpeed),
-
-              // Volume/Brightness Overlays
-              if (_isChangingBrightness)
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: VolumeBrightnessOverlay(
-                      isVolume: false,
-                      value: uiState.brightness,
+                // Volume/Brightness Overlays
+                if (_isChangingBrightness)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: VolumeBrightnessOverlay(
+                        isVolume: false,
+                        value: uiState.brightness,
+                      ),
                     ),
                   ),
-                ),
-              if (_isChangingVolume)
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: VolumeBrightnessOverlay(
-                      isVolume: true,
-                      value: uiState.volume,
+                if (_isChangingVolume)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: VolumeBrightnessOverlay(
+                        isVolume: true,
+                        value: uiState.volume,
+                      ),
                     ),
                   ),
+
+                // Subtitles
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: uiState.isVisible ? 90 : 20,
+                  child: const SubtitleOverlay(),
                 ),
 
-              // Subtitles
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: uiState.isVisible ? 90 : 20,
-                child: const SubtitleOverlay(),
-              ),
+                // Floating Skip Intro/Outro Button
+                const FloatingSkipButtonOverlay(),
 
-              // Floating Skip Intro/Outro Button
-              const FloatingSkipButtonOverlay(),
-
-              // Floating Next Episode Recommendation Prompt (at 95% progress)
-              const NextEpisodePromptOverlay(),
+                // Floating Next Episode Recommendation Prompt (at 95% progress)
+                const NextEpisodePromptOverlay(),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }

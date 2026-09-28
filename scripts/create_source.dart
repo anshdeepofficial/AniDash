@@ -5,7 +5,8 @@ void main() {
 
   // 1. Get Source Name
   stdout.write(
-      '${AppLogger.cyan}Enter Source Name (e.g. HiAnime): ${AppLogger.reset}');
+    '${AppLogger.cyan}Enter Source Name (e.g. HiAnime): ${AppLogger.reset}',
+  );
   final name = stdin.readLineSync()?.trim();
 
   if (name == null || name.isEmpty) {
@@ -15,7 +16,8 @@ void main() {
 
   // 2. Get Base URL
   stdout.write(
-      '${AppLogger.cyan}Enter Base URL (e.g. https://hianime.to): ${AppLogger.reset}');
+    '${AppLogger.cyan}Enter Base URL (e.g. https://hianime.to): ${AppLogger.reset}',
+  );
   final baseUrl = stdin.readLineSync()?.trim();
 
   if (baseUrl == null || baseUrl.isEmpty) {
@@ -53,7 +55,11 @@ void main() {
 }
 
 void _createProviderFile(
-    String filePath, String fileName, String className, String baseUrl) {
+  String filePath,
+  String fileName,
+  String className,
+  String baseUrl,
+) {
   final content = '''
 import 'package:html/dom.dart';
 import 'package:html/parser.dart';
@@ -205,8 +211,10 @@ SearchPage _parsePage(Document document, String baseUrl) {
 
 String _toSnakeCase(String input) {
   return input
-      .replaceAllMapped(RegExp(r'([a-z])([A-Z])'),
-          (match) => '${match.group(1)}_${match.group(2)}')
+      .replaceAllMapped(
+        RegExp(r'([a-z])([A-Z])'),
+        (match) => '${match.group(1)}_${match.group(2)}',
+      )
       .replaceAll(RegExp(r'[\s-]+'), '_')
       .toLowerCase();
 }
@@ -214,8 +222,12 @@ String _toSnakeCase(String input) {
 String _toPascalCase(String input) {
   return input
       .split(RegExp(r'[_\s]+'))
-      .map((word) =>
-          word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '')
+      .map(
+        (word) =>
+            word.isNotEmpty
+                ? '${word[0].toUpperCase()}${word.substring(1)}'
+                : '',
+      )
       .join('');
 }
 
@@ -262,3 +274,5 @@ class AppLogger {
     }
   }
 }
+
+// ignore_for_file: avoid_print

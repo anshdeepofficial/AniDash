@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:device_apps/device_apps.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 class AniyomiExtensions extends Extension {
+  static const int _maxApkBytes = 50 * 1024 * 1024;
   AniyomiExtensions() {
     initialize();
   }
@@ -133,17 +135,10 @@ class AniyomiExtensions extends Extension {
               ? source.id!
               : apkName.replaceAll('.apk', '');
 
-      final response = await http.get(Uri.parse(source.apkUrl!));
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to download APK: HTTP ${response.statusCode}');
-      }
-
       final tempDir = await getTemporaryDirectory();
       final apkFileName = apkName.endsWith('.apk') ? apkName : '$apkName.apk';
       final apkFile = File(path.join(tempDir.path, apkFileName));
-
-      await apkFile.writeAsBytes(response.bodyBytes);
+      await _downloadVerifiedApk(source, apkFile);
 
       final result = await InstallPlugin.installApk(
         apkFile.path,
@@ -241,17 +236,11 @@ class AniyomiExtensions extends Extension {
     try {
       final packageName = source.apkUrl!.split('/').last.replaceAll('.apk', '');
 
-      final response = await http.get(Uri.parse(source.apkUrl!));
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to download APK: HTTP ${response.statusCode}');
-      }
-
       final tempDir = await getTemporaryDirectory();
       final apkFileName = '$packageName.apk';
       final apkFile = File(path.join(tempDir.path, apkFileName));
 
-      await apkFile.writeAsBytes(response.bodyBytes);
+      await _downloadVerifiedApk(source, apkFile);
 
       final result = await InstallPlugin.installApk(
         apkFile.path,
@@ -284,6 +273,61 @@ class AniyomiExtensions extends Extension {
         print('Error installing source: $e');
       }
       rethrow;
+    }
+  }
+
+  Future<void> _downloadVerifiedApk(Source source, File destination) async {
+    final expected = source.apkSha256?.trim().toLowerCase();
+    if (expected == null || !RegExp(r'^[a-f0-9]{64}$').hasMatch(expected)) {
+      throw StateError(
+        'This external extension does not publish a valid SHA-256 checksum. '
+        'Installation was blocked for safety.',
+      );
+    }
+
+    final client = http.Client();
+    IOSink? sink;
+    try {
+      final request = http.Request('GET', Uri.parse(source.apkUrl!));
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'APK download returned HTTP ${response.statusCode}',
+        );
+      }
+      final declaredLength = response.contentLength;
+      if (declaredLength != null && declaredLength > _maxApkBytes) {
+        throw StateError('Extension APK exceeds the 50 MB safety limit.');
+      }
+
+      var received = 0;
+      sink = destination.openWrite();
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 20),
+      )) {
+        received += chunk.length;
+        if (received > _maxApkBytes) {
+          throw StateError('Extension APK exceeds the 50 MB safety limit.');
+        }
+        sink.add(chunk);
+      }
+      await sink.flush();
+      await sink.close();
+      sink = null;
+
+      final actual =
+          (await sha256.bind(destination.openRead()).first).toString();
+      if (actual != expected) {
+        throw StateError('Extension APK checksum verification failed.');
+      }
+    } finally {
+      await sink?.close();
+      client.close();
+      if (destination.existsSync() && destination.lengthSync() == 0) {
+        await destination.delete();
+      }
     }
   }
 

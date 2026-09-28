@@ -21,25 +21,29 @@ void main(List<String> args) async {
 
   stdout.write('Enter New Base Version (default: $currentBase): ');
   String? inputBase = stdin.readLineSync();
-  final targetBase = (inputBase == null || inputBase.isEmpty) ? currentBase : inputBase;
+  final targetBase =
+      (inputBase == null || inputBase.isEmpty) ? currentBase : inputBase;
 
   int targetBuild;
   if (targetBase != currentBase) {
-    targetBuild = 1; 
+    targetBuild = 1;
     print('\n[WARNING] Base version changed ($currentBase -> $targetBase).');
     print('[WARNING] Resetting build number to 1.\n');
   } else {
     targetBuild = currentBuild + 1;
-    print('Incrementing build number for $targetBase: $currentBuild -> $targetBuild');
+    print(
+      'Incrementing build number for $targetBase: $currentBuild -> $targetBuild',
+    );
   }
 
   stdout.write('Enter Suffix (e.g., hotfix.1) or leave empty: ');
   final suffix = stdin.readLineSync();
 
   final pubspecVersion = '$targetBase+$targetBuild';
-  final gitTag = (suffix != null && suffix.isNotEmpty) 
-      ? 'v$targetBase-$suffix' 
-      : 'v$targetBase';
+  final gitTag =
+      (suffix != null && suffix.isNotEmpty)
+          ? 'v$targetBase-$suffix'
+          : 'v$targetBase';
 
   print('\nSummary:');
   print('  Pubspec: $pubspecVersion');
@@ -48,13 +52,13 @@ void main(List<String> args) async {
   if (stdin.readLineSync()?.toLowerCase() != 'y') return;
 
   await updatePubspec(pubspecFile, pubspecVersion);
-  
+
   await run('git', ['add', 'pubspec.yaml']);
   await run('git', ['commit', '-m', 'chore: bump version to $pubspecVersion']);
   await run('git', ['tag', gitTag]);
-  
+
   print('Pushing to GitHub...');
-  await run('git', ['push', 'origin', 'main']); 
+  await run('git', ['push', 'origin', 'main']);
   await run('git', ['push', 'origin', gitTag]);
 
   print('\n--- SUCCESS: $gitTag is out there. ---');
@@ -68,12 +72,13 @@ Future<String> getCurrentVersion(File file) async {
 
 Future<void> updatePubspec(File file, String newVersion) async {
   final lines = await file.readAsLines();
-  final updatedLines = lines.map((line) {
-    if (line.trim().startsWith('version:')) {
-      return 'version: $newVersion';
-    }
-    return line;
-  }).toList();
+  final updatedLines =
+      lines.map((line) {
+        if (line.trim().startsWith('version:')) {
+          return 'version: $newVersion';
+        }
+        return line;
+      }).toList();
   await file.writeAsString(updatedLines.join('\n'));
 }
 
@@ -93,3 +98,5 @@ Future<void> run(String cmd, List<String> args) async {
     exit(1);
   }
 }
+
+// ignore_for_file: avoid_print

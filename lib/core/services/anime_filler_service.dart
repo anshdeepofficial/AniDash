@@ -6,10 +6,7 @@ class AnimeFillerInfo {
   final Set<int> fillers;
   final Set<int> mixed;
 
-  const AnimeFillerInfo({
-    this.fillers = const {},
-    this.mixed = const {},
-  });
+  const AnimeFillerInfo({this.fillers = const {}, this.mixed = const {}});
 }
 
 class AnimeFillerService {
@@ -37,7 +34,18 @@ class AnimeFillerService {
       return _cache[cacheKey]!;
     }
 
-    // 1. Try AnimeFillerList (fastest, most accurate, 1 request)
+    // Prefer the structured Jikan API when a MAL id is available. Scraping is
+    // only a fallback because AnimeFillerList markup changes frequently.
+    if (malId != null && malId > 0) {
+      final jikanFillers = await _fetchFromJikan(malId);
+      if (jikanFillers.isNotEmpty) {
+        final jikanInfo = AnimeFillerInfo(fillers: jikanFillers);
+        _cache[cacheKey] = jikanInfo;
+        return jikanInfo;
+      }
+    }
+
+    // Fallback to AnimeFillerList when no structured result is available.
     final aflInfo = await _fetchFromAnimeFillerList(
       title,
       alternateTitles: alternateTitles,
@@ -50,22 +58,10 @@ class AnimeFillerService {
       return aflInfo;
     }
 
-    // 2. Fallback to Jikan if MAL ID is available
-    if (malId != null && malId > 0) {
-      final jikanFillers = await _fetchFromJikan(malId);
-      if (jikanFillers.isNotEmpty) {
-        final jikanInfo = AnimeFillerInfo(fillers: jikanFillers);
-        _cache[cacheKey] = jikanInfo;
-        AppLogger.success(
-          '[AnimeFillerService] Found ${jikanFillers.length} filler episodes from Jikan for MAL ID: $malId',
-        );
-        return jikanInfo;
-      }
-    }
-
-    const empty = AnimeFillerInfo();
-    _cache[cacheKey] = empty;
-    return empty;
+    // Do not cache an empty result: the provider can be temporarily rate
+    // limited or unavailable, and caching that failure hides filler labels
+    // until the app is restarted.
+    return const AnimeFillerInfo();
   }
 
   /// Returns the set of episode numbers that are identified as filler.
@@ -125,7 +121,9 @@ class AnimeFillerService {
           return AnimeFillerInfo(fillers: fillers, mixed: mixed);
         }
       } catch (e) {
-        AppLogger.d('[AnimeFillerService] AFL probe failed for slug "$slug": $e');
+        AppLogger.d(
+          '[AnimeFillerService] AFL probe failed for slug "$slug": $e',
+        );
       }
     }
 
@@ -139,25 +137,29 @@ class AnimeFillerService {
       if (raw.trim().isEmpty) continue;
 
       // Clean brackets, suffixes, Dub/Sub markers
-      var cleaned = raw
-          .replaceAll(
-            RegExp(
-              r'\s*\((?:dub|sub|tv|audio|uncensored|season\s*\d*)[^)]*\)',
-              caseSensitive: false,
-            ),
-            '',
-          )
-          .replaceAll(
-            RegExp(
-              r'\s*\[(?:dub|sub|tv|audio|uncensored)[^\]]*\]',
-              caseSensitive: false,
-            ),
-            '',
-          )
-          .replaceAll(RegExp(r'\s*-\s*(?:dub|sub)$', caseSensitive: false), '')
-          .replaceAll(RegExp(r'[:!]'), '')
-          .toLowerCase()
-          .trim();
+      var cleaned =
+          raw
+              .replaceAll(
+                RegExp(
+                  r'\s*\((?:dub|sub|tv|audio|uncensored|season\s*\d*)[^)]*\)',
+                  caseSensitive: false,
+                ),
+                '',
+              )
+              .replaceAll(
+                RegExp(
+                  r'\s*\[(?:dub|sub|tv|audio|uncensored)[^\]]*\]',
+                  caseSensitive: false,
+                ),
+                '',
+              )
+              .replaceAll(
+                RegExp(r'\s*-\s*(?:dub|sub)$', caseSensitive: false),
+                '',
+              )
+              .replaceAll(RegExp(r'[:!]'), '')
+              .toLowerCase()
+              .trim();
 
       String toSlug(String s) => s
           .replaceAll(RegExp(r'[^a-z0-9]+'), '-')

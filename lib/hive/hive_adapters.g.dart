@@ -461,13 +461,15 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       isAdult: fields[19] == null ? false : fields[19] as bool,
       durationSeconds: (fields[20] as num?)?.toInt(),
       audioLanguage: fields[21] == null ? 'Unknown' : fields[21] as String,
+      animeId: fields[22] as String?,
+      totalEpisodes: (fields[23] as num?)?.toInt(),
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadItem obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -511,7 +513,11 @@ class DownloadItemAdapter extends TypeAdapter<DownloadItem> {
       ..writeByte(20)
       ..write(obj.durationSeconds)
       ..writeByte(21)
-      ..write(obj.audioLanguage);
+      ..write(obj.audioLanguage)
+      ..writeByte(22)
+      ..write(obj.animeId)
+      ..writeByte(23)
+      ..write(obj.totalEpisodes);
   }
 
   @override

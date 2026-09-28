@@ -79,13 +79,12 @@ class AnimeWatchProgressEntry {
   }
 
   bool get isCompletedOrFinished {
-    // If status is 'watching', user is actively watching/rewatching this anime — never hide from Continue Watching!
-    if (status.toLowerCase() == 'watching') return false;
     if (status.toLowerCase() == 'completed') return true;
 
-    final effectiveTotal = totalEpisodes > 0
-        ? totalEpisodes
-        : (animeFormat?.toUpperCase() == 'MOVIE' ? 1 : 0);
+    final effectiveTotal =
+        totalEpisodes > 0
+            ? totalEpisodes
+            : (animeFormat?.toUpperCase() == 'MOVIE' ? 1 : 0);
 
     if (effectiveTotal > 0) {
       if (currentEpisode > effectiveTotal) return true;
@@ -124,7 +123,8 @@ class AnimeWatchProgressEntry {
 
     // For Specials, OVAs, and single-episode media where totalEpisodes was unrecorded or 0
     if (episodesProgress.isNotEmpty) {
-      final isSpecialOrMovie = animeFormat?.toUpperCase() == 'SPECIAL' ||
+      final isSpecialOrMovie =
+          animeFormat?.toUpperCase() == 'SPECIAL' ||
           animeFormat?.toUpperCase() == 'MOVIE' ||
           animeFormat?.toUpperCase() == 'OVA';
 
@@ -238,12 +238,14 @@ class AnimeWatchProgressEntry {
             ),
           ) ??
           {},
-      lastUpdated: map['lastUpdated'] != null
-          ? DateTime.tryParse(map['lastUpdated'])
-          : null,
-      lastPlayedAt: map['lastPlayedAt'] != null
-          ? DateTime.tryParse(map['lastPlayedAt'])
-          : null,
+      lastUpdated:
+          map['lastUpdated'] != null
+              ? DateTime.tryParse(map['lastUpdated'])
+              : null,
+      lastPlayedAt:
+          map['lastPlayedAt'] != null
+              ? DateTime.tryParse(map['lastPlayedAt'])
+              : null,
       currentEpisode: map['currentEpisode']?.toInt() ?? 1,
       status: map['status'] ?? 'watching',
       isAdult: map['isAdult'] ?? false,
@@ -310,9 +312,8 @@ class EpisodeProgress {
       progressInSeconds: map['progressInSeconds']?.toInt(),
       durationInSeconds: map['durationInSeconds']?.toInt(),
       isCompleted: map['isCompleted'] ?? false,
-      watchedAt: map['watchedAt'] != null
-          ? DateTime.tryParse(map['watchedAt'])
-          : null,
+      watchedAt:
+          map['watchedAt'] != null ? DateTime.tryParse(map['watchedAt']) : null,
     );
   }
 }

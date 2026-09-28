@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:install_plugin/install_plugin.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:crypto/crypto.dart';
 import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 
@@ -12,12 +13,14 @@ class UpdateInfo {
   final String downloadUrl;
   final String releaseNotes;
   final DateTime publishedAt;
+  final String? sha256;
 
   UpdateInfo({
     required this.version,
     required this.downloadUrl,
     required this.releaseNotes,
     required this.publishedAt,
+    this.sha256,
   });
 }
 
@@ -27,7 +30,9 @@ class UpdateService {
   Future<UpdateInfo?> checkForUpdate() async {
     try {
       final response = await _httpClient.get(
-        Uri.parse('https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest'),
+        Uri.parse(
+          'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -35,27 +40,33 @@ class UpdateService {
         final tagName = data['tag_name'] as String;
         final releaseNotes = data['body'] as String;
         final publishedAt = DateTime.parse(data['published_at']);
-        
+
         final assets = data['assets'] as List;
         if (assets.isEmpty) return null;
-        
+
         final apkAsset = assets.firstWhere(
           (asset) => asset['name'].toString().endsWith('.apk'),
-          orElse: () => assets[0],
+          orElse: () => null,
         );
+        if (apkAsset == null) return null;
         final downloadUrl = apkAsset['browser_download_url'] as String;
+        final digest = apkAsset['digest']?.toString();
 
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
 
         final cleanTagName = tagName.replaceAll('v', '');
-        
+
         if (_isNewerVersion(currentVersion, cleanTagName)) {
           return UpdateInfo(
             version: cleanTagName,
             downloadUrl: downloadUrl,
             releaseNotes: releaseNotes,
             publishedAt: publishedAt,
+            sha256:
+                digest?.startsWith('sha256:') == true
+                    ? digest!.substring('sha256:'.length).toLowerCase()
+                    : null,
           );
         }
       }
@@ -66,11 +77,27 @@ class UpdateService {
   }
 
   bool _isNewerVersion(String current, String latest) {
-    final cleanCurrent = current.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
-    final cleanLatest = latest.replaceAll(RegExp(r'^v'), '').split('+').first.split('-').first.trim();
+    final cleanCurrent =
+        current
+            .replaceAll(RegExp(r'^v'), '')
+            .split('+')
+            .first
+            .split('-')
+            .first
+            .trim();
+    final cleanLatest =
+        latest
+            .replaceAll(RegExp(r'^v'), '')
+            .split('+')
+            .first
+            .split('-')
+            .first
+            .trim();
 
-    final currentParts = cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final latestParts = cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final currentParts =
+        cleanCurrent.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final latestParts =
+        cleanLatest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
     while (currentParts.length < 3) {
       currentParts.add(0);
@@ -103,6 +130,7 @@ class UpdateService {
 
   Future<void> downloadAndInstallUpdate(
     String url, {
+    String? expectedSha256,
     void Function(int receivedBytes, int totalBytes)? onProgress,
   }) async {
     final client = http.Client();
@@ -133,6 +161,19 @@ class UpdateService {
 
         await sink.flush();
         await sink.close();
+
+        if (expectedSha256 == null || expectedSha256.trim().isEmpty) {
+          await file.delete();
+          throw const FormatException(
+            'The release does not provide an APK SHA-256 digest.',
+          );
+        }
+        final actualSha256 =
+            sha256.convert(await file.readAsBytes()).toString();
+        if (actualSha256.toLowerCase() != expectedSha256.toLowerCase()) {
+          await file.delete();
+          throw const FormatException('Downloaded APK integrity check failed.');
+        }
 
         await InstallPlugin.install(savePath);
       } else {

@@ -92,7 +92,7 @@ Future<void> checkForUpdates(
 
     if (debugMode || isNewer) {
       final assets = latestRelease['assets'] as List<dynamic>;
-      String? downloadUrl = _getPlatformSpecificAsset(assets);
+      final selectedAsset = _getPlatformSpecificAsset(assets);
 
       if (!context.mounted) return;
 
@@ -102,7 +102,8 @@ Future<void> checkForUpdates(
         currentVersion,
         updateType,
         releaseNotes: releaseNotes,
-        apkDownloadUrl: downloadUrl,
+        apkDownloadUrl: selectedAsset?.url,
+        apkSha256: selectedAsset?.sha256,
       );
     } else if (debugMode) {
       showAppSnackBar('No updates', 'You are on the latest allowed version');
@@ -112,33 +113,42 @@ Future<void> checkForUpdates(
   }
 }
 
-String? _getPlatformSpecificAsset(List<dynamic> assets) {
+({String url, String? sha256})? _getPlatformSpecificAsset(
+  List<dynamic> assets,
+) {
+  ({String url, String? sha256}) value(dynamic asset) {
+    final digest = asset['digest']?.toString();
+    return (
+      url: asset['browser_download_url'] as String,
+      sha256:
+          digest?.startsWith('sha256:') == true
+              ? digest!.substring('sha256:'.length).toLowerCase()
+              : null,
+    );
+  }
+
   if (Platform.isAndroid) {
     // 1. First look for arm64-v8a specific apk if available
     for (final a in assets) {
       final name = (a['name'] as String).toLowerCase();
-      final url = a['browser_download_url'] as String;
-      if (name.contains('arm64') && name.endsWith('.apk')) return url;
+      if (name.contains('arm64') && name.endsWith('.apk')) return value(a);
     }
     // 2. Fallback to any apk (such as app-release.apk)
     for (final a in assets) {
       final name = (a['name'] as String).toLowerCase();
-      final url = a['browser_download_url'] as String;
-      if (name.endsWith('.apk')) return url;
+      if (name.endsWith('.apk')) return value(a);
     }
   }
 
   for (final a in assets) {
     final name = (a['name'] as String).toLowerCase();
-    final url = a['browser_download_url'] as String;
-
     if (Platform.isWindows &&
         (name.endsWith('-setup.exe') ||
             name.contains('windows-portable.zip') ||
             name.endsWith('.zip'))) {
-      return url;
+      return value(a);
     }
-    if (Platform.isLinux && name.contains('linux.zip')) return url;
+    if (Platform.isLinux && name.contains('linux.zip')) return value(a);
   }
   return null;
 }
@@ -206,6 +216,7 @@ Future<void> showUpdateBottomSheet(
   UpdateType type, {
   String? releaseNotes,
   String? apkDownloadUrl,
+  String? apkSha256,
 }) {
   return showGeneralDialog<void>(
     context: context,
@@ -221,6 +232,7 @@ Future<void> showUpdateBottomSheet(
           type: type,
           releaseNotes: releaseNotes,
           apkDownloadUrl: apkDownloadUrl,
+          apkSha256: apkSha256,
         ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curvedAnimation = CurvedAnimation(

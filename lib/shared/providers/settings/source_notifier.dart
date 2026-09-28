@@ -33,6 +33,10 @@ class SourceNotifier extends _$SourceNotifier {
   Future<void> initialize() async {
     try {
       final extensionManager = Get.find<ExtensionManager>();
+      // AniDash only supports sandboxed, in-process MangaYomi sources.
+      // AniYomi indexes distribute Android APKs and therefore must not be
+      // presented as an in-app extension installation.
+      extensionManager.setCurrentManager(ExtensionType.mangayomi);
 
       // Listen for manager changes (e.g., swapping between Aniyomi/Mangayomi)
       _managerSubscription?.cancel();
@@ -100,15 +104,6 @@ class SourceNotifier extends _$SourceNotifier {
       }
 
       await addExtensions(manager);
-      // Also collect from other extension manager so extensions are never lost
-      try {
-        final currentType = ExtensionType.fromManager(manager);
-        final other =
-            currentType == ExtensionType.aniyomi
-                ? ExtensionType.mangayomi.getManager()
-                : ExtensionType.aniyomi.getManager();
-        await addExtensions(other);
-      } catch (_) {}
 
       _updateExtensions(type, extensions);
     }
@@ -262,35 +257,29 @@ class SourceNotifier extends _$SourceNotifier {
   }
 
   Future<void> fetchSources(ItemType mediaType) async {
-    final manager = Get.find<ExtensionManager>().currentManager;
+    final extensionManager = Get.find<ExtensionManager>();
+    if (ExtensionType.fromManager(extensionManager.currentManager) !=
+        ExtensionType.mangayomi) {
+      extensionManager.setCurrentManager(ExtensionType.mangayomi);
+    }
+    final manager = extensionManager.currentManager;
     if (mediaType == ItemType.anime) {
-      final isMangayomi =
-          ExtensionType.fromManager(manager) == ExtensionType.mangayomi;
       final savedList = sharedPrefs.getStringList('saved_anime_repos') ?? [];
       final repos =
-          isMangayomi
-              ? const [
-                'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
-                'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
-              ]
-              : <String>{
-                'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
-                'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
-                ...savedList,
-              }.toList();
+          <String>{
+            'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+            'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
+            ...savedList.where((url) => !url.contains('index.min.json')),
+          }.toList();
       await manager.fetchAvailableAnimeExtensions(repos);
     } else if (mediaType == ItemType.manga) {
-      final isMangayomi =
-          ExtensionType.fromManager(manager) == ExtensionType.mangayomi;
       final repos =
-          isMangayomi
-              ? const [
-                'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
-              ]
-              : <String>{
-                'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
-                ...?sharedPrefs.getStringList('saved_manga_repos'),
-              }.toList();
+          <String>{
+            'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
+            ...?sharedPrefs
+                .getStringList('saved_manga_repos')
+                ?.where((url) => !url.contains('index.min.json')),
+          }.toList();
       await manager.fetchAvailableMangaExtensions(repos);
     } else {
       if (state.activeNovelRepo.isEmpty) return;

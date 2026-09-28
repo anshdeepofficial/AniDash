@@ -35,13 +35,24 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
     super.initState();
     final entry = _matchingEntry();
     final saved = entry?.episodesProgress[widget.item.episodeNumber];
-    _startAt = widget.initialPosition ??
+    _startAt =
+        widget.initialPosition ??
         Duration(seconds: saved?.progressInSeconds ?? 0);
     UIHelper.enableImmersiveMode();
     UIHelper.forceLandscape();
   }
 
   AnimeWatchProgressEntry? _matchingEntry() {
+    final stableId = widget.item.animeId;
+    if (stableId != null && stableId.isNotEmpty) {
+      final byId =
+          ref
+              .read(watchProgressRepositoryProvider)
+              .getAllProgress()
+              .where((entry) => entry.animeId == stableId)
+              .firstOrNull;
+      if (byId != null) return byId;
+    }
     final title = widget.item.animeTitle.trim().toLowerCase();
     final matches =
         ref
@@ -86,7 +97,12 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
         );
     final mediaId =
         existing?.animeId ??
+        widget.item.animeId ??
         'offline:${widget.item.animeTitle.trim().toLowerCase()}';
+    final knownTotal =
+        widget.item.totalEpisodes ??
+        existing?.totalEpisodes ??
+        downloadedEpisodeCount;
     final episode = EpisodeProgress(
       episodeNumber: widget.item.episodeNumber,
       episodeTitle: widget.item.episodeTitle,
@@ -105,13 +121,13 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
                 animeId: mediaId,
                 animeTitle: widget.item.animeTitle,
                 animeCover: widget.item.thumbnail,
-                totalEpisodes: downloadedEpisodeCount,
+                totalEpisodes: knownTotal,
                 isAdult: widget.item.isAdult,
               ))
           .copyWith(
             episodesProgress: episodes,
             currentEpisode: widget.item.episodeNumber,
-            totalEpisodes: existing?.totalEpisodes ?? downloadedEpisodeCount,
+            totalEpisodes: knownTotal,
             lastUpdated: DateTime.now(),
             lastPlayedAt: DateTime.now(),
           ),
@@ -166,10 +182,15 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
 
   @override
   void dispose() {
-    ref.read(playerStateProvider.notifier).pause();
-    AudioFocusService().reset();
     final state = ref.read(playerStateProvider);
-    unawaited(_saveProgress(state.position, state.duration));
+    unawaited(
+      _saveProgress(
+        state.position,
+        state.duration,
+        force: true,
+      ).whenComplete(() => ref.read(playerStateProvider.notifier).stop()),
+    );
+    AudioFocusService().reset();
     UIHelper.forcePortrait();
     UIHelper.exitImmersiveMode();
     super.dispose();
@@ -190,7 +211,7 @@ class _LocalPlayerScreenState extends ConsumerState<LocalPlayerScreen> {
           playerState.duration,
           force: true,
         );
-        ref.read(playerStateProvider.notifier).pause();
+        await ref.read(playerStateProvider.notifier).stop();
         AudioFocusService().reset();
         if (context.mounted) Navigator.pop(context);
         await UIHelper.forcePortrait();

@@ -1,5 +1,6 @@
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
 
 import 'MangayomiExtensionManager.dart';
 
@@ -76,7 +77,7 @@ class MangayomiExtensions extends Extension {
 
           if (match != null) {
             match.itemType = ItemType.anime;
-            print(
+            debugPrint(
               '[EXT_AUTO_INSTALL] Installing default anime extension: ${match.name} (${match.version})',
             );
             await installSource(match);
@@ -92,7 +93,6 @@ class MangayomiExtensions extends Extension {
       final availableManga = getAvailableRx(ItemType.manga).value;
       const targetManga = ['mangadex'];
 
-
       for (final target in targetManga) {
         if (!installedManga.contains(target)) {
           final match =
@@ -107,7 +107,7 @@ class MangayomiExtensions extends Extension {
 
           if (match != null) {
             match.itemType = ItemType.manga;
-            print(
+            debugPrint(
               '[EXT_AUTO_INSTALL] Installing default manga extension: ${match.name} (${match.version})',
             );
             await installSource(match);
@@ -115,7 +115,7 @@ class MangayomiExtensions extends Extension {
         }
       }
     } catch (e) {
-      print('[EXT_AUTO_INSTALL] Error installing defaults: $e');
+      debugPrint('[EXT_AUTO_INSTALL] Error installing defaults: $e');
     }
   }
 

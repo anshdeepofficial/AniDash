@@ -72,12 +72,16 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     );
 
     ref.onDispose(() {
-      cleanup();
+      unawaited(cleanup());
       WidgetsBinding.instance.removeObserver(this);
     });
   }
 
-  void cleanup() {
+  Future<void> cleanup() async {
+    if (_isDisposed) return;
+    // Persist the last known position before the player is unloaded. Awaiting
+    // this path prevents a quick back/close from losing the final seconds.
+    await _triggerSave(force: true);
     _isDisposed = true;
     _wasPlayingBeforeLock = false;
     _isAppInBackground = false;
@@ -88,7 +92,6 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     try {
       ref.read(playerStateProvider.notifier).setActiveSession(null, null);
     } catch (_) {}
-    _triggerSave(force: true);
   }
 
   @override
@@ -181,8 +184,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       AppLogger.i(
         'Clearing stale player session: ${playerNotifier.activeMediaId} -> $mediaId',
       );
-      await playerNotifier.pause();
-      playerNotifier.setActiveSession(null, null);
+      await playerNotifier.stop();
     }
 
     _mediaId = mediaId;
@@ -417,6 +419,14 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _pos = next.position.inSeconds;
       _dur = next.duration.inSeconds;
 
+      if (next.playbackError != null &&
+          next.playbackError != prev?.playbackError &&
+          !_isAppInBackground) {
+        unawaited(
+          ref.read(episodeDataProvider.notifier).recoverFromPlaybackFailure(),
+        );
+      }
+
       // Fetch skip ranges as soon as the manifest duration is known. This lets
       // auto-skip seek before the opening frames have to begin rendering.
       if (_dur > 30) _checkAniSkip(mediaId, animeName, next.duration);
@@ -566,10 +576,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     final epNum = _epNum;
     if (epNum == null) return;
 
-    final currentSkips = ref.read(aniSkipProvider);
-    final hasEd = currentSkips.any((s) => s.skipType == SkipType.ed);
-    // If we already fetched for this episode and have both OP & ED, skip re-fetch
-    if (epNum == _lastAniSkipEpisode && hasEd) return;
+    // This runs from the position listener. Re-fetching on every frame until
+    // an ED interval arrives floods AniSkip/JustAnime requests and competes
+    // directly with HLS segment downloads, which can produce recurring
+    // two-second buffering on slower connections.
+    if (epNum == _lastAniSkipEpisode) return;
 
     _lastAniSkipEpisode = epNum;
     ref

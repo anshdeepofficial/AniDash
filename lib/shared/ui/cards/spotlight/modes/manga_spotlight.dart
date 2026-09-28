@@ -19,9 +19,10 @@ class MangaSpotlight extends StatelessWidget {
   Widget build(BuildContext context) {
     if (anime == null) return const SizedBox.shrink();
 
-    final imageUrl = anime!.bannerImage?.isNotEmpty == true
-        ? anime!.bannerImage!
-        : (anime!.coverImage.large ?? anime!.coverImage.medium ?? '');
+    final imageUrl =
+        anime!.bannerImage?.isNotEmpty == true
+            ? anime!.bannerImage!
+            : (anime!.coverImage.large ?? anime!.coverImage.medium ?? '');
 
     return GestureDetector(
       onTap: () => onTap?.call(anime!),
@@ -55,20 +56,23 @@ class MangaSpotlight extends StatelessWidget {
                         imageUrl: imageUrl,
                         fit: BoxFit.cover,
                         memCacheWidth: 800,
-                        placeholder: (_, _) =>
-                            const AnimeCardShimmer(height: double.infinity),
-                        errorWidget: (_, _, _) =>
-                            const AnimeCardShimmer(height: double.infinity),
-                        imageBuilder: (context, imageProvider) => ColorFiltered(
-                          colorFilter: const ColorFilter.mode(
-                            Colors.grey,
-                            BlendMode.saturation,
-                          ),
-                          child: Image(
-                            image: imageProvider,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                        placeholder:
+                            (_, _) =>
+                                const AnimeCardShimmer(height: double.infinity),
+                        errorWidget:
+                            (_, _, _) =>
+                                const AnimeCardShimmer(height: double.infinity),
+                        imageBuilder:
+                            (context, imageProvider) => ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Colors.grey,
+                                BlendMode.saturation,
+                              ),
+                              child: Image(
+                                image: imageProvider,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                         useOldImageOnUrlChange: true,
                       ),
                     ),
@@ -78,7 +82,9 @@ class MangaSpotlight extends StatelessWidget {
                         left: 0,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red.shade900,
                             border: const Border(
@@ -103,7 +109,9 @@ class MangaSpotlight extends StatelessWidget {
                         right: 0,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black,
                             border: Border(
@@ -127,8 +135,10 @@ class MangaSpotlight extends StatelessWidget {
               ),
             ),
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
               child: Row(
                 children: [
                   Expanded(
@@ -147,14 +157,18 @@ class MangaSpotlight extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(2),
                     ),
                     child: Text(
-                      'VOL. ${anime!.episodes ?? "?"}',
+                      anime!.episodes != null
+                          ? 'VOL. ${anime!.episodes}'
+                          : 'VOLUMES TBA',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

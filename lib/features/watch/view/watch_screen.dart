@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screenshot/screenshot.dart';
@@ -109,7 +111,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   bool _isExiting = false;
 
-  void _handleBack() {
+  Future<void> _handleBack() async {
     if (_isExiting) return;
 
     if (_panelController.isCompleted || _panelController.value > 0) {
@@ -118,30 +120,39 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     }
 
     _isExiting = true;
-    ref.read(playerStateProvider.notifier).pause();
-    ref.read(watchControllerProvider.notifier).cleanup();
-    if (context.mounted) {
-      Navigator.of(context).pop();
-    }
+    await ref.read(watchControllerProvider.notifier).cleanup();
+    await ref.read(playerStateProvider.notifier).stop();
+    if (!mounted) return;
+    Navigator.of(context).pop();
     _resetSystemUI();
   }
 
   Future<void> _resetSystemUI() async {
     try {
       await ScreenBrightness().resetApplicationScreenBrightness();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not reset screen brightness: $error');
+    }
     try {
       await FlutterVolumeController.updateShowSystemUI(true);
       await UIHelper.disableVolumeInterception();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not restore volume controls: $error');
+    }
     await UIHelper.resetOrientation();
     await UIHelper.exitImmersiveMode();
   }
 
   @override
   void dispose() {
-    ref.read(playerStateProvider.notifier).pause();
-    ref.read(watchControllerProvider.notifier).cleanup();
+    if (!_isExiting) {
+      unawaited(
+        ref
+            .read(watchControllerProvider.notifier)
+            .cleanup()
+            .whenComplete(() => ref.read(playerStateProvider.notifier).stop()),
+      );
+    }
     _resetSystemUI();
     _panelController.dispose();
     super.dispose();
@@ -230,7 +241,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _handleBack();
+        unawaited(_handleBack());
       },
       child: Scaffold(
         backgroundColor: Colors.black,

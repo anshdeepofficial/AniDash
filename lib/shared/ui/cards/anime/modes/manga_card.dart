@@ -26,21 +26,22 @@ class MangaCard extends StatelessWidget {
         color: bgColor,
         border: Border.all(color: borderColor, width: 3), // Thicker border
         borderRadius: BorderRadius.zero, // Sharp corners for manga panel look
-        boxShadow: isHovered
-            ? [
-                BoxShadow(
-                  color: Colors.black,
-                  offset: const Offset(6, 6),
-                  blurRadius: 0, // Hard shadow
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black,
-                  offset: const Offset(3, 3),
-                  blurRadius: 0,
-                ),
-              ],
+        boxShadow:
+            isHovered
+                ? [
+                  BoxShadow(
+                    color: Colors.black,
+                    offset: const Offset(6, 6),
+                    blurRadius: 0, // Hard shadow
+                  ),
+                ]
+                : [
+                  BoxShadow(
+                    color: Colors.black,
+                    offset: const Offset(3, 3),
+                    blurRadius: 0,
+                  ),
+                ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,10 +66,12 @@ class MangaCard extends StatelessWidget {
                             '',
                         fit: BoxFit.cover,
                         memCacheHeight: 400,
-                        placeholder: (_, _) =>
-                            const AnimeCardShimmer(height: double.infinity),
-                        errorWidget: (_, _, _) =>
-                            const AnimeCardShimmer(height: double.infinity),
+                        placeholder:
+                            (_, _) =>
+                                const AnimeCardShimmer(height: double.infinity),
+                        errorWidget:
+                            (_, _, _) =>
+                                const AnimeCardShimmer(height: double.infinity),
                         imageBuilder: (context, imageProvider) {
                           if (isHovered) {
                             return Image(
@@ -183,7 +186,9 @@ class MangaCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Text(
-                    'VOL. ${anime?.episodes ?? "?"}',
+                    anime?.episodes != null
+                        ? 'VOL. ${anime!.episodes}'
+                        : 'VOLUMES TBA',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

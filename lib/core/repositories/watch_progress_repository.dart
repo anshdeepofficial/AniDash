@@ -134,6 +134,47 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
     }
   }
 
+  @override
+  Future<void> replaceAllProgress(
+    Iterable<AnimeWatchProgressEntry> entries,
+  ) async {
+    final restored = entries.toList(growable: false);
+    final isarEntries = restored
+        .map(
+          (entry) => IsarAnimeWatchProgress(
+            id: fastHash(entry.animeId),
+            animeId: entry.animeId,
+            animeTitle: entry.animeTitle,
+            animeFormat: entry.animeFormat,
+            animeCover: entry.animeCover,
+            totalEpisodes: entry.totalEpisodes,
+            lastUpdated: entry.lastUpdated,
+            currentEpisode: entry.currentEpisode,
+            status: entry.status,
+            episodesProgress:
+                entry.episodesProgress.values.map(_toIsarProgress).toList(),
+          ),
+        )
+        .toList(growable: false);
+
+    await isar.writeTxn(() async {
+      await isar.isarAnimeWatchProgress.clear();
+      if (isarEntries.isNotEmpty) {
+        await isar.isarAnimeWatchProgress.putAll(isarEntries);
+      }
+    });
+
+    final box =
+        Hive.isBoxOpen('anime_watch_progress')
+            ? Hive.box<AnimeWatchProgressEntry>('anime_watch_progress')
+            : await Hive.openBox<AnimeWatchProgressEntry>(
+              'anime_watch_progress',
+            );
+    await box.clear();
+    await box.putAll({for (final entry in restored) entry.animeId: entry});
+    await sharedPrefs.setBool('migrated_watch_progress_isar', true);
+  }
+
   bool isAdultAnimeId(String animeId) {
     final adultIds = sharedPrefs.getStringList('adult_anime_ids') ?? [];
     return adultIds.contains(animeId);

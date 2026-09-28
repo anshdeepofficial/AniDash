@@ -56,6 +56,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   var _isSearchFocused = false;
   var _isExploreLoading = true;
   var _isSearchSubmitted = false;
+  int _searchGeneration = 0;
 
   @override
   void initState() {
@@ -160,10 +161,16 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     }
   }
 
-  Future<void> _fetchResults(String keyword, int page) async {
-    if (_isLoading || !_hasMore) return;
+  Future<bool> _fetchResults(String keyword, int page, int generation) async {
+    // A page-one search intentionally supersedes an older request. Pagination
+    // is still serial so a fast scroll cannot skip pages.
+    if ((_isLoading && page > 1) ||
+        !_hasMore ||
+        generation != _searchGeneration) {
+      return false;
+    }
     // Allow search if keyword is empty BUT filter is present
-    if (keyword.isEmpty && _currentFilter.isEmpty) return;
+    if (keyword.isEmpty && _currentFilter.isEmpty) return false;
 
     setState(() => _isLoading = true);
 
@@ -180,7 +187,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
               ? await JikanService().searchUniversal(keyword)
               : results;
 
-      if (mounted) {
+      if (mounted && generation == _searchGeneration) {
         setState(() {
           if (page == 1) {
             _results = effectiveResults;
@@ -190,25 +197,37 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
           _hasMore = results.isNotEmpty;
           _isLoading = false;
         });
+        return true;
       }
     } catch (e, stackTrace) {
       AppLogger.e("Search error", e, stackTrace);
       final fallback = await JikanService().searchUniversal(keyword);
-      if (mounted) {
+      if (mounted && generation == _searchGeneration) {
         setState(() {
           if (page == 1) _results = fallback;
           _hasMore = false;
           _isLoading = false;
         });
+        return true;
       }
     }
+    return false;
   }
 
-  void _onScroll() {
+  Future<void> _onScroll() async {
     if (_results.isNotEmpty &&
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 200) {
-      _fetchResults(_searchController.text, ++_currentPage);
+      final generation = _searchGeneration;
+      final nextPage = _currentPage + 1;
+      final loaded = await _fetchResults(
+        _searchController.text,
+        nextPage,
+        generation,
+      );
+      if (loaded && mounted && generation == _searchGeneration) {
+        _currentPage = nextPage;
+      }
     }
   }
 
@@ -276,6 +295,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   }
 
   Future<void> _search() async {
+    final generation = ++_searchGeneration;
     if (_searchController.text.isEmpty && _currentFilter.isEmpty) {
       setState(() {
         _results.clear();
@@ -290,7 +310,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       _hasMore = true;
     });
 
-    await _fetchResults(_searchController.text, _currentPage);
+    await _fetchResults(_searchController.text, _currentPage, generation);
   }
 
   void _openFilter() async {

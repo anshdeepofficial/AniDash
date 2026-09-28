@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
+import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:ani_dash/core/models/settings/content_settings_model.dart';
 import 'package:ani_dash/core/models/settings/download_settings_model.dart';
@@ -39,14 +40,18 @@ class BackupService {
       if (includeWatchlist) {
         final progressBox = Hive.box<AnimeWatchProgressEntry>(_progressBox);
         dataPayload['watchlist'] = progressBox.toMap().map(
-              (key, value) => MapEntry(key.toString(), value.toMap()),
-            );
+          (key, value) => MapEntry(key.toString(), value.toMap()),
+        );
       }
 
       if (includeSettings) {
         final settingsData = <String, dynamic>{};
 
-        void addSetting<T>(String key, String prefKey, Map<String, dynamic> Function(String) parser) {
+        void addSetting<T>(
+          String key,
+          String prefKey,
+          Map<String, dynamic> Function(String) parser,
+        ) {
           final jsonStr = sharedPrefs.getString(prefKey);
           if (jsonStr != null) {
             try {
@@ -55,12 +60,32 @@ class BackupService {
           }
         }
 
-        addSetting('theme', 'theme_settings', (j) => ThemeModel.fromJson(j).toMap());
-        addSetting('download', 'download_settings', (j) => DownloadSettingsModel.fromJson(j).toMap());
-        addSetting('player', 'player_settings', (j) => PlayerModel.fromJson(j).toMap());
+        addSetting(
+          'theme',
+          'theme_settings',
+          (j) => ThemeModel.fromJson(j).toMap(),
+        );
+        addSetting(
+          'download',
+          'download_settings',
+          (j) => DownloadSettingsModel.fromJson(j).toMap(),
+        );
+        addSetting(
+          'player',
+          'player_settings',
+          (j) => PlayerModel.fromJson(j).toMap(),
+        );
         addSetting('ui', 'ui_settings', (j) => UiSettings.fromJson(j).toMap());
-        addSetting('experimental', 'experimental_settings', (j) => ExperimentalFeaturesModel.fromJson(j).toMap());
-        addSetting('content', 'content_settings', (j) => ContentSettingsModel.fromJson(j).toMap());
+        addSetting(
+          'experimental',
+          'experimental_settings',
+          (j) => ExperimentalFeaturesModel.fromJson(j).toMap(),
+        );
+        addSetting(
+          'content',
+          'content_settings',
+          (j) => ContentSettingsModel.fromJson(j).toMap(),
+        );
 
         dataPayload['settings'] = settingsData;
       }
@@ -72,14 +97,16 @@ class BackupService {
       };
 
       final jsonString = jsonEncode(backupData);
-      final fileName = 'AniDash_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      final fileName =
+          'AniDash_backup_${DateTime.now().millisecondsSinceEpoch}.json';
 
       if (Platform.isAndroid) {
         bool saved = false;
         try {
-          final hasPermission = await _ref
-              .read(permissionsProvider.notifier)
-              .requestStoragePermission();
+          final hasPermission =
+              await _ref
+                  .read(permissionsProvider.notifier)
+                  .requestStoragePermission();
 
           if (hasPermission) {
             final dir = await StorageProvider.getDefaultDirectory();
@@ -92,14 +119,18 @@ class BackupService {
             }
           }
         } catch (err) {
-          AppLogger.w('Storage permission check failed or denied, sharing backup file: $err');
+          AppLogger.w(
+            'Storage permission check failed or denied, sharing backup file: $err',
+          );
         }
 
         if (!saved) {
           final tempDir = await getTemporaryDirectory();
           final file = File('${tempDir.path}/$fileName');
           await file.writeAsString(jsonString);
-          await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'AniDash Backup'));
+          await SharePlus.instance.share(
+            ShareParams(files: [XFile(file.path)], text: 'AniDash Backup'),
+          );
         }
       } else {
         final result = await FilePicker.saveFile(
@@ -142,8 +173,6 @@ class BackupService {
 
       if (data.containsKey('watchlist')) {
         final watchlistData = data['watchlist'] as Map<String, dynamic>;
-        final box = Hive.box<AnimeWatchProgressEntry>(_progressBox);
-        await box.clear();
 
         final Map<String, AnimeWatchProgressEntry> entries = {};
         for (var entry in watchlistData.entries) {
@@ -153,13 +182,21 @@ class BackupService {
             );
           } catch (_) {}
         }
-        await box.putAll(entries);
+        // Isar is the live source of truth. Restoring Hive alone makes a
+        // successful import appear empty until a later migration.
+        await _ref
+            .read(watchProgressRepositoryProvider)
+            .replaceAllProgress(entries.values);
       }
 
       if (data.containsKey('settings')) {
         final settingsData = data['settings'] as Map<String, dynamic>;
 
-        Future<void> restoreSetting(String key, String prefKey, dynamic Function(Map<String, dynamic>) parser) async {
+        Future<void> restoreSetting(
+          String key,
+          String prefKey,
+          dynamic Function(Map<String, dynamic>) parser,
+        ) async {
           if (settingsData.containsKey(key)) {
             try {
               final model = parser(settingsData[key]);
@@ -168,12 +205,32 @@ class BackupService {
           }
         }
 
-        await restoreSetting('theme', 'theme_settings', (m) => ThemeModel.fromMap(m));
-        await restoreSetting('download', 'download_settings', (m) => DownloadSettingsModel.fromMap(m));
-        await restoreSetting('player', 'player_settings', (m) => PlayerModel.fromMap(m));
+        await restoreSetting(
+          'theme',
+          'theme_settings',
+          (m) => ThemeModel.fromMap(m),
+        );
+        await restoreSetting(
+          'download',
+          'download_settings',
+          (m) => DownloadSettingsModel.fromMap(m),
+        );
+        await restoreSetting(
+          'player',
+          'player_settings',
+          (m) => PlayerModel.fromMap(m),
+        );
         await restoreSetting('ui', 'ui_settings', (m) => UiSettings.fromMap(m));
-        await restoreSetting('experimental', 'experimental_settings', (m) => ExperimentalFeaturesModel.fromMap(m));
-        await restoreSetting('content', 'content_settings', (m) => ContentSettingsModel.fromMap(m));
+        await restoreSetting(
+          'experimental',
+          'experimental_settings',
+          (m) => ExperimentalFeaturesModel.fromMap(m),
+        );
+        await restoreSetting(
+          'content',
+          'content_settings',
+          (m) => ContentSettingsModel.fromMap(m),
+        );
       }
     } catch (e, s) {
       AppLogger.e('Failed to import data', e, s);

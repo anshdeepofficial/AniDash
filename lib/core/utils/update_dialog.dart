@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypto/crypto.dart';
 import 'package:ani_dash/core/utils/updater.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -15,6 +16,7 @@ class UpdateDialog extends StatefulWidget {
   final UpdateType type;
   final String? releaseNotes;
   final String? apkDownloadUrl;
+  final String? apkSha256;
 
   const UpdateDialog({
     super.key,
@@ -23,13 +25,15 @@ class UpdateDialog extends StatefulWidget {
     required this.type,
     this.releaseNotes,
     this.apkDownloadUrl,
+    this.apkSha256,
   });
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
 }
 
-class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver {
+class _UpdateDialogState extends State<UpdateDialog>
+    with WidgetsBindingObserver {
   static const _installer = MethodChannel('anidash/updater');
   double _progress = 0.0;
   bool _downloading = false;
@@ -150,12 +154,18 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
             setState(() {
               if (contentLength > 0) {
                 _progress = received / contentLength;
-                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
-                final totalMB = (contentLength / (1024 * 1024)).toStringAsFixed(1);
+                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(
+                  1,
+                );
+                final totalMB = (contentLength / (1024 * 1024)).toStringAsFixed(
+                  1,
+                );
                 _statusMessage =
                     "Downloading... ${(_progress * 100).toInt()}% ($receivedMB MB / $totalMB MB)";
               } else {
-                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
+                final receivedMB = (received / (1024 * 1024)).toStringAsFixed(
+                  1,
+                );
                 _statusMessage = "Downloading... $receivedMB MB";
               }
             });
@@ -167,6 +177,20 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
       }
 
       _downloadedApkPath = savePath;
+      if (Platform.isAndroid) {
+        final expected = widget.apkSha256?.trim().toLowerCase();
+        if (expected == null || expected.isEmpty) {
+          await file.delete();
+          throw const FormatException(
+            'This release has no verifiable APK SHA-256 digest.',
+          );
+        }
+        final actual = sha256.convert(await file.readAsBytes()).toString();
+        if (actual != expected) {
+          await file.delete();
+          throw const FormatException('APK integrity verification failed.');
+        }
+      }
       await _launchInstaller(savePath);
     } catch (e) {
       if (mounted) {
@@ -203,10 +227,13 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
           _statusMessage = 'Opening Android installer...';
         });
       }
-      final success = await _installer.invokeMethod<bool>('installApk', {'path': savePath});
+      final success = await _installer.invokeMethod<bool>('installApk', {
+        'path': savePath,
+      });
       if (success != true && mounted) {
         setState(() {
-          _statusMessage = 'Could not open installer. Tap Install Update again.';
+          _statusMessage =
+              'Could not open installer. Tap Install Update again.';
         });
       }
     } catch (e) {

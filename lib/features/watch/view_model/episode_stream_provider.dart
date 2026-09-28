@@ -202,6 +202,8 @@ class EpisodeData extends _$EpisodeData {
       return;
     }
 
+    if (state.selectedEpisode != ep) _runtimeRecoveryAttempts = 0;
+
     final generation = ++_loadGeneration;
     _player.setActiveSession(mediaId ?? _epList.animeId, ep);
 
@@ -308,6 +310,8 @@ class EpisodeData extends _$EpisodeData {
   int? _prefetchedEpNum;
   BaseSourcesModel? _prefetchedSourceData;
   bool _isPrefetching = false;
+  bool _isRecoveringPlayback = false;
+  int _runtimeRecoveryAttempts = 0;
 
   Future<void> prefetchNextEpisode() async {
     final currentEp = state.selectedEpisode;
@@ -355,6 +359,62 @@ class EpisodeData extends _$EpisodeData {
       ref.read(playerStateProvider).position,
       generation: generation,
     );
+  }
+
+  /// Recovers from an error emitted *after* MPV accepted the URL. In that
+  /// case `_player.open` has already completed, so the normal extraction
+  /// fallback cannot see the failure. Keep audio language unchanged and try
+  /// another source/server at the last confirmed position.
+  Future<void> recoverFromPlaybackFailure() async {
+    if (_isRecoveringPlayback || _runtimeRecoveryAttempts >= 2) return;
+    final ep = state.selectedEpisode;
+    if (ep == null) return;
+
+    _isRecoveringPlayback = true;
+    _runtimeRecoveryAttempts++;
+    final generation = ++_loadGeneration;
+    final startAt = _player.lastStablePosition;
+    state = state.copyWith(
+      addState: EpisodeStreamState.SOURCE_LOADING,
+      clearError: true,
+    );
+    try {
+      final currentIndex = state.selectedSourceIdx ?? 0;
+      final nextIndex = currentIndex + 1;
+      if (nextIndex < state.sources.length) {
+        await _loadSourceStream(
+          nextIndex,
+          startAt: startAt,
+          generation: generation,
+        );
+        return;
+      }
+
+      final currentServer = state.selectedServer;
+      final alternateServer = state.servers.firstWhereOrNull(
+        (server) =>
+            server.isDub == currentServer?.isDub &&
+            server.id != currentServer?.id,
+      );
+      if (alternateServer != null) {
+        state = state.copyWith(selectedServer: alternateServer);
+        clearEpisodeCache(
+          mediaId: _epList.mediaId ?? _epList.animeId,
+          episodeNumber: ep,
+        );
+        await _playCurrent(startAt, generation: generation);
+        return;
+      }
+      state = state.copyWith(
+        error:
+            'This stream failed on all available ${currentServer?.isDub == true ? 'English dub' : 'Japanese sub'} servers.',
+      );
+    } finally {
+      if (generation == _loadGeneration) {
+        state = state.copyWith(removeState: EpisodeStreamState.SOURCE_LOADING);
+      }
+      _isRecoveringPlayback = false;
+    }
   }
 
   Future<void> switchAudioLanguage(String language) async {
@@ -645,6 +705,8 @@ class EpisodeData extends _$EpisodeData {
 
       final item = DownloadItem(
         animeTitle: animeTitle,
+        animeId: _epList.mediaId ?? _epList.animeId,
+        totalEpisodes: _epList.episodes.length,
         episodeTitle: ep.title ?? 'Episode $epNum',
         episodeNumber: epNum,
         thumbnail: thumb,
@@ -781,6 +843,8 @@ class EpisodeData extends _$EpisodeData {
 
         final item = DownloadItem(
           animeTitle: animeTitle,
+          animeId: _epList.mediaId ?? _epList.animeId,
+          totalEpisodes: _epList.episodes.length,
           episodeTitle: ep.title ?? 'Episode $epNum',
           episodeNumber: epNum,
           thumbnail: thumb,
@@ -929,7 +993,9 @@ class EpisodeData extends _$EpisodeData {
     } catch (e, stack) {
       AppLogger.e("Server fetch failed", e, stack);
     } finally {
-      state = state.copyWith(removeState: EpisodeStreamState.SERVER_LOADING);
+      if (generation == null || generation == _loadGeneration) {
+        state = state.copyWith(removeState: EpisodeStreamState.SERVER_LOADING);
+      }
     }
   }
 
@@ -1147,7 +1213,9 @@ class EpisodeData extends _$EpisodeData {
         error: 'Source not available for this episode. Try another server.',
       );
     } finally {
-      state = state.copyWith(removeState: EpisodeStreamState.SOURCE_LOADING);
+      if (activeGeneration == _loadGeneration) {
+        state = state.copyWith(removeState: EpisodeStreamState.SOURCE_LOADING);
+      }
     }
   }
 
@@ -1337,7 +1405,9 @@ class EpisodeData extends _$EpisodeData {
             });
       }
     } finally {
-      state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
+      if (activeGeneration == _loadGeneration) {
+        state = state.copyWith(removeState: EpisodeStreamState.QUALITY_LOADING);
+      }
     }
   }
 

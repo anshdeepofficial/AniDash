@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'cache_config.dart';
@@ -17,8 +18,8 @@ class UniversalHttpClient {
   }
 
   String _generateKey(String method, Uri url, {Object? body}) {
-    final hash = Object.hash(method, url.toString(), body?.toString());
-    return hash.toUnsigned(32).toRadixString(16);
+    final input = '$method\n${url.toString()}\n${body ?? ''}';
+    return sha256.convert(utf8.encode(input)).toString();
   }
 
   Future<http.Response> _request({
@@ -56,7 +57,9 @@ class UniversalHttpClient {
     }
 
     try {
-      final response = await networkRequest();
+      final response = await networkRequest().timeout(
+        const Duration(seconds: 20),
+      );
 
       if (useCache && response.statusCode >= 200 && response.statusCode < 300) {
         AppLogger.w('[CACHE MISS] Saving $method $url');
@@ -100,8 +103,13 @@ class UniversalHttpClient {
       url: url,
       body: body,
       cacheConfig: cacheConfig,
-      networkRequest: () =>
-          _client.post(url, headers: headers, body: body, encoding: encoding),
+      networkRequest:
+          () => _client.post(
+            url,
+            headers: headers,
+            body: body,
+            encoding: encoding,
+          ),
     );
   }
 
@@ -117,8 +125,13 @@ class UniversalHttpClient {
       url: url,
       body: body,
       cacheConfig: cacheConfig,
-      networkRequest: () =>
-          _client.put(url, headers: headers, body: body, encoding: encoding),
+      networkRequest:
+          () => _client.put(
+            url,
+            headers: headers,
+            body: body,
+            encoding: encoding,
+          ),
     );
   }
 
@@ -134,8 +147,13 @@ class UniversalHttpClient {
       url: url,
       body: body,
       cacheConfig: cacheConfig,
-      networkRequest: () =>
-          _client.patch(url, headers: headers, body: body, encoding: encoding),
+      networkRequest:
+          () => _client.patch(
+            url,
+            headers: headers,
+            body: body,
+            encoding: encoding,
+          ),
     );
   }
 
@@ -151,8 +169,13 @@ class UniversalHttpClient {
       url: url,
       body: body,
       cacheConfig: cacheConfig,
-      networkRequest: () =>
-          _client.delete(url, headers: headers, body: body, encoding: encoding),
+      networkRequest:
+          () => _client.delete(
+            url,
+            headers: headers,
+            body: body,
+            encoding: encoding,
+          ),
     );
   }
 

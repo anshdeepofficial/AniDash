@@ -29,7 +29,8 @@ class AnimeSearchState {
 @riverpod
 class AnimeSearchNotifier extends _$AnimeSearchNotifier {
   Timer? _debounce;
-  
+  int _searchGeneration = 0;
+
   @override
   AnimeSearchState build() {
     ref.onDispose(() {
@@ -38,7 +39,11 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
     return AnimeSearchState();
   }
 
-  void tryAutoResolve(UniversalMedia media, bool autoMatch, Function(BaseAnimeModel) onMatch) async {
+  void tryAutoResolve(
+    UniversalMedia media,
+    bool autoMatch,
+    Function(BaseAnimeModel) onMatch,
+  ) async {
     final title = media.title.userPreferred;
     performSearch(title);
 
@@ -57,18 +62,25 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
   }
 
   Future<void> performSearch(String query) async {
+    final generation = ++_searchGeneration;
     state = state.copyWith(isLoading: true);
     try {
       final results = await ref.read(animeMatchServiceProvider).search(query);
+      if (!ref.mounted || generation != _searchGeneration) return;
       state = state.copyWith(results: results, isLoading: false);
     } catch (e) {
+      if (!ref.mounted || generation != _searchGeneration) return;
       state = state.copyWith(results: [], isLoading: false);
     }
   }
 
   void onSearchChanged(String query) {
     _debounce?.cancel();
-    if (query.trim().length < 2) return;
+    if (query.trim().length < 2) {
+      _searchGeneration++;
+      state = state.copyWith(results: const [], isLoading: false);
+      return;
+    }
 
     _debounce = Timer(const Duration(milliseconds: 600), () {
       performSearch(query);
@@ -78,7 +90,7 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
   void saveSelection(UniversalMedia media, BaseAnimeModel anime) {
     if (ref.read(contentSettingsProvider).smartSourceEnabled) {
       final useExtensions = ref.read(experimentalProvider).useExtensions;
-      
+
       if (useExtensions) {
         final activeSource = ref.read(sourceProvider).activeAnimeSource;
         if (activeSource != null) {
@@ -90,11 +102,13 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
             matchedAnimeTitle: anime.name,
           );
 
-          ref.read(sourcePreferenceRepositoryProvider).saveSourcePreference(
-            media.id.toString(),
-            (media.coverImage.medium ?? media.coverImage.large)!,
-            selection,
-          );
+          ref
+              .read(sourcePreferenceRepositoryProvider)
+              .saveSourcePreference(
+                media.id.toString(),
+                (media.coverImage.medium ?? media.coverImage.large)!,
+                selection,
+              );
         }
       } else {
         final sourceId = ref.read(selectedProviderKeyProvider);
@@ -107,14 +121,15 @@ class AnimeSearchNotifier extends _$AnimeSearchNotifier {
             matchedAnimeTitle: anime.name,
           );
 
-          ref.read(sourcePreferenceRepositoryProvider).saveSourcePreference(
-            media.id.toString(),
-            (media.coverImage.medium ?? media.coverImage.large)!,
-            selection,
-          );
+          ref
+              .read(sourcePreferenceRepositoryProvider)
+              .saveSourcePreference(
+                media.id.toString(),
+                (media.coverImage.medium ?? media.coverImage.large)!,
+                selection,
+              );
         }
       }
     }
   }
 }
-

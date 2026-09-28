@@ -15,6 +15,7 @@ part 'auth_notifier.g.dart';
 
 @immutable
 class AuthState {
+  static const Object _unset = Object();
   final bool anilistLoading;
   final bool malLoading;
   final String? anilistAccessToken;
@@ -36,19 +37,28 @@ class AuthState {
   AuthState copyWith({
     bool? anilistLoading,
     bool? malLoading,
-    String? anilistAccessToken,
-    String? malAccessToken,
-    AuthUser? anilistUser,
-    AuthUser? malUser,
+    Object? anilistAccessToken = _unset,
+    Object? malAccessToken = _unset,
+    Object? anilistUser = _unset,
+    Object? malUser = _unset,
     AuthPlatform? activePlatform,
   }) {
     return AuthState(
       anilistLoading: anilistLoading ?? this.anilistLoading,
       malLoading: malLoading ?? this.malLoading,
-      anilistAccessToken: anilistAccessToken ?? this.anilistAccessToken,
-      malAccessToken: malAccessToken ?? this.malAccessToken,
-      anilistUser: anilistUser ?? this.anilistUser,
-      malUser: malUser ?? this.malUser,
+      anilistAccessToken:
+          identical(anilistAccessToken, _unset)
+              ? this.anilistAccessToken
+              : anilistAccessToken as String?,
+      malAccessToken:
+          identical(malAccessToken, _unset)
+              ? this.malAccessToken
+              : malAccessToken as String?,
+      anilistUser:
+          identical(anilistUser, _unset)
+              ? this.anilistUser
+              : anilistUser as AuthUser?,
+      malUser: identical(malUser, _unset) ? this.malUser : malUser as AuthUser?,
       activePlatform: activePlatform ?? this.activePlatform,
     );
   }

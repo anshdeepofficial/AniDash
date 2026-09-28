@@ -18,6 +18,10 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
   @override
   void initState() {
     super.initState();
+    // AniDash extensions are intentionally in-process. AniYomi repositories
+    // contain Android APK plug-ins, which would be installed as separate apps
+    // and cannot satisfy AniDash's sandboxed extension model.
+    Get.find<ExtensionManager>().setCurrentManager(ExtensionType.mangayomi);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRepositories());
   }
 
@@ -49,34 +53,25 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
   };
 
   List<String> _getSavedAnimeRepos(dynamic manager) {
-    if (ExtensionType.fromManager(manager) == ExtensionType.mangayomi) {
-      return const [
-        'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
-        'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
-      ];
-    }
-    final saved = sharedPrefs.getStringList('saved_anime_repos');
     final repos = <String>{
-      "https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json",
-      "https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json",
+      'https://raw.githubusercontent.com/Mallyd11/mangayomi-anime-extensions/main/anime_index.json',
+      'https://raw.githubusercontent.com/m2k3a/mangayomi-extensions/main/anime_index.json',
     };
+    final saved = sharedPrefs.getStringList('saved_anime_repos');
     if (saved != null && saved.isNotEmpty) {
-      repos.addAll(saved);
+      repos.addAll(saved.where((url) => !url.contains('index.min.json')));
     }
     return repos.toList();
   }
 
   List<String> _getSavedMangaRepos(dynamic manager) {
-    if (ExtensionType.fromManager(manager) == ExtensionType.mangayomi) {
-      return const [
-        'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
-      ];
-    }
-    final saved = sharedPrefs.getStringList('saved_manga_repos');
     final repos = <String>{
-      'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
+      'https://raw.githubusercontent.com/kodjodevf/mangayomi-extensions/main/index.json',
     };
-    if (saved != null && saved.isNotEmpty) repos.addAll(saved);
+    final saved = sharedPrefs.getStringList('saved_manga_repos');
+    if (saved != null && saved.isNotEmpty) {
+      repos.addAll(saved.where((url) => !url.contains('index.min.json')));
+    }
     return repos.toList();
   }
 
@@ -105,9 +100,8 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                   (context) => AlertDialog(
                     title: const Text('Extension engines'),
                     content: const Text(
-                      'These are two ways AniDash can load community sources.\n\n'
-                      'AniYomi: best for the Android source lists shown in this app, including Yuzono.\n\n'
-                      'MangaYomi: supports a different type of community source file. Use it only when a repository says it is made for MangaYomi.\n\n'
+                      'AniDash uses MangaYomi-compatible source files that run inside AniDash.\n\n'
+                      'AniYomi repositories distribute Android APK plug-ins. They are intentionally blocked because they install as separate apps instead of staying inside AniDash.\n\n'
                       'Adding a repository does not install every source inside it. After adding it, open Available Anime or Available Manga and install the source you want.',
                     ),
                     actions: [
@@ -154,24 +148,6 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
         onPressed: _refreshRepositories,
         icon: const Icon(Iconsax.refresh),
         tooltip: 'Refresh',
-      ),
-      PopupMenuButton<ExtensionType>(
-        icon: const Icon(Iconsax.category),
-        tooltip: 'Filter Extension Type',
-        onSelected: (type) {
-          Get.find<ExtensionManager>().setCurrentManager(type);
-          manager = Get.find<ExtensionManager>().currentManager;
-          setState(() {});
-          _refreshRepositories();
-        },
-        itemBuilder: (context) {
-          return ExtensionType.values.map((type) {
-            return PopupMenuItem(
-              value: type,
-              child: Text(type.name.toUpperCase()),
-            );
-          }).toList();
-        },
       ),
     ];
   }
@@ -247,27 +223,6 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
             'https://kohiden.xyz/Kohi-den/extensions/raw/branch/main/index.min.json',
         type: ItemType.anime,
         is18Plus: false,
-      ),
-      (
-        name: 'Yuzono (18+ & Anime Sources)',
-        url:
-            'https://raw.githubusercontent.com/yuzono/anime-repo/repo/index.min.json',
-        type: ItemType.anime,
-        is18Plus: true,
-      ),
-      (
-        name: 'Secozzi Aniyomi Extensions',
-        url:
-            'https://raw.githubusercontent.com/Secozzi/aniyomi-extensions/refs/heads/repo/index.min.json',
-        type: ItemType.anime,
-        is18Plus: false,
-      ),
-      (
-        name: 'Keiyoushi Manga Sources',
-        url:
-            'https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json',
-        type: ItemType.manga,
-        is18Plus: true,
       ),
     ];
 
@@ -417,6 +372,16 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                           : () async {
                             final url = controller.text.trim();
                             if (url.isNotEmpty) {
+                              if (url.contains('index.min.json')) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'AniYomi APK repositories are not supported. Add a MangaYomi JSON repository so sources stay inside AniDash.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               setState(() => isAdding = true);
                               final messenger = ScaffoldMessenger.of(context);
                               try {
