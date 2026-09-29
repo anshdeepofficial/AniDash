@@ -102,6 +102,9 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   int? _activeEpisode;
   Duration _lastStablePosition = Duration.zero;
   bool _automaticRetryInFlight = false;
+  Map<String, String> _playbackProperties = const {};
+  Map<String, String> _customMpvSettings = const {};
+  int _openGeneration = 0;
 
   Player get player => _player;
   String? get activeMediaId => _activeMediaId;
@@ -156,7 +159,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     // Keep at least 100 MiB available for forward HLS buffering. `cache-secs`
     // is intentionally larger than the target window: the byte cap remains
     // the real memory guard while MPV keeps filling continuously.
-    final fastProperties = <String, String>{
+    _playbackProperties = <String, String>{
       // media_kit's safe hardware path avoids making the UI isolate perform
       // full 1080p software decoding while HLS segments are also arriving.
       'hwdec': 'auto-safe',
@@ -197,26 +200,10 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       'video-sync': 'audio', // Audio-locked sync; prevents A/V drift
     };
 
-    final platform = _player.platform as dynamic;
-    for (final entry in fastProperties.entries) {
-      try {
-        platform.setProperty(entry.key, entry.value);
-      } catch (error) {
-        AppLogger.d('MPV option ${entry.key} was not accepted: $error');
-      }
-    }
-
-    // Apply user custom MPV settings
-    for (final entry in mpvSettings.entries) {
-      // Keep the tested safe online-decoder baseline. A stale custom hwdec
-      // value must not silently restore forced software decoding.
-      if (entry.key == 'vo' || entry.key == 'hwdec') continue;
-      try {
-        platform.setProperty(entry.key, entry.value);
-      } catch (error) {
-        AppLogger.d('Custom MPV option ${entry.key} was not accepted: $error');
-      }
-    }
+    _customMpvSettings =
+        Map<String, String>.from(mpvSettings)
+          ..remove('vo')
+          ..remove('hwdec');
 
     videoController = VideoController(
       _player,
@@ -254,6 +241,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
           position: pos,
           isSeeking: landed ? false : null,
           isOpening: pos > Duration.zero ? false : null,
+          clearPlaybackError: pos > Duration.zero,
         );
       }),
     );
@@ -370,6 +358,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     String? mediaId,
     int? episode,
   }) async {
+    final openGeneration = ++_openGeneration;
     final isSameSession =
         mediaId != null &&
         episode != null &&
@@ -403,15 +392,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       duration: isSameSession ? state.duration : Duration.zero,
     );
     _startupTimer?.cancel();
-    _startupTimer = Timer(const Duration(seconds: 12), () {
-      if (state.isOpening) {
-        state = state.copyWith(
-          isOpening: false,
-          playbackError: 'Video startup timed out. Tap Retry to try again.',
-        );
-      }
-    });
     try {
+      // setProperty is asynchronous. The previous fire-and-forget setup raced
+      // the first manifest request, so later episodes could open with stale
+      // cache/demuxer values from the preceding stream. Apply the complete
+      // playback profile in order before every media open.
+      await _applyPlaybackProperties();
       final platform = _player.platform as dynamic;
       // ── Set UA, Referer, and http-header-fields concurrently in 1 roundtrip ──
       final ua =
@@ -446,10 +432,39 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     } catch (error) {
       AppLogger.w('Could not apply stream headers before playback: $error');
     }
+    if (openGeneration != _openGeneration) return;
+    _startupTimer = Timer(const Duration(seconds: 30), () {
+      if (openGeneration == _openGeneration &&
+          state.isOpening &&
+          _player.state.position == Duration.zero) {
+        state = state.copyWith(
+          isOpening: false,
+          playbackError: 'Video startup timed out. Tap Retry to try again.',
+        );
+      }
+    });
     await _player.open(
       Media(url, httpHeaders: effectiveHeaders, start: effectiveStartAt),
       play: true,
     );
+  }
+
+  Future<void> _applyPlaybackProperties() async {
+    final platform = _player.platform as dynamic;
+    for (final entry in _playbackProperties.entries) {
+      try {
+        await platform.setProperty(entry.key, entry.value);
+      } catch (error) {
+        AppLogger.d('MPV option ${entry.key} was not accepted: $error');
+      }
+    }
+    for (final entry in _customMpvSettings.entries) {
+      try {
+        await platform.setProperty(entry.key, entry.value);
+      } catch (error) {
+        AppLogger.d('Custom MPV option ${entry.key} was not accepted: $error');
+      }
+    }
   }
 
   Future<void> retry() async {
