@@ -130,6 +130,6 @@ AniDash is available under the [Apache License 2.0](LICENSE.md).
 
 Made by <a href="https://github.com/anshdeepofficial1">Anshdeep Singh</a>
 
-<a href="https://github.com/sponsors/anshdeepofficial">Sponsor on GitHub</a> • <a href="https://buymeacoffee.com/anshdeepofficial">Buy Me a Coffee</a>
+<a href="https://github.com/sponsors/anshdeepofficial1">Sponsor on GitHub</a> • <a href="https://buymeacoffee.com/anshdeepofficial1">Buy Me a Coffee</a>
 
 </div>
