@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/features/details/view_model/details_page_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/details/view/widgets/episodes_tab.dart';
 import 'package:ani_dash/features/details/view/widgets/characters_tab.dart';
 import 'package:ani_dash/shared/providers/settings/experimental_notifier.dart';
@@ -73,6 +74,10 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
 
   void _onSeasonSelected(UniversalMedia media) {
     if (media.id == _activeMedia.id) return;
+    // The episode list is shared for playback continuity. Clear it before
+    // changing identity so a completed request for the previous season can
+    // never be rendered as the newly selected season.
+    ref.read(episodeListProvider.notifier).reset();
     setState(() {
       _activeMedia = media;
     });
@@ -151,9 +156,10 @@ class _AnimeDetailsScreenState extends ConsumerState<AnimeDetailsScreen>
                     characters: displayedAnime.characters,
                     isLoading: isLoading,
                     onRetry:
-                        () => ref
-                            .read(detailsPageProvider(id).notifier)
-                            .fetchDetails(),
+                        () =>
+                            ref
+                                .read(detailsPageProvider(id).notifier)
+                                .fetchDetails(),
                   ),
                 ),
               ],

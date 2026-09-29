@@ -69,10 +69,15 @@ class _AnimeCardState extends State<AnimeCard> {
                     isHovered: _isHovered,
                     progress: widget.progress,
                   ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: SeasonBadge(anime: widget.anime),
+                  ),
                   if (widget.anime.isMature)
                     Positioned(
                       top: 8,
-                      left: 8,
+                      right: 8,
                       child: AdultBadge(anime: widget.anime),
                     ),
                 ],

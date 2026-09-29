@@ -3,6 +3,40 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/models/universal/universal_media.dart';
 
+String? animeSeasonBadge(UniversalMedia anime) {
+  final format = anime.format?.toUpperCase() ?? '';
+  if (const {'MOVIE', 'OVA', 'ONA', 'SPECIAL', 'MUSIC'}.contains(format)) {
+    return null;
+  }
+
+  final titles = [
+    anime.title.english,
+    anime.title.romaji,
+    ...anime.synonyms,
+  ].whereType<String>().join(' ');
+  final seasonMatch = RegExp(
+    r'(?:season|series)\s*(\d+)|\b(\d+)(?:st|nd|rd|th)\s+season\b',
+    caseSensitive: false,
+  ).firstMatch(titles);
+  final partMatch = RegExp(
+    r'(?:part|cour)\s*(\d+)',
+    caseSensitive: false,
+  ).firstMatch(titles);
+  final season =
+      int.tryParse(seasonMatch?.group(1) ?? seasonMatch?.group(2) ?? '') ?? 1;
+  final part = int.tryParse(partMatch?.group(1) ?? '');
+  return part != null && part > 1 ? 'S$season-$part' : 'S$season';
+}
+
+int animeSeasonSortKey(UniversalMedia anime) {
+  final badge = animeSeasonBadge(anime);
+  if (badge == null) return 9999;
+  final match = RegExp(r'^S(\d+)(?:-(\d+))?$').firstMatch(badge);
+  final season = int.tryParse(match?.group(1) ?? '') ?? 1;
+  final part = int.tryParse(match?.group(2) ?? '') ?? 1;
+  return season * 100 + part;
+}
+
 String? formatEpisodeText({
   required UniversalMedia? anime,
   int? progress,
@@ -12,6 +46,13 @@ String? formatEpisodeText({
   final totalEpisodes = anime?.episodes;
   final hasTotal = totalEpisodes != null && totalEpisodes > 0;
   final currentProgress = progress;
+  final isMovie = anime?.format?.toUpperCase() == 'MOVIE';
+
+  // Movies are single playable titles, not one-episode series. Keep this
+  // distinction visible everywhere the shared card metadata is used.
+  if (isMovie) {
+    return compact ? '1 MOVIE' : '1 Movie';
+  }
 
   if (currentProgress != null && currentProgress > 0) {
     if (hasTotal) {
@@ -314,6 +355,46 @@ class AdultBadge extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class SeasonBadge extends StatelessWidget {
+  final UniversalMedia anime;
+
+  const SeasonBadge({super.key, required this.anime});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = animeSeasonBadge(anime);
+    if (label == null) return const SizedBox.shrink();
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.55),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: colors.onPrimaryContainer,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.4,
         ),
       ),
     );

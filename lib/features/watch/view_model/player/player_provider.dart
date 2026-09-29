@@ -25,6 +25,7 @@ class PlayerState {
   final List<String> subtitle;
   final BoxFit fit;
   final double subtitleDelay;
+  final bool isRepeating;
 
   const PlayerState({
     required this.position,
@@ -39,6 +40,7 @@ class PlayerState {
     required this.subtitle,
     required this.fit,
     this.subtitleDelay = 0.0,
+    this.isRepeating = false,
   });
 
   factory PlayerState.initial() => const PlayerState(
@@ -53,6 +55,7 @@ class PlayerState {
     subtitle: [],
     fit: BoxFit.contain,
     subtitleDelay: 0.0,
+    isRepeating: false,
   );
 
   PlayerState copyWith({
@@ -69,6 +72,7 @@ class PlayerState {
     List<String>? subtitle,
     BoxFit? fit,
     double? subtitleDelay,
+    bool? isRepeating,
   }) {
     return PlayerState(
       position: position ?? this.position,
@@ -84,6 +88,7 @@ class PlayerState {
       subtitle: subtitle ?? this.subtitle,
       fit: fit ?? this.fit,
       subtitleDelay: subtitleDelay ?? this.subtitleDelay,
+      isRepeating: isRepeating ?? this.isRepeating,
     );
   }
 }
@@ -502,6 +507,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     _activeMediaId = null;
     _activeEpisode = null;
     _lastStablePosition = Duration.zero;
+    await _player.setPlaylistMode(PlaylistMode.none);
     await _player.stop();
     state = PlayerState.initial();
   }
@@ -538,6 +544,14 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   Future<void> setSpeed(double speed) => _player.setRate(speed);
+
+  Future<void> toggleRepeat() async {
+    final enabled = !state.isRepeating;
+    await _player.setPlaylistMode(
+      enabled ? PlaylistMode.single : PlaylistMode.none,
+    );
+    state = state.copyWith(isRepeating: enabled);
+  }
 
   void setFit(BoxFit fit) => state = state.copyWith(fit: fit);
 

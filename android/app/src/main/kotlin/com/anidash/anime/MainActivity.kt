@@ -410,6 +410,13 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && shouldInterceptVolumeKeys) {
+            interceptVolumeKeys = true
+        }
+    }
+
     override fun onPause() {
         interceptVolumeKeys = false
         try {

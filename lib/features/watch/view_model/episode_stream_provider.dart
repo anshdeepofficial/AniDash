@@ -1145,7 +1145,10 @@ class EpisodeData extends _$EpisodeData {
             fallback = await _effectiveProvider!
                 .getSources(
                   _justAnimeId,
-                  epModel.id ?? epNum.toString(),
+                  // JustAnime's watch API accepts the displayed episode
+                  // number. Extension episode IDs may be opaque or belong to
+                  // a neighbouring item after metadata enrichment.
+                  epModel.number?.toString() ?? epNum.toString(),
                   altServer,
                   category,
                 )
@@ -1204,7 +1207,9 @@ class EpisodeData extends _$EpisodeData {
               final dubFallback = await _effectiveProvider!
                   .getSources(
                     targetId,
-                    epModel.id ?? epNum.toString(),
+                    _effectiveProvider?.providerName == 'justanime'
+                        ? (epModel.number?.toString() ?? epNum.toString())
+                        : (epModel.id ?? epNum.toString()),
                     altDub.id,
                     'dub',
                   )
@@ -1499,10 +1504,11 @@ class EpisodeData extends _$EpisodeData {
     if (isJustAnime && provider != null && effectiveAnimeId.isNotEmpty) {
       try {
         final category = isDubRequested ? 'dub' : 'sub';
-        final targetEpId =
-            (ep.id != null && ep.id!.isNotEmpty)
-                ? ep.id!
-                : (ep.number?.toString() ?? '1');
+        // The native JustAnime API is keyed by the visible episode number,
+        // not an extension-specific episode ID. Using the latter could turn
+        // Episode 1 into /episode/2 (or an opaque slug) and leave playback on
+        // the startup screen after a 404.
+        final targetEpId = ep.number?.toString() ?? '1';
         final res = await provider
             .getSources(effectiveAnimeId, targetEpId, server?.id, category)
             .timeout(const Duration(seconds: 15));

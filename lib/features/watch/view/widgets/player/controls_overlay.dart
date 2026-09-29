@@ -41,12 +41,83 @@ class ControlsOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (locked) {
+      return Stack(
+        children: [
+          _lockedProgress(context, ref),
+          AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(ignoring: !visible, child: _lockBtn()),
+          ),
+        ],
+      );
+    }
     return AnimatedOpacity(
       opacity: visible ? 1 : 0,
       duration: const Duration(milliseconds: 300),
+      child: IgnorePointer(ignoring: !visible, child: _controls(ref)),
+    );
+  }
+
+  Widget _lockedProgress(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(playerStateProvider);
+    final durationMs = state.duration.inMilliseconds;
+    final positionMs = state.position.inMilliseconds.clamp(
+      0,
+      durationMs > 0 ? durationMs : 0,
+    );
+    final progress = durationMs > 0 ? positionMs / durationMs : 0.0;
+    final remaining =
+        durationMs > 0
+            ? Duration(milliseconds: durationMs - positionMs)
+            : Duration.zero;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom.clamp(8.0, 24.0);
+
+    String time(Duration value) {
+      final hours = value.inHours;
+      final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+      return hours > 0
+          ? '$hours:$minutes:$seconds'
+          : '${value.inMinutes}:$seconds';
+    }
+
+    return Positioned(
+      left: 32,
+      right: 32,
+      bottom: bottom,
       child: IgnorePointer(
-        ignoring: !visible,
-        child: locked ? _lockBtn() : _controls(ref),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  time(state.position),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                Text(
+                  '-${time(remaining)}',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: Colors.white24,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

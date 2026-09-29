@@ -457,6 +457,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
 
     if (!force &&
         state.animeIdForSource != null &&
+        episodeListState.mediaId == animeId &&
         (episodeListState.episodes.isNotEmpty || episodeListState.isLoading)) {
       return;
     }
@@ -544,6 +545,7 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
                   state.details.value?.coverImage.large ??
                   state.details.value?.coverImage.medium,
             ),
+            isMovie: state.details.value?.format?.toUpperCase() == 'MOVIE',
           );
 
       if (!ref.mounted) return;

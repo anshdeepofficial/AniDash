@@ -336,11 +336,12 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     }
 
     final isMatchingAnime =
-        (state.animeIdForSource != null &&
-            episodeListState.animeId == state.animeIdForSource) ||
-        (state.bestMatchName != null &&
-            episodeListState.animeTitle == state.bestMatchName &&
-            episodeListState.episodes.isNotEmpty);
+        episodeListState.mediaId == widget.mediaId &&
+        ((state.animeIdForSource != null &&
+                episodeListState.animeId == state.animeIdForSource) ||
+            (state.bestMatchName != null &&
+                episodeListState.animeTitle == state.bestMatchName &&
+                episodeListState.episodes.isNotEmpty));
     final hasSourceMatch = state.animeIdForSource != null;
 
     if (!isMatchingAnime &&
@@ -368,6 +369,7 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
                 cover: widget.mediaCover,
               ),
               isAdult: widget.fromHentaiHub,
+              isMovie: widget.mediaFormat.toUpperCase() == 'MOVIE',
             );
       });
     }
@@ -1470,183 +1472,85 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
               builder: (context, setState) {
                 return Consumer(
                   builder: (context, ref, _) {
-                    final useExtensions =
-                        ref.watch(experimentalProvider).useExtensions;
-                    final nativeKey = ref.watch(selectedProviderKeyProvider);
-                    final isNative =
-                        nativeKey != null &&
-                        ref.watch(animeSourceRegistryProvider).has(nativeKey);
-                    final initialIndex = (useExtensions && !isNative) ? 1 : 0;
-
-                    return DefaultTabController(
-                      length: 2,
-                      initialIndex: initialIndex,
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16.0),
-                            child: Center(
-                              child: Container(
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: theme.dividerColor.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: theme.dividerColor.withValues(
+                                  alpha: 0.5,
                                 ),
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Select Source',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Select Source',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                decoration: InputDecoration(
+                                  hintText: 'Search sources...',
+                                  prefixIcon: const Icon(Icons.search),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  fillColor:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  filled: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
                                   ),
                                 ),
-                                const SizedBox(height: 12),
-                                TextField(
-                                  decoration: InputDecoration(
-                                    hintText: 'Search sources...',
-                                    prefixIcon: const Icon(Icons.search),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    fillColor:
-                                        theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                    filled: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() => searchQuery = value);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const TabBar(
-                            tabs: [
-                              Tab(text: 'Built-in Sources'),
-                              Tab(text: 'Extensions'),
+                                onChanged: (value) {
+                                  setState(() => searchQuery = value);
+                                },
+                              ),
                             ],
                           ),
-                          Expanded(
-                            child: TabBarView(
-                              children: [
-                                _buildCanonicalSourceList(
-                                  ref,
-                                  scrollController,
-                                  notifier,
-                                  searchQuery,
-                                ),
-                                _buildExtensionSourceList(
-                                  ref,
-                                  scrollController,
-                                  notifier,
-                                  searchQuery,
-                                ),
-                              ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Extensions',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        Expanded(
+                          child: _buildExtensionSourceList(
+                            ref,
+                            scrollController,
+                            notifier,
+                            searchQuery,
+                          ),
+                        ),
+                      ],
                     );
                   },
                 );
               },
             );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCanonicalSourceList(
-    WidgetRef ref,
-    ScrollController scrollController,
-    DetailsPageNotifier notifier,
-    String query,
-  ) {
-    final registry = ref.watch(animeSourceRegistryProvider);
-    final activeKey = ref.watch(selectedProviderKeyProvider)?.toLowerCase();
-    final useExtensions = ref.watch(experimentalProvider).useExtensions;
-
-    final candidates =
-        [
-          (
-            key: 'justanime',
-            name: 'JustAnime',
-            sub: 'HLS / Multi-Server / Intro Skip',
-            icon: Icons.play_circle_fill_rounded,
-          ),
-          (
-            key: 'hianime',
-            name: 'HiAnime',
-            sub: 'Native HLS Stream',
-            icon: Icons.movie_filter_rounded,
-          ),
-          (
-            key: 'anikoto',
-            name: 'AniKoto',
-            sub: 'Native Fast Stream',
-            icon: Icons.video_collection_rounded,
-          ),
-        ].where((c) => registry.has(c.key)).where((c) {
-          if (query.isEmpty) return true;
-          return c.name.toLowerCase().contains(query.toLowerCase());
-        }).toList();
-
-    return ListView.builder(
-      controller: scrollController,
-      itemCount: candidates.length,
-      itemBuilder: (context, index) {
-        final item = candidates[index];
-        final isSelected = !useExtensions && activeKey == item.key;
-        return ListTile(
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
-            child: Icon(
-              item.icon,
-              color:
-                  isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          title: Text(
-            item.name,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Text(item.sub),
-          trailing:
-              isSelected
-                  ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                  : null,
-          onTap: () {
-            ref.read(selectedProviderKeyProvider.notifier).select(item.key);
-            ref.read(experimentalProvider.notifier).toggleExtensions(false);
-
-            Navigator.pop(context);
-            notifier.refresh();
           },
         );
       },

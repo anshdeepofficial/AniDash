@@ -82,12 +82,11 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   void initState() {
     super.initState();
     if (Platform.isAndroid || Platform.isIOS) {
-      FlutterVolumeController.updateShowSystemUI(false);
-      UIHelper.enableVolumeInterception();
       UIHelper.setVolumeKeyHandler(
         onVolumeUp: () => _handleHardwareVolumeKey(true),
         onVolumeDown: () => _handleHardwareVolumeKey(false),
       );
+      _activatePlayerVolumeControls();
       FlutterVolumeController.getVolume().then((v) {
         if (mounted && v != null) {
           ref.read(playerUIControllerProvider.notifier).setVolume(v);
@@ -113,6 +112,16 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     });
   }
 
+  Future<void> _activatePlayerVolumeControls() async {
+    // Configure both layers in a deterministic order. Some Android devices
+    // otherwise process the first key press before the native interceptor is
+    // active and briefly show the system volume panel.
+    await FlutterVolumeController.updateShowSystemUI(false);
+    await UIHelper.enableVolumeInterception();
+    if (!mounted) return;
+    await FlutterVolumeController.updateShowSystemUI(false);
+  }
+
   @override
   void dispose() {
     _focusNode.dispose();
@@ -136,6 +145,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
   void _handleHardwareVolumeKey(bool isUp) {
     if (!mounted) return;
+
+    FlutterVolumeController.updateShowSystemUI(false);
 
     final controller = ref.read(playerUIControllerProvider.notifier);
     final state = ref.read(playerUIControllerProvider);
@@ -540,7 +551,13 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     // already playing. Only a real underrun, seek, or initial open owns the
     // central loading indicator.
     final isBusy =
-        state.isBuffering ||
+        // MPV may keep `buffering` true while it is filling the configured
+        // forward cache even though frames and audio are already advancing.
+        // Covering healthy playback with a spinner made a working stream look
+        // permanently stuck. Initial startup and genuine paused underruns are
+        // still represented by the conditions below.
+        (state.isBuffering &&
+            (!state.isPlaying || state.position == Duration.zero)) ||
         state.isSeeking ||
         (!state.isPlaying &&
             (state.isOpening ||

@@ -6,6 +6,7 @@ import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
+import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
 
 class SettingsSheetContent extends ConsumerWidget {
   final VoidCallback onDismiss;
@@ -53,11 +54,79 @@ class SettingsSheetContent extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "More",
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              Text("More", style: Theme.of(context).textTheme.headlineSmall),
               const Divider(height: 24),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.picture_in_picture_alt_rounded),
+                title: const Text('Pop-up player'),
+                subtitle: const Text('Continue watching over other apps'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await ref.read(pipProvider.notifier).enterPiP();
+                },
+              ),
+              ListTile(
+                dense: true,
+                leading: Icon(
+                  ref.watch(playerStateProvider.select((p) => p.isRepeating))
+                      ? Icons.repeat_one_rounded
+                      : Icons.repeat_rounded,
+                ),
+                title: const Text('Repeat mode'),
+                trailing: Text(
+                  ref.watch(playerStateProvider.select((p) => p.isRepeating))
+                      ? 'Episode'
+                      : 'Off',
+                ),
+                onTap:
+                    () => ref.read(playerStateProvider.notifier).toggleRepeat(),
+              ),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.info_outline_rounded),
+                title: const Text('Video information'),
+                subtitle: Text(
+                  '${isDub ? 'English DUB' : 'Japanese SUB'} · ${currentQuality ?? 'Auto'}',
+                ),
+                onTap: () {
+                  final player = ref.read(playerStateProvider);
+                  _showDialog(
+                    context,
+                    builder:
+                        (ctx) => AlertDialog(
+                          title: const Text('Video information'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Audio: ${isDub ? 'English DUB' : 'Japanese SUB'}',
+                              ),
+                              Text('Quality: ${currentQuality ?? 'Auto'}'),
+                              Text(
+                                'Position: ${_formatDuration(player.position)}',
+                              ),
+                              Text(
+                                'Duration: ${_formatDuration(player.duration)}',
+                              ),
+                              Text(
+                                'Buffered: ${_formatDuration(player.buffer)}',
+                              ),
+                              Text('Speed: ${player.playbackSpeed}x'),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                  );
+                },
+              ),
+              const Divider(height: 20),
               if (onSubtitlesPressed != null)
                 ListTile(
                   leading: const Icon(Icons.subtitles_rounded),
@@ -65,10 +134,7 @@ class SettingsSheetContent extends ConsumerWidget {
                   subtitle: const Text('Select, disable, or load a subtitle'),
                   onTap: () {
                     Navigator.pop(context);
-                    Future<void>.delayed(
-                      Duration.zero,
-                      onSubtitlesPressed,
-                    );
+                    Future<void>.delayed(Duration.zero, onSubtitlesPressed);
                   },
                 ),
               ListTile(
@@ -121,51 +187,60 @@ class SettingsSheetContent extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.record_voice_over_rounded),
                 title: const Text("Audio Track"),
-                trailing: Text(
-                  isDub ? 'DUB' : 'SUB',
-                ),
+                trailing: Text(isDub ? 'DUB' : 'SUB'),
                 onTap: () {
                   _showDialog(
                     context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text("Select Audio Track"),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            title: const Text("Japanese (SUB)"),
-                            trailing: playerSettings.preferredAudioLanguage == 'sub'
-                                ? const Icon(Icons.check, color: Colors.green)
-                                : null,
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              streamNotifier.switchAudioLanguage('sub');
-                            },
+                    builder:
+                        (ctx) => AlertDialog(
+                          title: const Text("Select Audio Track"),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                title: const Text("Japanese (SUB)"),
+                                trailing:
+                                    playerSettings.preferredAudioLanguage ==
+                                            'sub'
+                                        ? const Icon(
+                                          Icons.check,
+                                          color: Colors.green,
+                                        )
+                                        : null,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  streamNotifier.switchAudioLanguage('sub');
+                                },
+                              ),
+                              ListTile(
+                                title: const Text("English (DUB)"),
+                                trailing:
+                                    playerSettings.preferredAudioLanguage ==
+                                            'dub'
+                                        ? const Icon(
+                                          Icons.check,
+                                          color: Colors.green,
+                                        )
+                                        : null,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  streamNotifier.switchAudioLanguage('dub');
+                                },
+                              ),
+                            ],
                           ),
-                          ListTile(
-                            title: const Text("English (DUB)"),
-                            trailing: playerSettings.preferredAudioLanguage == 'dub'
-                                ? const Icon(Icons.check, color: Colors.green)
-                                : null,
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              streamNotifier.switchAudioLanguage('dub');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
                   );
                 },
               ),
               ListTile(
-                  leading: const Icon(Icons.dns_rounded),
-                  title: const Text("Server"),
-                  trailing: Text(
-                    streamData.selectedServer?.name ??
-                        streamData.selectedServer?.id?.toUpperCase() ??
-                        'Auto',
-                  ),
+                leading: const Icon(Icons.dns_rounded),
+                title: const Text("Server"),
+                trailing: Text(
+                  streamData.selectedServer?.name ??
+                      streamData.selectedServer?.id?.toUpperCase() ??
+                      'Auto',
+                ),
                 onTap:
                     streamData.servers.isEmpty
                         ? null
@@ -341,17 +416,18 @@ class SettingsSheetContent extends ConsumerWidget {
                   final player = ref.read(playerStateProvider);
                   _showDialog(
                     context,
-                    builder: (ctx) => JumpToTimeDialog(
-                      currentPosition: player.position,
-                      totalDuration: player.duration,
-                      title: 'Jump to Time',
-                      actionLabel: 'Jump',
-                      onJump: (targetDuration) {
-                        ref
-                            .read(playerStateProvider.notifier)
-                            .seek(targetDuration);
-                      },
-                    ),
+                    builder:
+                        (ctx) => JumpToTimeDialog(
+                          currentPosition: player.position,
+                          totalDuration: player.duration,
+                          title: 'Jump to Time',
+                          actionLabel: 'Jump',
+                          onJump: (targetDuration) {
+                            ref
+                                .read(playerStateProvider.notifier)
+                                .seek(targetDuration);
+                          },
+                        ),
                   );
                 },
               ),

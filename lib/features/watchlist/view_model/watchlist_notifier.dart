@@ -76,9 +76,10 @@ class WatchlistNotifier extends Notifier<WatchListState> {
     try {
       await _repo.toggleFavorite(id);
 
-      final updated = wasFav
-          ? state.favorites.where((m) => m.id != anime.id).toList()
-          : [...state.favorites, anime];
+      final updated =
+          wasFav
+              ? state.favorites.where((m) => m.id != anime.id).toList()
+              : [...state.favorites, anime];
 
       state = state.copyWith(favorites: updated);
     } catch (e) {
@@ -96,18 +97,13 @@ class WatchlistNotifier extends Notifier<WatchListState> {
     final idsSet = animeIds.toSet();
     final updatedLists = <String, List<UniversalMediaListEntry>>{};
     for (final entry in state.lists.entries) {
-      updatedLists[entry.key] = entry.value
-          .where((item) => !idsSet.contains(item.media.id))
-          .toList();
+      updatedLists[entry.key] =
+          entry.value.where((item) => !idsSet.contains(item.media.id)).toList();
     }
-    final updatedFavorites = state.favorites
-        .where((item) => !idsSet.contains(item.id))
-        .toList();
+    final updatedFavorites =
+        state.favorites.where((item) => !idsSet.contains(item.id)).toList();
 
-    state = state.copyWith(
-      lists: updatedLists,
-      favorites: updatedFavorites,
-    );
+    state = state.copyWith(lists: updatedLists, favorites: updatedFavorites);
   }
 
   Future<WatchListState> fetchListForStatus(
@@ -118,6 +114,11 @@ class WatchlistNotifier extends Notifier<WatchListState> {
   }) async {
     if (_shouldSkip(status, force, page)) return state;
 
+    final previousFavorites = List<UniversalMedia>.from(state.favorites);
+    final previousEntries = List<UniversalMediaListEntry>.from(
+      state.listFor(status),
+    );
+
     state = state.copyWith(
       loadingStatuses: {...state.loadingStatuses, status},
       errors: {...state.errors}..remove(status),
@@ -127,7 +128,29 @@ class WatchlistNotifier extends Notifier<WatchListState> {
       if (state.isLocal) {
         return await _fetchLocal(status, page);
       } else {
-        return await _fetchRemote(status, page, perPage);
+        await _fetchRemote(status, page, perPage);
+        if (force && page == 1) {
+          final refreshedEmpty =
+              status == 'favorites'
+                  ? state.favorites.isEmpty
+                  : state.listFor(status).isEmpty;
+          final hadContent =
+              status == 'favorites'
+                  ? previousFavorites.isNotEmpty
+                  : previousEntries.isNotEmpty;
+          if (refreshedEmpty && hadContent) {
+            // Remote trackers occasionally answer a refresh with an empty
+            // page. Keep the last known good list instead of flashing or
+            // permanently replacing it with that transient response.
+            state =
+                status == 'favorites'
+                    ? state.copyWith(favorites: previousFavorites)
+                    : state.copyWith(
+                      lists: {...state.lists, status: previousEntries},
+                    );
+          }
+        }
+        return state;
       }
     } catch (e) {
       state = state.copyWith(errors: {...state.errors, status: e.toString()});
@@ -163,9 +186,8 @@ class WatchlistNotifier extends Notifier<WatchListState> {
       perPage: perPage,
     );
 
-    final existing = page == 1
-        ? <UniversalMediaListEntry>[]
-        : state.listFor(status);
+    final existing =
+        page == 1 ? <UniversalMediaListEntry>[] : state.listFor(status);
 
     state = state.copyWith(
       lists: {
@@ -194,13 +216,17 @@ class WatchlistNotifier extends Notifier<WatchListState> {
       final tracks = await _localRepo.getTracksByStatus(trackStatus);
       final entries = <UniversalMediaListEntry>[];
 
-      final mediaIds = tracks
-          .map((t) => int.tryParse(t.mediaId ?? '') ?? 0)
-          .where((id) => id != 0)
-          .toList();
+      final mediaIds =
+          tracks
+              .map((t) => int.tryParse(t.mediaId ?? '') ?? 0)
+              .where((id) => id != 0)
+              .toList();
 
       final medias = await _localRepo.getMedias(mediaIds);
-      final mediaMap = {for (var m in medias) if (m != null) m.id: m};
+      final mediaMap = {
+        for (var m in medias)
+          if (m != null) m.id: m,
+      };
 
       for (final track in tracks) {
         final int mediaId = int.tryParse(track.mediaId ?? '') ?? 0;

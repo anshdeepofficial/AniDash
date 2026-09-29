@@ -17,6 +17,7 @@ import 'package:ani_dash/features/browse/view/widgets/filter_bottom_sheet.dart';
 import 'package:ani_dash/features/browse/view/section_screen.dart';
 import 'package:ani_dash/main.dart';
 import 'package:ani_dash/core/jikan/jikan_service.dart';
+import 'package:ani_dash/shared/ui/cards/anime/anime_card_components.dart';
 
 class BrowseScreen extends ConsumerStatefulWidget {
   final String? keyword;
@@ -41,6 +42,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
   Timer? _debounce;
   static const _historyKey = 'anime_search_history';
   List<String> _searchHistory = [];
+  List<String> _remoteSuggestions = [];
+  int _suggestionGeneration = 0;
 
   // State variables
   List<UniversalMedia> _results = [];
@@ -182,10 +185,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
         filter: _currentFilter,
       );
 
-      final effectiveResults =
-          page == 1 && results.isEmpty
-              ? await JikanService().searchUniversal(keyword)
-              : results;
+      final effectiveResults = List<UniversalMedia>.from(
+        page == 1 && results.isEmpty
+            ? await JikanService().searchUniversal(keyword)
+            : results,
+      );
+
+      if (page == 1) {
+        _sortSearchResults(effectiveResults, keyword);
+      }
 
       if (mounted && generation == _searchGeneration) {
         setState(() {
@@ -201,7 +209,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       }
     } catch (e, stackTrace) {
       AppLogger.e("Search error", e, stackTrace);
-      final fallback = await JikanService().searchUniversal(keyword);
+      final fallback = List<UniversalMedia>.from(
+        await JikanService().searchUniversal(keyword),
+      );
+      _sortSearchResults(fallback, keyword);
       if (mounted && generation == _searchGeneration) {
         setState(() {
           if (page == 1) _results = fallback;
@@ -212,6 +223,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       }
     }
     return false;
+  }
+
+  void _sortSearchResults(List<UniversalMedia> results, String keyword) {
+    final query = keyword.trim().toLowerCase();
+    results.sort((a, b) {
+      final aTitle = a.title.userPreferred.toLowerCase();
+      final bTitle = b.title.userPreferred.toLowerCase();
+      final relevance = (aTitle.contains(query) ? 0 : 1).compareTo(
+        bTitle.contains(query) ? 0 : 1,
+      );
+      if (relevance != 0) return relevance;
+      final season = animeSeasonSortKey(a).compareTo(animeSeasonSortKey(b));
+      return season != 0 ? season : aTitle.compareTo(bTitle);
+    });
   }
 
   Future<void> _onScroll() async {
@@ -237,9 +262,42 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
       setState(() {
         _isSearchSubmitted = false;
         _results.clear();
+        _remoteSuggestions.clear();
       });
     } else {
       setState(() {});
+      final normalized = query.trim();
+      if (normalized.length >= 2) {
+        _debounce = Timer(
+          const Duration(milliseconds: 300),
+          () => _fetchSearchSuggestions(normalized),
+        );
+      } else {
+        _suggestionGeneration++;
+        _remoteSuggestions.clear();
+      }
+    }
+  }
+
+  Future<void> _fetchSearchSuggestions(String query) async {
+    final generation = ++_suggestionGeneration;
+    try {
+      var results = await _repo.searchAnime(query, page: 1, perPage: 12);
+      if (results.isEmpty) {
+        results = await JikanService().searchUniversal(query);
+      }
+      if (!mounted || generation != _suggestionGeneration) return;
+      setState(() {
+        _remoteSuggestions =
+            results
+                .map((anime) => anime.title.userPreferred)
+                .where((title) => title.isNotEmpty)
+                .toList();
+      });
+    } catch (_) {
+      if (mounted && generation == _suggestionGeneration) {
+        setState(() => _remoteSuggestions = []);
+      }
     }
   }
 
@@ -283,7 +341,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
     final titles = [..._trending, ..._popular, ..._upcoming]
         .map((anime) => anime.title.userPreferred)
         .where((title) => title.isNotEmpty);
-    final candidates = <String>[..._searchHistory, ...titles];
+    final candidates = <String>[
+      ..._searchHistory,
+      ..._remoteSuggestions,
+      ...titles,
+    ];
     final seen = <String>{};
     return candidates
         .where((title) {

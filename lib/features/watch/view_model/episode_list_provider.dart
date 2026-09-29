@@ -85,6 +85,7 @@ class EpisodeListState {
 @Riverpod(keepAlive: true)
 class EpisodeListNotifier extends _$EpisodeListNotifier {
   final JikanService _jikan = JikanService();
+  int _requestGeneration = 0;
 
   ExperimentalFeaturesModel get _exp => ref.read(experimentalProvider);
   AnimeProvider? get _animeProvider => ref.read(selectedAnimeProvider);
@@ -105,9 +106,15 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     DMedia? media,
     int? malId,
     bool isAdult = false,
+    bool isMovie = false,
   }) async {
+    final requestGeneration = ++_requestGeneration;
+    final requestedMediaId = mediaId;
     // 1. Check Cache
-    if (!force && state.episodes.isNotEmpty && state.animeId == animeId) {
+    if (!force &&
+        state.episodes.isNotEmpty &&
+        state.animeId == animeId &&
+        state.mediaId == requestedMediaId) {
       AppLogger.d('Episode list cache hit for: $animeTitle');
       return state.episodes;
     }
@@ -129,13 +136,26 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     // 2. Use provided episodes if available
     if (episodes.isNotEmpty) {
       AppLogger.success('Using ${episodes.length} pre-provided episodes');
-      state = state.copyWith(episodes: episodes, isLoading: false);
+      final normalized = _normalizeEpisodeTitles(
+        episodes,
+        animeTitle: animeTitle,
+        isMovie: isMovie,
+      );
+      if (requestGeneration != _requestGeneration) return const [];
+      state = state.copyWith(episodes: normalized, isLoading: false);
       _syncMetadataIfEnabled();
-      return episodes;
+      return normalized;
     }
 
     // 3. Fetch from remote sources
     var fetched = await _fetchEpisodesInternal(animeId, media: media);
+    if (requestGeneration != _requestGeneration) return const [];
+
+    fetched = _normalizeEpisodeTitles(
+      fetched,
+      animeTitle: animeTitle,
+      isMovie: isMovie,
+    );
 
     if (fetched.isEmpty) {
       final titleLow = animeTitle.toLowerCase();
@@ -185,7 +205,34 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     );
   }
 
-  void reset() => state = const EpisodeListState();
+  void reset() {
+    _requestGeneration++;
+    state = const EpisodeListState();
+  }
+
+  List<EpisodeDataModel> _normalizeEpisodeTitles(
+    List<EpisodeDataModel> episodes, {
+    required String animeTitle,
+    required bool isMovie,
+  }) {
+    return episodes.indexed
+        .map((entry) {
+          final index = entry.$1;
+          final episode = entry.$2;
+          final number = episode.number ?? index + 1;
+          final title = episode.title?.trim() ?? '';
+          final genericTitle = RegExp(
+            r'^(episode|ep\.?)\s*\d+$',
+            caseSensitive: false,
+          ).hasMatch(title);
+          if (title.isNotEmpty && !(isMovie && genericTitle)) return episode;
+          return episode.copyWith(
+            title: isMovie ? animeTitle : 'Episode $number',
+            number: number,
+          );
+        })
+        .toList(growable: false);
+  }
 
   void attachMalId(int malId) {
     if (state.malId == malId) return;
@@ -206,9 +253,12 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
       // Fast path for JustAnime: AniList mediaId is the exact anime ID
       if (currentKey == 'justanime') {
-        final directId = (int.tryParse(animeId ?? '') != null)
-            ? animeId
-            : (int.tryParse(state.mediaId ?? '') != null ? state.mediaId : null);
+        final directId =
+            (int.tryParse(animeId ?? '') != null)
+                ? animeId
+                : (int.tryParse(state.mediaId ?? '') != null
+                    ? state.mediaId
+                    : null);
         if (directId != null) {
           final directEps = await _fetchLegacyEpisodes(directId);
           if (directEps.isNotEmpty) {
@@ -345,7 +395,9 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       targetId = state.mediaId!;
     }
 
-    AppLogger.d('Fetching episodes via Legacy Provider: $provider (id: $targetId)');
+    AppLogger.d(
+      'Fetching episodes via Legacy Provider: $provider (id: $targetId)',
+    );
     try {
       return (await provider.getEpisodes(targetId)).episodes ?? [];
     } catch (e) {
