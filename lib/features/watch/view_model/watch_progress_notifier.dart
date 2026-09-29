@@ -64,7 +64,10 @@ class WatchProgressNotifier extends _$WatchProgressNotifier {
     String? currentThumb = epThumb;
 
     try {
-      if (takeScreenshot) {
+      // Prefer the provider's episode banner. Capture a frame only when the
+      // episode list did not supply artwork, rather than replacing official
+      // episode thumbnails with arbitrary playback frames.
+      if (takeScreenshot && (currentThumb == null || currentThumb.isEmpty)) {
         final thumb = await captureScreenshot();
         if (thumb != null) currentThumb = thumb;
       }

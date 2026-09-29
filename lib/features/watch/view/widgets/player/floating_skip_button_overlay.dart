@@ -25,8 +25,10 @@ class _FloatingSkipButtonOverlayState
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(playerSettingsProvider);
-    // Hide the manual skip buttons completely if auto-skip is enabled or ani-skip is disabled
-    if (!settings.enableAniSkip || settings.enableAutoSkip) {
+    // Keep the manual action available whenever the playhead is inside a
+    // detected intro/outro. Auto-skip normally moves past the range at once,
+    // but this remains a reliable fallback while its seek is still pending.
+    if (!settings.enableAniSkip) {
       return const SizedBox.shrink();
     }
 
@@ -65,11 +67,12 @@ class _FloatingSkipButtonOverlayState
           s.interval != null &&
           pos >= Duration(seconds: s.interval!.startTime.toInt()) &&
           pos < Duration(seconds: s.interval!.endTime.toInt()),
-      orElse: () => const AniSkipResultItem(
-        skipType: SkipType.unknown,
-        action: '',
-        episodeLength: 0,
-      ),
+      orElse:
+          () => const AniSkipResultItem(
+            skipType: SkipType.unknown,
+            action: '',
+            episodeLength: 0,
+          ),
     );
 
     String? label;

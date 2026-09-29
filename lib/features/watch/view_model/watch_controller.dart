@@ -46,6 +46,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _fromHentaiHub = false;
   bool _prefetchTriggered = false;
   bool _nextPromptTriggered = false;
+  bool _episodeTransitionInProgress = false;
   bool _wasPlayingBeforeLock = false;
   bool _isAppInBackground = false;
   int _savedPosBeforeLock = 0;
@@ -208,6 +209,26 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           isAdult: fromHentaiHub,
         );
 
+    // Resolve the initial episode metadata before the first progress save.
+    // Previously only later episode changes populated these fields, so the
+    // first Continue Watching card permanently inherited the anime cover.
+    final resolvedEpisodes = ref.read(episodeListProvider).episodes;
+    try {
+      final initialInfo = resolvedEpisodes.firstWhere(
+        (episode) => episode.number == initialEpisode,
+      );
+      _epTitle = initialInfo.title;
+      _epThumb = initialInfo.thumbnail;
+    } catch (_) {
+      try {
+        final initialInfo = episodes.firstWhere(
+          (episode) => episode.number == initialEpisode,
+        );
+        _epTitle = initialInfo.title;
+        _epThumb = initialInfo.thumbnail;
+      } catch (_) {}
+    }
+
     AudioFocusService().initialize(
       onPauseRequested: () async {
         if (_isDisposed) return;
@@ -351,7 +372,12 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     List<EpisodeDataModel> episodes,
   ) {
     void triggerAutoAdvance() {
-      if (_isDisposed || _hasAutoAdvanced || !_isPlayerReady) return;
+      if (_isDisposed ||
+          _hasAutoAdvanced ||
+          !_isPlayerReady ||
+          _episodeTransitionInProgress) {
+        return;
+      }
 
       // Halt playback if "Stop after this episode" is enabled.
       if (ref.read(playerSettingsProvider).stopAfterCurrentEpisode) {
@@ -419,6 +445,15 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       _pos = next.position.inSeconds;
       _dur = next.duration.inSeconds;
 
+      // `selectedEpisode` changes before the new stream is opened. Ignore the
+      // previous episode's final position until the replacement open begins;
+      // otherwise its 95% state immediately re-shows the prompt as Ep N+2.
+      if (_episodeTransitionInProgress &&
+          next.isOpening &&
+          ref.read(playerStateProvider.notifier).activeEpisode == _epNum) {
+        _episodeTransitionInProgress = false;
+      }
+
       if (next.playbackError != null &&
           next.playbackError != prev?.playbackError &&
           !_isAppInBackground) {
@@ -444,7 +479,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       if (_dur > 120 && _pos >= _dur - 1) triggerAutoAdvance();
 
       // Flow optimizations: 85% pre-fetch & 95% next episode prompt
-      if (_dur > 60) {
+      if (!_episodeTransitionInProgress && _dur > 60) {
         final progressRatio = _pos / _dur;
 
         // 85% Trigger: Pre-fetch next episode stream in background
@@ -497,6 +532,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
       }
 
       if (next != null) {
+        _episodeTransitionInProgress = true;
         ref.read(aniSkipProvider.notifier).clear();
         _hasAutoSkippedIntro = false;
         _hasAutoSkippedOutro = false;
@@ -512,7 +548,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         ref.read(watchProgressProvider.notifier).resetLastSavedPosition();
 
         try {
-          final epInfo = episodes.firstWhere((e) => e.number == next);
+          final currentEpisodes = ref.read(episodeListProvider).episodes;
+          final epInfo = currentEpisodes.firstWhere(
+            (e) => e.number == next,
+            orElse: () => episodes.firstWhere((e) => e.number == next),
+          );
           _epTitle = epInfo.title;
           _epThumb = epInfo.thumbnail;
         } catch (_) {}
@@ -596,6 +636,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
   void _checkAutoSkip(Duration position) {
     if (!ref.read(playerSettingsProvider).enableAutoSkip) return;
+
+    // Never seek an old/empty MPV session while the replacement media is
+    // still opening. Seeking before the manifest is ready can leave some HLS
+    // episodes indefinitely on "Starting video". The position listener calls
+    // this again as soon as the first frame advances.
+    final playerState = ref.read(playerStateProvider);
+    if (playerState.isOpening ||
+        playerState.duration <= Duration.zero ||
+        position <= Duration.zero) {
+      return;
+    }
 
     final skips = ref.read(aniSkipProvider);
     for (final skip in skips) {

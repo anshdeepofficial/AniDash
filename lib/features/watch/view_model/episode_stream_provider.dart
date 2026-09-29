@@ -390,6 +390,41 @@ class EpisodeData extends _$EpisodeData {
         return;
       }
 
+      // Some otherwise valid HLS providers expose a multi-variant master that
+      // a device demuxer can accept without ever producing its first frame.
+      // Quality discovery runs in the background after open; on a genuine
+      // startup failure, retry one concrete child playlist before abandoning
+      // the user's selected server or audio language.
+      final currentQuality = state.selectedQualityIdx ?? 0;
+      if (currentQuality == 0 && state.qualityOptions.length > 1) {
+        final preferred = ref.read(playerSettingsProvider).defaultQuality;
+        var qualityIndex = -1;
+        if (preferred.toLowerCase() != 'auto') {
+          qualityIndex = state.qualityOptions.indexWhere(
+            (quality) => (quality['quality'] as String? ?? '')
+                .toLowerCase()
+                .contains(preferred.toLowerCase()),
+          );
+        }
+        if (qualityIndex <= 0) qualityIndex = 1;
+        final option = state.qualityOptions[qualityIndex];
+        final qualityUrl = option['url'] as String?;
+        if (qualityUrl != null && qualityUrl.isNotEmpty) {
+          final qualityHeaders =
+              option['headers'] as Map<String, String>? ??
+              state.headers?.cast<String, String>();
+          state = state.copyWith(selectedQualityIdx: qualityIndex);
+          await _player.open(
+            qualityUrl,
+            startAt,
+            headers: qualityHeaders,
+            mediaId: _epList.animeId,
+            episode: ep,
+          );
+          return;
+        }
+      }
+
       final currentServer = state.selectedServer;
       final alternateServer = state.servers.firstWhereOrNull(
         (server) =>

@@ -31,6 +31,7 @@ class ContinueSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dismissedIds = ref.watch(continueWatchingDismissedProvider);
+    final activeEpisodeList = ref.watch(episodeListProvider);
     final scopedEntries =
         isAdult
             ? allProgress.where((e) => e.isAdult).toList()
@@ -63,7 +64,10 @@ class ContinueSection extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text("Continue Watching", style: theme.textTheme.titleLarge),
+              child: Text(
+                "Continue Watching",
+                style: theme.textTheme.titleLarge,
+              ),
             ),
             IconButton(
               tooltip: 'View all continue watching',
@@ -87,7 +91,8 @@ class ContinueSection extends ConsumerWidget {
               // Keep resuming the current episode unless it has truly reached the end (within last 45s or >= 92% watched)
               final dur = currentEp?.durationInSeconds ?? 0;
               final prog = currentEp?.progressInSeconds ?? 0;
-              final isCurrentCompleted = (currentEp?.isCompleted == true &&
+              final isCurrentCompleted =
+                  (currentEp?.isCompleted == true &&
                       (dur == 0 || prog >= dur - 45 || (prog / dur) >= 0.92)) ||
                   (dur > 0 && (prog / dur) >= 0.92);
 
@@ -110,8 +115,25 @@ class ContinueSection extends ConsumerWidget {
                 if (d > 0) progressValue = (p / d).clamp(0.0, 1.0);
               }
 
-              final thumb =
+              String? listThumbnail;
+              final listMatchesEntry =
+                  activeEpisodeList.mediaId == entry.animeId ||
+                  activeEpisodeList.animeId == entry.animeId ||
+                  activeEpisodeList.animeTitle == entry.animeTitle;
+              if (listMatchesEntry) {
+                for (final episode in activeEpisodeList.episodes) {
+                  if (episode.number == nextEpisodeNum &&
+                      episode.thumbnail?.isNotEmpty == true) {
+                    listThumbnail = episode.thumbnail;
+                    break;
+                  }
+                }
+              }
+              final savedThumbnail =
                   displayEp?.episodeThumbnail ?? currentEp?.episodeThumbnail;
+              final thumb =
+                  listThumbnail ??
+                  (savedThumbnail != entry.animeCover ? savedThumbnail : null);
               Widget imageWidget;
 
               if (thumb != null && thumb.startsWith('http')) {
@@ -201,10 +223,11 @@ class ContinueSection extends ConsumerWidget {
                               isAdult: isAdult || entry.isAdult,
                             ),
                             startAt: nextEpisodeNum,
-                            startAtPosition: (nextEpisodeNum == entry.currentEpisode &&
-                                    (currentEp?.progressInSeconds ?? 0) > 0)
-                                ? currentEp?.progressInSeconds
-                                : null,
+                            startAtPosition:
+                                (nextEpisodeNum == entry.currentEpisode &&
+                                        (currentEp?.progressInSeconds ?? 0) > 0)
+                                    ? currentEp?.progressInSeconds
+                                    : null,
                             withAnimeMatch: true,
                             directAutoMatch: true,
                             fromHentaiHub: isAdult || entry.isAdult,
@@ -363,9 +386,8 @@ class ContinueSection extends ConsumerWidget {
             targetEp.episodeTitle.trim().isNotEmpty) {
           resolvedTitle = targetEp.episodeTitle;
         } else if (epList.animeId == entry.animeId) {
-          final match = epList.episodes
-              .where((e) => e.number == targetEpNum)
-              .firstOrNull;
+          final match =
+              epList.episodes.where((e) => e.number == targetEpNum).firstOrNull;
           if (match != null &&
               match.title != null &&
               match.title!.trim().isNotEmpty) {
@@ -375,9 +397,7 @@ class ContinueSection extends ConsumerWidget {
 
         return SafeArea(
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: screenHeight * 0.85,
-            ),
+            constraints: BoxConstraints(maxHeight: screenHeight * 0.85),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -385,261 +405,275 @@ class ContinueSection extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.dividerColor.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(2),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.dividerColor.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  entry.animeTitle,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 16),
+                  Text(
+                    entry.animeTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  resolvedTitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  Text(
+                    resolvedTitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                const Divider(height: 24),
-                // 1. View Anime Details
-                ListTile(
-                  leading: Icon(
-                    Iconsax.info_circle,
-                    color: theme.colorScheme.primary,
+                  const Divider(height: 24),
+                  // 1. View Anime Details
+                  ListTile(
+                    leading: Icon(
+                      Iconsax.info_circle,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('View Anime Details'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      context.push('/details', extra: entry.toUniversalMedia());
+                    },
                   ),
-                  title: const Text('View Anime Details'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    context.push('/details', extra: entry.toUniversalMedia());
-                  },
-                ),
-                // 2. Mark as Watched
-                ListTile(
-                  leading: const Icon(
-                    Icons.check_circle_outline_rounded,
-                    color: Colors.green,
-                  ),
-                  title: Text(
-                    'Mark Episode $targetEpNum as Watched',
-                  ),
-                  subtitle: const Text(
-                    'Marks this episode complete and updates progress',
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    final isSameEp = targetEp != null &&
-                        targetEp.episodeNumber == targetEpNum;
-                    final duration = (isSameEp &&
-                            targetEp.durationInSeconds != null &&
-                            targetEp.durationInSeconds! > 0)
-                        ? targetEp.durationInSeconds!
-                        : 1440;
-                    final repo = ref.read(watchProgressRepositoryProvider);
-                    repo.updateEpisodeProgress(
-                      entry.animeId,
-                      EpisodeProgress(
-                        episodeNumber: targetEpNum,
-                        episodeTitle: resolvedTitle,
-                        episodeThumbnail: (isSameEp &&
-                                targetEp.episodeThumbnail != null)
-                            ? targetEp.episodeThumbnail!
-                            : entry.animeCover,
-                        progressInSeconds: duration,
-                        durationInSeconds: duration,
-                        isCompleted: true,
-                        watchedAt: DateTime.now(),
-                      ),
-                    );
-                    ref.read(watchSyncProvider.notifier).handleTrackingUpdate(
-                      mediaId: entry.animeId,
-                      episodeNum: targetEpNum,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Marked Episode $targetEpNum as watched',
+                  // 2. Mark as Watched
+                  ListTile(
+                    leading: const Icon(
+                      Icons.check_circle_outline_rounded,
+                      color: Colors.green,
+                    ),
+                    title: Text('Mark Episode $targetEpNum as Watched'),
+                    subtitle: const Text(
+                      'Marks this episode complete and updates progress',
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      final isSameEp =
+                          targetEp != null &&
+                          targetEp.episodeNumber == targetEpNum;
+                      final duration =
+                          (isSameEp &&
+                                  targetEp.durationInSeconds != null &&
+                                  targetEp.durationInSeconds! > 0)
+                              ? targetEp.durationInSeconds!
+                              : 1440;
+                      final repo = ref.read(watchProgressRepositoryProvider);
+                      repo.updateEpisodeProgress(
+                        entry.animeId,
+                        EpisodeProgress(
+                          episodeNumber: targetEpNum,
+                          episodeTitle: resolvedTitle,
+                          episodeThumbnail:
+                              (isSameEp && targetEp.episodeThumbnail != null)
+                                  ? targetEp.episodeThumbnail!
+                                  : entry.animeCover,
+                          progressInSeconds: duration,
+                          durationInSeconds: duration,
+                          isCompleted: true,
+                          watchedAt: DateTime.now(),
                         ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
-                // 3. Jump to Time
-                ListTile(
-                  leading: Icon(
-                    Iconsax.timer_1,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text('Jump to Time'),
-                  subtitle: Text(
-                    'Start Episode $targetEpNum from a specific timestamp',
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    final isSameEp = targetEp != null &&
-                        targetEp.episodeNumber == targetEpNum;
-                    final totalDur = (isSameEp &&
-                            targetEp.durationInSeconds != null &&
-                            targetEp.durationInSeconds! > 0)
-                        ? Duration(seconds: targetEp.durationInSeconds!)
-                        : Duration.zero;
-                    final currentPos = (isSameEp &&
-                            targetEp.progressInSeconds != null &&
-                            targetEp.progressInSeconds! > 0)
-                        ? Duration(seconds: targetEp.progressInSeconds!)
-                        : Duration.zero;
-
-                    showDialog(
-                      context: context,
-                      builder: (dialogCtx) => JumpToTimeDialog(
-                        currentPosition: currentPos,
-                        totalDuration: totalDur,
-                        title: 'Jump to Time (Ep $targetEpNum)',
-                        actionLabel: 'Play',
-                        onJump: (targetDuration) async {
-                          final localDownload = await ref
-                              .read(downloadsProvider.notifier)
-                              .findDownloadedEpisode(
-                                animeTitle: entry.animeTitle,
-                                episodeNumber: targetEpNum,
-                              );
-                          if (localDownload != null && context.mounted) {
-                            await Navigator.of(context, rootNavigator: true).push(
-                              MaterialPageRoute(
-                                builder: (_) => LocalPlayerScreen(
-                                  item: localDownload,
-                                  initialPosition: targetDuration,
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          if (!context.mounted) return;
-                          await providerAnimeMatchSearch(
-                            context: context,
-                            ref: ref,
-                            animeMedia: UniversalMedia(
-                              id: entry.animeId,
-                              title: UniversalTitle(
-                                romaji: entry.animeTitle,
-                                english: entry.animeTitle,
-                                native: entry.animeTitle,
-                              ),
-                              coverImage: UniversalCoverImage(
-                                large: entry.animeCover,
-                                medium: entry.animeCover,
-                              ),
-                              isAdult: isAdult || entry.isAdult,
-                            ),
-                            startAt: targetEpNum,
-                            startAtPosition: targetDuration.inSeconds,
-                            withAnimeMatch: true,
-                            directAutoMatch: true,
-                            fromHentaiHub: isAdult || entry.isAdult,
+                      );
+                      ref
+                          .read(watchSyncProvider.notifier)
+                          .handleTrackingUpdate(
+                            mediaId: entry.animeId,
+                            episodeNum: targetEpNum,
                           );
-                        },
-                      ),
-                    );
-                  },
-                ),
-                // 4. Download this episode
-                ListTile(
-                  leading: Icon(
-                    Iconsax.document_download,
-                    color: theme.colorScheme.primary,
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Marked Episode $targetEpNum as watched',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
                   ),
-                  title: const Text('Download this episode'),
-                  subtitle: Text('Episode $targetEpNum'),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-                    final currentEpList = ref.read(episodeListProvider);
-                    if (currentEpList.animeId != entry.animeId ||
-                        currentEpList.episodes.isEmpty) {
+                  // 3. Jump to Time
+                  ListTile(
+                    leading: Icon(
+                      Iconsax.timer_1,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Jump to Time'),
+                    subtitle: Text(
+                      'Start Episode $targetEpNum from a specific timestamp',
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      final isSameEp =
+                          targetEp != null &&
+                          targetEp.episodeNumber == targetEpNum;
+                      final totalDur =
+                          (isSameEp &&
+                                  targetEp.durationInSeconds != null &&
+                                  targetEp.durationInSeconds! > 0)
+                              ? Duration(seconds: targetEp.durationInSeconds!)
+                              : Duration.zero;
+                      final currentPos =
+                          (isSameEp &&
+                                  targetEp.progressInSeconds != null &&
+                                  targetEp.progressInSeconds! > 0)
+                              ? Duration(seconds: targetEp.progressInSeconds!)
+                              : Duration.zero;
+
                       showDialog(
                         context: context,
-                        barrierDismissible: false,
                         builder:
-                            (ctx) => const Center(
-                              child: CircularProgressIndicator(),
+                            (dialogCtx) => JumpToTimeDialog(
+                              currentPosition: currentPos,
+                              totalDuration: totalDur,
+                              title: 'Jump to Time (Ep $targetEpNum)',
+                              actionLabel: 'Play',
+                              onJump: (targetDuration) async {
+                                final localDownload = await ref
+                                    .read(downloadsProvider.notifier)
+                                    .findDownloadedEpisode(
+                                      animeTitle: entry.animeTitle,
+                                      episodeNumber: targetEpNum,
+                                    );
+                                if (localDownload != null && context.mounted) {
+                                  await Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  ).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => LocalPlayerScreen(
+                                            item: localDownload,
+                                            initialPosition: targetDuration,
+                                          ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (!context.mounted) return;
+                                await providerAnimeMatchSearch(
+                                  context: context,
+                                  ref: ref,
+                                  animeMedia: UniversalMedia(
+                                    id: entry.animeId,
+                                    title: UniversalTitle(
+                                      romaji: entry.animeTitle,
+                                      english: entry.animeTitle,
+                                      native: entry.animeTitle,
+                                    ),
+                                    coverImage: UniversalCoverImage(
+                                      large: entry.animeCover,
+                                      medium: entry.animeCover,
+                                    ),
+                                    isAdult: isAdult || entry.isAdult,
+                                  ),
+                                  startAt: targetEpNum,
+                                  startAtPosition: targetDuration.inSeconds,
+                                  withAnimeMatch: true,
+                                  directAutoMatch: true,
+                                  fromHentaiHub: isAdult || entry.isAdult,
+                                );
+                              },
                             ),
                       );
+                    },
+                  ),
+                  // 4. Download this episode
+                  ListTile(
+                    leading: Icon(
+                      Iconsax.document_download,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Download this episode'),
+                    subtitle: Text('Episode $targetEpNum'),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      final currentEpList = ref.read(episodeListProvider);
+                      if (currentEpList.animeId != entry.animeId ||
+                          currentEpList.episodes.isEmpty) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder:
+                              (ctx) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                        );
+                        await ref
+                            .read(episodeListProvider.notifier)
+                            .fetchEpisodes(
+                              animeTitle: entry.animeTitle,
+                              animeId: entry.animeId,
+                              mediaId: entry.animeId,
+                              animeCover: entry.animeCover,
+                              episodes: [],
+                              force: true,
+                              isAdult: isAdult || entry.isAdult,
+                            );
+                        if (context.mounted) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+                      }
+                      if (!context.mounted) return;
                       await ref
-                          .read(episodeListProvider.notifier)
-                          .fetchEpisodes(
-                            animeTitle: entry.animeTitle,
-                            animeId: entry.animeId,
+                          .read(episodeDataProvider.notifier)
+                          .downloadEpisode(context, targetEpNum);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.refresh_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Refresh source match'),
+                    subtitle: const Text(
+                      'Clear the saved stream match and resolve it again',
+                    ),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await ref
+                          .read(sourcePreferenceRepositoryProvider)
+                          .clearSourcePreference(entry.animeId);
+                      ref
+                          .read(episodeDataProvider.notifier)
+                          .clearEpisodeCache(
                             mediaId: entry.animeId,
-                            animeCover: entry.animeCover,
-                            episodes: [],
-                            force: true,
-                            isAdult: isAdult || entry.isAdult,
+                            episodeNumber: targetEpNum,
                           );
                       if (context.mounted) {
-                        Navigator.of(context, rootNavigator: true).pop();
-                      }
-                    }
-                    if (!context.mounted) return;
-                    await ref
-                        .read(episodeDataProvider.notifier)
-                        .downloadEpisode(context, targetEpNum);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.refresh_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text('Refresh source match'),
-                  subtitle: const Text(
-                    'Clear the saved stream match and resolve it again',
-                  ),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-                    await ref
-                        .read(sourcePreferenceRepositoryProvider)
-                        .clearSourcePreference(entry.animeId);
-                    ref.read(episodeDataProvider.notifier).clearEpisodeCache(
-                          mediaId: entry.animeId,
-                          episodeNumber: targetEpNum,
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Source match will refresh on next play.',
+                            ),
+                          ),
                         );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Source match will refresh on next play.'),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                // Remove from Continue Watching
-                ListTile(
-                  leading: Icon(
-                    Iconsax.close_circle,
-                    color: theme.colorScheme.error,
+                      }
+                    },
                   ),
-                  title: const Text('Remove from Continue Watching'),
-                  subtitle: const Text('Clears your watch progress'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    showContinueWatchingUndoSnackBar(
-                      context: context,
-                      ref: ref,
-                      animeId: entry.animeId,
-                      animeTitle: entry.animeTitle,
-                    );
-                  },
-                ),
-              ],
+                  // Remove from Continue Watching
+                  ListTile(
+                    leading: Icon(
+                      Iconsax.close_circle,
+                      color: theme.colorScheme.error,
+                    ),
+                    title: const Text('Remove from Continue Watching'),
+                    subtitle: const Text('Clears your watch progress'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      showContinueWatchingUndoSnackBar(
+                        context: context,
+                        ref: ref,
+                        animeId: entry.animeId,
+                        animeTitle: entry.animeTitle,
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),

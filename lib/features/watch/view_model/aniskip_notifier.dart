@@ -16,6 +16,7 @@ part 'aniskip_notifier.g.dart';
 class AniSkipNotifier extends _$AniSkipNotifier {
   final JikanService _jikan = JikanService();
   static final Map<String, int> _malIdCache = {};
+  int _requestGeneration = 0;
 
   @override
   List<AniSkipResultItem> build() {
@@ -29,6 +30,7 @@ class AniSkipNotifier extends _$AniSkipNotifier {
     required int episodeLength,
     int? malId,
   }) async {
+    final requestGeneration = ++_requestGeneration;
     try {
       final cacheKey = animeTitle.trim().toLowerCase();
 
@@ -44,18 +46,22 @@ class AniSkipNotifier extends _$AniSkipNotifier {
       }
 
       // 2. Authoritative check: Query JustAnime Core API for exact intro/outro timestamps
-      final anilistId = int.tryParse(mediaId) ??
+      final anilistId =
+          int.tryParse(mediaId) ??
           int.tryParse(ref.read(episodeListProvider).animeId ?? '') ??
           int.tryParse(ref.read(episodeListProvider).mediaId ?? '');
       if (anilistId != null) {
         try {
           final res = await UniversalHttpClient.instance
               .get(
-                Uri.parse('https://core.justanime.to/api/watch/$anilistId/episode/$episodeNumber/megaplay'),
+                Uri.parse(
+                  'https://core.justanime.to/api/watch/$anilistId/episode/$episodeNumber/megaplay',
+                ),
                 headers: {
                   'Origin': 'https://justanime.to',
                   'Referer': 'https://justanime.to/',
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                  'User-Agent':
+                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 },
               )
               .timeout(const Duration(seconds: 4));
@@ -64,8 +70,10 @@ class AniSkipNotifier extends _$AniSkipNotifier {
             if (decoded is Map) {
               final subMap = decoded['sub'] as Map?;
               final dubMap = decoded['dub'] as Map?;
-              final rawIntro = decoded['intro'] ?? subMap?['intro'] ?? dubMap?['intro'];
-              final rawOutro = decoded['outro'] ?? subMap?['outro'] ?? dubMap?['outro'];
+              final rawIntro =
+                  decoded['intro'] ?? subMap?['intro'] ?? dubMap?['intro'];
+              final rawOutro =
+                  decoded['outro'] ?? subMap?['outro'] ?? dubMap?['outro'];
               Intro? intro;
               Intro? outro;
               if (rawIntro is Map) {
@@ -83,8 +91,11 @@ class AniSkipNotifier extends _$AniSkipNotifier {
                 }
               }
               if (intro != null || outro != null) {
+                if (requestGeneration != _requestGeneration) return;
                 setFallbackFromSource(intro: intro, outro: outro);
-                AppLogger.d('JustAnime Core API provided exact intro ($intro) and outro ($outro) for Ep $episodeNumber');
+                AppLogger.d(
+                  'JustAnime Core API provided exact intro ($intro) and outro ($outro) for Ep $episodeNumber',
+                );
               }
             }
           }
@@ -174,6 +185,7 @@ class AniSkipNotifier extends _$AniSkipNotifier {
           episodeNumber,
           effectiveLength,
         );
+        if (requestGeneration != _requestGeneration) return;
         // Merge AniSkip results: Stream source intro/outro always takes absolute priority!
         state = _mergeWithSourcePriority(results);
         AppLogger.d(
@@ -255,6 +267,9 @@ class AniSkipNotifier extends _$AniSkipNotifier {
   }
 
   void clear() {
+    // Invalidate any lookup still running for the previous episode so its
+    // result cannot overwrite the next episode's intro/outro ranges.
+    _requestGeneration++;
     _sourceSkips = [];
     state = [];
   }

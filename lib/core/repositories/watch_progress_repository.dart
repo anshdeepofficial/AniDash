@@ -455,7 +455,10 @@ class WatchProgressRepository implements WatchProgressRepositoryInterface {
           currentEpisode: EpisodeProgress(
             episodeNumber: currentEpisode,
             episodeTitle: 'Episode $currentEpisode',
-            episodeThumbnail: animeCover,
+            // The anime cover is a card fallback, not an episode thumbnail.
+            // A real episode banner is persisted by WatchProgressNotifier as
+            // soon as playback progress is saved.
+            episodeThumbnail: null,
             progressInSeconds: 0,
             durationInSeconds: 1440,
             isCompleted: false,
