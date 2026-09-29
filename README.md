@@ -14,7 +14,6 @@
 ![Android](https://img.shields.io/badge/Android-6.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Flutter](https://img.shields.io/badge/Flutter-3.8%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.7%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-[![Release Build](https://github.com/anshdeepofficial1/AniDash/actions/workflows/release.yaml/badge.svg)](https://github.com/anshdeepofficial1/AniDash/actions/workflows/release.yaml)
 
 [![Download Latest APK](https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white)](https://github.com/anshdeepofficial1/AniDash/releases/latest)
 
