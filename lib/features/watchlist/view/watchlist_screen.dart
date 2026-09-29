@@ -96,22 +96,23 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
     final prevIndex = _index;
     _controller?.dispose();
     _statuses = List<String>.from(visible);
-    final newIndex = prevIndex >= _statuses.length
-        ? (_statuses.length - 1).clamp(0, _statuses.length - 1)
-        : prevIndex;
+    final newIndex =
+        prevIndex >= _statuses.length
+            ? (_statuses.length - 1).clamp(0, _statuses.length - 1)
+            : prevIndex;
     _index = newIndex;
     _controller = TabController(
       length: _statuses.length,
       initialIndex: newIndex,
       vsync: this,
     )..addListener(() {
-        if (_controller != null && _controller!.index != _index) {
-          // Clear selection when changing tabs
-          ref.read(watchlistSelectionProvider.notifier).clear();
-          _index = _controller!.index;
-          _fetch(_index);
-        }
-      });
+      if (_controller != null && _controller!.index != _index) {
+        // Clear selection when changing tabs
+        ref.read(watchlistSelectionProvider.notifier).clear();
+        _index = _controller!.index;
+        _fetch(_index);
+      }
+    });
     setState(() {});
     _fetch(_index);
   }
@@ -137,26 +138,27 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Selected?'),
-        content: Text(
-          'Are you sure you want to delete ${selectedIds.length} items? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Selected?'),
+            content: Text(
+              'Are you sure you want to delete ${selectedIds.length} items? This action cannot be undone.',
             ),
-            child: const Text('Delete'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (confirmed != true) return;
@@ -208,9 +210,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Deleted $successCount items')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Deleted $successCount items')));
       }
 
       // Refresh current list with fresh network fetch
@@ -242,16 +244,19 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        leading: isSelectionMode
-            ? IconButton(
-                onPressed: () =>
-                    ref.read(watchlistSelectionProvider.notifier).clear(),
-                icon: const Icon(Icons.close),
-              )
-            : null,
-        title: isSelectionMode
-            ? Text('${selected.length} Selected')
-            : const Text('Your Library'),
+        leading:
+            isSelectionMode
+                ? IconButton(
+                  onPressed:
+                      () =>
+                          ref.read(watchlistSelectionProvider.notifier).clear(),
+                  icon: const Icon(Icons.close),
+                )
+                : null,
+        title:
+            isSelectionMode
+                ? Text('${selected.length} Selected')
+                : const Text('Your Library'),
         actions: [
           if (isSelectionMode)
             IconButton(
@@ -313,8 +318,10 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                 maxHeight: MediaQuery.of(context).size.height * 0.75,
               ),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,8 +331,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.3,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -358,14 +366,16 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                       child: ReorderableListView.builder(
                         padding: EdgeInsets.only(bottom: bottomPadding + 32),
                         itemCount: tabsState.allTabs.length,
-                        onReorder: (oldIdx, newIdx) =>
-                            notifier.reorder(oldIdx, newIdx),
+                        onReorder:
+                            (oldIdx, newIdx) =>
+                                notifier.reorder(oldIdx, newIdx),
                         itemBuilder: (context, index) {
                           final tab = tabsState.allTabs[index];
                           final label = _label(tab.status);
-                          final visibleCount = tabsState.allTabs
-                              .where((t) => t.isVisible)
-                              .length;
+                          final visibleCount =
+                              tabsState.allTabs
+                                  .where((t) => t.isVisible)
+                                  .length;
                           final canHide = !tab.isVisible || visibleCount > 1;
 
                           return Container(
@@ -379,19 +389,21 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                             child: ListTile(
                               leading: Icon(
                                 _tabIcon(tab.status),
-                                color: tab.isVisible
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurfaceVariant
-                                        .withValues(alpha: 0.5),
+                                color:
+                                    tab.isVisible
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant
+                                            .withValues(alpha: 0.5),
                               ),
                               title: Text(
                                 label,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: tab.isVisible
-                                      ? theme.colorScheme.onSurface
-                                      : theme.colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.5),
+                                  color:
+                                      tab.isVisible
+                                          ? theme.colorScheme.onSurface
+                                          : theme.colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.5),
                                 ),
                               ),
                               trailing: Row(
@@ -399,18 +411,19 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen>
                                 children: [
                                   Switch(
                                     value: tab.isVisible,
-                                    onChanged: canHide
-                                        ? (_) => notifier
-                                            .toggleVisibility(tab.status)
-                                        : null,
+                                    onChanged:
+                                        canHide
+                                            ? (_) => notifier.toggleVisibility(
+                                              tab.status,
+                                            )
+                                            : null,
                                   ),
                                   const SizedBox(width: 8),
                                   ReorderableDragStartListener(
                                     index: index,
                                     child: Icon(
                                       Icons.drag_handle_rounded,
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -536,9 +549,10 @@ class _SwitchOption extends StatelessWidget {
         child: Text(
           label,
           style: theme.textTheme.labelMedium?.copyWith(
-            color: isSelected
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurfaceVariant,
+            color:
+                isSelected
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurfaceVariant,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
@@ -563,24 +577,42 @@ class _WatchlistTabView extends ConsumerWidget {
     final isSelectionMode = selectedIds.isNotEmpty;
 
     final entries = status == 'favorites' ? null : state.listFor(status);
-    final media = status == 'favorites'
-        ? state.favorites
-        : entries!.map((e) => e.media).toList();
+    final media =
+        status == 'favorites'
+            ? state.favorites
+            : entries!.map((e) => e.media).toList();
 
     final isLoading = state.loadingStatuses.contains(status);
 
-    if (isLoading && media.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.errors.containsKey(status) && media.isEmpty) {
-      return WatchlistErrorView(
-        message: state.errors[status]!,
-        onRetry: () => notifier.fetchListForStatus(status, force: true),
+    Widget refreshableState(Widget child) {
+      return RefreshIndicator(
+        onRefresh:
+            () => notifier.fetchListForStatus(status, force: true, page: 1),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [SliverFillRemaining(hasScrollBody: false, child: child)],
+        ),
       );
     }
 
-    if (media.isEmpty) return const WatchlistEmptyState();
+    if (isLoading && media.isEmpty) {
+      return refreshableState(const Center(child: CircularProgressIndicator()));
+    }
+
+    if (state.errors.containsKey(status) && media.isEmpty) {
+      return refreshableState(
+        WatchlistErrorView(
+          message: state.errors[status]!,
+          onRetry: () => notifier.fetchListForStatus(status, force: true),
+        ),
+      );
+    }
+
+    if (media.isEmpty) {
+      return refreshableState(const WatchlistEmptyState());
+    }
 
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
@@ -596,14 +628,17 @@ class _WatchlistTabView extends ConsumerWidget {
         return false;
       },
       child: RefreshIndicator(
-        onRefresh: () async => notifier.fetchListForStatus(status, force: true),
+        onRefresh:
+            () => notifier.fetchListForStatus(status, force: true, page: 1),
         child: AniDashGridView(
           itemCount: media.length + (isLoading ? 1 : 0),
           crossAxisExtent: dim.width,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
           padding: EdgeInsets.fromLTRB(10, 10, 10, 100),
-          physics: const BouncingScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           childAspectRatio: dim.width / dim.height,
           itemBuilder: (context, index) {
             if (index == media.length) {
@@ -612,10 +647,12 @@ class _WatchlistTabView extends ConsumerWidget {
             final anime = media[index];
             final tag = 'watchlist-$status-${anime.id}';
             final isSelected = selectedIds.contains(anime.id);
-            final entry = (entries != null && index < entries.length)
-                ? entries[index]
-                : null;
-            final progress = entry?.progress ??
+            final entry =
+                (entries != null && index < entries.length)
+                    ? entries[index]
+                    : null;
+            final progress =
+                entry?.progress ??
                 ref
                     .read(watchProgressRepositoryProvider)
                     .getProgress(anime.id.toString())

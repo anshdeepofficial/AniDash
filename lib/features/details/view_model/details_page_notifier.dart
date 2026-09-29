@@ -84,10 +84,23 @@ class DetailsPageNotifier extends _$DetailsPageNotifier {
       );
       ref.read(episodeListProvider.notifier).reset();
       ref.read(episodeDataProvider.notifier).reset();
+
+      // Episode discovery must not wait for the slower About/details
+      // enrichment. Starting both together prevents the Episodes tab from
+      // briefly looking empty (and removes the need for a manual refresh).
+      final episodesFuture = _fetchEpisodes(media.title);
       await fetchDetails();
       if (!ref.mounted) return;
+      await episodesFuture;
+
+      // If the initial title could not be matched, retry once with the
+      // enriched title returned by AniList/Jikan.
+      if (!ref.mounted) return;
+      final episodeState = ref.read(episodeListProvider);
       final enrichedMedia = state.details.value ?? media;
-      await _fetchEpisodes(enrichedMedia.title);
+      if (episodeState.episodes.isEmpty && episodeState.error != null) {
+        await _fetchEpisodes(enrichedMedia.title, force: true);
+      }
     }
   }
 

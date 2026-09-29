@@ -18,6 +18,8 @@ import 'package:ani_dash/core/repositories/watch_progress_repository.dart';
 import 'package:ani_dash/core/repositories/source_preference_repository.dart';
 import 'package:ani_dash/features/watch/view/widgets/player/dialogs/jump_to_time_dialog.dart';
 
+final Map<String, String> _continueEpisodeThumbnailCache = {};
+
 class ContinueSection extends ConsumerWidget {
   final List<AnimeWatchProgressEntry> allProgress;
   final bool isAdult;
@@ -125,14 +127,26 @@ class ContinueSection extends ConsumerWidget {
                   if (episode.number == nextEpisodeNum &&
                       episode.thumbnail?.isNotEmpty == true) {
                     listThumbnail = episode.thumbnail;
+                    final cacheKey = '${entry.animeId}:$nextEpisodeNum';
+                    _continueEpisodeThumbnailCache[cacheKey] = listThumbnail!;
+                    _persistEpisodeThumbnail(
+                      ref,
+                      entry,
+                      nextEpisodeNum,
+                      episode.title,
+                      listThumbnail,
+                    );
                     break;
                   }
                 }
               }
+              final cachedThumbnail =
+                  _continueEpisodeThumbnailCache['${entry.animeId}:$nextEpisodeNum'];
               final savedThumbnail =
                   displayEp?.episodeThumbnail ?? currentEp?.episodeThumbnail;
               final thumb =
                   listThumbnail ??
+                  cachedThumbnail ??
                   (savedThumbnail != entry.animeCover ? savedThumbnail : null);
               Widget imageWidget;
 
@@ -358,6 +372,44 @@ class ContinueSection extends ConsumerWidget {
         const SizedBox(height: 24),
       ],
     );
+  }
+
+  void _persistEpisodeThumbnail(
+    WidgetRef ref,
+    AnimeWatchProgressEntry entry,
+    int episodeNumber,
+    String? episodeTitle,
+    String thumbnail,
+  ) {
+    final existing = entry.episodesProgress[episodeNumber];
+    if (existing?.episodeThumbnail == thumbnail) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final repository = ref.read(watchProgressRepositoryProvider);
+      final current = repository.getProgress(entry.animeId) ?? entry;
+      final currentEpisode = current.episodesProgress[episodeNumber];
+      if (currentEpisode?.episodeThumbnail == thumbnail) return;
+
+      final updatedEpisodes = Map<int, EpisodeProgress>.from(
+        current.episodesProgress,
+      );
+      updatedEpisodes[episodeNumber] = EpisodeProgress(
+        episodeNumber: episodeNumber,
+        episodeTitle:
+            episodeTitle ??
+            currentEpisode?.episodeTitle ??
+            'Episode $episodeNumber',
+        episodeThumbnail: thumbnail,
+        progressInSeconds: currentEpisode?.progressInSeconds,
+        durationInSeconds: currentEpisode?.durationInSeconds,
+        isCompleted: currentEpisode?.isCompleted ?? false,
+        watchedAt: currentEpisode?.watchedAt,
+      );
+
+      await repository.saveProgress(
+        current.copyWith(episodesProgress: updatedEpisodes),
+      );
+    });
   }
 
   void _showContinueWatchingMenu(
