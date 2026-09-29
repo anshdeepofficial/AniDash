@@ -6,13 +6,27 @@
 
 ### Discover, watch, download, and keep track of anime in one place.
 
-[![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Latest)](https://github.com/anshdeepofficial1/AniDash/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/anshdeepofficial1/AniDash/total?style=for-the-badge&logo=android&label=Downloads)](https://github.com/anshdeepofficial1/AniDash/releases)
-[![License](https://img.shields.io/github/license/anshdeepofficial1/AniDash?style=for-the-badge)](LICENSE.md)
+<p>
+  <a href="https://github.com/anshdeepofficial1/AniDash/releases/latest"><img src="https://img.shields.io/github/v/release/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Latest" alt="Latest release" /></a>
+  <a href="https://github.com/anshdeepofficial1/AniDash/releases"><img src="https://img.shields.io/github/downloads/anshdeepofficial1/AniDash/total?style=for-the-badge&logo=android&label=Downloads" alt="Total downloads" /></a>
+  <a href="https://github.com/anshdeepofficial1/AniDash/stargazers"><img src="https://img.shields.io/github/stars/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Stars" alt="GitHub stars" /></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/github/license/anshdeepofficial1/AniDash?style=for-the-badge" alt="License" /></a>
+</p>
 
-<a href="https://github.com/anshdeepofficial1/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest AniDash APK" /></a>
+<p>
+  <img src="https://img.shields.io/badge/Android-6.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 6.0+" />
+  <img src="https://img.shields.io/badge/Flutter-3.8%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter 3.8+" />
+  <img src="https://img.shields.io/badge/Dart-3.7%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart 3.7+" />
+  <a href="https://github.com/anshdeepofficial1/AniDash/actions/workflows/release.yaml"><img src="https://github.com/anshdeepofficial1/AniDash/actions/workflows/release.yaml/badge.svg" alt="Release Build" /></a>
+</p>
 
-<a href="https://rookieenough.github.io/Orion-Data/redirect.html?id=anidash"><img src="https://raw.githubusercontent.com/RookieEnough/Orion-Store/refs/heads/main/assets/orion-badge.png" alt="Get it on Orion Store" height="60" /></a>
+<p>
+  <a href="https://github.com/anshdeepofficial1/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest AniDash APK" /></a>
+</p>
+
+<p>
+  <a href="https://rookieenough.github.io/Orion-Data/redirect.html?id=anidash"><img src="https://raw.githubusercontent.com/RookieEnough/Orion-Store/refs/heads/main/assets/orion-badge.png" alt="Get it on Orion Store" height="60" /></a>
+</p>
 
 </div>
 
