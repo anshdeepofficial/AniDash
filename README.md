@@ -6,11 +6,11 @@
 
 ### Discover, watch, download, and keep track of anime in one place.
 
-[![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial/AniDash?style=for-the-badge&logo=github&label=Latest)](https://github.com/anshdeepofficial/AniDash/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/anshdeepofficial/AniDash/total?style=for-the-badge&logo=android&label=Downloads)](https://github.com/anshdeepofficial/AniDash/releases)
-[![License](https://img.shields.io/github/license/anshdeepofficial/AniDash?style=for-the-badge)](LICENSE.md)
+[![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Latest)](https://github.com/anshdeepofficial1/AniDash/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/anshdeepofficial1/AniDash/total?style=for-the-badge&logo=android&label=Downloads)](https://github.com/anshdeepofficial1/AniDash/releases)
+[![License](https://img.shields.io/github/license/anshdeepofficial1/AniDash?style=for-the-badge)](LICENSE.md)
 
-<a href="https://github.com/anshdeepofficial/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest AniDash APK" /></a>
+<a href="https://github.com/anshdeepofficial1/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest AniDash APK" /></a>
 
 </div>
 
@@ -70,7 +70,7 @@ You can use AniDash without connecting an account. If you want your anime list a
 
 ## Install on Android
 
-1. Open the **[latest AniDash release](https://github.com/anshdeepofficial/AniDash/releases/latest)**.
+1. Open the **[latest AniDash release](https://github.com/anshdeepofficial1/AniDash/releases/latest)**.
 2. Download the newest file ending in `.apk`.
 3. Open the downloaded file.
 4. If Android asks, allow installation from your browser or file manager.
@@ -88,7 +88,7 @@ When an update is available, you can install the newer APK over the existing app
 
 ## Need help or found a bug?
 
-Open a **[GitHub issue](https://github.com/anshdeepofficial/AniDash/issues)** and include:
+Open a **[GitHub issue](https://github.com/anshdeepofficial1/AniDash/issues)** and include:
 
 - your AniDash version;
 - your Android version and phone model;
@@ -106,7 +106,7 @@ These details make playback and source problems much easier to reproduce and fix
 You need a compatible Flutter SDK and the Android or desktop development tools for your platform.
 
 ```bash
-git clone https://github.com/anshdeepofficial/AniDash.git
+git clone https://github.com/anshdeepofficial1/AniDash.git
 cd AniDash
 flutter pub get
 flutter run
@@ -128,7 +128,7 @@ AniDash is available under the [Apache License 2.0](LICENSE.md).
 
 <div align="center">
 
-Made by <a href="https://github.com/anshdeepofficial">Anshdeep Singh</a>
+Made by <a href="https://github.com/anshdeepofficial1">Anshdeep Singh</a>
 
 <a href="https://github.com/sponsors/anshdeepofficial">Sponsor on GitHub</a> • <a href="https://buymeacoffee.com/anshdeepofficial">Buy Me a Coffee</a>
 
