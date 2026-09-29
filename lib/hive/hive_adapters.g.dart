@@ -77,7 +77,7 @@ class PlayerModelAdapter extends TypeAdapter<PlayerModel> {
       enableAutoSkip: fields[2] == null ? false : fields[2] as bool,
       skipFillerEpisodes: fields[9] == null ? false : fields[9] as bool,
       preferDub: fields[3] == null ? true : fields[3] as bool,
-      bufferSize: fields[8] == null ? 32 : (fields[8] as num).toDouble(),
+      bufferSize: fields[8] == null ? 100 : (fields[8] as num).toDouble(),
       seekDuration: fields[4] == null ? 10 : (fields[4] as num).toInt(),
       autoHideDuration: fields[5] == null ? 5 : (fields[5] as num).toInt(),
       lockAutoHideDuration:

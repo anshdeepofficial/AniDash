@@ -26,7 +26,7 @@ class PlayerModel {
     this.skipFillerEpisodes = false,
     bool? preferDub,
     String? preferredAudioLanguage,
-    this.bufferSize = 32,
+    double bufferSize = 100,
     this.seekDuration = 10,
     this.autoHideDuration = 5,
     this.lockAutoHideDuration = 3,
@@ -38,7 +38,8 @@ class PlayerModel {
     this.mpvSettings = const {},
     this.showManualSkip = true,
     this.manualSkipDuration = 85,
-  }) : preferredAudioLanguage =
+  }) : bufferSize = bufferSize.clamp(100.0, 256.0).toDouble(),
+       preferredAudioLanguage =
            preferredAudioLanguage == 'dub'
                ? 'dub'
                : (preferDub == true ? 'dub' : 'sub');
@@ -135,7 +136,13 @@ class PlayerModel {
       seekDuration: map['seekDuration'] ?? 10,
       autoHideDuration: map['autoHideDuration'] ?? 5,
       lockAutoHideDuration: map['lockAutoHideDuration'] ?? 3,
-      bufferSize: (map['bufferSize'] as num?)?.toDouble() ?? 32.0,
+      // Older installations stored a 32 MB cache. Migrate those values to a
+      // 100 MiB forward-cache capacity so online HLS playback does not drain
+      // its buffer after only a few seconds.
+      bufferSize:
+          ((map['bufferSize'] as num?)?.toDouble() ?? 100.0)
+              .clamp(100.0, 256.0)
+              .toDouble(),
       showNextPrevButtons: map['showNextPrevButtons'] ?? true,
       prefetchNextEpisode: map['prefetchNextEpisode'] ?? true,
       showNextEpisodePrompt: map['showNextEpisodePrompt'] ?? true,

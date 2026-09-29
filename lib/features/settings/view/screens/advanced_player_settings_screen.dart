@@ -125,9 +125,13 @@ class _AdvancedPlayerSettingsScreenState
                   icon: Icon(Icons.cached_rounded),
                   description: '${settings.bufferSize.toInt()} MB',
                   value: settings.bufferSize,
-                  onChanged: (value) => notifier.updateSettings(
-                    (s) => s.copyWith(bufferSize: value),
-                  ),
+                  min: 100,
+                  max: 256,
+                  divisions: 156,
+                  onChanged:
+                      (value) => notifier.updateSettings(
+                        (s) => s.copyWith(bufferSize: value),
+                      ),
                 ),
                 DropdownSettingsItem(
                   title: 'Hardware Decoding',
@@ -217,8 +221,8 @@ class _AdvancedPlayerSettingsScreenState
                   icon: Icon(Icons.animation, color: colorScheme.primary),
                   accent: colorScheme.primary,
                   value: _currentMap['interpolation'] == 'yes',
-                  onChanged: (v) =>
-                      _updateKey('interpolation', v ? 'yes' : 'no'),
+                  onChanged:
+                      (v) => _updateKey('interpolation', v ? 'yes' : 'no'),
                 ),
                 DropdownSettingsItem(
                   title: 'Upscaling Algorithm',

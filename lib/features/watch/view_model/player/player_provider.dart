@@ -138,12 +138,12 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       playerSettingsProvider.select((s) => s.bufferSize),
     );
     final effectiveBufferBytes = (bufferSize.toInt() * 1024 * 1024).clamp(
-      32 * 1024 * 1024,
-      96 * 1024 * 1024,
+      100 * 1024 * 1024,
+      256 * 1024 * 1024,
     );
-    final backBufferBytes = (effectiveBufferBytes ~/ 4).clamp(
-      8 * 1024 * 1024,
-      24 * 1024 * 1024,
+    final backBufferBytes = (effectiveBufferBytes ~/ 5).clamp(
+      16 * 1024 * 1024,
+      32 * 1024 * 1024,
     );
     _player = Player(
       configuration: PlayerConfiguration(
@@ -153,18 +153,17 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       ),
     );
 
-    // Keep a rolling 100+ second forward window where the host bitrate and the
-    // byte budget permit it. MPV may stop earlier at demuxer-max-bytes, which is
-    // intentional protection for lower-memory Android devices.
+    // Keep at least 100 MiB available for forward HLS buffering. `cache-secs`
+    // is intentionally larger than the target window: the byte cap remains
+    // the real memory guard while MPV keeps filling continuously.
     final fastProperties = <String, String>{
-      // Online providers regularly return streams with device-problematic
-      // H.264/HEVC profiles. A stable software baseline is preferable to
-      // black/pixelated frames or a decoder reset that restarts the episode.
-      'hwdec': 'no',
+      // media_kit's safe hardware path avoids making the UI isolate perform
+      // full 1080p software decoding while HLS segments are also arriving.
+      'hwdec': 'auto-safe',
 
       // ── Cache / buffer sizing ─────────────────────────────────────────────
       'cache': 'yes',
-      'cache-secs': '110',
+      'cache-secs': '600',
       'demuxer-seekable-cache': 'yes',
       'demuxer-max-bytes': effectiveBufferBytes.toString(),
       'demuxer-max-back-bytes': backBufferBytes.toString(),
@@ -176,22 +175,13 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
       // ── Instant playback + underrun protection ────────────────────────────
       'cache-pause': 'yes', // Pause gracefully on underrun
-      // Start after a small safety buffer; continue filling the 100-second
-      // rolling cache in the background once frames begin rendering.
-      // Keep startup and recovery responsive. The rolling cache continues
-      // filling in the background; waiting eight seconds after every brief
-      // underrun made fast networks feel frozen.
-      // Five seconds is still inside the requested sub-10-second startup but
-      // prevents a 1080p HLS stream from immediately draining a tiny buffer
-      // and entering a play-two-seconds/buffer loop.
-      'cache-pause-wait': '5',
-      'cache-pause-initial': 'yes',
+      // Do not make MPV wait for a second, independent initial-buffer target.
+      // That was the startup deadlock behind the endless 90% spinner. Later
+      // underruns still pause briefly and resume from the existing cache.
+      'cache-pause-wait': '2',
+      'cache-pause-initial': 'no',
 
       // ── Network & Reconnect ───────────────────────────────────────────────
-      // Let FFmpeg recover transient stream failures quickly. Keep the option
-      // format deliberately simple because MPV rejects malformed AVOption
-      // lists as a whole.
-      'stream-lavf-o': 'reconnect=1,reconnect_streamed=1,reconnect_delay_max=2',
       'network-timeout': '30',
 
       // ── FFmpeg demuxer / HLS probe (tuned for ultra-fast <10s startup) ──
@@ -218,8 +208,8 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
 
     // Apply user custom MPV settings
     for (final entry in mpvSettings.entries) {
-      // Keep the safe online-decoder baseline. A stale custom hwdec setting
-      // must not silently re-enable the crash-prone path.
+      // Keep the tested safe online-decoder baseline. A stale custom hwdec
+      // value must not silently restore forced software decoding.
       if (entry.key == 'vo' || entry.key == 'hwdec') continue;
       try {
         platform.setProperty(entry.key, entry.value);
@@ -231,7 +221,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     videoController = VideoController(
       _player,
       configuration: const VideoControllerConfiguration(
-        enableHardwareAcceleration: false,
+        enableHardwareAcceleration: true,
       ),
     );
 
@@ -413,7 +403,7 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
       duration: isSameSession ? state.duration : Duration.zero,
     );
     _startupTimer?.cancel();
-    _startupTimer = Timer(const Duration(seconds: 25), () {
+    _startupTimer = Timer(const Duration(seconds: 12), () {
       if (state.isOpening) {
         state = state.copyWith(
           isOpening: false,
