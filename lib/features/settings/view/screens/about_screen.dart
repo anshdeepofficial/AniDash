@@ -135,7 +135,7 @@ class AboutScreen extends StatelessWidget {
                   title: 'Developer',
                   content: 'anshdeepofficial',
                   subtitle:
-                      'Passionate Flutter Developer (github.com/anshdeepofficial)',
+                      'Passionate Flutter Developer (github.com/anshdeepofficial1)',
                 ),
 
                 const SizedBox(height: 16),
@@ -233,7 +233,7 @@ class AboutScreen extends StatelessWidget {
                         label: 'Developer',
                         onTap:
                             () => _launchUrl(
-                              'https://github.com/anshdeepofficial',
+                              'https://github.com/anshdeepofficial1',
                             ),
                       ),
                     ),
@@ -245,7 +245,7 @@ class AboutScreen extends StatelessWidget {
                         label: 'Source Code',
                         onTap:
                             () => _launchUrl(
-                              'https://github.com/anshdeepofficial/Anidash',
+                              'https://github.com/anshdeepofficial1/Anidash',
                             ),
                       ),
                     ),
@@ -257,7 +257,7 @@ class AboutScreen extends StatelessWidget {
                         label: 'Report Issue',
                         onTap:
                             () => _launchUrl(
-                              'https://github.com/anshdeepofficial/Anidash/issues',
+                              'https://github.com/anshdeepofficial1/Anidash/issues',
                             ),
                       ),
                     ),
