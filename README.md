@@ -12,6 +12,8 @@
 
 <a href="https://github.com/anshdeepofficial1/AniDash/releases/latest"><img src="https://img.shields.io/badge/Download-Latest%20APK-2E8B57?style=for-the-badge&logo=android&logoColor=white" alt="Download the latest AniDash APK" /></a>
 
+<a href="https://rookieenough.github.io/Orion-Data/redirect.html?id=anidash"><img src="https://raw.githubusercontent.com/RookieEnough/Orion-Store/refs/heads/main/assets/orion-badge.png" alt="Get it on Orion Store" height="60" /></a>
+
 </div>
 
 ## What is AniDash?
@@ -69,6 +71,16 @@ You can use AniDash without connecting an account. If you want your anime list a
 - **Stay informed** — control update, release, Continue Watching, and download notifications separately.
 
 ## Install on Android
+
+### Orion Store
+
+AniDash is available on Orion Store.
+
+**[Open AniDash in Orion Store](https://rookieenough.github.io/Orion-Data/redirect.html?id=anidash)**
+
+Orion Store deep link: `orionstore://app/anidash`
+
+### GitHub APK
 
 1. Open the **[latest AniDash release](https://github.com/anshdeepofficial1/AniDash/releases/latest)**.
 2. Download the newest file ending in `.apk`.
