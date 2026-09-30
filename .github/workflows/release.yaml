@@ -204,7 +204,9 @@ jobs:
 
   build-windows:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_windows == 'true'
-    runs-on: windows-latest
+    # Flutter 3.35 detects Visual Studio 2022; the newer windows-latest image
+    # exposes VS 2026 and makes CMake incorrectly fall back to VS 2019.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       
