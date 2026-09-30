@@ -17,7 +17,7 @@ dependencies:
   cached_network_image: ^3.4.1
   carousel_slider: ^5.1.1
   collection: ^1.19.1
-  connectivity_plus: 7.1.0
+  connectivity_plus: 6.1.5
   cupertino_icons: ^1.0.8
 
   commentum_client:
