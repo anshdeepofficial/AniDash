@@ -22,6 +22,9 @@ class PiPNotifier extends Notifier<bool> {
   bool _iosAttachInFlight = false;
   bool _iosAutoArmed = false;
 
+  bool get isPreparedForBackgroundPiP =>
+      Platform.isIOS && _iosVideoController != null && _iosAutoArmed;
+
   @override
   bool build() {
     if (Platform.isAndroid) {
