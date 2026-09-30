@@ -139,6 +139,19 @@ jobs:
           rm -rf /tmp/anidash-keystore-first /tmp/anidash-keystore-second /tmp/anidash-signcheck
           echo "Android release signing key validated successfully."
 
+      - name: Configure App API Keys
+        run: |
+          cat <<EOF > keys.json
+          {
+            "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
+            "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
+            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
+            "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
+            "API_URL": "${{ secrets.API_URL }}",
+            "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"
+          }
+          EOF
+
       - run: flutter pub get
       - name: Run playback regression tests
         run: flutter test test/unit/stream_headers_test.dart
