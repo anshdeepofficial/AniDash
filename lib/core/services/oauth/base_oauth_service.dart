@@ -10,10 +10,16 @@ abstract class BaseOAuthService {
   String get redirectUri =>
       isDesktop
           ? 'http://localhost:43824/success?code=1337'
+          : Platform.isIOS
+          ? 'anidash://callback'
           : 'shonenx://callback';
 
   String get callbackUrlScheme =>
-      isDesktop ? 'http://localhost:43824' : 'shonenx';
+      isDesktop
+          ? 'http://localhost:43824'
+          : Platform.isIOS
+          ? 'anidash'
+          : 'shonenx';
 
   /// Wraps [FlutterWebAuth2.authenticate] using common parameters and options.
   /// Returns the query parameters of the callback URL.
