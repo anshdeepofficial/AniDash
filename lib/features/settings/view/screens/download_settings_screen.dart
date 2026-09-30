@@ -34,19 +34,28 @@ class DownloadSettingsScreen extends ConsumerWidget {
             titleColor: colorScheme.primary,
             onTap: () {},
             children: [
-              Consumer(
-                builder: (context, ref, child) {
-                  return ToggleableSettingsItem(
-                    icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
-                    accent: colorScheme.primary,
-                    title: 'Custom Download Path',
-                    description: 'Use a custom directory for downloads',
-                    value: settings.useCustomPath,
-                    onChanged: (val) => notifier.toggleUseCustomPath(val),
-                  );
-                },
-              ),
-              if (settings.useCustomPath)
+              if (Platform.isIOS)
+                NormalSettingsItem(
+                  icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
+                  accent: colorScheme.primary,
+                  title: 'Storage Location',
+                  description:
+                      'AniDash Documents — available from the iOS Files app',
+                )
+              else
+                Consumer(
+                  builder: (context, ref, child) {
+                    return ToggleableSettingsItem(
+                      icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
+                      accent: colorScheme.primary,
+                      title: 'Custom Download Path',
+                      description: 'Use a custom directory for downloads',
+                      value: settings.useCustomPath,
+                      onChanged: (val) => notifier.toggleUseCustomPath(val),
+                    );
+                  },
+                ),
+              if (!Platform.isIOS && settings.useCustomPath)
                 NormalSettingsItem(
                   icon: Icon(Iconsax.folder, color: colorScheme.primary),
                   accent: colorScheme.primary,
