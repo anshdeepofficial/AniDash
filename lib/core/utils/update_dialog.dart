@@ -88,7 +88,7 @@ class _UpdateDialogState extends State<UpdateDialog>
         isBeta
             ? 'AniDash-Beta-$tag-Universal.apk'
             : 'AniDash-$tag-Universal.apk';
-    return 'https://github.com/anshdeepofficial/AniDash/releases/download/$tag/$apkName';
+    return 'https://github.com/anshdeepofficial1/AniDash/releases/download/$tag/$apkName';
   }
 
   Future<void> _handleUpdateAction() async {
