@@ -21,10 +21,10 @@ void main() {
       expect(animeSeasonBadge(media('Example Season 3 Part 2')), 'S3-2');
     });
 
-    test('does not present movies as numbered seasons', () {
+    test('presents movies with a compact M badge', () {
       expect(
         animeSeasonBadge(media('SPY x FAMILY CODE: White', format: 'MOVIE')),
-        isNull,
+        'M',
       );
     });
 
@@ -41,14 +41,14 @@ void main() {
   });
 
   group('card media type labels', () {
-    test('describes a movie as a movie instead of an episode count', () {
+    test('leaves movie metadata to the dedicated M badge', () {
       final movie = media(
         'Kaiju No. 8 Mission Recon',
         format: 'MOVIE',
       ).copyWith(episodes: 1);
 
-      expect(formatEpisodeText(anime: movie), '1 Movie');
-      expect(formatEpisodeText(anime: movie, compact: true), '1 MOVIE');
+      expect(formatEpisodeText(anime: movie), isNull);
+      expect(formatEpisodeText(anime: movie, compact: true), isNull);
     });
   });
 }
