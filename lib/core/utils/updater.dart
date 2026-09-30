@@ -25,7 +25,7 @@ Future<void> checkForUpdates(
     final repo =
         useTestReleases
             ? 'anshdeepofficial/Anidash-test-releases'
-            : 'anshdeepofficial/Anidash';
+            : 'anshdeepofficial1/AniDash';
 
     final pageSize = (includeBeta || includeAlpha) ? 5 : 1;
     final url = Uri.parse(
