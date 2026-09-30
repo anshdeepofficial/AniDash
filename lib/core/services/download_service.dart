@@ -189,7 +189,9 @@ class DownloadService with WidgetsBindingObserver {
     }
 
     String basePath;
-    if (_settings.useCustomPath && _settings.customDownloadPath != null) {
+    if (!Platform.isIOS &&
+        _settings.useCustomPath &&
+        _settings.customDownloadPath != null) {
       final customDir = Directory(_settings.customDownloadPath!);
       if (!customDir.existsSync()) {
         try {
