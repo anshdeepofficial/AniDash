@@ -44,6 +44,15 @@ class Permissions extends _$Permissions {
   }
 
   Future<void> checkAll() async {
+    if (Platform.isIOS) {
+      state = state.copyWith(
+        notification: await Permission.notification.isGranted,
+        storage: true,
+        photos: true,
+        videos: true,
+      );
+      return;
+    }
     if (!Platform.isAndroid) {
       state = state.copyWith(
         notification: true,
@@ -64,8 +73,13 @@ class Permissions extends _$Permissions {
   }
 
   Future<bool> requestNotificationPermission() async {
-    if (state.notification || !Platform.isAndroid) return true;
-    final granted = await _request(Permission.notification);
+    if (state.notification) return true;
+    if (!(Platform.isAndroid || Platform.isIOS)) return true;
+    final result = await Permission.notification.request();
+    final granted =
+        result == PermissionStatus.granted ||
+        result == PermissionStatus.limited ||
+        result == PermissionStatus.provisional;
     state = state.copyWith(notification: granted);
     return granted;
   }
