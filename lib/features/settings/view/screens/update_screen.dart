@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -211,9 +212,11 @@ class _UpdateScreenState extends ConsumerState<UpdateScreen> {
                   accent: colorScheme.primary,
                   title: 'Check Interval',
                   description:
-                      settings.checkIntervalMinutes < 15
-                          ? 'Checks approximately every 15 minutes (Android WorkManager minimum)'
-                          : 'Checks approximately every ${settings.checkIntervalMinutes} minutes',
+                      Platform.isIOS
+                          ? 'iOS schedules background checks opportunistically; this interval is a minimum preference, not an exact timer'
+                          : (settings.checkIntervalMinutes < 15
+                              ? 'Checks approximately every 15 minutes (Android WorkManager minimum)'
+                              : 'Checks approximately every ${settings.checkIntervalMinutes} minutes'),
                   value: settings.checkIntervalMinutes.toDouble(),
                   min: 5,
                   max: 60,
