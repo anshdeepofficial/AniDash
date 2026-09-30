@@ -19,6 +19,8 @@
 
 <a href="https://rookieenough.github.io/Orion-Data/redirect.html?id=anidash"><img src="https://raw.githubusercontent.com/RookieEnough/Orion-Store/refs/heads/main/assets/orion-badge.png" alt="Get it on Orion Store" height="60" /></a>
 
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/anshdeepofficial1/AniDash"><img src="https://img.shields.io/badge/Add_to_Obtainium-6750A3?style=for-the-badge" alt="Add to Obtainium" height="48" /></a>
+
 </div>
 
 ## What is AniDash?
