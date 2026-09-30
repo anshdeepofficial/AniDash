@@ -157,22 +157,23 @@ class ThemeSettingsScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                  ToggleableSettingsItem(
-                    icon: Icon(
-                      Iconsax.color_swatch,
-                      color: colorScheme.primary,
+                  if (!Platform.isIOS)
+                    ToggleableSettingsItem(
+                      icon: Icon(
+                        Iconsax.color_swatch,
+                        color: colorScheme.primary,
+                      ),
+                      accent: colorScheme.primary,
+                      title:
+                          'System Colors ${Platform.isAndroid ? '(A12+)' : ''}',
+                      description: 'Use colors from your wallpaper',
+                      value: theme.useDynamicColors,
+                      onChanged: (value) async {
+                        themeNotifier.updateSettings(
+                          (prev) => prev.copyWith(useDynamicColors: value),
+                        );
+                      },
                     ),
-                    accent: colorScheme.primary,
-                    title:
-                        'System Colors ${Platform.isAndroid ? '(A12+)' : ''}',
-                    description: 'Use colors from your wallpaper',
-                    value: theme.useDynamicColors,
-                    onChanged: (value) async {
-                      themeNotifier.updateSettings(
-                        (prev) => prev.copyWith(useDynamicColors: value),
-                      );
-                    },
-                  ),
                   ToggleableSettingsItem(
                     icon: Icon(Iconsax.magicpen, color: colorScheme.primary),
                     accent: colorScheme.primary,
