@@ -630,6 +630,10 @@ class NotificationService {
     required double progress,
   }) async {
     if (!await _isCategoryEnabled('enableDownloads')) return;
+    // Android supports a quiet ongoing progress notification. Re-posting local
+    // notifications for every progress tick on iOS would create banner/sound
+    // spam, so iOS keeps progress in-app and posts the completion alert only.
+    if (Platform.isIOS) return;
     final percent = (progress * 100).clamp(0, 100).toInt();
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
