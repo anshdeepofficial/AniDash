@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -375,9 +376,13 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       }
     });
 
-    final isWide = MediaQuery.sizeOf(context).width > 800;
     final uiSettings = ref.watch(uiSettingsProvider);
     final visibleNavItems = _getVisibleNavItems(uiSettings);
+    final isDesktop =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS);
 
     // If active branch was disabled by user in settings, safely redirect to Home (branch 0)
     final isCurrentVisible = visibleNavItems.any(
@@ -425,57 +430,58 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       child: Scaffold(
         extendBody: true,
         extendBodyBehindAppBar: true,
-        body: Stack(
-          fit: StackFit.expand,
+        body: Row(
           children: [
-            PageView(
-              controller: _pageController,
-              onPageChanged: (pageIndex) {
-                if (pageIndex >= 0 && pageIndex < visibleNavItems.length) {
-                  final targetBranch = visibleNavItems[pageIndex].branchIndex;
-                  if (targetBranch != widget.navigationShell.currentIndex) {
-                    widget.navigationShell.goBranch(targetBranch);
-                  }
-                }
-              },
-              physics: const BouncingScrollPhysics(),
-              children:
-                  visibleNavItems.map((item) {
-                    final child = widget.children[item.branchIndex];
-                    return Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        isWide ? 90 : 0,
-                        isWide ? 15 : 0,
-                        0,
-                        isWide ? 15 : 0,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: _KeepAliveWrapper(child: child),
-                      ),
-                    );
-                  }).toList(),
-            ),
-            Positioned(
-              left: isWide ? 10 : 0,
-              right: isWide ? null : 0,
-              top: isWide ? 10 : null,
-              bottom: 10,
-              child: SafeArea(
-                child:
-                    isWide
-                        ? _SideNav(
-                          shell: widget.navigationShell,
-                          items: visibleNavItems,
-                          onTabSelected:
-                              (branch) => _onNavTap(branch, visibleNavItems),
-                        )
-                        : _BottomNav(
+            if (isDesktop)
+              _DesktopNav(
+                shell: widget.navigationShell,
+                items: visibleNavItems,
+                onTabSelected: (branch) => _onNavTap(branch, visibleNavItems),
+              ),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView(
+                    controller: _pageController,
+                    onPageChanged: (pageIndex) {
+                      if (pageIndex >= 0 &&
+                          pageIndex < visibleNavItems.length) {
+                        final targetBranch =
+                            visibleNavItems[pageIndex].branchIndex;
+                        if (targetBranch !=
+                            widget.navigationShell.currentIndex) {
+                          widget.navigationShell.goBranch(targetBranch);
+                        }
+                      }
+                    },
+                    physics: const BouncingScrollPhysics(),
+                    children:
+                        visibleNavItems.map((item) {
+                          final child = widget.children[item.branchIndex];
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              isDesktop ? 0 : 15,
+                            ),
+                            child: _KeepAliveWrapper(child: child),
+                          );
+                        }).toList(),
+                  ),
+                  if (!isDesktop)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 10,
+                      child: SafeArea(
+                        child: _BottomNav(
                           shell: widget.navigationShell,
                           items: visibleNavItems,
                           onTabSelected:
                               (branch) => _onNavTap(branch, visibleNavItems),
                         ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -485,73 +491,116 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   }
 }
 
-class _SideNav extends StatelessWidget {
+class _DesktopNav extends StatelessWidget {
   final StatefulNavigationShell shell;
   final List<NavItem> items;
-  final void Function(int branchIndex)? onTabSelected;
+  final void Function(int branchIndex) onTabSelected;
 
-  const _SideNav({
+  const _DesktopNav({
     required this.shell,
     required this.items,
-    this.onTabSelected,
+    required this.onTabSelected,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      width: 75,
+      width: 248,
+      padding: const EdgeInsets.fromLTRB(18, 34, 18, 24),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(35),
-        border: Border.all(color: colorScheme.primary),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: const Color(0xFF07130D),
+        border: Border(
+          right: BorderSide(color: scheme.primary.withValues(alpha: .22)),
+        ),
       ),
       child: Column(
-        children: List.generate(items.length, (index) {
-          final item = items[index];
-          final isSelected = shell.currentIndex == item.branchIndex;
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(5),
-              child: InkWell(
-                onTap: () {
-                  if (onTabSelected != null) {
-                    onTabSelected!(item.branchIndex);
-                  } else {
-                    shell.goBranch(item.branchIndex);
-                  }
-                },
-                borderRadius: BorderRadius.circular(30),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    color:
-                        isSelected
-                            ? colorScheme.primary.withValues(alpha: 0.2)
-                            : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    item.icon,
-                    color:
-                        isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Image.asset('assets/icons/anidash_logo_dark.png', height: 66),
+          const SizedBox(height: 10),
+          const Text(
+            'AniDash',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 25,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Text(
+            'ANIME  •  MANGA  •  ALWAYS WITH YOU',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 9,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 34),
+          ...items.map((item) {
+            final selected = shell.currentIndex == item.branchIndex;
+            final label =
+                item.label == 'Browse'
+                    ? 'Discover'
+                    : item.label == 'Watchlist'
+                    ? 'Library'
+                    : item.label;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color:
+                    selected
+                        ? scheme.primary.withValues(alpha: .30)
+                        : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: () => onTabSelected(item.branchIndex),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          item.icon,
+                          color: selected ? Colors.white : Colors.white70,
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: selected ? Colors.white : Colors.white70,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            );
+          }),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .06),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white12),
             ),
-          );
-        }),
+            child: const Text(
+              'Good anime. Brighter days.',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

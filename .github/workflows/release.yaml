@@ -263,23 +263,23 @@ jobs:
           Source: "build\windows\x64\runner\release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
-          Name: "{group}\$appName"; Filename: "{app}\shonenx.exe"
-          Name: "{autodesktop}\$appName"; Filename: "{app}\shonenx.exe"; Tasks: desktopicon
+          Name: "{group}\$appName"; Filename: "{app}\AniDash.exe"
+          Name: "{autodesktop}\$appName"; Filename: "{app}\AniDash.exe"; Tasks: desktopicon
 
           [Run]
-          Filename: "{app}\shonenx.exe"; Description: "{cm:LaunchProgram,$appName}"; Flags: nowait postinstall skipifsilent
+          Filename: "{app}\AniDash.exe"; Description: "{cm:LaunchProgram,$appName}"; Flags: nowait postinstall skipifsilent
           "@
           $iss | Out-File -FilePath installer.iss -Encoding utf8
       - name: Compile Inno Setup
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
       - name: Create Portable Zip
-        run: Compress-Archive -Path build\windows\x64\runner\release\* -DestinationPath ShonenX-Windows-Portable.zip
+        run: Compress-Archive -Path build\windows\x64\runner\release\* -DestinationPath AniDash-Windows-Portable.zip
       - uses: actions/upload-artifact@v4
         with:
           name: windows-dist
           path: |
             build/windows/x64/installer/*.exe
-            ShonenX-Windows-Portable.zip
+            AniDash-Windows-Portable.zip
 
   publish-release:
     needs: [build-android, build-linux, build-windows]

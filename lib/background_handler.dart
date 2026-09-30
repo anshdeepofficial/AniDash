@@ -78,7 +78,7 @@ Future<bool> _checkForAppUpdate(Map<String, dynamic>? inputData) async {
     final response = await http
         .get(
           Uri.parse(
-            'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
+            'https://api.github.com/repos/anshdeepofficial1/AniDash/releases/latest',
           ),
           headers: const {
             'Accept': 'application/vnd.github.v3+json',

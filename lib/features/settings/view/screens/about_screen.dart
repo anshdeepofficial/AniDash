@@ -133,7 +133,7 @@ class AboutScreen extends StatelessWidget {
                   context,
                   icon: Iconsax.code,
                   title: 'Developer',
-                  content: 'anshdeepofficial',
+                  content: 'anshdeepofficial1',
                   subtitle:
                       'Passionate Flutter Developer (github.com/anshdeepofficial1)',
                 ),
@@ -331,7 +331,7 @@ class AboutScreen extends StatelessWidget {
                         child: InkWell(
                           onTap:
                               () => _launchUrl(
-                                'https://github.com/sponsors/anshdeepofficial',
+                                'https://github.com/sponsors/anshdeepofficial1',
                               ),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(
@@ -414,7 +414,7 @@ class AboutScreen extends StatelessWidget {
                 // Footer
                 Center(
                   child: Text(
-                    'Made with ❤️ by anshdeepofficial\n© 2026 AniDash',
+                    'Made with ❤️ by anshdeepofficial1\n© 2026 AniDash',
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurface.withValues(alpha: 0.6),

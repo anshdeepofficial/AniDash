@@ -1,14 +1,16 @@
-# AniDash v1.16.9 - Android Experience Polish
+# AniDash v1.17.0 — Everywhere Edition 🚀
 
-## What changed
-- Fixed adaptive app-logo light and dark choices and safely applies launcher changes on the next app start.
-- Guest profile taps now open the sign-in flow instead of doing nothing.
-- Continue Watching now shows episode number and title consistently and offers the correct next-episode action.
-- Movie cards use a compact `M` badge.
-- Hardware volume controls are restored when returning to the video player.
+## What’s new
+- 🖥️ Added a polished desktop navigation layout inspired by the AniDash desktop design while keeping the familiar AniDash experience.
+- 📱 iPad now keeps the same bottom navigation style as phones instead of moving controls to the left.
+- 🔔 Fixed the first-launch notification button so Android and Apple devices request the real system permission.
+- 🍎 Prepared wider iPhone and iPad support with a consistent AniDash name and bundle identity.
+- 🌐 Added a separate installable AniDash streaming PWA at `/watch` with search, SUB/DUB selection, episode lists, playback progress, and Continue Watching.
+- 👤 Updated official repository and developer references to `anshdeepofficial1`.
+- 🪟 Added AniDash Windows desktop and installer packaging.
 
-## Safety
-- Existing streaming and playback behavior was preserved.
-- Focused UI and unit checks were completed before the Android release build.
+## Playback safety
+- Existing native Android/iOS video-player code was not redesigned or replaced in this update.
+- Android static analysis and release compilation completed successfully.
 
-**Version:** 1.16.9 (106)
+**Version:** 1.17.0 (107)

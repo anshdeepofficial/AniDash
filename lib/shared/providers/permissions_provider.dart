@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:ani_dash/core/services/notification_service.dart';
 
 part 'permissions_provider.g.dart';
 
@@ -44,6 +45,15 @@ class Permissions extends _$Permissions {
   }
 
   Future<void> checkAll() async {
+    if (Platform.isIOS || Platform.isMacOS) {
+      state = state.copyWith(
+        notification: await Permission.notification.isGranted,
+        storage: true,
+        photos: true,
+        videos: true,
+      );
+      return;
+    }
     if (!Platform.isAndroid) {
       state = state.copyWith(
         notification: true,
@@ -64,8 +74,11 @@ class Permissions extends _$Permissions {
   }
 
   Future<bool> requestNotificationPermission() async {
-    if (state.notification || !Platform.isAndroid) return true;
-    final granted = await _request(Permission.notification);
+    if (state.notification) return true;
+    if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
+      return true;
+    }
+    final granted = await NotificationService().requestSystemPermission();
     state = state.copyWith(notification: granted);
     return granted;
   }

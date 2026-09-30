@@ -59,6 +59,31 @@ class NotificationService {
       StreamController<String>.broadcast();
   Stream<String> get onNotificationRoute => notificationRouteController.stream;
 
+  Future<bool> requestSystemPermission() async {
+    if (Platform.isAndroid) {
+      final android =
+          flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+      return await android?.requestNotificationsPermission() ?? true;
+    }
+    if (Platform.isIOS || Platform.isMacOS) {
+      final darwin =
+          flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin
+              >();
+      return await darwin?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ??
+          false;
+    }
+    return true;
+  }
+
   Future<void> registerPeriodicNotificationWorker({
     bool forceReplace = true,
   }) async {
@@ -196,6 +221,13 @@ class NotificationService {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings(_iconName);
 
+    const DarwinInitializationSettings initializationSettingsDarwin =
+        DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        );
+
     const LinuxInitializationSettings initializationSettingsLinux =
         LinuxInitializationSettings(defaultActionName: 'Open notification');
 
@@ -209,6 +241,8 @@ class NotificationService {
     const InitializationSettings initializationSettings =
         InitializationSettings(
           android: initializationSettingsAndroid,
+          iOS: initializationSettingsDarwin,
+          macOS: initializationSettingsDarwin,
           linux: initializationSettingsLinux,
           windows: initializationSettingsWindows,
         );

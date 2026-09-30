@@ -1,5 +1,8 @@
 {
   "outputDirectory": "website",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/watch", "destination": "/watch/index.html" }
+  ]
 }

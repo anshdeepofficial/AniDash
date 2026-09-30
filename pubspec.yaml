@@ -3,11 +3,11 @@ name: ani_dash
 description: >
   🚀 AniDash is a blazing-fast, modern, and user-friendly anime streaming app built with Flutter.
   Stream your favorite anime, keep track of your watch progress, and explore trending shows —
-  all in one place. Built with ❤️ by anshdeepofficial.
+  all in one place. Built with ❤️ by anshdeepofficial1.
 
 publish_to: "none"
 
-version: 1.16.9+106
+version: 1.17.0+107
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -127,9 +127,9 @@ inno_bundle:
   id: 0516d984-72bf-47d4-bfbc-b2b8fd563479
   publisher: Anshdeep Singh
   name: AniDash
-  url: https://github.com/anshdeepofficial/AniDash
-  support_url: https://github.com/anshdeepofficial/AniDash/issues
-  updates_url: https://github.com/anshdeepofficial/AniDash/releases
+  url: https://github.com/anshdeepofficial1/AniDash
+  support_url: https://github.com/anshdeepofficial1/AniDash/issues
+  updates_url: https://github.com/anshdeepofficial1/AniDash/releases
   languages:
     - english
   admin: false

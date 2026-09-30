@@ -40,7 +40,10 @@ class SettingsScreen extends ConsumerWidget {
                   onTap: () => context.push('/settings/account'),
                 ),
                 NormalSettingsItem(
-                  icon: Icon(Icons.security_rounded, color: colorScheme.primary),
+                  icon: Icon(
+                    Icons.security_rounded,
+                    color: colorScheme.primary,
+                  ),
                   accent: colorScheme.primary,
                   title: 'Security & Privacy',
                   description: 'App lock, adult hub lock, screenshot privacy',
@@ -83,12 +86,13 @@ class SettingsScreen extends ConsumerWidget {
                   accent: colorScheme.primary,
                   title: 'Data & Storage',
                   description: 'Clear cache, backup & restore',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const DataSettingsScreen(),
-                    ),
-                  ),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DataSettingsScreen(),
+                        ),
+                      ),
                 ),
                 NormalSettingsItem(
                   icon: Icon(
@@ -134,12 +138,13 @@ class SettingsScreen extends ConsumerWidget {
                   accent: colorScheme.primary,
                   title: 'Home Layout',
                   description: 'Customize home screen sections',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeSettingsScreen(),
-                    ),
-                  ),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomeSettingsScreen(),
+                        ),
+                      ),
                 ),
                 NormalSettingsItem(
                   icon: Icon(Iconsax.mobile, color: colorScheme.primary),
@@ -161,20 +166,24 @@ class SettingsScreen extends ConsumerWidget {
                   accent: const Color(0xFFFFDD00),
                   title: 'Buy Me a Coffee',
                   description: 'Support the developer directly',
-                  onTap: () => launchUrl(
+                  onTap:
+                      () => launchUrl(
                     Uri.parse('https://buymeacoffee.com/anshdeepofficial'),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                        mode: LaunchMode.externalApplication,
+                      ),
                 ),
                 NormalSettingsItem(
                   icon: const Icon(Iconsax.heart, color: Color(0xFFEA4AAA)),
                   accent: const Color(0xFFEA4AAA),
                   title: 'GitHub Sponsors',
                   description: 'Sponsor the development on GitHub',
-                  onTap: () => launchUrl(
-                    Uri.parse('https://github.com/sponsors/anshdeepofficial'),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  onTap:
+                      () => launchUrl(
+                        Uri.parse(
+                          'https://github.com/sponsors/anshdeepofficial1',
+                        ),
+                        mode: LaunchMode.externalApplication,
+                      ),
                 ),
                 NormalSettingsItem(
                   icon: Icon(Iconsax.info_circle, color: colorScheme.primary),

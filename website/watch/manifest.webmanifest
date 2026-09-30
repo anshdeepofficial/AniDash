@@ -1,0 +1,15 @@
+{
+  "id": "/watch/",
+  "name": "AniDash Streaming",
+  "short_name": "AniDash",
+  "description": "Discover and stream anime from your Home Screen.",
+  "start_url": "/watch/",
+  "scope": "/watch/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090b0a",
+  "theme_color": "#0b1210",
+  "icons": [
+    {"src":"/assets/anidash_logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

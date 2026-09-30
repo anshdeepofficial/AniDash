@@ -31,7 +31,7 @@ class UpdateService {
     try {
       final response = await _httpClient.get(
         Uri.parse(
-          'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
+          'https://api.github.com/repos/anshdeepofficial1/AniDash/releases/latest',
         ),
       );
 
