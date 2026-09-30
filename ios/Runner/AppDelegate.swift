@@ -1,6 +1,7 @@
 import AVFoundation
 import Flutter
 import MediaPlayer
+import Photos
 import UIKit
 import workmanager
 
@@ -47,6 +48,7 @@ import workmanager
     configureSecurityChannel(controller.binaryMessenger)
     configureMediaControls(controller.binaryMessenger)
     configureBackgroundExecution(controller.binaryMessenger)
+    configurePhotoLibrary(controller.binaryMessenger)
     observeAudioSession()
     observeScreenCapture()
     return launched
@@ -150,6 +152,118 @@ import workmanager
   }
 
 
+
+
+  private func configurePhotoLibrary(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "anidash/photo_library",
+      binaryMessenger: messenger
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "saveImage" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard
+        let args = call.arguments as? [String: Any],
+        let path = args["path"] as? String,
+        !path.isEmpty
+      else {
+        result(
+          FlutterError(
+            code: "INVALID_PATH",
+            message: "Image path is missing.",
+            details: nil
+          )
+        )
+        return
+      }
+
+      let fileURL = URL(fileURLWithPath: path)
+      guard FileManager.default.fileExists(atPath: fileURL.path) else {
+        result(
+          FlutterError(
+            code: "FILE_NOT_FOUND",
+            message: "The downloaded poster file does not exist.",
+            details: nil
+          )
+        )
+        return
+      }
+
+      let save: () -> Void = {
+        PHPhotoLibrary.shared().performChanges({
+          PHAssetChangeRequest.creationRequestForAssetFromImage(
+            atFileURL: fileURL
+          )
+        }) { success, error in
+          DispatchQueue.main.async {
+            if success {
+              result(true)
+            } else {
+              result(
+                FlutterError(
+                  code: "PHOTO_SAVE_FAILED",
+                  message: error?.localizedDescription
+                    ?? "iOS could not save the image to Photos.",
+                  details: nil
+                )
+              )
+            }
+          }
+        }
+      }
+
+      let handleStatus: (PHAuthorizationStatus) -> Void = { status in
+        switch status {
+        case .authorized, .limited:
+          save()
+        case .denied, .restricted:
+          DispatchQueue.main.async {
+            result(
+              FlutterError(
+                code: "PHOTO_PERMISSION_DENIED",
+                message: "Allow AniDash to add photos in iOS Settings.",
+                details: nil
+              )
+            )
+          }
+        case .notDetermined:
+          break
+        @unknown default:
+          DispatchQueue.main.async {
+            result(
+              FlutterError(
+                code: "PHOTO_PERMISSION_UNKNOWN",
+                message: "Photo permission is unavailable.",
+                details: nil
+              )
+            )
+          }
+        }
+      }
+
+      if #available(iOS 14.0, *) {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        if status == .notDetermined {
+          PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+            handleStatus(newStatus)
+          }
+        } else {
+          handleStatus(status)
+        }
+      } else {
+        let status = PHPhotoLibrary.authorizationStatus()
+        if status == .notDetermined {
+          PHPhotoLibrary.requestAuthorization { newStatus in
+            handleStatus(newStatus)
+          }
+        } else {
+          handleStatus(status)
+        }
+      }
+    }
+  }
 
   private func configureBackgroundExecution(_ messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
