@@ -1,65 +1,54 @@
-# AniDash iOS / iPadOS Port Plan
+# AniDash iOS / iPadOS Port Status
 
-This file tracks the iOS-only work for AniDash. Android files must remain untouched while this port is prepared.
+Android behavior must remain unchanged. iOS-specific work is isolated behind iOS configuration or platform checks.
 
-## Current goal
+## Completed
 
-Prepare the existing Flutter iOS runner so AniDash can be built and tested on iPhone and iPad without changing the Android app.
+- iOS display name renamed from ShonenX to AniDash.
+- Production bundle identifier set to `com.anshdeepofficial1.anidash`.
+- RunnerTests bundle identifier updated.
+- iOS deployment target aligned to iOS 13.0 across Flutter framework and Xcode configurations.
+- One universal target remains enabled for iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`).
+- `anidash://` URL scheme registered for OAuth/deep-link callbacks.
+- CocoaPods `Podfile` added for Flutter plugin integration.
+- iOS entitlements file added and linked to Debug, Release and Profile Runner configurations.
+- Audio session configured for video/media playback.
+- Background Audio/AirPlay/Picture-in-Picture prerequisite enabled through the `audio` background mode.
+- iOS local notifications are initialized and notification permission is requested correctly.
+- Shared permission state now reflects actual iOS notification authorization.
+- Downloads already use the app sandbox through `getApplicationSupportDirectory()/AniDash`; Android storage paths are not used on iOS.
+- Android-only Aniyomi extensions remain Android-only. Non-Android platforms continue to use the portable Mangayomi/Dart extension path.
+- iOS self-update no longer attempts APK installation; the update action opens the latest AniDash release externally.
+- GitHub Actions macOS iOS build validation added.
 
-## Changes already started
+## Requires real-device validation
 
-- Rename iOS app metadata from ShonenX to AniDash.
-- Add `anidash://` as the iOS deep-link scheme for future OAuth redirects.
-- Raise the Flutter iOS framework minimum OS version to iOS 13.0.
+These cannot be considered verified until a signed build is run on an iPhone/iPad:
 
-## Next iOS-only batches
+- Hardware video decoding and all streaming providers.
+- Picture in Picture behavior with the current media_kit texture/player path.
+- Background playback transitions and lock-screen behavior.
+- Long-running/background episode downloads.
+- OAuth callbacks for each configured tracker provider.
+- Notification presentation/tap behavior.
+- iPad portrait, landscape, Split View and Stage Manager layouts.
 
-### 1. Xcode project identity
+## Distribution work
 
-- Update the iOS Runner bundle identifier from the old ShonenX value to an AniDash value.
-- Recommended production bundle identifier: `com.anshdeepofficial1.anidash`.
-- Keep one universal target for both iPhone and iPad.
+Before App Store/TestFlight distribution:
 
-### 2. Build compatibility
+- Register `com.anshdeepofficial1.anidash` in the Apple Developer account.
+- Configure signing team/certificates/provisioning in Xcode or CI secrets.
+- Create the App Store Connect app record.
+- Replace the temporary iOS update destination with the App Store product URL after an App Store ID exists.
+- Review third-party streaming/content-source behavior against App Store content and rights requirements.
 
-- Set the Runner iOS deployment target to at least iOS 13.0.
-- Confirm plugin compatibility with the Flutter SDK used by the repository.
-- Run `flutter pub get` and `pod install` from a macOS build environment.
+## Android protection
 
-### 3. iOS source support
+The iOS port does not change:
 
-- Keep Android-only Aniyomi/APK extension support disabled on iOS.
-- Use Dart/Mangayomi-style sources first because they are more portable to iOS.
-- Add platform guards wherever source code assumes Android-only extension behavior.
-
-### 4. Player support
-
-- Keep the current Flutter player UI.
-- Verify `media_kit` playback on iPhone and iPad.
-- Add an iOS-specific Picture-in-Picture implementation later; the current PiP controller is Android-only.
-
-### 5. Downloads
-
-- Save downloads inside the iOS app container.
-- Disable Android storage-permission assumptions on iOS.
-- Later evaluate native iOS background downloading if long episode downloads are required.
-
-### 6. Updates
-
-- Do not use APK self-update on iOS.
-- iOS updates should go through TestFlight/App Store.
-- The in-app update screen can show release notes and open the App Store/TestFlight page later.
-
-### 7. iPad UI pass
-
-- Keep the phone layout on narrow screens.
-- Add a wider iPad layout with sidebar navigation and larger grids.
-- Test portrait, landscape, split view, and external keyboard/mouse behavior.
-
-## Do not touch in this port batch
-
-- `android/`
-- Android app package name
-- Android updater/APK install flow
-- Android extension bridge behavior
-- Existing Android release process
+- Android package identity.
+- Android APK updater/install flow.
+- Android Aniyomi extension behavior.
+- Android native activity/PiP implementation.
+- Existing Android release artifacts.
