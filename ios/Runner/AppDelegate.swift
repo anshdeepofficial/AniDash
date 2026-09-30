@@ -16,6 +16,7 @@ import workmanager
   private var privacyEnabled = false
   private var interruptionObserver: NSObjectProtocol?
   private var routeChangeObserver: NSObjectProtocol?
+  private var captureObserver: NSObjectProtocol?
 
   override func application(
     _ application: UIApplication,
@@ -47,6 +48,7 @@ import workmanager
     configureMediaControls(controller.binaryMessenger)
     configureBackgroundExecution(controller.binaryMessenger)
     observeAudioSession()
+    observeScreenCapture()
     return launched
   }
 
@@ -286,13 +288,31 @@ import workmanager
       case "setSecureFlag":
         let args = call.arguments as? [String: Any]
         self.privacyEnabled = args?["enable"] as? Bool ?? false
-        if !self.privacyEnabled {
-          self.removePrivacyCover()
-        }
+        self.updateCapturePrivacy()
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+
+  private func observeScreenCapture() {
+    captureObserver = NotificationCenter.default.addObserver(
+      forName: UIScreen.capturedDidChangeNotification,
+      object: UIScreen.main,
+      queue: .main
+    ) { [weak self] _ in
+      self?.updateCapturePrivacy()
+    }
+    updateCapturePrivacy()
+  }
+
+  private func updateCapturePrivacy() {
+    if privacyEnabled && UIScreen.main.isCaptured {
+      installPrivacyCover()
+    } else if UIApplication.shared.applicationState == .active {
+      removePrivacyCover()
     }
   }
 
@@ -317,7 +337,7 @@ import workmanager
   }
 
   override func applicationDidBecomeActive(_ application: UIApplication) {
-    removePrivacyCover()
+    updateCapturePrivacy()
     configureAudioSession()
     super.applicationDidBecomeActive(application)
   }
@@ -328,6 +348,9 @@ import workmanager
     }
     if let routeChangeObserver {
       NotificationCenter.default.removeObserver(routeChangeObserver)
+    }
+    if let captureObserver {
+      NotificationCenter.default.removeObserver(captureObserver)
     }
     for (command, target) in remoteCommandTargets {
       command.removeTarget(target)
