@@ -302,10 +302,7 @@ jobs:
         run: |
           VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
           TAG="v$VERSION"
-          NOTES_FILE="release_notes_v${VERSION}.md"
-          if [ ! -f "$NOTES_FILE" ]; then
-            NOTES_FILE="release_notes.md"
-          fi
+          NOTES_FILE="release_notes.md"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
