@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:screenshot/screenshot.dart';
@@ -50,10 +52,17 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _wasPlayingBeforeLock = false;
   bool _isAppInBackground = false;
   int _savedPosBeforeLock = 0;
+  int _lastNowPlayingSecond = -1;
+  static const MethodChannel _iosMediaChannel =
+      MethodChannel('anidash/media_controls');
 
   @override
   void build() {
     WidgetsBinding.instance.addObserver(this);
+
+    if (Platform.isIOS) {
+      _iosMediaChannel.setMethodCallHandler(_handleIOSMediaCommand);
+    }
 
     _playbackActionSubscription = NotificationService().onPlaybackAction.listen(
       (action) {
@@ -78,6 +87,60 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     });
   }
 
+
+  Future<dynamic> _handleIOSMediaCommand(MethodCall call) async {
+    if (_isDisposed) return null;
+    final player = ref.read(playerStateProvider.notifier);
+    switch (call.method) {
+      case 'play':
+        await player.play();
+        break;
+      case 'pause':
+        await player.pause();
+        break;
+      case 'next':
+        await ref.read(episodeDataProvider.notifier).changeEpisode(null, by: 1);
+        break;
+      case 'prev':
+        await ref.read(episodeDataProvider.notifier).changeEpisode(null, by: -1);
+        break;
+      case 'seek':
+        final seconds =
+            (call.arguments is Map)
+                ? ((call.arguments as Map)['seconds'] as num?)?.toDouble()
+                : null;
+        if (seconds != null && seconds.isFinite) {
+          await player.seek(
+            Duration(milliseconds: (seconds.clamp(0, 86400) * 1000).round()),
+          );
+        }
+        break;
+    }
+    return null;
+  }
+
+  void _updateIOSNowPlaying(PlayerState playerState, {bool force = false}) {
+    if (!Platform.isIOS || _isDisposed || _animeName == null) return;
+    final second = playerState.position.inSeconds;
+    if (!force && second == _lastNowPlayingSecond) return;
+    _lastNowPlayingSecond = second;
+
+    unawaited(
+      _iosMediaChannel.invokeMethod<void>('updateNowPlaying', {
+        'animeTitle': _animeName!,
+        'episodeTitle':
+            (_epTitle?.trim().isNotEmpty ?? false)
+                ? _epTitle!.trim()
+                : 'Episode ${_epNum ?? ''}',
+        'episodeNumber': _epNum ?? 0,
+        'duration': playerState.duration.inMilliseconds / 1000.0,
+        'position': playerState.position.inMilliseconds / 1000.0,
+        'isPlaying': playerState.isPlaying,
+        'playbackRate': playerState.playbackSpeed,
+      }),
+    );
+  }
+
   Future<void> cleanup() async {
     if (_isDisposed) return;
     // Persist the last known position before the player is unloaded. Awaiting
@@ -89,6 +152,10 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _completedSubscription?.cancel();
     _playbackActionSubscription?.cancel();
     NotificationService().hidePlaybackNotification();
+    if (Platform.isIOS) {
+      _iosMediaChannel.setMethodCallHandler(null);
+      unawaited(_iosMediaChannel.invokeMethod<void>('clearNowPlaying'));
+    }
     AudioFocusService().reset();
     try {
       ref.read(playerStateProvider.notifier).setActiveSession(null, null);
@@ -195,6 +262,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _totalEps = episodes.length;
     _fromHentaiHub = fromHentaiHub;
     _malId = malId;
+    _lastNowPlayingSecond = -1;
 
     await ref
         .read(episodeListProvider.notifier)
@@ -440,10 +508,16 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         });
 
     ref.listen(playerStateProvider, (prev, next) {
-      if (_isDisposed || _isAppInBackground) return;
+      if (_isDisposed) return;
 
       _pos = next.position.inSeconds;
       _dur = next.duration.inSeconds;
+      _updateIOSNowPlaying(
+        next,
+        force: prev?.isPlaying != next.isPlaying || prev?.duration != next.duration,
+      );
+
+      if (_isAppInBackground) return;
 
       // `selectedEpisode` changes before the new stream is opened. Ignore the
       // previous episode's final position until the replacement open begins;
@@ -555,6 +629,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
           );
           _epTitle = epInfo.title;
           _epThumb = epInfo.thumbnail;
+          _lastNowPlayingSecond = -1;
+          _updateIOSNowPlaying(ref.read(playerStateProvider), force: true);
         } catch (_) {}
       }
     });
