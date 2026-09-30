@@ -9,6 +9,8 @@ import workmanager
   private var audioFocusChannel: FlutterMethodChannel?
   private var securityChannel: FlutterMethodChannel?
   private var mediaControlChannel: FlutterMethodChannel?
+  private var backgroundExecutionChannel: FlutterMethodChannel?
+  private var downloadBackgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
   private var privacyView: UIView?
   private var privacyEnabled = false
@@ -43,6 +45,7 @@ import workmanager
     configureAudioFocusChannel(controller.binaryMessenger)
     configureSecurityChannel(controller.binaryMessenger)
     configureMediaControls(controller.binaryMessenger)
+    configureBackgroundExecution(controller.binaryMessenger)
     observeAudioSession()
     return launched
   }
@@ -144,6 +147,53 @@ import workmanager
     }
   }
 
+
+
+  private func configureBackgroundExecution(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "anidash/background_execution",
+      binaryMessenger: messenger
+    )
+    backgroundExecutionChannel = channel
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else {
+        result(nil)
+        return
+      }
+      switch call.method {
+      case "beginDownload":
+        if self.downloadBackgroundTask == .invalid {
+          self.downloadBackgroundTask = UIApplication.shared.beginBackgroundTask(
+            withName: "AniDash active download"
+          ) { [weak self] in
+            guard let self else { return }
+            self.backgroundExecutionChannel?.invokeMethod(
+              "onBackgroundTimeExpired",
+              arguments: nil
+            )
+            self.endDownloadBackgroundTask()
+          }
+        }
+        result(self.downloadBackgroundTask == .invalid ? nil : self.downloadBackgroundTask.rawValue)
+
+      case "endDownload":
+        self.endDownloadBackgroundTask()
+        result(nil)
+
+      case "remainingTime":
+        result(UIApplication.shared.backgroundTimeRemaining)
+
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private func endDownloadBackgroundTask() {
+    guard downloadBackgroundTask != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(downloadBackgroundTask)
+    downloadBackgroundTask = .invalid
+  }
 
   private func configureMediaControls(_ messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
@@ -283,5 +333,6 @@ import workmanager
       command.removeTarget(target)
     }
     remoteCommandTargets.removeAll()
+    endDownloadBackgroundTask()
   }
 }
