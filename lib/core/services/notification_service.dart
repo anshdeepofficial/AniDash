@@ -512,6 +512,16 @@ class NotificationService {
     await ensureSoundChannelsCreated();
 
     final details = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_updates',
         channelName: 'App Updates',
@@ -551,6 +561,16 @@ class NotificationService {
     final styleInfo = BigTextStyleInformation(body, contentTitle: title);
 
     final platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_news',
         channelName: 'AniDash News',
@@ -597,6 +617,16 @@ class NotificationService {
         );
 
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: androidPlatformChannelSpecifics,
     );
 
@@ -634,6 +664,16 @@ class NotificationService {
         );
 
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: androidPlatformChannelSpecifics,
     );
 
@@ -697,6 +737,16 @@ class NotificationService {
     );
 
     final platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_episodes',
         channelName: 'Episode Releases',
@@ -722,16 +772,16 @@ class NotificationService {
     );
   }
 
-  /// Schedules exact Android alarms for upcoming episodes (24h, 2h, 1h, and exact release).
-  /// These alarms are registered directly with Android AlarmManager, so they wake up the device
-  /// and trigger notifications even if AniDash is closed or terminated.
+  /// Schedules upcoming episode alerts (24h, 2h, 1h, and exact release).
+  /// Android uses AlarmManager through flutter_local_notifications; iOS uses
+  /// native pending local notifications, so alerts can fire while AniDash is closed.
   Future<void> scheduleUpcomingEpisodeAlerts({
     required int mediaId,
     required String animeTitle,
     required int episodeNumber,
     required int airingAtEpoch,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!(Platform.isAndroid || Platform.isIOS)) return;
     if (!await _isCategoryEnabled('enableSubReleases')) return;
     if (await _prefersEnglishDub()) return;
     _setupTimeZone();
@@ -744,6 +794,16 @@ class NotificationService {
     final pref = await SharedPreferences.getInstance();
 
     final details = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_episodes',
         channelName: 'Episode Releases',
@@ -903,6 +963,16 @@ class NotificationService {
     final styleInfo = BigTextStyleInformation(body, contentTitle: title);
 
     final platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_reminders',
         channelName: 'Continue Watching Reminders',
@@ -956,6 +1026,16 @@ class NotificationService {
     );
 
     final details = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: _buildAndroidDetails(
         channelBaseId: 'AniDash_updates',
         channelName: 'App Updates',
@@ -1046,6 +1126,16 @@ class NotificationService {
         );
 
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
       android: androidPlatformChannelSpecifics,
     );
 
