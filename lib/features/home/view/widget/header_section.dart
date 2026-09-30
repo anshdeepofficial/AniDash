@@ -52,7 +52,12 @@ class HeaderSection extends ConsumerWidget {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => context.push('/settings/account/profile'),
+                  onTap:
+                      () => context.push(
+                        user != null
+                            ? '/settings/account/profile'
+                            : '/settings/account',
+                      ),
                   child: _UserAvatar(user: user, size: 48),
                 ),
                 const SizedBox(width: 14),

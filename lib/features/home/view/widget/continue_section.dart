@@ -109,6 +109,7 @@ class ContinueSection extends ConsumerWidget {
 
               final displayEp =
                   entry.episodesProgress[nextEpisodeNum] ?? currentEp;
+              String? listEpisodeTitle;
 
               double progressValue = 0.0;
               if (!isCurrentCompleted && currentEp != null) {
@@ -127,6 +128,7 @@ class ContinueSection extends ConsumerWidget {
                   if (episode.number == nextEpisodeNum &&
                       episode.thumbnail?.isNotEmpty == true) {
                     listThumbnail = episode.thumbnail;
+                    listEpisodeTitle = episode.title;
                     final cacheKey = '${entry.animeId}:$nextEpisodeNum';
                     _continueEpisodeThumbnailCache[cacheKey] = listThumbnail!;
                     _persistEpisodeThumbnail(
@@ -140,6 +142,17 @@ class ContinueSection extends ConsumerWidget {
                   }
                 }
               }
+              final savedEpisodeTitle = displayEp?.episodeTitle.trim() ?? '';
+              final resolvedEpisodeTitle =
+                  (listEpisodeTitle?.trim().isNotEmpty ?? false)
+                      ? listEpisodeTitle!.trim()
+                      : savedEpisodeTitle;
+              final episodeLabel =
+                  resolvedEpisodeTitle.isEmpty ||
+                          resolvedEpisodeTitle.toLowerCase() ==
+                              'episode $nextEpisodeNum'
+                      ? 'E$nextEpisodeNum'
+                      : 'E$nextEpisodeNum - $resolvedEpisodeTitle';
               final cachedThumbnail =
                   _continueEpisodeThumbnailCache['${entry.animeId}:$nextEpisodeNum'];
               final savedThumbnail =
@@ -339,19 +352,7 @@ class ContinueSection extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              isCurrentCompleted
-                                  ? (entry
-                                              .episodesProgress[nextEpisodeNum]
-                                              ?.episodeTitle
-                                              .isNotEmpty ==
-                                          true
-                                      ? entry
-                                          .episodesProgress[nextEpisodeNum]!
-                                          .episodeTitle
-                                      : 'Episode $nextEpisodeNum')
-                                  : (currentEp?.episodeTitle.isNotEmpty == true
-                                      ? currentEp!.episodeTitle
-                                      : 'Episode ${entry.currentEpisode}'),
+                              episodeLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: textTheme.bodySmall?.copyWith(
@@ -495,6 +496,40 @@ class ContinueSection extends ConsumerWidget {
                       context.push('/details', extra: entry.toUniversalMedia());
                     },
                   ),
+                  if (entry.totalEpisodes == 0 ||
+                      targetEpNum < entry.totalEpisodes)
+                    ListTile(
+                      leading: Icon(
+                        Iconsax.next,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text('Play Episode ${targetEpNum + 1}'),
+                      subtitle: const Text('Open the next episode'),
+                      onTap: () async {
+                        Navigator.pop(sheetContext);
+                        await providerAnimeMatchSearch(
+                          context: context,
+                          ref: ref,
+                          animeMedia: UniversalMedia(
+                            id: entry.animeId,
+                            title: UniversalTitle(
+                              romaji: entry.animeTitle,
+                              english: entry.animeTitle,
+                              native: entry.animeTitle,
+                            ),
+                            coverImage: UniversalCoverImage(
+                              large: entry.animeCover,
+                              medium: entry.animeCover,
+                            ),
+                            isAdult: isAdult || entry.isAdult,
+                          ),
+                          startAt: targetEpNum + 1,
+                          withAnimeMatch: true,
+                          directAutoMatch: true,
+                          fromHentaiHub: isAdult || entry.isAdult,
+                        );
+                      },
+                    ),
                   // 2. Mark as Watched
                   ListTile(
                     leading: const Icon(

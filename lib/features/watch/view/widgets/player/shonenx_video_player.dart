@@ -57,7 +57,8 @@ class AniDashVideoPlayer extends ConsumerStatefulWidget {
   ConsumerState<AniDashVideoPlayer> createState() => _AniDashVideoPlayerState();
 }
 
-class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
+class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
+    with WidgetsBindingObserver {
   final FocusNode _focusNode = FocusNode();
 
   // Local state for complex interactions that don't need to be global/persisted
@@ -81,6 +82,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.setVolumeKeyHandler(
         onVolumeUp: () => _handleHardwareVolumeKey(true),
@@ -124,6 +126,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _focusNode.dispose();
     _volumeOverlayTimer?.cancel();
     _doubleTapTimer?.cancel();
@@ -141,6 +144,18 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       windowManager.setFullScreen(false);
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        (Platform.isAndroid || Platform.isIOS)) {
+      UIHelper.setVolumeKeyHandler(
+        onVolumeUp: () => _handleHardwareVolumeKey(true),
+        onVolumeDown: () => _handleHardwareVolumeKey(false),
+      );
+      _activatePlayerVolumeControls();
+    }
   }
 
   void _handleHardwareVolumeKey(bool isUp) {

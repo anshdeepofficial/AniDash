@@ -5,7 +5,8 @@ import 'package:ani_dash/core/models/universal/universal_media.dart';
 
 String? animeSeasonBadge(UniversalMedia anime) {
   final format = anime.format?.toUpperCase() ?? '';
-  if (const {'MOVIE', 'OVA', 'ONA', 'SPECIAL', 'MUSIC'}.contains(format)) {
+  if (format == 'MOVIE') return 'M';
+  if (const {'OVA', 'ONA', 'SPECIAL', 'MUSIC'}.contains(format)) {
     return null;
   }
 
@@ -51,7 +52,7 @@ String? formatEpisodeText({
   // Movies are single playable titles, not one-episode series. Keep this
   // distinction visible everywhere the shared card metadata is used.
   if (isMovie) {
-    return compact ? '1 MOVIE' : '1 Movie';
+    return null;
   }
 
   if (currentProgress != null && currentProgress > 0) {

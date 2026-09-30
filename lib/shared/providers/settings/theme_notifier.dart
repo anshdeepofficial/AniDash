@@ -47,7 +47,8 @@ class ThemeSettingsNotifier extends Notifier<ThemeModel> {
   void updateSettings(ThemeModel Function(ThemeModel) updater) {
     state = updater(state);
     sharedPrefs.setString(_prefsKey, state.toJson());
-    _syncLauncherIcon(state.logoMode);
+    // Changing an Android launcher alias may recreate the current task.
+    // Persist now; build() applies the choice on the next cold app launch.
   }
 
   void _syncLauncherIcon(String mode) {

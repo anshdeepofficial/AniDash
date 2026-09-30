@@ -207,8 +207,8 @@ class MainActivity : FlutterFragmentActivity() {
                     return@setMethodCallHandler
                 }
                 val selected = when (call.argument<String>("mode")) {
-                    "white" -> "LauncherDark"
-                    "black" -> "LauncherLight"
+                    "dark", "white" -> "LauncherDark"
+                    "light", "black" -> "LauncherLight"
                     else -> "LauncherDynamic"
                 }
                 listOf("LauncherDynamic", "LauncherLight", "LauncherDark").forEach { alias ->

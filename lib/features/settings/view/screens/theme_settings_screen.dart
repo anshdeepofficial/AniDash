@@ -44,9 +44,10 @@ class ThemeSettingsScreen extends ConsumerWidget {
                     title: 'Adaptive App Logo',
                     description: 'Choose automatic, white, or black logo',
                     selectedValue:
-                        theme.logoMode == 'white'
+                        theme.logoMode == 'light' || theme.logoMode == 'black'
                             ? 1
-                            : theme.logoMode == 'black'
+                            : theme.logoMode == 'dark' ||
+                                theme.logoMode == 'white'
                             ? 2
                             : 0,
                     onValueChanged: (value) {
@@ -55,9 +56,9 @@ class ThemeSettingsScreen extends ConsumerWidget {
                         (prev) => prev.copyWith(
                           logoMode:
                               index == 1
-                                  ? 'white'
+                                  ? 'light'
                                   : index == 2
-                                  ? 'black'
+                                  ? 'dark'
                                   : 'dynamic',
                         ),
                       );
@@ -67,7 +68,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                       1: Icon(Icons.light_mode_rounded),
                       2: Icon(Icons.dark_mode_rounded),
                     },
-                    labels: const {0: 'Dynamic', 1: 'White', 2: 'Black'},
+                    labels: const {0: 'Dynamic', 1: 'Light', 2: 'Dark'},
                     icon: const Icon(Icons.apps_rounded),
                   ),
                   NormalSettingsItem(
@@ -130,10 +131,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                             _showColorSchemeSheet(context, ref, themeNotifier),
                   ),
                   ToggleableSettingsItem(
-                    icon: Icon(
-                      Iconsax.colorfilter,
-                      color: colorScheme.primary,
-                    ),
+                    icon: Icon(Iconsax.colorfilter, color: colorScheme.primary),
                     accent: colorScheme.primary,
                     title: 'AMOLED Pure Black',
                     description:
