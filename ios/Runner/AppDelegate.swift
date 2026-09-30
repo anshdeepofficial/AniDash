@@ -1,6 +1,7 @@
 import AVFoundation
 import Flutter
 import UIKit
+import workmanager
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -18,6 +19,18 @@ import UIKit
     configureAudioSession()
 
     GeneratedPluginRegistrant.register(with: self)
+
+    // Workmanager launches iOS background work in a separate Flutter engine.
+    // Re-register plugins there so SharedPreferences, notifications and secure
+    // storage used by AniDash background tasks remain available.
+    WorkmanagerPlugin.setPluginRegistrantCallback { registry in
+      GeneratedPluginRegistrant.register(with: registry)
+    }
+    WorkmanagerPlugin.registerPeriodicTask(
+      withIdentifier: "com.anidash.anime.notification_refresh",
+      frequency: NSNumber(value: 15 * 60)
+    )
+
     let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
     guard let controller = window?.rootViewController as? FlutterViewController else {
