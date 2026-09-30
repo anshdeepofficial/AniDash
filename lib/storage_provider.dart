@@ -16,7 +16,12 @@ class StorageProvider {
   }
 
   static Future<Directory?> getDefaultDirectory() async {
-    final dir = await getApplicationSupportDirectory();
+    // Keep Android/desktop storage behavior unchanged. On iOS, downloads belong
+    // in Documents so they survive normally and can be exposed through Files.
+    final dir =
+        Platform.isIOS
+            ? await getApplicationDocumentsDirectory()
+            : await getApplicationSupportDirectory();
     final directory = Directory(path.join(dir.path, 'AniDash'));
     await directory.create(recursive: true);
     return directory;
