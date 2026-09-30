@@ -82,3 +82,6 @@ dist
 repomix-output.xml
 *.iml~
 *.apk
+
+# Codex temporary attachments
+.codex-remote-attachments/
