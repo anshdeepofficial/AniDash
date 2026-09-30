@@ -260,9 +260,9 @@ import workmanager
       )
       return .success
     }
-    if let seekTarget {
-      remoteCommandTargets.append((commands.changePlaybackPositionCommand, seekTarget))
-    }
+    remoteCommandTargets.append(
+      (commands.changePlaybackPositionCommand, seekTarget)
+    )
   }
 
   private func addRemoteCommand(_ command: MPRemoteCommand, method: String) {
@@ -271,9 +271,7 @@ import workmanager
       self?.mediaControlChannel?.invokeMethod(method, arguments: nil)
       return .success
     }
-    if let target {
-      remoteCommandTargets.append((command, target))
-    }
+    remoteCommandTargets.append((command, target))
   }
 
   private func configureSecurityChannel(_ messenger: FlutterBinaryMessenger) {
