@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -67,7 +68,9 @@ class DownloadsNotifier extends _$DownloadsNotifier {
     final settings = ref.read(downloadSettingsProvider);
     String baseDir;
 
-    if (settings.useCustomPath && settings.customDownloadPath != null) {
+    if (!Platform.isIOS &&
+        settings.useCustomPath &&
+        settings.customDownloadPath != null) {
       baseDir = settings.customDownloadPath!;
     } else {
       final defaultDir = await StorageProvider.getDefaultDirectory();
