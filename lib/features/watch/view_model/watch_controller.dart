@@ -17,6 +17,7 @@ import 'package:ani_dash/features/watch/view_model/aniskip_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/episode_list_provider.dart';
 import 'package:ani_dash/features/watch/view_model/episode_stream_provider.dart';
 import 'package:ani_dash/features/watch/view_model/player/player_provider.dart';
+import 'package:ani_dash/features/watch/view_model/player/pip_controller.dart';
 import 'package:ani_dash/features/watch/view_model/watch_progress_notifier.dart';
 import 'package:ani_dash/features/watch/view_model/watch_sync_notifier.dart';
 import 'package:ani_dash/shared/providers/settings/player_notifier.dart';
@@ -51,6 +52,7 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
   bool _episodeTransitionInProgress = false;
   bool _wasPlayingBeforeLock = false;
   bool _isAppInBackground = false;
+  Timer? _iosBackgroundPauseTimer;
   int _savedPosBeforeLock = 0;
   int _lastNowPlayingSecond = -1;
   static const MethodChannel _iosMediaChannel =
@@ -149,6 +151,8 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     _isDisposed = true;
     _wasPlayingBeforeLock = false;
     _isAppInBackground = false;
+    _iosBackgroundPauseTimer?.cancel();
+    _iosBackgroundPauseTimer = null;
     _completedSubscription?.cancel();
     _playbackActionSubscription?.cancel();
     NotificationService().hidePlaybackNotification();
@@ -164,21 +168,53 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
+    // iOS briefly enters inactive for system overlays and during the transition
+    // into PiP. Waiting for paused/hidden avoids interrupting playback before
+    // AVPictureInPictureController can take ownership of the video frames.
+    final movedToBackground =
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        (!Platform.isIOS && state == AppLifecycleState.inactive);
+
+    if (movedToBackground) {
       _isAppInBackground = true;
       _savedPosBeforeLock = _pos;
       final isPlaying = ref.read(playerStateProvider).isPlaying;
+
       if (isPlaying && !_isDisposed) {
         _wasPlayingBeforeLock = true;
-        // Pause safely before hardware rendering surface detaches to keep MPV memory cache intact
-        ref.read(playerStateProvider.notifier).pause();
+
+        final iosPiPReady =
+            Platform.isIOS &&
+            ref.read(pipProvider.notifier).isPreparedForBackgroundPiP;
+
+        if (iosPiPReady) {
+          // Give native automatic PiP a short hand-off window. If iOS does not
+          // actually enter PiP (e.g. unsupported transition or screen lock),
+          // fall back to the old safe pause behavior.
+          _iosBackgroundPauseTimer?.cancel();
+          _iosBackgroundPauseTimer = Timer(
+            const Duration(milliseconds: 1200),
+            () {
+              if (_isDisposed || !_isAppInBackground) return;
+              if (!ref.read(pipProvider)) {
+                unawaited(ref.read(playerStateProvider.notifier).pause());
+              }
+            },
+          );
+        } else {
+          // Preserve the proven Android behavior and the iOS 13/14 fallback.
+          unawaited(ref.read(playerStateProvider.notifier).pause());
+        }
       }
+
       if (_savedPosBeforeLock > 0) {
-        _triggerSave(targetPos: _savedPosBeforeLock);
+        unawaited(_triggerSave(targetPos: _savedPosBeforeLock));
       }
     } else if (state == AppLifecycleState.resumed) {
+      _iosBackgroundPauseTimer?.cancel();
+      _iosBackgroundPauseTimer = null;
+
       if (_isDisposed || !AudioFocusService().isSessionActive) {
         _wasPlayingBeforeLock = false;
         _isAppInBackground = false;
