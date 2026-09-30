@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -263,7 +264,9 @@ class SecuritySettingsScreen extends ConsumerWidget {
                   accent: colorScheme.primary,
                   title: 'Recent Apps Privacy Blur',
                   description:
-                      'Blurs app content in Android app switcher preview thumbnail',
+                      Platform.isIOS
+                          ? 'Hides AniDash content in the iOS app switcher preview'
+                          : 'Blurs app content in Android app switcher preview thumbnail',
                   value: security.recentAppsPrivacy,
                   onChanged: notifier.toggleRecentAppsPrivacy,
                 ),
@@ -275,7 +278,9 @@ class SecuritySettingsScreen extends ConsumerWidget {
                   accent: colorScheme.primary,
                   title: 'Screenshot Privacy',
                   description:
-                      'Block screenshots & device screen capture. (Wi-Fi TV casting remains fully functional)',
+                      Platform.isIOS
+                          ? 'Hide AniDash while iOS screen recording or mirroring is active. iOS does not let apps pre-block a one-off screenshot.'
+                          : 'Block screenshots & device screen capture. (Wi-Fi TV casting remains fully functional)',
                   value: security.screenshotPrivacy,
                   onChanged: notifier.toggleScreenshotPrivacy,
                 ),
