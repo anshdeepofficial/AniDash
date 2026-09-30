@@ -26,7 +26,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.anshdeepofficial1.anidash.auth</string>
+			<string>com.anidash.anime.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>anidash</string>
