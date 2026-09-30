@@ -31,7 +31,9 @@ dependencies:
   dartotsu_extension_bridge:
     path: packages/dartotsu_extension_bridge
 
-  device_info_plus: ^12.4.0
+  # 12.4 calls an iOS 26-only NSProcessInfo selector; 12.3 includes current
+  # iPhone/iPad identifiers and compiles on the stable Xcode runner.
+  device_info_plus: 12.3.0
   dynamic_color: 1.7.0
   crypto: ^3.0.6
   encrypt: ^5.0.3
