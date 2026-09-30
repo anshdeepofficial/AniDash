@@ -334,11 +334,15 @@ class NotificationService {
               .resolvePlatformSpecificImplementation<
                 IOSFlutterLocalNotificationsPlugin
               >();
-      await iosPlugin?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      if (!Platform.isIOS ||
+          (await SharedPreferences.getInstance()).getBool('is_onboarded') ==
+              true) {
+        await iosPlugin?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
     }
     await reconcileScheduledReleaseAlerts();
   }
