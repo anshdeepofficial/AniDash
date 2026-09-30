@@ -108,6 +108,11 @@ class _UpdateDialogState extends State<UpdateDialog>
     } else if (Platform.isWindows) {
       final url = _effectiveApkUrl;
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else if (Platform.isIOS) {
+      await launchUrl(
+        Uri.parse('https://github.com/anshdeepofficial1/AniDash/releases/latest'),
+        mode: LaunchMode.externalApplication,
+      );
     }
   }
 
@@ -430,11 +435,15 @@ class _UpdateDialogState extends State<UpdateDialog>
                       icon: Icon(
                         isLinux
                             ? Icons.content_copy_rounded
+                            : Platform.isIOS
+                            ? Icons.open_in_new_rounded
                             : Icons.download_rounded,
                       ),
                       label: Text(
                         isLinux
                             ? 'Copy Command'
+                            : Platform.isIOS
+                            ? 'View Release'
                             : (_downloading
                                 ? 'Downloading...'
                                 : (_downloadedApkPath != null
