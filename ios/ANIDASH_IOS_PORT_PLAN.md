@@ -5,7 +5,7 @@ Android behavior must remain unchanged. iOS-specific work is isolated behind iOS
 ## Completed
 
 - iOS display name renamed from ShonenX to AniDash.
-- Production bundle identifier set to `com.anshdeepofficial1.anidash`.
+- Production bundle identifier set to `com.anidash.anime`.
 - RunnerTests bundle identifier updated.
 - iOS deployment target aligned to iOS 13.0 across Flutter framework and Xcode configurations.
 - One universal target remains enabled for iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`).
@@ -37,7 +37,7 @@ These cannot be considered verified until a signed build is run on an iPhone/iPa
 
 Before App Store/TestFlight distribution:
 
-- Register `com.anshdeepofficial1.anidash` in the Apple Developer account.
+- Register `com.anidash.anime` in the Apple Developer account.
 - Configure signing team/certificates/provisioning in Xcode or CI secrets.
 - Create the App Store Connect app record.
 - Replace the temporary iOS update destination with the App Store product URL after an App Store ID exists.
