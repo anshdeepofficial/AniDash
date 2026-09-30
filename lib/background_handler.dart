@@ -28,7 +28,8 @@ void callbackDispatcher() {
         return await SyncTrackingTask.performSync(inputData);
       }
       if (task == NotificationService.notificationCheckTask ||
-          task == NotificationService.notificationBootstrapTask) {
+          task == NotificationService.notificationBootstrapTask ||
+          task == NotificationService.iosNotificationRefreshTask) {
         final releaseResult = await EpisodeReleaseTask.performCheck();
         final newsResult = await NewsBackgroundTask.performUpdate();
         final prefs = await SharedPreferences.getInstance();
