@@ -26,7 +26,19 @@ class ExtensionManager extends GetxController {
   void initialize() {
     final settings = isar.bridgeSettings.getSync(26)!;
     final savedType = ExtensionType.fromString(settings.currentManager);
-    _currentManager = savedType.getManager().obs;
+    // A database restored from Android can remember AniYomi. iOS/macOS cannot
+    // register the Android APK bridge, so never resolve an unsupported manager.
+    final supported = getSupportedExtensions;
+    final initialType =
+        supported.contains(savedType) ? savedType : supported.first;
+    _currentManager = initialType.getManager().obs;
+    if (initialType != savedType) {
+      isar.writeTxnSync(() {
+        isar.bridgeSettings.putSync(
+          settings..currentManager = initialType.toString(),
+        );
+      });
+    }
   }
 
   void setCurrentManager(ExtensionType type) {
