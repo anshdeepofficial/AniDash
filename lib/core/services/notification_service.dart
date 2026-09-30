@@ -40,6 +40,8 @@ class NotificationService {
   NotificationService._internal();
 
   static const notificationCheckTask = 'anidash_notification_check';
+  static const iosNotificationRefreshTask =
+      'com.anidash.anime.notification_refresh';
   static const notificationBootstrapTask =
       'anidash_notification_check_bootstrap';
   static const notificationWorkerTag = 'anidash_notifications';
@@ -62,8 +64,33 @@ class NotificationService {
   Future<void> registerPeriodicNotificationWorker({
     bool forceReplace = true,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!(Platform.isAndroid || Platform.isIOS)) return;
     try {
+      if (Platform.isIOS) {
+        // Workmanager 0.7 uses BGTaskScheduler for periodic work on iOS 13+.
+        // The native frequency is registered in AppDelegate; iOS ultimately
+        // decides the actual run time based on device/app usage.
+        await Workmanager().registerPeriodicTask(
+          iosNotificationRefreshTask,
+          iosNotificationRefreshTask,
+          frequency: const Duration(minutes: 15),
+          initialDelay: const Duration(seconds: 10),
+          existingWorkPolicy:
+              forceReplace
+                  ? ExistingWorkPolicy.replace
+                  : ExistingWorkPolicy.keep,
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(
+          'notification_worker_registered_at',
+          DateTime.now().millisecondsSinceEpoch,
+        );
+        AppLogger.i(
+          '[NotificationWorker] Registered iOS BGAppRefresh task',
+        );
+        return;
+      }
+
       await Workmanager().registerPeriodicTask(
         notificationCheckTask,
         notificationCheckTask,
