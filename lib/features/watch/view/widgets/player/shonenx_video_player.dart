@@ -100,6 +100,13 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     // Restart auto-hide timer on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        if (Platform.isIOS) {
+          ref
+              .read(pipProvider.notifier)
+              .attachIOSVideoController(
+                ref.read(playerStateProvider.notifier).videoController,
+              );
+        }
         _focusNode.requestFocus();
         ref.read(playerUIControllerProvider.notifier).restartHideTimer();
         final path = widget.localFilePath;
@@ -128,6 +135,9 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     _volumeOverlayTimer?.cancel();
     _doubleTapTimer?.cancel();
 
+    if (Platform.isIOS) {
+      unawaited(ref.read(pipProvider.notifier).detachIOSVideoController());
+    }
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
       UIHelper.removeVolumeKeyHandler();
@@ -540,6 +550,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
     final uiState = ref.watch(playerUIControllerProvider);
     final uiController = ref.watch(playerUIControllerProvider.notifier);
     final isPiP = ref.watch(pipProvider);
+    // Android PiP shrinks the Flutter Activity itself, so the compact Flutter
+    // overlay is useful there. iOS PiP renders through AVPictureInPictureController
+    // and provides native system controls instead.
+    final showEmbeddedPiPControls = Platform.isAndroid && isPiP;
 
     final episodeStreamState = ref.watch(
       episodeDataProvider.select((e) => e.states),
@@ -619,7 +633,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
               // Video Layer
               videoView,
 
-              if (isPiP)
+              if (showEmbeddedPiPControls)
                 const Positioned.fill(child: PiPControlsOverlay())
               else ...[
                 // Gesture Layer (Background)
