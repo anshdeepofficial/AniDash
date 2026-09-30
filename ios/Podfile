@@ -2,6 +2,34 @@ platform :ios, '13.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# The pinned media_kit_video revision keeps its iOS PiP implementation under
+# ios/Classes, while its podspec only compiles ios/media_kit_video/Sources.
+# Stage those upstream Swift files before CocoaPods evaluates the podspec.
+# This is intentionally iOS-only and does not alter Android playback code.
+require 'fileutils'
+
+media_kit_video_ios = File.expand_path(
+  File.join('.symlinks', 'plugins', 'media_kit_video', 'ios'),
+  __dir__,
+)
+media_kit_pip_source = File.join(media_kit_video_ios, 'Classes', 'plugin', 'pip')
+media_kit_pip_destination = File.join(
+  media_kit_video_ios,
+  'media_kit_video',
+  'Sources',
+  'media_kit_video',
+  'plugin',
+  'pip',
+)
+
+if Dir.exist?(media_kit_pip_source)
+  FileUtils.mkdir_p(media_kit_pip_destination)
+  FileUtils.cp_r(
+    Dir.glob(File.join(media_kit_pip_source, '*.swift')),
+    media_kit_pip_destination,
+  )
+end
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,

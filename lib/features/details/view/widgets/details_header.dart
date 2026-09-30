@@ -251,7 +251,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
             'path': file.path,
           });
           if (saved != true) {
-            throw const PlatformException(
+            throw PlatformException(
               code: 'PHOTO_SAVE_FAILED',
               message: 'iOS did not confirm that the poster was saved.',
             );
