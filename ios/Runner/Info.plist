@@ -37,6 +37,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>AniDash uses Face ID to securely unlock your protected app data.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AniDash needs permission to save anime posters to your Photos library.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>
