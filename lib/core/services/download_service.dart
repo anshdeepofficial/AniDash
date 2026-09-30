@@ -8,6 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:path/path.dart' as p;
@@ -21,7 +22,7 @@ import 'package:ani_dash/shared/providers/settings/download_settings_notifier.da
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/storage_provider.dart';
 
-class DownloadService {
+class DownloadService with WidgetsBindingObserver {
   final Ref ref;
   final DownloadsNotifier _notifier;
   int get _maxConcurrent => _settings.parallelDownloads.clamp(1, 10);
@@ -43,6 +44,7 @@ class DownloadService {
 
   DownloadService(this.ref, this._notifier) {
     if (Platform.isIOS) {
+      WidgetsBinding.instance.addObserver(this);
       _iosBackgroundChannel.setMethodCallHandler(_handleIOSBackgroundCall);
     }
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
@@ -69,7 +71,11 @@ class DownloadService {
     for (final item in items) {
       _ports[item.id]?.send('cancel');
       _isolates[item.id]?.kill(priority: Isolate.immediate);
-      _cleanup(item.id, releaseBackgroundTask: false);
+      _cleanup(
+        item.id,
+        releaseBackgroundTask: false,
+        processQueue: false,
+      );
       _notifier.updateDownloadState(
         item.copyWith(
           state: DownloadStatus.paused,
@@ -337,7 +343,11 @@ class DownloadService {
     }
   }
 
-  void _cleanup(String id, {bool releaseBackgroundTask = true}) {
+  void _cleanup(
+    String id, {
+    bool releaseBackgroundTask = true,
+    bool processQueue = true,
+  }) {
     _isolates.remove(id);
     _ports.remove(id);
     _receiveSubscriptions.remove(id)?.cancel();
@@ -345,9 +355,17 @@ class DownloadService {
     _activeItems.remove(id);
     _lastProgressNotification.remove(id);
     _lastNotifiedPercent.remove(id);
-    _processQueue();
+    if (processQueue) _processQueue();
     if (releaseBackgroundTask && _isolates.isEmpty && _queue.isEmpty) {
       unawaited(_endIOSBackgroundExecution());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!Platform.isIOS || state != AppLifecycleState.resumed) return;
+    if (_queue.isNotEmpty) {
+      unawaited(_beginIOSBackgroundExecution().then((_) => _processQueue()));
     }
   }
 
@@ -369,6 +387,7 @@ class DownloadService {
     _receivePorts.clear();
     _activeItems.clear();
     if (Platform.isIOS) {
+      WidgetsBinding.instance.removeObserver(this);
       _iosBackgroundChannel.setMethodCallHandler(null);
       unawaited(_endIOSBackgroundExecution());
     }
