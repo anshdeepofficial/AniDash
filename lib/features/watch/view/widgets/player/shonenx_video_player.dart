@@ -592,6 +592,10 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer> {
       wakelock: true,
       filterQuality: kDebugMode ? FilterQuality.none : FilterQuality.low,
       controls: NoVideoControls,
+      // Native iOS PiP needs the libmpv player to remain alive while Flutter
+      // moves to the background. Android keeps its existing lifecycle behavior.
+      pauseUponEnteringBackgroundMode: !Platform.isIOS,
+      resumeUponEnteringForegroundMode: false,
       subtitleViewConfiguration: const SubtitleViewConfiguration(
         visible: false,
       ),
