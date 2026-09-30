@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:path/path.dart' as p;
@@ -30,6 +31,10 @@ class DownloadService {
   final Map<String, SendPort> _ports = {};
   final Map<String, ReceivePort> _receivePorts = {};
   final Map<String, StreamSubscription<dynamic>> _receiveSubscriptions = {};
+  final Map<String, DownloadItem> _activeItems = {};
+  static const MethodChannel _iosBackgroundChannel =
+      MethodChannel('anidash/background_execution');
+  bool _iosBackgroundTaskActive = false;
   final Map<String, DownloadItem> _waitingForWifi = {};
   final Map<String, DateTime> _lastProgressNotification = {};
   final Map<String, int> _lastNotifiedPercent = {};
@@ -37,6 +42,9 @@ class DownloadService {
   Timer? _networkRetryTimer;
 
   DownloadService(this.ref, this._notifier) {
+    if (Platform.isIOS) {
+      _iosBackgroundChannel.setMethodCallHandler(_handleIOSBackgroundCall);
+    }
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       r,
     ) async {
@@ -51,7 +59,48 @@ class DownloadService {
         unawaited(startDownload(item));
       }
     });
+
     ref.onDispose(dispose);
+  }
+
+  Future<dynamic> _handleIOSBackgroundCall(MethodCall call) async {
+    if (call.method != 'onBackgroundTimeExpired') return null;
+    final items = _activeItems.values.toList(growable: false);
+    for (final item in items) {
+      _ports[item.id]?.send('cancel');
+      _isolates[item.id]?.kill(priority: Isolate.immediate);
+      _cleanup(item.id, releaseBackgroundTask: false);
+      _notifier.updateDownloadState(
+        item.copyWith(
+          state: DownloadStatus.paused,
+          error: 'Paused by iOS after background execution time expired',
+        ),
+      );
+    }
+    _iosBackgroundTaskActive = false;
+    return null;
+  }
+
+  Future<void> _beginIOSBackgroundExecution() async {
+    if (!Platform.isIOS || _iosBackgroundTaskActive) return;
+    try {
+      final token = await _iosBackgroundChannel.invokeMethod<int>(
+        'beginDownload',
+      );
+      _iosBackgroundTaskActive = token != null;
+    } catch (e) {
+      AppLogger.w('Could not request iOS background download time: $e');
+    }
+  }
+
+  Future<void> _endIOSBackgroundExecution() async {
+    if (!Platform.isIOS || !_iosBackgroundTaskActive) return;
+    _iosBackgroundTaskActive = false;
+    try {
+      await _iosBackgroundChannel.invokeMethod<void>('endDownload');
+    } catch (e) {
+      AppLogger.d('Could not end iOS background task cleanly: $e');
+    }
   }
 
   DownloadSettingsModel get _settings => ref.read(downloadSettingsProvider);
@@ -190,6 +239,7 @@ class DownloadService {
         !_isolates.containsKey(queuedItem.id)) {
       _queue.add(queuedItem);
     }
+    await _beginIOSBackgroundExecution();
     _processQueue();
   }
 
@@ -229,6 +279,7 @@ class DownloadService {
   }
 
   Future<void> _spawnIsolate(DownloadItem item) async {
+    _activeItems[item.id] = item;
     final receivePort = ReceivePort();
     _receivePorts[item.id] = receivePort;
     _notifier.updateDownloadState(
@@ -248,6 +299,7 @@ class DownloadService {
         if (msg is SendPort) {
           _ports[item.id] = msg;
         } else if (msg is DownloadItem) {
+          _activeItems[item.id] = msg;
           _notifier.updateDownloadState(msg);
           final notifId = item.id.hashCode;
           if (msg.state == DownloadStatus.downloaded) {
@@ -285,14 +337,18 @@ class DownloadService {
     }
   }
 
-  void _cleanup(String id) {
+  void _cleanup(String id, {bool releaseBackgroundTask = true}) {
     _isolates.remove(id);
     _ports.remove(id);
     _receiveSubscriptions.remove(id)?.cancel();
     _receivePorts.remove(id)?.close();
+    _activeItems.remove(id);
     _lastProgressNotification.remove(id);
     _lastNotifiedPercent.remove(id);
     _processQueue();
+    if (releaseBackgroundTask && _isolates.isEmpty && _queue.isEmpty) {
+      unawaited(_endIOSBackgroundExecution());
+    }
   }
 
   void dispose() {
@@ -311,6 +367,11 @@ class DownloadService {
     _ports.clear();
     _receiveSubscriptions.clear();
     _receivePorts.clear();
+    _activeItems.clear();
+    if (Platform.isIOS) {
+      _iosBackgroundChannel.setMethodCallHandler(null);
+      unawaited(_endIOSBackgroundExecution());
+    }
   }
 
   void _fail(DownloadItem item, String reason) {
