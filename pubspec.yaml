@@ -129,9 +129,9 @@ inno_bundle:
   id: 0516d984-72bf-47d4-bfbc-b2b8fd563479
   publisher: Anshdeep Singh
   name: AniDash
-  url: https://github.com/anshdeepofficial/AniDash
-  support_url: https://github.com/anshdeepofficial/AniDash/issues
-  updates_url: https://github.com/anshdeepofficial/AniDash/releases
+  url: https://github.com/anshdeepofficial1/AniDash
+  support_url: https://github.com/anshdeepofficial1/AniDash/issues
+  updates_url: https://github.com/anshdeepofficial1/AniDash/releases
   languages:
     - english
   admin: false
