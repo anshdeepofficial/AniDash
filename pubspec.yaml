@@ -70,7 +70,13 @@ dependencies:
   logger: ^2.5.0
 
   media_kit: any
-  media_kit_video: any
+  # Pinned to the upstream iOS PiP implementation until media-kit publishes it.
+  # Exact commit avoids tracking a moving branch.
+  media_kit_video:
+    git:
+      url: https://github.com/media-kit/media-kit.git
+      ref: 1eac02c8dabdc2f7be62049fbc0848bbed17dae7
+      path: media_kit_video
   media_kit_libs_video: any
 
   package_info_plus: ^9.0.1
