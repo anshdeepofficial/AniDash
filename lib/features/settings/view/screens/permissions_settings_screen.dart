@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,8 +16,10 @@ class PermissionsSettingsScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Manage Permissions'),
-        content: const Text(
-          'Granted system permissions on Android can only be revoked from the device App Settings.',
+        content: Text(
+          Platform.isIOS
+              ? 'Notification permission can be changed from AniDash in the iOS Settings app.'
+              : 'Granted system permissions on Android can only be revoked from the device App Settings.',
         ),
         actions: [
           TextButton(
@@ -58,22 +61,23 @@ class PermissionsSettingsScreen extends ConsumerWidget {
               titleColor: colorScheme.primary,
               onTap: () {},
               children: [
-                ToggleableSettingsItem(
-                  icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
-                  accent: colorScheme.primary,
-                  title: 'Storage Access',
-                  description: 'Allow access to storage to download anime.',
-                  value: permissionsState.storage,
-                  onChanged: (val) async {
-                    if (val == false) {
-                      _promptRevoke(context);
-                      return;
-                    }
-                    await ref
-                        .read(permissionsProvider.notifier)
-                        .requestStoragePermission();
-                  },
-                ),
+                if (Platform.isAndroid)
+                  ToggleableSettingsItem(
+                    icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
+                    accent: colorScheme.primary,
+                    title: 'Storage Access',
+                    description: 'Allow access to storage to download anime.',
+                    value: permissionsState.storage,
+                    onChanged: (val) async {
+                      if (val == false) {
+                        _promptRevoke(context);
+                        return;
+                      }
+                      await ref
+                          .read(permissionsProvider.notifier)
+                          .requestStoragePermission();
+                    },
+                  ),
                 ToggleableSettingsItem(
                   icon: Icon(Iconsax.notification, color: colorScheme.primary),
                   accent: colorScheme.primary,
