@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -248,7 +249,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         body: OrientationBuilder(
           builder: (_, orientation) {
             final isPiP = ref.watch(pipProvider);
-            if (isPiP && _panelController.value > 0) {
+            final isEmbeddedPiP = Platform.isAndroid && isPiP;
+            if (isEmbeddedPiP && _panelController.value > 0) {
               _panelController.reset();
             }
 
@@ -258,7 +260,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
               screenshotController: _screenshotController,
             );
 
-            if (orientation == Orientation.landscape && !isPiP) {
+            if (orientation == Orientation.landscape && !isEmbeddedPiP) {
               return Row(
                 children: [
                   Expanded(child: player),
