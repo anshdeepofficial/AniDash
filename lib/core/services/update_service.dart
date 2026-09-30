@@ -31,7 +31,7 @@ class UpdateService {
     try {
       final response = await _httpClient.get(
         Uri.parse(
-          'https://api.github.com/repos/anshdeepofficial/AniDash/releases/latest',
+          'https://api.github.com/repos/anshdeepofficial1/AniDash/releases/latest',
         ),
       );
 
@@ -41,16 +41,28 @@ class UpdateService {
         final releaseNotes = data['body'] as String;
         final publishedAt = DateTime.parse(data['published_at']);
 
-        final assets = data['assets'] as List;
-        if (assets.isEmpty) return null;
+        final assets = (data['assets'] as List?) ?? const [];
+        final releasePage =
+            data['html_url']?.toString() ??
+            'https://github.com/anshdeepofficial1/AniDash/releases/latest';
 
-        final apkAsset = assets.firstWhere(
-          (asset) => asset['name'].toString().endsWith('.apk'),
-          orElse: () => null,
-        );
-        if (apkAsset == null) return null;
-        final downloadUrl = apkAsset['browser_download_url'] as String;
-        final digest = apkAsset['digest']?.toString();
+        dynamic apkAsset;
+        for (final asset in assets) {
+          if (asset['name'].toString().toLowerCase().endsWith('.apk')) {
+            apkAsset = asset;
+            break;
+          }
+        }
+
+        // Android requires an actual APK. iOS (and desktop fallbacks) should
+        // still discover the release even when no APK is applicable.
+        if (Platform.isAndroid && apkAsset == null) return null;
+        final downloadUrl =
+            Platform.isAndroid
+                ? apkAsset['browser_download_url'] as String
+                : releasePage;
+        final digest =
+            Platform.isAndroid ? apkAsset['digest']?.toString() : null;
 
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
