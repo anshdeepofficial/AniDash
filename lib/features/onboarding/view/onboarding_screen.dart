@@ -52,7 +52,7 @@ class _OnboardingBenefit extends StatelessWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _totalPages = Platform.isAndroid ? 9 : 8;
+  final int _totalPages = (Platform.isAndroid || Platform.isIOS) ? 9 : 8;
 
   @override
   void dispose() {
@@ -131,7 +131,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   _buildCardModeStep(context, ref),
                   _buildSpotlightModeStep(context, ref),
                   _buildHomeLayoutStep(context, ref),
-                  if (Platform.isAndroid) _buildPermissionsStep(context, ref),
+                  if (Platform.isAndroid || Platform.isIOS)
+                    _buildPermissionsStep(context, ref),
                   _buildUpdatesStep(context, ref),
                 ],
               ),
@@ -585,25 +586,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         _buildHeader(
           context,
           'Grant\nPermissions',
-          'Allow access to storage to download anime.',
+          Platform.isIOS
+              ? 'Allow notifications for episode releases and AniDash alerts.'
+              : 'Allow access to storage to download anime.',
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: ToggleableSettingsItem(
-            icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
-            accent: colorScheme.primary,
-            title: 'Storage Access',
-            description:
-                'Allow access to storage to download anime and support extensions.',
-            value: permissionsState.storage,
-            onChanged: (val) async {
-              if (val == false) return;
-              await ref
-                  .read(permissionsProvider.notifier)
-                  .requestStoragePermission();
-            },
+        if (Platform.isAndroid)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ToggleableSettingsItem(
+              icon: Icon(Iconsax.folder_open, color: colorScheme.primary),
+              accent: colorScheme.primary,
+              title: 'Storage Access',
+              description:
+                  'Allow access to storage to download anime and support extensions.',
+              value: permissionsState.storage,
+              onChanged: (val) async {
+                if (val == false) return;
+                await ref
+                    .read(permissionsProvider.notifier)
+                    .requestStoragePermission();
+              },
+            ),
           ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: ToggleableSettingsItem(
