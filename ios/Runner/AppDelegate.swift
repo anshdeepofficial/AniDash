@@ -215,9 +215,16 @@ import workmanager
       }
 
       let handleStatus: (PHAuthorizationStatus) -> Void = { status in
-        switch status {
-        case .authorized, .limited:
+        if status == .authorized {
           save()
+          return
+        }
+        if #available(iOS 14.0, *), status == .limited {
+          save()
+          return
+        }
+
+        switch status {
         case .denied, .restricted:
           DispatchQueue.main.async {
             result(
@@ -230,7 +237,7 @@ import workmanager
           }
         case .notDetermined:
           break
-        @unknown default:
+        default:
           DispatchQueue.main.async {
             result(
               FlutterError(
