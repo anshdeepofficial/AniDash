@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -234,28 +235,57 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
         );
       }
 
-      Directory? targetDir;
-      if (Platform.isAndroid) {
-        final picturesDir = Directory('/storage/emulated/0/Pictures/AniDash');
-        if (await picturesDir.exists()) {
-          targetDir = picturesDir;
-        } else {
-          try {
-            targetDir = await picturesDir.create(recursive: true);
-          } catch (_) {
-            targetDir = await getExternalStorageDirectory();
-          }
-        }
-      } else {
-        targetDir = await getApplicationDocumentsDirectory();
-      }
-
       final sanitizedTitle =
           animeTitle.replaceAll(RegExp(r'[^\w\s\.-]'), '_').trim();
       final fileName =
           '${sanitizedTitle}_poster_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final file = File('${targetDir!.path}/$fileName');
-      await file.writeAsBytes(response.bodyBytes);
+
+      String successMessage;
+      if (Platform.isIOS) {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes, flush: true);
+        try {
+          const channel = MethodChannel('anidash/photo_library');
+          final saved = await channel.invokeMethod<bool>('saveImage', {
+            'path': file.path,
+          });
+          if (saved != true) {
+            throw const PlatformException(
+              code: 'PHOTO_SAVE_FAILED',
+              message: 'iOS did not confirm that the poster was saved.',
+            );
+          }
+          successMessage = 'Poster saved to Photos';
+        } finally {
+          try {
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+        }
+      } else {
+        Directory? targetDir;
+        if (Platform.isAndroid) {
+          final picturesDir = Directory('/storage/emulated/0/Pictures/AniDash');
+          if (await picturesDir.exists()) {
+            targetDir = picturesDir;
+          } else {
+            try {
+              targetDir = await picturesDir.create(recursive: true);
+            } catch (_) {
+              targetDir = await getExternalStorageDirectory();
+            }
+          }
+        } else {
+          targetDir = await getApplicationDocumentsDirectory();
+        }
+
+        final file = File('${targetDir!.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes, flush: true);
+        successMessage =
+            Platform.isAndroid
+                ? 'Poster saved to Pictures/AniDash/$fileName'
+                : 'Poster saved to $fileName';
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -267,9 +297,7 @@ class _DetailsHeaderState extends ConsumerState<DetailsHeader> {
                   color: Colors.greenAccent,
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Text('Poster saved to Pictures/AniDash/$fileName'),
-                ),
+                Expanded(child: Text(successMessage)),
               ],
             ),
             backgroundColor: Colors.grey.shade900,
