@@ -1,5 +1,6 @@
 import AVFoundation
 import Flutter
+import MediaPlayer
 import UIKit
 import workmanager
 
@@ -7,6 +8,8 @@ import workmanager
 @objc class AppDelegate: FlutterAppDelegate {
   private var audioFocusChannel: FlutterMethodChannel?
   private var securityChannel: FlutterMethodChannel?
+  private var mediaControlChannel: FlutterMethodChannel?
+  private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
   private var privacyView: UIView?
   private var privacyEnabled = false
   private var interruptionObserver: NSObjectProtocol?
@@ -39,6 +42,7 @@ import workmanager
 
     configureAudioFocusChannel(controller.binaryMessenger)
     configureSecurityChannel(controller.binaryMessenger)
+    configureMediaControls(controller.binaryMessenger)
     observeAudioSession()
     return launched
   }
@@ -140,6 +144,86 @@ import workmanager
     }
   }
 
+
+  private func configureMediaControls(_ messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "anidash/media_controls",
+      binaryMessenger: messenger
+    )
+    mediaControlChannel = channel
+
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "updateNowPlaying":
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "INVALID_ARGS", message: "Missing now-playing data", details: nil))
+          return
+        }
+        let animeTitle = args["animeTitle"] as? String ?? "AniDash"
+        let episodeTitle = args["episodeTitle"] as? String ?? ""
+        let episodeNumber = args["episodeNumber"] as? Int ?? 0
+        let duration = args["duration"] as? Double ?? 0
+        let position = args["position"] as? Double ?? 0
+        let isPlaying = args["isPlaying"] as? Bool ?? false
+        let playbackRate = args["playbackRate"] as? Double ?? 1.0
+
+        var info: [String: Any] = [
+          MPMediaItemPropertyTitle: animeTitle,
+          MPMediaItemPropertyArtist:
+            episodeTitle.isEmpty ? "Episode \(episodeNumber)" : episodeTitle,
+          MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, position),
+          MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? playbackRate : 0.0,
+          MPNowPlayingInfoPropertyDefaultPlaybackRate: playbackRate,
+        ]
+        if duration > 0 {
+          info[MPMediaItemPropertyPlaybackDuration] = duration
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        result(nil)
+
+      case "clearNowPlaying":
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        result(nil)
+
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    let commands = MPRemoteCommandCenter.shared()
+    addRemoteCommand(commands.playCommand, method: "play")
+    addRemoteCommand(commands.pauseCommand, method: "pause")
+    addRemoteCommand(commands.nextTrackCommand, method: "next")
+    addRemoteCommand(commands.previousTrackCommand, method: "prev")
+
+    commands.changePlaybackPositionCommand.isEnabled = true
+    let seekTarget = commands.changePlaybackPositionCommand.addTarget {
+      [weak self] event in
+      guard let seekEvent = event as? MPChangePlaybackPositionCommandEvent else {
+        return .commandFailed
+      }
+      self?.mediaControlChannel?.invokeMethod(
+        "seek",
+        arguments: ["seconds": seekEvent.positionTime]
+      )
+      return .success
+    }
+    if let seekTarget {
+      remoteCommandTargets.append((commands.changePlaybackPositionCommand, seekTarget))
+    }
+  }
+
+  private func addRemoteCommand(_ command: MPRemoteCommand, method: String) {
+    command.isEnabled = true
+    let target = command.addTarget { [weak self] _ in
+      self?.mediaControlChannel?.invokeMethod(method, arguments: nil)
+      return .success
+    }
+    if let target {
+      remoteCommandTargets.append((command, target))
+    }
+  }
+
   private func configureSecurityChannel(_ messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "shonenx/security", binaryMessenger: messenger)
     securityChannel = channel
@@ -195,5 +279,9 @@ import workmanager
     if let routeChangeObserver {
       NotificationCenter.default.removeObserver(routeChangeObserver)
     }
+    for (command, target) in remoteCommandTargets {
+      command.removeTarget(target)
+    }
+    remoteCommandTargets.removeAll()
   }
 }
