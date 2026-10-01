@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   try {
     const target = new URL(req.query.url || '');
     if (target.protocol !== 'https:' || !allowed(target.hostname)) return res.status(403).json({ error: 'Media host is not allowed' });
-    const headers = { Origin: 'https://justanime.to', Referer: 'https://justanime.to/', 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 AniDash-PWA' };
+    const headers = { Origin: 'https://megaplay.buzz', Referer: 'https://megaplay.buzz/', 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 AniDash-PWA' };
     if (req.headers.range) headers.Range = req.headers.range;
     const upstream = await fetch(target, { headers });
     if (!upstream.ok && upstream.status !== 206) return res.status(upstream.status).end();

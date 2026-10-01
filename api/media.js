@@ -8,8 +8,8 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Media host is not allowed' });
     }
     const headers = {
-      Origin: 'https://justanime.to',
-      Referer: 'https://justanime.to/',
+      Origin: 'https://megaplay.buzz',
+      Referer: 'https://megaplay.buzz/',
       'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 AniDash-PWA',
     };
     if (req.headers.range) headers.Range = req.headers.range;
