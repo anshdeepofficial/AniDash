@@ -13,8 +13,15 @@
   <title>AniDash</title>
 </head>
 <body>
+  <aside class="desktop-sidebar">
+    <div class="desktop-brand"><span>AD</span><strong>AniDash</strong><small>ANIME · MANGA · ALWAYS WITH YOU</small></div>
+    <button data-desktop-page="homePage" class="active">⌂ <span>Home</span></button><button data-desktop-page="searchPage">◉ <span>Discover</span></button><button data-desktop-page="mangaPage">▱ <span>Manga</span></button><button data-desktop-page="downloadsPage">⇩ <span>Downloads</span></button><button data-desktop-page="libraryPage">♡ <span>Library</span></button>
+    <hr><small>QUICK ACCESS</small><button data-desktop-page="searchPage">◷ <span>Recently Added</span></button><button data-desktop-page="searchPage">☆ <span>Top Rated</span></button><button data-desktop-page="homePage">⌁ <span>Trending</span></button><button data-desktop-page="searchPage">▦ <span>Genres</span></button>
+    <div class="desktop-quote"><b>Good Anime<br>Brighter Days</b><i></i></div>
+  </aside>
   <main id="app">
     <section id="homePage" class="page active">
+      <div class="desktop-top"><div><small id="desktopGreeting">Good evening,</small><strong>AniDash</strong></div><label><span>⌕</span><input id="desktopSearch" placeholder="Search anime, manga, or anything..."><kbd>Ctrl K</kbd></label><button>♧</button><span class="desktop-avatar">AD</span></div>
       <header class="app-header">
         <button class="profile-button" id="profileButton"><span class="avatar">AD</span><span><small id="greeting">Good morning</small><strong>Guest</strong></span></button>
         <div class="header-actions"><button aria-label="News">▤</button><button aria-label="Notifications">♧</button><button aria-label="Settings">⚙</button></div>
@@ -30,6 +37,7 @@
     <section id="downloadsPage" class="page"><div class="page-head"><h1>Downloads</h1></div><div class="segmented"><button class="active">All</button><button>Downloading</button><button>Completed</button></div><div class="empty-state"><span>⇩</span><h2>No downloads yet</h2><p>Downloaded episodes will appear here and work offline.</p></div></section>
     <section id="mangaPage" class="page"><div class="page-head"><h1>Manga</h1></div><div class="search-bar"><span>⌕</span><input id="mangaSearch" type="search" placeholder="Search manga"><button hidden>×</button></div><div id="mangaGrid" class="poster-grid"></div></section>
   </main>
+  <aside class="desktop-right"><section><div class="section-title"><h2>Your List</h2><button>View All →</button></div><div id="desktopContinue"></div></section><section><div class="section-title"><h2>Discover Genres</h2><button>View All →</button></div><div class="genre-grid"><button>Action</button><button>Romance</button><button>Fantasy</button><button>Slice of Life</button><button>Mystery</button><button>Drama</button></div></section></aside>
 
   <nav class="bottom-nav" aria-label="Main navigation">
     <button data-page="homePage" class="active" aria-label="Home"><span class="nav-icon">⌂</span></button>
