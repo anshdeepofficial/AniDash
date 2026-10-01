@@ -13,25 +13,26 @@ class PermissionsSettingsScreen extends ConsumerWidget {
   void _promptRevoke(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Manage Permissions'),
-        content: const Text(
-          'Granted system permissions on Android can only be revoked from the device App Settings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Manage Permissions'),
+            content: const Text(
+              'Granted system permissions on Android can only be revoked from the device App Settings.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -66,9 +67,34 @@ class PermissionsSettingsScreen extends ConsumerWidget {
                   value: permissionsState.storage,
                   onChanged: (val) async {
                     if (val == false) {
-                      _promptRevoke(context);
+                      await ref
+                          .read(permissionsProvider.notifier)
+                          .revokeStorageAccess();
                       return;
                     }
+                    final approved = await showDialog<bool>(
+                      context: context,
+                      builder:
+                          (dialogContext) => AlertDialog(
+                            title: const Text('Allow storage access?'),
+                            content: const Text(
+                              'AniDash will use its private app storage for downloads and extension data. Other apps cannot access these files.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed:
+                                    () => Navigator.pop(dialogContext, false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed:
+                                    () => Navigator.pop(dialogContext, true),
+                                child: const Text('Allow'),
+                              ),
+                            ],
+                          ),
+                    );
+                    if (approved != true) return;
                     await ref
                         .read(permissionsProvider.notifier)
                         .requestStoragePermission();

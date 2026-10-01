@@ -20,7 +20,7 @@ import 'manga_section_screen.dart';
 
 class _MangaChapterResolver {
   static final List<({DMedia item, Source source, VoidCallback onResolved})>
-      _queue = [];
+  _queue = [];
   static int _activeRequests = 0;
   static const int _maxConcurrency = 2;
   static final Set<String> _pendingKeys = {};
@@ -46,14 +46,19 @@ class _MangaChapterResolver {
           .getDetail(next.item)
           .timeout(const Duration(seconds: 4))
           .then((detail) {
-        if (detail.episodes != null && detail.episodes!.isNotEmpty) {
-          sharedPrefs.setInt('manga_ch_count_$key', detail.episodes!.length);
-          next.onResolved();
-        }
-      }).catchError((_) {}).whenComplete(() {
-        _activeRequests--;
-        _drainQueue();
-      });
+            if (detail.episodes != null && detail.episodes!.isNotEmpty) {
+              sharedPrefs.setInt(
+                'manga_ch_count_$key',
+                detail.episodes!.length,
+              );
+              next.onResolved();
+            }
+          })
+          .catchError((_) {})
+          .whenComplete(() {
+            _activeRequests--;
+            _drainQueue();
+          });
     }
   }
 }
@@ -92,8 +97,6 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
     _debounce?.cancel();
     super.dispose();
   }
-
-
 
   Source? _getActiveMangaSource() {
     final sourceState = ref.read(sourceProvider);
@@ -151,7 +154,6 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
       final spotlightCandidates =
           finalPopular.isNotEmpty ? finalPopular : finalLatest;
       final spotlight = spotlightCandidates.take(6).toList();
-
 
       if (mounted) {
         setState(() {
@@ -311,7 +313,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                               leading: const Icon(Iconsax.book),
                               title: Text(src.name ?? 'Unknown'),
                               subtitle: Text(
-                                'v${src.version ?? '0.0.1'} â€¢ ${src.lang?.toUpperCase() ?? 'EN'}',
+                                'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
                               trailing:
                                   isSelected
@@ -348,7 +350,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                                 ],
                               ),
                               subtitle: Text(
-                                'v${src.version ?? '0.0.1'} â€¢ ${src.lang?.toUpperCase() ?? 'EN'}',
+                                'v${src.version ?? '0.0.1'} • ${src.lang?.toUpperCase() ?? 'EN'}',
                               ),
                               trailing:
                                   isSelected
@@ -531,8 +533,6 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 ),
               ),
 
-
-
               // Action 2: Toggle Search
               Material(
                 color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
@@ -601,7 +601,6 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                 build18PlusBadge(fontSize: 8),
               ],
               const Spacer(),
-
             ],
           ),
 
@@ -1102,7 +1101,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          '${entry.chapterTitle} â€¢ Page ${entry.pageIndex}/${entry.totalPages}',
+                          '${entry.chapterTitle} • Page ${entry.pageIndex}/${entry.totalPages}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -1165,7 +1164,7 @@ class _MangaScreenState extends ConsumerState<MangaScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${entry.chapterTitle} â€¢ Page ${entry.pageIndex}/${entry.totalPages}',
+                  '${entry.chapterTitle} • Page ${entry.pageIndex}/${entry.totalPages}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

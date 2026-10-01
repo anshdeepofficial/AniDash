@@ -44,10 +44,15 @@ class ControlsOverlay extends ConsumerWidget {
     if (locked) {
       return Stack(
         children: [
-          AnimatedOpacity(
-            opacity: visible ? 1 : 0,
-            duration: const Duration(milliseconds: 250),
-            child: _lockedProgress(context, ref),
+          Positioned(
+            left: 32,
+            right: 32,
+            bottom: MediaQuery.viewPaddingOf(context).bottom.clamp(8.0, 24.0),
+            child: AnimatedOpacity(
+              opacity: visible ? 1 : 0,
+              duration: const Duration(milliseconds: 250),
+              child: _lockedProgress(context, ref),
+            ),
           ),
           AnimatedOpacity(
             opacity: visible ? 1 : 0,
@@ -76,8 +81,6 @@ class ControlsOverlay extends ConsumerWidget {
         durationMs > 0
             ? Duration(milliseconds: durationMs - positionMs)
             : Duration.zero;
-    final bottom = MediaQuery.viewPaddingOf(context).bottom.clamp(8.0, 24.0);
-
     String time(Duration value) {
       final hours = value.inHours;
       final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -87,41 +90,36 @@ class ControlsOverlay extends ConsumerWidget {
           : '${value.inMinutes}:$seconds';
     }
 
-    return Positioned(
-      left: 32,
-      right: 32,
-      bottom: bottom,
-      child: IgnorePointer(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  time(state.position),
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                ),
-                Text(
-                  '-${time(remaining)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 4,
-                backgroundColor: Colors.white24,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).colorScheme.primary,
-                ),
+    return IgnorePointer(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                time(state.position),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+              Text(
+                '-${time(remaining)}',
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

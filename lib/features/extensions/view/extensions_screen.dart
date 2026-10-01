@@ -2,10 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart'
     hide Extension;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ani_dash/main.dart';
+import 'package:ani_dash/shared/providers/settings/source_notifier.dart';
 
 class ExtensionScreen extends StatefulWidget {
   const ExtensionScreen({super.key});
@@ -587,6 +589,11 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
         );
         try {
           await manager.installSource(source);
+          if (mounted) {
+            await ProviderScope.containerOf(
+              context,
+            ).read(sourceProvider.notifier).initialize();
+          }
           messenger.showSnackBar(
             SnackBar(content: Text('${source.name ?? 'Extension'} installed.')),
           );
@@ -614,8 +621,22 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
           );
         }
       },
-      onUninstall: () => manager.uninstallSource(source),
-      onUpdate: () => manager.updateSource(source),
+      onUninstall: () async {
+        await manager.uninstallSource(source);
+        if (mounted) {
+          await ProviderScope.containerOf(
+            context,
+          ).read(sourceProvider.notifier).initialize();
+        }
+      },
+      onUpdate: () async {
+        await manager.updateSource(source);
+        if (mounted) {
+          await ProviderScope.containerOf(
+            context,
+          ).read(sourceProvider.notifier).initialize();
+        }
+      },
       onTap: () async {
         // Open details or settings if installed
         if (widget.isInstalled) {

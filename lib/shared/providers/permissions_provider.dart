@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/remote_push_service.dart';
@@ -37,6 +38,7 @@ class PermissionState {
 
 @Riverpod(keepAlive: true)
 class Permissions extends _$Permissions {
+  static const _storageConsentKey = 'storage_access_confirmed';
   int? _cachedSdkInt;
 
   @override
@@ -69,7 +71,12 @@ class Permissions extends _$Permissions {
     state = state.copyWith(
       notification: await Permission.notification.isGranted,
       storage:
-          _usesAppOwnedStorage ? true : await _storagePermission().isGranted,
+          _usesAppOwnedStorage
+              ? (await SharedPreferences.getInstance()).getBool(
+                    _storageConsentKey,
+                  ) ??
+                  false
+              : await _storagePermission().isGranted,
       photos: await _mediaPermission(Permission.photos).isGranted,
       videos: await _mediaPermission(Permission.videos).isGranted,
     );
@@ -95,12 +102,26 @@ class Permissions extends _$Permissions {
     if (state.storage || !Platform.isAndroid) return true;
     await _initSdkInt();
     if (_usesAppOwnedStorage) {
+      await (await SharedPreferences.getInstance()).setBool(
+        _storageConsentKey,
+        true,
+      );
       state = state.copyWith(storage: true);
       return true;
     }
     final granted = await _request(_storagePermission());
     state = state.copyWith(storage: granted);
     return granted;
+  }
+
+  Future<void> revokeStorageAccess() async {
+    if (Platform.isAndroid && _usesAppOwnedStorage) {
+      await (await SharedPreferences.getInstance()).setBool(
+        _storageConsentKey,
+        false,
+      );
+      state = state.copyWith(storage: false);
+    }
   }
 
   Future<bool> requestMediaPermissions() async {

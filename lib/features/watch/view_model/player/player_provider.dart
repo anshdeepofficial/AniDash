@@ -512,6 +512,16 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
     state = PlayerState.initial();
   }
 
+  /// Stops playback only when this player still belongs to [mediaId].
+  ///
+  /// A watch route can finish its asynchronous cleanup after the user has
+  /// already opened another title. Unconditionally stopping the shared player
+  /// from that old route would then kill the newly opened video.
+  Future<void> stopIfSession(String mediaId) async {
+    if (_activeMediaId != mediaId) return;
+    await stop();
+  }
+
   Future<void> seek(Duration pos) async {
     _pendingSeekTarget = pos;
     state = state.copyWith(position: pos);

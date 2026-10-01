@@ -150,7 +150,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         ref
             .read(watchControllerProvider.notifier)
             .cleanup()
-            .whenComplete(() => ref.read(playerStateProvider.notifier).stop()),
+            .whenComplete(
+              () => ref
+                  .read(playerStateProvider.notifier)
+                  .stopIfSession(widget.mediaId),
+            ),
       );
     }
     _resetSystemUI();

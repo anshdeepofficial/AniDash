@@ -426,50 +426,58 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
         Expanded(
           child: providerStatus.when(
-            data: (statusData) => ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                  child: Text(
-                    'CANONICAL SOURCES',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: Theme.of(context).colorScheme.primary,
+            data:
+                (statusData) => ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                      child: Text(
+                        'CANONICAL SOURCES',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                for (final provider in animeSources) ...[
-                  Builder(builder: (context) {
-                    final status = statusData[provider]?['status'] as String?;
-                    final isSelected = selectedAnimeSource?.providerName ==
-                        provider.toLowerCase();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: SelectableSettingsItem(
-                        icon: Icon(_getStatusIcon(status)),
-                        iconColor: _getStatusColor(status),
-                        accent: _getStatusColor(status),
-                        title: provider == 'justanime'
-                            ? 'JUSTANIME  •  RECOMMENDED'
-                            : provider.toUpperCase(),
-                        description: provider == 'justanime'
-                            ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
-                            : status?.toUpperCase() ?? 'UNKNOWN',
-                        isInSelectionMode: true,
-                        isSelected: isSelected,
-                        onTap: () {
-                          ref
-                              .read(selectedProviderKeyProvider.notifier)
-                              .select(provider);
+                    for (final provider in animeSources) ...[
+                      Builder(
+                        builder: (context) {
+                          final status =
+                              statusData[provider]?['status'] as String?;
+                          final isSelected =
+                              selectedAnimeSource?.providerName ==
+                              provider.toLowerCase();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: SelectableSettingsItem(
+                              icon: Icon(_getStatusIcon(status)),
+                              iconColor: _getStatusColor(status),
+                              accent: _getStatusColor(status),
+                              title:
+                                  provider == 'justanime'
+                                      ? 'JUSTANIME  •  RECOMMENDED'
+                                      : provider.toUpperCase(),
+                              description:
+                                  provider == 'justanime'
+                                      ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
+                                      : status?.toUpperCase() ?? 'UNKNOWN',
+                              isInSelectionMode: true,
+                              isSelected: isSelected,
+                              onTap: () {
+                                ref
+                                    .read(selectedProviderKeyProvider.notifier)
+                                    .select(provider);
+                              },
+                            ),
+                          );
                         },
                       ),
-                    );
-                  }),
-                ],              ],
-            ),
+                    ],
+                  ],
+                ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, s) => Center(child: Text('Error: $e')),
           ),
@@ -597,7 +605,33 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 'Allow access to storage to download anime and support extensions.',
             value: permissionsState.storage,
             onChanged: (val) async {
-              if (val == false) return;
+              if (val == false) {
+                await ref
+                    .read(permissionsProvider.notifier)
+                    .revokeStorageAccess();
+                return;
+              }
+              final approved = await showDialog<bool>(
+                context: context,
+                builder:
+                    (dialogContext) => AlertDialog(
+                      title: const Text('Allow storage access?'),
+                      content: const Text(
+                        'AniDash will use its private app storage for downloads and extension data. Other apps cannot access these files.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('Not now'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          child: const Text('Allow'),
+                        ),
+                      ],
+                    ),
+              );
+              if (approved != true) return;
               await ref
                   .read(permissionsProvider.notifier)
                   .requestStoragePermission();

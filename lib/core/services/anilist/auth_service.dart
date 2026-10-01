@@ -15,20 +15,31 @@ class AniListAuthService extends BaseOAuthService {
   static const String _authUrl = 'https://anilist.co/api/v2/oauth/authorize';
   static const String _tokenUrl = 'https://anilist.co/api/v2/oauth/token';
 
+  Uri buildAuthorizationUri({bool? desktop}) {
+    final useDesktopFlow = desktop ?? isDesktop;
+    final clientId =
+        useDesktopFlow
+            ? ANILIST_CLIENT_ID.split('|')[1]
+            : ANILIST_CLIENT_ID.split('|')[0];
+    final parameters = <String, String>{
+      'client_id': clientId,
+      'response_type': useDesktopFlow ? 'code' : 'token',
+    };
+
+    // AniList's implicit grant uses the redirect URL registered against the
+    // OAuth client. Supplying a second mobile redirect here can make AniList
+    // reject the request (or leave some browsers on a blank page) when the
+    // strings do not match byte-for-byte. Desktop still needs an explicit
+    // redirect for the authorization-code flow.
+    if (useDesktopFlow) {
+      parameters['redirect_uri'] = redirectUri;
+    }
+
+    return Uri.parse(_authUrl).replace(queryParameters: parameters);
+  }
+
   Future<String?> authenticate() async {
-    final loginUrl =
-        Uri.parse(_authUrl)
-            .replace(
-              queryParameters: {
-                'client_id': _clientId,
-                'redirect_uri': redirectUri,
-                // Mobile apps cannot keep a client secret. AniList's implicit flow
-                // returns a bearer token directly; desktop builds can still use the
-                // server-style authorization-code exchange when configured.
-                'response_type': isDesktop ? 'code' : 'token',
-              },
-            )
-            .toString();
+    final loginUrl = buildAuthorizationUri().toString();
 
     final queryParams = await performWebAuth(loginUrl);
     return queryParams?[isDesktop ? 'code' : 'access_token'];
