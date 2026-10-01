@@ -544,7 +544,9 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
         _prefetchTriggered = false;
         _nextPromptTriggered = false;
         _isPlayerReady = false;
-        ref.read(nextEpisodePromptProvider.notifier).dismiss();
+        ref
+            .read(nextEpisodePromptProvider.notifier)
+            .dismissForEpisodeTransition();
         ref.read(watchProgressProvider.notifier).resetLastSavedPosition();
 
         try {

@@ -35,6 +35,7 @@ class UIHelper {
   static void setVolumeKeyHandler({
     required VoidCallback onVolumeUp,
     required VoidCallback onVolumeDown,
+    ValueChanged<double>? onVolumeChanged,
   }) {
     if (Platform.isAndroid) {
       _volumeChannel.setMethodCallHandler((call) async {
@@ -42,6 +43,9 @@ class UIHelper {
           onVolumeUp();
         } else if (call.method == 'volumeDown') {
           onVolumeDown();
+        } else if (call.method == 'volumeChanged') {
+          final value = (call.arguments as num?)?.toDouble();
+          if (value != null) onVolumeChanged?.call(value.clamp(0.0, 1.0));
         }
       });
     }

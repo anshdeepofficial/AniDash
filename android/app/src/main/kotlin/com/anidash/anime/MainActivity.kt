@@ -450,13 +450,29 @@ class MainActivity : FlutterFragmentActivity() {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_VOLUME_UP -> {
                     if (event.action == KeyEvent.ACTION_DOWN) {
-                        volumeChannel?.invokeMethod("volumeUp", null)
+                        val manager = audioManager ?: getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        manager.adjustStreamVolume(
+                            AudioManager.STREAM_MUSIC,
+                            AudioManager.ADJUST_RAISE,
+                            AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE
+                        )
+                        val max = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                        val current = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        volumeChannel?.invokeMethod("volumeChanged", current.toDouble() / max.toDouble())
                     }
                     return true
                 }
                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
                     if (event.action == KeyEvent.ACTION_DOWN) {
-                        volumeChannel?.invokeMethod("volumeDown", null)
+                        val manager = audioManager ?: getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        manager.adjustStreamVolume(
+                            AudioManager.STREAM_MUSIC,
+                            AudioManager.ADJUST_LOWER,
+                            AudioManager.FLAG_REMOVE_SOUND_AND_VIBRATE
+                        )
+                        val max = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                        val current = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        volumeChannel?.invokeMethod("volumeChanged", current.toDouble() / max.toDouble())
                     }
                     return true
                 }

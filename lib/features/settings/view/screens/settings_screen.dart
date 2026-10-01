@@ -7,6 +7,10 @@ import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ani_dash/core/services/developer_access_service.dart';
+import 'package:ani_dash/core/utils/env_loader.dart';
+import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
+import 'package:ani_dash/features/settings/view/settings_search_delegate.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -14,6 +18,8 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final auth = ref.watch(authProvider);
+    final isDeveloper = auth.anilistUser?.id.toString() == ADMIN_ANILIST_ID;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton.filledTonal(
@@ -22,6 +28,17 @@ class SettingsScreen extends ConsumerWidget {
         ),
         title: const Text('Settings'),
         forceMaterialTransparency: true,
+        actions: [
+          IconButton(
+            tooltip: 'Search settings',
+            icon: const Icon(Iconsax.search_normal_1),
+            onPressed:
+                () => showSearch<void>(
+                  context: context,
+                  delegate: SettingsSearchDelegate(),
+                ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10.0),
@@ -46,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   accent: colorScheme.primary,
                   title: 'Security & Privacy',
-                  description: 'App lock, adult hub lock, screenshot privacy',
+                  description: 'App lock, PIN options, screenshot privacy',
                   onTap: () => context.push('/settings/security'),
                 ),
               ],
@@ -168,7 +185,7 @@ class SettingsScreen extends ConsumerWidget {
                   description: 'Support the developer directly',
                   onTap:
                       () => launchUrl(
-                    Uri.parse('https://buymeacoffee.com/anshdeepofficial'),
+                        Uri.parse('https://buymeacoffee.com/anshdeepofficial1'),
                         mode: LaunchMode.externalApplication,
                       ),
                 ),
@@ -195,6 +212,37 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
+            if (isDeveloper)
+              FutureBuilder<bool>(
+                future: const DeveloperAccessService().isBlocked(),
+                builder: (context, snapshot) {
+                  if (snapshot.data == true) return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      SettingsSection(
+                        title: 'Developer',
+                        titleColor: colorScheme.primary,
+                        onTap: () {},
+                        children: [
+                          NormalSettingsItem(
+                            icon: Icon(
+                              Iconsax.send_1,
+                              color: colorScheme.primary,
+                            ),
+                            accent: colorScheme.primary,
+                            title: 'Broadcast & User Stats',
+                            description:
+                                'Message every device and view active installs',
+                            onTap:
+                                () => context.push('/settings/admin-broadcast'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                },
+              ),
             SettingsSection(
               title: 'Misc',
               titleColor: colorScheme.primary,

@@ -22,7 +22,7 @@ class PlayerModel {
   PlayerModel({
     this.defaultQuality = 'Auto',
     this.enableAniSkip = true,
-    this.enableAutoSkip = false,
+    this.enableAutoSkip = true,
     this.skipFillerEpisodes = false,
     bool? preferDub,
     String? preferredAudioLanguage,
@@ -130,7 +130,7 @@ class PlayerModel {
     return PlayerModel(
       defaultQuality: map['defaultQuality'] ?? 'Auto',
       enableAniSkip: map['enableAniSkip'] ?? true,
-      enableAutoSkip: map['enableAutoSkip'] ?? false,
+      enableAutoSkip: map['enableAutoSkip'] ?? true,
       skipFillerEpisodes: map['skipFillerEpisodes'] ?? false,
       preferredAudioLanguage: audioLang,
       seekDuration: map['seekDuration'] ?? 10,

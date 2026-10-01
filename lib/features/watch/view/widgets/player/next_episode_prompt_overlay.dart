@@ -27,7 +27,9 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
 
     final nextEpNum = currentEp + 1;
     final epList = ref.watch(episodeListProvider);
-    final nextEp = epList.episodes.firstWhereOrNull((e) => e.number == nextEpNum);
+    final nextEp = epList.episodes.firstWhereOrNull(
+      (e) => e.number == nextEpNum,
+    );
     if (nextEp == null) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
@@ -67,19 +69,22 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
                     width: 70,
                     height: 50,
                     color: colorScheme.surfaceContainerHighest,
-                    child: (nextEp.thumbnail != null && nextEp.thumbnail!.isNotEmpty)
-                        ? CachedNetworkImage(
-                            imageUrl: nextEp.thumbnail!,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, _, _) => Icon(
+                    child:
+                        (nextEp.thumbnail != null &&
+                                nextEp.thumbnail!.isNotEmpty)
+                            ? CachedNetworkImage(
+                              imageUrl: nextEp.thumbnail!,
+                              fit: BoxFit.cover,
+                              errorWidget:
+                                  (_, _, _) => Icon(
+                                    Icons.play_circle_outline,
+                                    color: colorScheme.primary,
+                                  ),
+                            )
+                            : Icon(
                               Icons.play_circle_outline,
                               color: colorScheme.primary,
                             ),
-                          )
-                        : Icon(
-                            Icons.play_circle_outline,
-                            color: colorScheme.primary,
-                          ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -115,7 +120,9 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
                         height: 28,
                         child: FilledButton.icon(
                           onPressed: () {
-                            ref.read(nextEpisodePromptProvider.notifier).dismiss();
+                            ref
+                                .read(nextEpisodePromptProvider.notifier)
+                                .dismissForEpisodeTransition();
                             ref
                                 .read(episodeDataProvider.notifier)
                                 .changeEpisode(null, by: 1);
@@ -123,7 +130,10 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
                           icon: const Icon(Icons.play_arrow_rounded, size: 16),
                           label: const Text(
                             'Play Now',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -138,9 +148,16 @@ class NextEpisodePromptOverlay extends ConsumerWidget {
 
                 // Dismiss Button
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18, color: Colors.white70),
+                  icon: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: Colors.white70,
+                  ),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
                   onPressed: () {
                     ref.read(nextEpisodePromptProvider.notifier).dismiss();
                   },

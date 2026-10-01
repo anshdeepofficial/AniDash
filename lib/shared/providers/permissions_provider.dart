@@ -3,6 +3,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/core/services/remote_push_service.dart';
 
 part 'permissions_provider.g.dart';
 
@@ -67,7 +68,8 @@ class Permissions extends _$Permissions {
 
     state = state.copyWith(
       notification: await Permission.notification.isGranted,
-      storage: await _storagePermission().isGranted,
+      storage:
+          _usesAppOwnedStorage ? true : await _storagePermission().isGranted,
       photos: await _mediaPermission(Permission.photos).isGranted,
       videos: await _mediaPermission(Permission.videos).isGranted,
     );
@@ -75,6 +77,12 @@ class Permissions extends _$Permissions {
 
   Future<bool> requestNotificationPermission() async {
     if (state.notification) return true;
+    if (Platform.isAndroid) {
+      final granted = await _request(Permission.notification);
+      if (granted) await RemotePushService.requestPermission();
+      state = state.copyWith(notification: granted);
+      return granted;
+    }
     if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
       return true;
     }
@@ -86,6 +94,10 @@ class Permissions extends _$Permissions {
   Future<bool> requestStoragePermission() async {
     if (state.storage || !Platform.isAndroid) return true;
     await _initSdkInt();
+    if (_usesAppOwnedStorage) {
+      state = state.copyWith(storage: true);
+      return true;
+    }
     final granted = await _request(_storagePermission());
     state = state.copyWith(storage: granted);
     return granted;
@@ -109,10 +121,10 @@ class Permissions extends _$Permissions {
   }
 
   Permission _storagePermission() {
-    return (_cachedSdkInt ?? 0) >= 30
-        ? Permission.manageExternalStorage
-        : Permission.storage;
+    return Permission.storage;
   }
+
+  bool get _usesAppOwnedStorage => (_cachedSdkInt ?? 0) >= 29;
 
   Permission _mediaPermission(Permission modern) {
     return (_cachedSdkInt ?? 0) >= 33 ? modern : Permission.storage;

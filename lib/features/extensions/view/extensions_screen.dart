@@ -372,7 +372,8 @@ class _ExtensionScreenState extends ExtensionManagerScreen<ExtensionScreen> {
                           : () async {
                             final url = controller.text.trim();
                             if (url.isNotEmpty) {
-                              if (url.contains('index.min.json')) {
+                              if (url.contains('index.min.json') ||
+                                  url.toLowerCase().contains('aniyomi')) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -552,9 +553,9 @@ class ExtensionListWidget extends StatefulWidget implements ExtensionConfig {
 class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
   @override
   Widget build(BuildContext context) {
-    // The repository dialog can switch to AniYomi. Refresh the manager held
-    // by this tab as well, otherwise the UI keeps showing the old engine's
-    // empty list even though the repository fetch succeeded.
+    // Always use AniDash's in-process engine. Stale AniYomi APK entries must
+    // never launch Android's separate-app installer from this screen.
+    Get.find<ExtensionManager>().setCurrentManager(ExtensionType.mangayomi);
     manager = Get.find<ExtensionManager>().currentManager;
     return super.build(context);
   }
@@ -582,26 +583,21 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
       onInstall: () async {
         final messenger = ScaffoldMessenger.of(context);
         messenger.showSnackBar(
-          const SnackBar(content: Text('Opening Android installer…')),
+          const SnackBar(content: Text('Installing source inside AniDash…')),
         );
         try {
-          await (source.extensionType?.getManager() ?? manager).installSource(
-            source,
-          );
+          await manager.installSource(source);
           messenger.showSnackBar(
             SnackBar(content: Text('${source.name ?? 'Extension'} installed.')),
           );
           if (mounted) {
-            final engine = source.extensionType ?? ExtensionType.mangayomi;
             await showDialog<void>(
               context: context,
               builder:
                   (context) => AlertDialog(
-                    title: Text('Installed in ${engine.toString()}'),
-                    content: Text(
-                      engine == ExtensionType.aniyomi
-                          ? 'You are viewing AniYomi sources. To return to your previous MangaYomi sources, tap the grid icon at the top and select MangaYomi.'
-                          : 'You are viewing MangaYomi sources. To find Android AniYomi sources, tap the grid icon at the top and select AniYomi.',
+                    title: const Text('Source installed'),
+                    content: const Text(
+                      'The source is installed inside AniDash. Open Installed Anime or Installed Manga to use it.',
                     ),
                     actions: [
                       TextButton(
@@ -618,14 +614,8 @@ class _ExtensionListWidgetState extends ExtensionList<ExtensionListWidget> {
           );
         }
       },
-      onUninstall:
-          () => (source.extensionType?.getManager() ?? manager).uninstallSource(
-            source,
-          ),
-      onUpdate:
-          () => (source.extensionType?.getManager() ?? manager).updateSource(
-            source,
-          ),
+      onUninstall: () => manager.uninstallSource(source),
+      onUpdate: () => manager.updateSource(source),
       onTap: () async {
         // Open details or settings if installed
         if (widget.isInstalled) {

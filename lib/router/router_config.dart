@@ -25,6 +25,8 @@ import 'package:ani_dash/features/settings/view/screens/about_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/account_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/anime_sources_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/download_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/data_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/home_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/experimental_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/player_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/advanced_player_settings_screen.dart';
@@ -40,6 +42,7 @@ import 'package:ani_dash/features/settings/view/screens/permissions_settings_scr
 import 'package:ani_dash/features/settings/view/screens/update_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/notification_settings_screen.dart';
 import 'package:ani_dash/features/settings/view/screens/security_settings_screen.dart';
+import 'package:ani_dash/features/settings/view/screens/admin_broadcast_screen.dart';
 import 'package:ani_dash/router/router_wrapper.dart';
 
 class AnimatedGoRoute extends GoRoute {
@@ -252,6 +255,14 @@ final routerConfig = GoRouter(
           contentBuilder: (_, _) => const DownloadSettingsScreen(),
         ),
         AnimatedGoRoute(
+          path: 'data',
+          contentBuilder: (_, _) => const DataSettingsScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'home-layout',
+          contentBuilder: (_, _) => const HomeSettingsScreen(),
+        ),
+        AnimatedGoRoute(
           path: 'theme',
           contentBuilder: (_, _) => const ThemeSettingsScreen(),
         ),
@@ -320,6 +331,10 @@ final routerConfig = GoRouter(
         AnimatedGoRoute(
           path: 'security',
           contentBuilder: (_, _) => const SecuritySettingsScreen(),
+        ),
+        AnimatedGoRoute(
+          path: 'admin-broadcast',
+          contentBuilder: (_, _) => const AdminBroadcastScreen(),
         ),
       ],
     ),

@@ -133,9 +133,8 @@ class AboutScreen extends StatelessWidget {
                   context,
                   icon: Iconsax.code,
                   title: 'Developer',
-                  content: 'anshdeepofficial1',
-                  subtitle:
-                      'Passionate Flutter Developer (github.com/anshdeepofficial1)',
+                  content: 'Anshdeep Singh',
+                  subtitle: 'Developer · github.com/anshdeepofficial1',
                 ),
 
                 const SizedBox(height: 16),
@@ -245,7 +244,7 @@ class AboutScreen extends StatelessWidget {
                         label: 'Source Code',
                         onTap:
                             () => _launchUrl(
-                              'https://github.com/anshdeepofficial1/Anidash',
+                              'https://github.com/anshdeepofficial1/AniDash',
                             ),
                       ),
                     ),
@@ -257,7 +256,7 @@ class AboutScreen extends StatelessWidget {
                         label: 'Report Issue',
                         onTap:
                             () => _launchUrl(
-                              'https://github.com/anshdeepofficial1/Anidash/issues',
+                              'https://github.com/anshdeepofficial1/AniDash/issues',
                             ),
                       ),
                     ),
@@ -293,7 +292,7 @@ class AboutScreen extends StatelessWidget {
                         child: InkWell(
                           onTap:
                               () => _launchUrl(
-                                'https://buymeacoffee.com/anshdeepofficial',
+                                'https://buymeacoffee.com/anshdeepofficial1',
                               ),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(

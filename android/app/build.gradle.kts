@@ -27,7 +27,7 @@ android {
 
     defaultConfig {
         applicationId = "com.anidash.anime"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName

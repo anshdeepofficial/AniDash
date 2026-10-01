@@ -48,11 +48,9 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
   }
 
   void _onLongPressStart(LongPressStartDetails details) {
-    if (details.globalPosition.dx > MediaQuery.of(context).size.width / 2) {
-      _isLongPressing = true;
-      _dragStartY = details.globalPosition.dy;
-      widget.onLongPressStart();
-    }
+    _isLongPressing = true;
+    _dragStartY = details.globalPosition.dy;
+    widget.onLongPressStart();
   }
 
   void _onLongPressUpdate(LongPressMoveUpdateDetails details) {
@@ -99,7 +97,7 @@ class _PlayerGestureHandlerState extends State<PlayerGestureHandler> {
       onLongPressUp: () {
         if (_isLongPressing) _onLongPressEnd(const LongPressEndDetails());
       },
-      behavior: HitTestBehavior.translucent,
+      behavior: HitTestBehavior.opaque,
       child: widget.child,
     );
   }

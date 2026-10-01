@@ -23,6 +23,7 @@ import 'package:ani_dash/features/news/view_model/news_provider.dart';
 import 'package:ani_dash/features/watchlist/view_model/watchlist_notifier.dart';
 import 'package:ani_dash/shared/auth/providers/auth_notifier.dart';
 import 'package:ani_dash/shared/providers/continue_watching_dismissed_provider.dart';
+import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -70,6 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   void _setupNewsListener() {
     _newsListener = ref.listenManual(newsProvider, (previous, next) {
+      if (!ref.read(notificationSettingsProvider).enableNews) return;
       if (previous is AsyncData && next is AsyncData) {
         if (!mounted) return;
         final router = GoRouter.of(context);

@@ -65,7 +65,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
   bool _isChangingVolume = false;
   bool _isChangingBrightness = false;
   bool _isDragLeft = false;
-  bool _allowVolumeBoostForGesture = false;
   bool _isSpeeding = false;
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
@@ -87,6 +86,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
       UIHelper.setVolumeKeyHandler(
         onVolumeUp: () => _handleHardwareVolumeKey(true),
         onVolumeDown: () => _handleHardwareVolumeKey(false),
+        onVolumeChanged: _handleHardwareVolumeChanged,
       );
       _activatePlayerVolumeControls();
       FlutterVolumeController.getVolume().then((v) {
@@ -153,6 +153,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
       UIHelper.setVolumeKeyHandler(
         onVolumeUp: () => _handleHardwareVolumeKey(true),
         onVolumeDown: () => _handleHardwareVolumeKey(false),
+        onVolumeChanged: _handleHardwareVolumeChanged,
       );
       _activatePlayerVolumeControls();
     }
@@ -163,12 +164,22 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
 
     FlutterVolumeController.updateShowSystemUI(false);
 
-    final controller = ref.read(playerUIControllerProvider.notifier);
     final state = ref.read(playerUIControllerProvider);
 
     const step = 0.05; // 5% per press
-    final maxVolume = isUp && state.volume < 1.0 ? 1.0 : 2.0;
-    double newV = (state.volume + (isUp ? step : -step)).clamp(0.0, maxVolume);
+    final newV = (state.volume + (isUp ? step : -step)).clamp(0.0, 1.0);
+
+    _applyPlayerVolume(newV);
+  }
+
+  void _handleHardwareVolumeChanged(double value) {
+    if (!mounted) return;
+    _applyPlayerVolume(value.clamp(0.0, 1.0), updateSystemVolume: false);
+  }
+
+  void _applyPlayerVolume(double value, {bool updateSystemVolume = true}) {
+    final newV = value.clamp(0.0, 1.0);
+    final controller = ref.read(playerUIControllerProvider.notifier);
 
     setState(() {
       _isChangingVolume = true;
@@ -176,22 +187,12 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
 
     controller.setVolume(newV);
 
-    if (newV > 1.0) {
-      FlutterVolumeController.setVolume(1.0);
-      final gain = (newV * 100);
-      ref
-          .read(playerStateProvider.notifier)
-          .videoController
-          .player
-          .setVolume(gain);
-    } else {
-      FlutterVolumeController.setVolume(newV.clamp(0.0, 1.0));
-      ref
-          .read(playerStateProvider.notifier)
-          .videoController
-          .player
-          .setVolume(newV * 100);
-    }
+    if (updateSystemVolume) FlutterVolumeController.setVolume(newV);
+    ref
+        .read(playerStateProvider.notifier)
+        .videoController
+        .player
+        .setVolume(100.0);
 
     _volumeOverlayTimer?.cancel();
     _volumeOverlayTimer = Timer(const Duration(milliseconds: 1500), () {
@@ -207,11 +208,6 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
     if (ref.read(playerUIControllerProvider).isLocked) return;
     final w = MediaQuery.of(context).size.width;
     _isDragLeft = details.globalPosition.dx < w / 2;
-    // A swipe that begins below 100% stops at normal maximum. Starting a new
-    // upward swipe on the right side at 100% explicitly unlocks amplified volume.
-    _allowVolumeBoostForGesture =
-        !_isDragLeft && ref.read(playerUIControllerProvider).volume >= 0.99;
-
     setState(() {
       if (_isDragLeft) {
         _isChangingBrightness = true;
@@ -237,27 +233,16 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
       double newB = (state.brightness + delta).clamp(0.0, 1.0);
       controller.setBrightness(newB);
     } else {
-      final maxVolume = _allowVolumeBoostForGesture ? 2.0 : 1.0;
-      double newV = (state.volume + delta).clamp(0.0, maxVolume);
+      final newV = (state.volume + delta).clamp(0.0, 1.0);
 
       // Update system/player volume
       controller.setVolume(newV);
 
-      // Update actual player gain if needed (boost up to 200%)
-      if (newV > 1.0) {
-        final gain = (newV * 100);
-        ref
-            .read(playerStateProvider.notifier)
-            .videoController
-            .player
-            .setVolume(gain);
-      } else {
-        ref
-            .read(playerStateProvider.notifier)
-            .videoController
-            .player
-            .setVolume(100.0);
-      }
+      ref
+          .read(playerStateProvider.notifier)
+          .videoController
+          .player
+          .setVolume(100.0);
     }
   }
 
@@ -361,7 +346,45 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
     controller.restartHideTimer();
   }
 
-  void _openSettings() => _sheet(
+  Future<void> _sideSheet(Widget child) async {
+    final controller = ref.read(playerUIControllerProvider.notifier);
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close player settings',
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder:
+          (context, animation, secondaryAnimation) => Align(
+            alignment: Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.38,
+              heightFactor: 1,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface.withAlpha(248),
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(24),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: child,
+              ),
+            ),
+          ),
+      transitionBuilder:
+          (context, animation, secondaryAnimation, child) => SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+    );
+    controller.restartHideTimer();
+  }
+
+  void _openSettings() => _sideSheet(
     SettingsSheetContent(
       onSubtitlesPressed: _openSubtitle,
       onDismiss: () {
@@ -465,12 +488,14 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
 
     _isDragSeekForward = isForward;
     setState(() => _isDraggingSeek = true);
+
+    // Apply every double-tap immediately. The accumulated overlay remains
+    // visible briefly, but playback no longer waits for the tap sequence to
+    // finish before moving by 10, 20, 30… seconds.
+    unawaited(ref.read(playerStateProvider.notifier).seek(_dragTargetPos));
     _doubleTapTimer?.cancel();
     _doubleTapTimer = Timer(const Duration(milliseconds: 650), () {
       if (!mounted) return;
-      if (_doubleTapPairCount >= 1) {
-        ref.read(playerStateProvider.notifier).seek(_dragTargetPos);
-      }
       setState(() {
         _isDraggingSeek = false;
         _doubleTapPairCount = 0;

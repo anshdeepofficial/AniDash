@@ -491,7 +491,7 @@ class ContinueSection extends ConsumerWidget {
                       color: theme.colorScheme.primary,
                     ),
                     title: const Text('View Anime Details'),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(sheetContext);
                       context.push('/details', extra: entry.toUniversalMedia());
                     },
@@ -540,7 +540,7 @@ class ContinueSection extends ConsumerWidget {
                     subtitle: const Text(
                       'Marks this episode complete and updates progress',
                     ),
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(sheetContext);
                       final isSameEp =
                           targetEp != null &&
@@ -552,7 +552,7 @@ class ContinueSection extends ConsumerWidget {
                               ? targetEp.durationInSeconds!
                               : 1440;
                       final repo = ref.read(watchProgressRepositoryProvider);
-                      repo.updateEpisodeProgress(
+                      await repo.updateEpisodeProgress(
                         entry.animeId,
                         EpisodeProgress(
                           episodeNumber: targetEpNum,
@@ -573,10 +573,14 @@ class ContinueSection extends ConsumerWidget {
                             mediaId: entry.animeId,
                             episodeNum: targetEpNum,
                           );
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Marked Episode $targetEpNum as watched',
+                            entry.totalEpisodes == 0 ||
+                                    targetEpNum < entry.totalEpisodes
+                                ? 'Episode $targetEpNum watched — Episode ${targetEpNum + 1} is up next'
+                                : 'Marked Episode $targetEpNum as watched',
                           ),
                           duration: const Duration(seconds: 2),
                         ),

@@ -143,9 +143,6 @@ class AnimeWatchProgressEntry {
         if (isSpecialOrMovie || status.toLowerCase() == 'completed') {
           return true;
         }
-        if (totalEpisodes == 0 && episodesProgress.length == 1) {
-          return true;
-        }
       }
     }
     return false;

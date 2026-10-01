@@ -53,12 +53,9 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
   Widget build(BuildContext context) {
     if (_opacity == 0.0) return const SizedBox();
 
-    final isBoosted = widget.isVolume && widget.value > 1.0;
-    final maxLimit = widget.isVolume ? 2.0 : 1.0;
+    const maxLimit = 1.0;
     final displayValue = widget.value.clamp(0.0, maxLimit);
     final percent = (displayValue * 100).toInt();
-    final accent = Theme.of(context).colorScheme.primary;
-
     return AnimatedOpacity(
       opacity: _opacity,
       duration: const Duration(milliseconds: 300),
@@ -80,7 +77,7 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
                             ? Iconsax.volume_low
                             : Iconsax.volume_high))
                     : (percent < 50 ? Iconsax.sun_1 : Iconsax.sun_1),
-                color: isBoosted ? accent : Colors.white,
+                color: Colors.white,
                 size: 32,
               ),
               const SizedBox(height: 12),
@@ -128,7 +125,7 @@ class _VolumeBrightnessOverlayState extends State<VolumeBrightnessOverlay> {
               Text(
                 '$percent%',
                 style: TextStyle(
-                  color: isBoosted ? accent : Colors.white,
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),

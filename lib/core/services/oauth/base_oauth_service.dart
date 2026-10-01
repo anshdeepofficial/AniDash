@@ -23,7 +23,12 @@ abstract class BaseOAuthService {
       final result = await FlutterWebAuth2.authenticate(
         url: url,
         callbackUrlScheme: callbackUrlScheme,
-        options: FlutterWebAuth2Options(useWebview: !isDesktop),
+        // AniList does not reliably render its authorization page in an
+        // embedded Android WebView. Use a secure browser/custom tab on Android
+        // and keep the existing embedded flow on Apple platforms.
+        options: FlutterWebAuth2Options(
+          useWebview: !isDesktop && !Platform.isAndroid,
+        ),
       );
       AppLogger.i('Authentication callback received.');
       final callback = Uri.parse(result);

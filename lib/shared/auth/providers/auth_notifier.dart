@@ -10,6 +10,7 @@ import 'package:ani_dash/core/services/auth_provider_enum.dart';
 import 'package:commentum_client/commentum_client.dart';
 import 'package:ani_dash/core/commentum/commentum_client.dart';
 import 'package:ani_dash/core/models/auth/user.dart';
+import 'package:ani_dash/core/services/remote_push_service.dart';
 
 part 'auth_notifier.g.dart';
 
@@ -105,6 +106,7 @@ class Auth extends _$Auth {
 
   Future<void> _init() async {
     await Future.wait([_loadAnilistToken(), _loadMalToken()]);
+    await RemotePushService.identifyAniListUser(state.anilistUser?.id);
     await commentumClient.init();
     commentumClient.setActiveProvider(
       state.activePlatform == AuthPlatform.anilist
@@ -216,6 +218,7 @@ class Auth extends _$Auth {
         anilistUser: _buildAnilistUser(userData),
         activePlatform: AuthPlatform.anilist,
       );
+      await RemotePushService.identifyAniListUser(state.anilistUser?.id);
     } finally {
       state = state.copyWith(anilistLoading: false);
     }
@@ -324,6 +327,7 @@ class Auth extends _$Auth {
         await sharedPrefs.remove('anilist-user-cache');
         await commentumClient.logout(CommentumProvider.anilist);
         state = state.copyWith(anilistAccessToken: null, anilistUser: null);
+        await RemotePushService.identifyAniListUser(null);
         break;
       case AuthPlatform.mal:
         await _secureStorage.delete(key: 'mal-token');

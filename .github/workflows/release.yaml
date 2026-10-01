@@ -148,7 +148,10 @@ jobs:
             "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
             "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
             "API_URL": "${{ secrets.API_URL }}",
-            "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"
+            "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}",
+            "ONESIGNAL_APP_ID": "${{ secrets.ONESIGNAL_APP_ID }}",
+            "ADMIN_ANILIST_ID": "8013267",
+            "ANIDASH_ADMIN_API_URL": "${{ secrets.ANIDASH_ADMIN_API_URL }}"
           }
           EOF
 
@@ -157,7 +160,7 @@ jobs:
         run: flutter test test/unit/stream_headers_test.dart
       - name: Build signed universal APK
         run: |
-          flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
+          flutter build apk --release --no-tree-shake-icons --obfuscate --split-debug-info=build/app/outputs/symbols --dart-define-from-file=keys.json
           VERSION=$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)
           mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/AniDash-v${VERSION}-Universal.apk"
       - uses: actions/upload-artifact@v4

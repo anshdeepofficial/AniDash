@@ -43,7 +43,7 @@ class _UpdateDialogState extends State<UpdateDialog>
   bool _awaitingInstallPermission = false;
 
   final String _linuxCmd =
-      'bash <(curl -fsSL https://raw.githubusercontent.com/Darkx-dev/AniDash/main/install.sh)';
+      'bash <(curl -fsSL https://raw.githubusercontent.com/anshdeepofficial1/AniDash/main/install.sh)';
 
   @override
   void initState() {

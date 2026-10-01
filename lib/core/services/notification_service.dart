@@ -59,6 +59,10 @@ class NotificationService {
       StreamController<String>.broadcast();
   Stream<String> get onNotificationRoute => notificationRouteController.stream;
 
+  void openRoute(String route) {
+    if (route.trim().isNotEmpty) notificationRouteController.add(route.trim());
+  }
+
   Future<bool> requestSystemPermission() async {
     if (Platform.isAndroid) {
       final android =
@@ -324,7 +328,6 @@ class NotificationService {
               .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin
               >();
-      await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.requestExactAlarmsPermission();
     }
     await reconcileScheduledReleaseAlerts();

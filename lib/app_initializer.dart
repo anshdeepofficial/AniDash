@@ -23,6 +23,7 @@ import 'package:ani_dash/core/models/settings/download_settings_model.dart';
 import 'package:ani_dash/core/models/settings/content_settings_model.dart';
 import 'package:ani_dash/core/models/universal/universal_news.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/core/services/remote_push_service.dart';
 import 'package:ani_dash/core/models/settings/ui_model.dart';
 import 'package:ani_dash/helpers/ui.dart';
 import 'package:ani_dash/hive/hive_registrar.g.dart';
@@ -58,6 +59,7 @@ class AppInitializer {
     await _initializeWindowManager();
     await _initializeMediaKit();
     try {
+      await RemotePushService.initialize();
       await NotificationService().initialize();
       // Keep the existing periodic worker: replacing it on every launch and
       // immediately checking again causes delayed alerts to burst together.

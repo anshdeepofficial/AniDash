@@ -44,7 +44,11 @@ class ControlsOverlay extends ConsumerWidget {
     if (locked) {
       return Stack(
         children: [
-          _lockedProgress(context, ref),
+          AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: const Duration(milliseconds: 250),
+            child: _lockedProgress(context, ref),
+          ),
           AnimatedOpacity(
             opacity: visible ? 1 : 0,
             duration: const Duration(milliseconds: 250),
