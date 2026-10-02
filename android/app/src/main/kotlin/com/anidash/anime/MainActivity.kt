@@ -37,9 +37,12 @@ class MainActivity : FlutterFragmentActivity() {
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         runOnUiThread {
             when (focusChange) {
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                     audioFocusChannel?.invokeMethod("onAudioFocusLossTransient", null)
+                }
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    // Short notification sounds may temporarily duck media,
+                    // but must not pause and resume video playback.
                 }
                 AudioManager.AUDIOFOCUS_LOSS -> {
                     hasAudioFocus = false
@@ -66,7 +69,7 @@ class MainActivity : FlutterFragmentActivity() {
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(playbackAttributes)
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
-                .setWillPauseWhenDucked(true)
+                .setWillPauseWhenDucked(false)
                 .build()
             audioFocusRequest = request
             am.requestAudioFocus(request)

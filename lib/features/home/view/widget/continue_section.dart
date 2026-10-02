@@ -56,7 +56,7 @@ class ContinueSection extends ConsumerWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final itemWidth = (screenWidth * 0.6).clamp(180.0, 280.0);
     final imageHeight = itemWidth * (9 / 16);
-    final listHeight = imageHeight + 60.0;
+    final listHeight = imageHeight + 78.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,6 +153,16 @@ class ContinueSection extends ConsumerWidget {
                               'episode $nextEpisodeNum'
                       ? 'E$nextEpisodeNum'
                       : 'E$nextEpisodeNum - $resolvedEpisodeTitle';
+              final watchedSeconds = displayEp?.progressInSeconds ?? 0;
+              final totalSeconds = displayEp?.durationInSeconds ?? 0;
+              final remainingSeconds =
+                  totalSeconds > watchedSeconds
+                      ? totalSeconds - watchedSeconds
+                      : 0;
+              final timeLabel =
+                  totalSeconds > 0
+                      ? '${_formatWatchTime(watchedSeconds)} watched · ${_formatWatchTime(remainingSeconds)} left'
+                      : null;
               final cachedThumbnail =
                   _continueEpisodeThumbnailCache['${entry.animeId}:$nextEpisodeNum'];
               final savedThumbnail =
@@ -360,6 +370,18 @@ class ContinueSection extends ConsumerWidget {
                                 fontSize: 11,
                               ),
                             ),
+                            if (timeLabel != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                timeLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -373,6 +395,14 @@ class ContinueSection extends ConsumerWidget {
         const SizedBox(height: 24),
       ],
     );
+  }
+
+  String _formatWatchTime(int seconds) {
+    final safe = seconds.clamp(0, 24 * 60 * 60);
+    final minutes = safe ~/ 60;
+    final remainder = safe % 60;
+    if (minutes == 0) return '${remainder}s';
+    return '$minutes:${remainder.toString().padLeft(2, '0')}';
   }
 
   void _persistEpisodeThumbnail(

@@ -136,7 +136,12 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
 
     if (Platform.isAndroid || Platform.isIOS) {
       UIHelper.disableVolumeInterception();
-      UIHelper.removeVolumeKeyHandler();
+      // Do not clear the shared platform-channel handler here. During an
+      // episode switch the outgoing player can dispose after the incoming
+      // player has already registered its callback, which used to remove the
+      // new callback and leave hardware keys without the in-player overlay.
+      // Interception is disabled above, so retaining the last callback is safe
+      // after leaving the player as well.
       FlutterVolumeController.removeListener();
       FlutterVolumeController.updateShowSystemUI(true);
       try {

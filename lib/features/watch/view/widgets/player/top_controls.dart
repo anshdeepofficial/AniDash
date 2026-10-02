@@ -38,6 +38,21 @@ class TopControls extends ConsumerWidget {
     };
   }
 
+  String? _cleanEpisodeTitle(String? rawTitle) {
+    final title =
+        (rawTitle ?? '')
+            .trim()
+            .replaceFirst(
+              RegExp(
+                r'^(?:(?:episode|ep)|e)\s*#?\s*\d+(?:\.\d+)?\s*(?:[-:—|/]+\s*)?',
+                caseSensitive: false,
+              ),
+              '',
+            )
+            .trim();
+    return title.isEmpty ? null : title;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedEp = ref.watch(
@@ -45,7 +60,7 @@ class TopControls extends ConsumerWidget {
     );
     final sources = ref.watch(episodeDataProvider.select((e) => e.sources));
 
-    final episodeTitle = ref.watch(
+    final rawEpisodeTitle = ref.watch(
       episodeListProvider.select((s) {
         if (selectedEp == null) return null;
         return s.episodes
@@ -53,6 +68,7 @@ class TopControls extends ConsumerWidget {
             ?.title;
       }),
     );
+    final episodeTitle = _cleanEpisodeTitle(rawEpisodeTitle);
 
     final animeId = ref.watch(episodeListProvider.select((s) => s.animeId));
     final isIncognito =

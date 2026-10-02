@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:dartotsu_extension_bridge/dartotsu_extension_bridge.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/jikan/models/jikan_media.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
@@ -96,6 +97,68 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   @override
   EpisodeListState build() => const EpisodeListState();
 
+  String _correctedTitleCacheKey(
+    String? mediaId,
+    String? animeId,
+    String animeTitle,
+  ) =>
+      'corrected_episode_titles_v1_${mediaId ?? animeId ?? animeTitle.toLowerCase().trim()}';
+
+  Future<List<EpisodeDataModel>> _applyPersistedCorrectedTitles(
+    List<EpisodeDataModel> episodes, {
+    required String animeTitle,
+    String? animeId,
+    String? mediaId,
+  }) async {
+    final raw = (await SharedPreferences.getInstance()).getString(
+      _correctedTitleCacheKey(mediaId, animeId, animeTitle),
+    );
+    if (raw == null || raw.isEmpty) return episodes;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return episodes;
+      return episodes
+          .map((episode) {
+            final number = episode.number;
+            if (number == null) return episode;
+            final corrected = decoded[number.toString()]?.toString().trim();
+            return corrected == null || corrected.isEmpty
+                ? episode
+                : episode.copyWith(title: corrected);
+          })
+          .toList(growable: false);
+    } catch (_) {
+      return episodes;
+    }
+  }
+
+  Future<void> _persistCorrectedTitles(
+    List<EpisodeDataModel> episodes, {
+    required String animeTitle,
+    String? animeId,
+    String? mediaId,
+  }) async {
+    final titles = <String, String>{};
+    for (final episode in episodes) {
+      final number = episode.number;
+      final title = episode.title?.trim() ?? '';
+      if (number == null ||
+          title.isEmpty ||
+          RegExp(
+            r'^(episode|ep\.?)\s*\d+$',
+            caseSensitive: false,
+          ).hasMatch(title)) {
+        continue;
+      }
+      titles[number.toString()] = title;
+    }
+    if (titles.isEmpty) return;
+    await (await SharedPreferences.getInstance()).setString(
+      _correctedTitleCacheKey(mediaId, animeId, animeTitle),
+      jsonEncode(titles),
+    );
+  }
+
   // --- Core Fetching Logic ---
 
   Future<List<EpisodeDataModel>> fetchEpisodes({
@@ -138,11 +201,19 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     // 2. Use provided episodes if available
     if (episodes.isNotEmpty) {
       AppLogger.success('Using ${episodes.length} pre-provided episodes');
-      final normalized = _normalizeEpisodeTitles(
+      var normalized = _normalizeEpisodeTitles(
         episodes,
         animeTitle: animeTitle,
         isMovie: isMovie,
       );
+      if (!force) {
+        normalized = await _applyPersistedCorrectedTitles(
+          normalized,
+          animeTitle: animeTitle,
+          animeId: animeId,
+          mediaId: mediaId,
+        );
+      }
       if (requestGeneration != _requestGeneration) return const [];
       state = state.copyWith(episodes: normalized, isLoading: false);
       _syncMetadataIfEnabled();
@@ -158,6 +229,14 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
       animeTitle: animeTitle,
       isMovie: isMovie,
     );
+    if (!force) {
+      fetched = await _applyPersistedCorrectedTitles(
+        fetched,
+        animeTitle: animeTitle,
+        animeId: animeId,
+        mediaId: mediaId,
+      );
+    }
 
     if (fetched.isEmpty) {
       final titleLow = animeTitle.toLowerCase();
@@ -199,11 +278,17 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     final mediaId = state.mediaId;
     if (id == null || title == null) return;
 
-    await fetchEpisodes(
+    final refreshed = await fetchEpisodes(
       animeId: id,
       animeTitle: title,
       mediaId: mediaId,
       force: true,
+    );
+    await _persistCorrectedTitles(
+      refreshed,
+      animeTitle: title,
+      animeId: id,
+      mediaId: mediaId,
     );
   }
 

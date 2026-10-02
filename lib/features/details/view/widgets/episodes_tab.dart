@@ -2006,9 +2006,11 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
     final progressFraction =
         inProgress ? (watchedSeconds / totalSeconds).clamp(0.0, 1.0) : 0.0;
 
+    final remainingSeconds =
+        totalSeconds > watchedSeconds ? totalSeconds - watchedSeconds : 0;
     final resumeText =
         inProgress
-            ? 'Resume at ${_formatDuration(watchedSeconds)}'
+            ? '${_formatDuration(watchedSeconds)} watched · ${_formatDuration(remainingSeconds)} left'
             : (progress?.isCompleted == true ? 'Completed' : 'Next to play');
 
     final thumbUrl =
