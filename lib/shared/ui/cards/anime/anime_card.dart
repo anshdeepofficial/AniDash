@@ -70,13 +70,18 @@ class _AnimeCardState extends State<AnimeCard> {
                     progress: widget.progress,
                   ),
                   Positioned(
-                    top: 8,
+                    top:
+                        widget.mode == AnimeCardMode.manga &&
+                                widget.anime.isMature
+                            ? 34
+                            : 8,
                     left: 8,
                     child: SeasonBadge(anime: widget.anime),
                   ),
-                  if (widget.anime.isMature)
+                  if (widget.anime.isMature &&
+                      widget.mode != AnimeCardMode.manga)
                     Positioned(
-                      top: 8,
+                      top: widget.anime.averageScore != null ? 42 : 8,
                       right: 8,
                       child: AdultBadge(anime: widget.anime),
                     ),

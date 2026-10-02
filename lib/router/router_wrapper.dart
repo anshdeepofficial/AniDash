@@ -104,6 +104,32 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
   StreamSubscription<String>? _updateTapSubscription;
   StreamSubscription<String>? _notificationRouteSubscription;
   ProviderSubscription? _updateSettingsSub;
+  bool _deferredUpdateCheck = false;
+  bool _wasWatchingVideo = false;
+  GoRouter? _goRouter;
+
+  bool get _isWatchingVideo {
+    if (!mounted) return false;
+    final router = _goRouter ?? GoRouter.of(context);
+    return router.routerDelegate.currentConfiguration.uri.path.startsWith(
+      '/watch/',
+    );
+  }
+
+  void _handleRouteChange() {
+    if (!mounted) return;
+    final isWatching = _isWatchingVideo;
+    final justLeftPlayer = _wasWatchingVideo && !isWatching;
+    _wasWatchingVideo = isWatching;
+    if (justLeftPlayer && _deferredUpdateCheck) {
+      _deferredUpdateCheck = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _checkForScheduledUpdate(isAppOpen: true, force: true);
+        }
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -145,6 +171,9 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
       _startPeriodicForegroundUpdateCheck();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _wasWatchingVideo = _isWatchingVideo;
+      _goRouter = GoRouter.of(context);
+      _goRouter!.routerDelegate.addListener(_handleRouteChange);
       _openDownloadsOffline();
       try {
         await ref.read(permissionsProvider.notifier).checkAll();
@@ -160,6 +189,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
 
   @override
   void dispose() {
+    _goRouter?.routerDelegate.removeListener(_handleRouteChange);
     SharedPreferences.getInstance().then(
       (prefs) => prefs.setBool('is_app_open', false),
     );
@@ -204,6 +234,10 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     bool force = false,
   }) async {
     if (_updateCheckInProgress || !mounted) return;
+    if (_isWatchingVideo) {
+      _deferredUpdateCheck = true;
+      return;
+    }
     final settings = ref.read(updateSettingsProvider);
     if (!settings.autoCheckEnabled && !force) return;
 
@@ -227,6 +261,12 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     try {
       final updateInfo = await UpdateService().checkForUpdate();
       if (updateInfo != null && mounted) {
+        // Never interrupt playback with an update prompt. Preserve the check
+        // and present it immediately after the user leaves the player.
+        if (_isWatchingVideo) {
+          _deferredUpdateCheck = true;
+          return;
+        }
         final latest = updateInfo.version.replaceFirst('v', '').trim();
 
         // Check if user snoozed ("Remind in 1 hour" or "Skip for today")
