@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 function badge(res, message, color) {
   return res.status(200).json({
     schemaVersion: 1,
-    label: 'active users (30d)',
+    label: 'actual users (30d)',
     message,
     color,
     namedLogo: 'android',

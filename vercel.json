@@ -1,5 +1,10 @@
 {
   "outputDirectory": "website",
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60
+    }
+  },
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
