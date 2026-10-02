@@ -34,14 +34,22 @@ class DeveloperAccessService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_blockedKey) ?? false) return false;
-    final response = await http.post(
-      Uri.parse('$ANIDASH_ADMIN_API_URL/admin-unlock'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'pin': pin}),
-    );
+    late final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse('$ANIDASH_ADMIN_API_URL/admin-unlock'),
+            headers: {
+              'Authorization': 'Bearer $accessToken',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'pin': pin}),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw const DeveloperVerificationUnavailable();
+    }
     if (response.statusCode == 200) {
       await prefs.setBool(_unlockedKey, true);
       await prefs.remove(_attemptsKey);
@@ -53,7 +61,29 @@ class DeveloperAccessService {
       await prefs.setInt(_attemptsKey, used);
       if (used >= 3) await prefs.setBool(_blockedKey, true);
     }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    throw Exception(body['error'] ?? 'Developer verification failed');
+    String? message;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        message =
+            decoded['error']?.toString() ?? decoded['message']?.toString();
+      }
+    } catch (_) {}
+    if (response.statusCode != 401 && response.statusCode != 403) {
+      throw DeveloperVerificationUnavailable(message);
+    }
+    throw Exception(message ?? 'The developer PIN was not accepted');
   }
+}
+
+class DeveloperVerificationUnavailable implements Exception {
+  const DeveloperVerificationUnavailable([this.details]);
+
+  final String? details;
+
+  @override
+  String toString() =>
+      details?.trim().isNotEmpty == true
+          ? 'Developer verification is temporarily unavailable: $details'
+          : 'Developer verification is temporarily unavailable. Please try again later.';
 }

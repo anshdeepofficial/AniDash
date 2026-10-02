@@ -83,7 +83,9 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            blocked
+            error is DeveloperVerificationUnavailable
+                ? error.toString()
+                : blocked
                 ? 'Developer access disabled on this installation.'
                 : '${error.toString().replaceFirst('Exception: ', '')}. $remaining attempts left.',
           ),
@@ -205,6 +207,39 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'Active today',
+                  value: _stats?['activeToday'],
+                  icon: Iconsax.activity,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(
+                  label: 'Active 7 days',
+                  value: _stats?['active7Days'],
+                  icon: Iconsax.calendar_1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatCard(
+                  label: 'Active 30 days',
+                  value: _stats?['active30Days'],
+                  icon: Iconsax.chart_1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Activity totals are anonymous aggregates. Names and watch history are never included.',
+            style: TextStyle(color: colors.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
           TextField(

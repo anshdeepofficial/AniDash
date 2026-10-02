@@ -24,6 +24,9 @@ class AdminBroadcastService {
     return {
       'totalDevices': (json['totalDevices'] as num?)?.toInt() ?? 0,
       'subscribedDevices': (json['subscribedDevices'] as num?)?.toInt() ?? 0,
+      'activeToday': (json['activeToday'] as num?)?.toInt() ?? 0,
+      'active7Days': (json['active7Days'] as num?)?.toInt() ?? 0,
+      'active30Days': (json['active30Days'] as num?)?.toInt() ?? 0,
     };
   }
 

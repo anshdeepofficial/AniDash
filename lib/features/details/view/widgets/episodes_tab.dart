@@ -81,6 +81,10 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   final TextEditingController _searchController = TextEditingController();
   bool _showSearch = false;
   bool _isSelecting = false;
+  final ScrollController _episodesScrollController = ScrollController();
+  final GlobalKey _currentEpisodeKey = GlobalKey();
+  int? _autoScrollEpisode;
+  String? _lastAutoScrollToken;
   @override
   void initState() {
     super.initState();
@@ -93,7 +97,50 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
   void dispose() {
     _selectionNotifier.removeListener(_onSelectionChanged);
     _searchController.dispose();
+    _episodesScrollController.dispose();
     super.dispose();
+  }
+
+  void _scheduleCurrentEpisodeScroll({
+    required int episodeNumber,
+    required List<EpisodeDataModel> visibleEpisodes,
+    required String selectedRange,
+  }) {
+    final targetIndex = visibleEpisodes.indexWhere(
+      (episode) => episode.number == episodeNumber,
+    );
+    if (targetIndex < 0 || visibleEpisodes.isEmpty) return;
+
+    final token = '${widget.mediaId}:$selectedRange:$episodeNumber';
+    if (_lastAutoScrollToken == token) return;
+    _lastAutoScrollToken = token;
+    _autoScrollEpisode = episodeNumber;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !_episodesScrollController.hasClients) return;
+
+      final maxExtent = _episodesScrollController.position.maxScrollExtent;
+      final fraction =
+          visibleEpisodes.length <= 1
+              ? 0.0
+              : targetIndex / (visibleEpisodes.length - 1);
+      await _episodesScrollController.animateTo(
+        (maxExtent * fraction).clamp(0.0, maxExtent),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+
+      if (!mounted) return;
+      final targetContext = _currentEpisodeKey.currentContext;
+      if (targetContext != null && targetContext.mounted) {
+        await Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.45,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   void _onSelectionChanged() {
@@ -502,9 +549,18 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
       }
     }
 
+    if (watchProgress != null && visibleEpisodes.isNotEmpty) {
+      _scheduleCurrentEpisodeScroll(
+        episodeNumber: watchProgress.currentEpisode,
+        visibleEpisodes: visibleEpisodes,
+        selectedRange: state.selectedRange,
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () async => await notifier.refresh(),
       child: CustomScrollView(
+        controller: _episodesScrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
@@ -1345,6 +1401,9 @@ class _EpisodesTabState extends ConsumerState<EpisodesTab>
           isSelectionMode: _isSelectionMode,
         ),
       };
+      if (epNum == _autoScrollEpisode) {
+        return KeyedSubtree(key: _currentEpisodeKey, child: itemWidget);
+      }
       return itemWidget;
     }
 

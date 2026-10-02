@@ -145,7 +145,7 @@ jobs:
           {
             "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
             "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
-            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
+            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID || 'dafce95c66734efefa19650c84178416' }}",
             "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
             "API_URL": "${{ secrets.API_URL }}",
             "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}",
@@ -189,7 +189,7 @@ jobs:
           {
             "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
             "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
-            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
+            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID || 'dafce95c66734efefa19650c84178416' }}",
             "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
             "API_URL": "${{ secrets.API_URL }}",
             "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"
@@ -227,7 +227,7 @@ jobs:
           {
             "ANILIST_CLIENT_ID": "${{ secrets.ANILIST_CLIENT_ID }}",
             "ANILIST_CLIENT_SECRET": "${{ secrets.ANILIST_CLIENT_SECRET }}",
-            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID }}",
+            "MAL_CLIENT_ID": "${{ secrets.MAL_CLIENT_ID || 'dafce95c66734efefa19650c84178416' }}",
             "MAL_CLIENT_SECRET": "${{ secrets.MAL_CLIENT_SECRET }}",
             "API_URL": "${{ secrets.API_URL }}",
             "COMMENTUM_API_URL": "${{ secrets.COMMENTUM_API_URL }}"

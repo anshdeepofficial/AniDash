@@ -64,20 +64,51 @@ class MyApp extends ConsumerWidget {
                 ? darkDynamic
                 : null;
 
+        final customLightScheme =
+            theme.flexScheme == FlexScheme.custom.name
+                ? ColorScheme.fromSeed(
+                  seedColor: Color(theme.customPrimaryColor),
+                  brightness: Brightness.light,
+                ).copyWith(
+                  primary: Color(theme.customPrimaryColor),
+                  secondary: Color(theme.customSecondaryColor),
+                  tertiary: Color(theme.customTertiaryColor),
+                  surface: Color(theme.customSurfaceColor),
+                )
+                : null;
+        final customDarkScheme =
+            theme.flexScheme == FlexScheme.custom.name
+                ? ColorScheme.fromSeed(
+                  seedColor: Color(theme.customPrimaryColor),
+                  brightness: Brightness.dark,
+                ).copyWith(
+                  primary: Color(theme.customPrimaryColor),
+                  secondary: Color(theme.customSecondaryColor),
+                  tertiary: Color(theme.customTertiaryColor),
+                  surface: Color(theme.customSurfaceColor),
+                )
+                : null;
+
         final lightTheme = FlexThemeData.light(
-          colorScheme: lightScheme,
+          colorScheme: lightScheme ?? customLightScheme,
           swapColors: theme.swapColors,
           blendLevel: theme.blendLevel,
-          scheme: lightScheme != null ? null : theme.flexSchemeEnum,
+          scheme:
+              lightScheme != null || customLightScheme != null
+                  ? null
+                  : theme.flexSchemeEnum,
           useMaterial3: theme.useMaterial3,
           textTheme: GoogleFonts.montserratTextTheme(),
         );
 
         final darkTheme = FlexThemeData.dark(
-          colorScheme: darkScheme,
+          colorScheme: darkScheme ?? customDarkScheme,
           swapColors: theme.swapColors,
           blendLevel: theme.amoled ? 0 : theme.blendLevel,
-          scheme: darkScheme != null ? null : theme.flexSchemeEnum,
+          scheme:
+              darkScheme != null || customDarkScheme != null
+                  ? null
+                  : theme.flexSchemeEnum,
           darkIsTrueBlack: theme.amoled,
           useMaterial3: theme.useMaterial3,
           textTheme: GoogleFonts.montserratTextTheme(),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:collection/collection.dart';
@@ -8,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/jikan/jikan_service.dart';
 import 'package:ani_dash/core/jikan/models/jikan_media.dart';
 import 'package:ani_dash/core/models/anime/episode_model.dart';
+import 'package:ani_dash/core/network/http_client.dart';
 import 'package:ani_dash/core/services/anime_filler_service.dart';
 import 'package:ani_dash/shared/providers/anime_source_provider.dart';
 import 'package:ani_dash/core/registery/sources/anime/anime_provider.dart';
@@ -409,6 +411,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
   // --- Metadata & Episode Name Syncing ---
 
   static final Map<String, List<EpisodeDataModel>> _justAnimeTitlesCache = {};
+  static final Map<String, Map<int, String>> _tvMazeThumbnailCache = {};
 
   void _syncMetadataIfEnabled() {
     if (state.episodes.isEmpty || state.animeTitle == null) {
@@ -435,9 +438,110 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
     // 2. Fetch and enrich episode names & rich metadata from JustAnime
     await _syncWithJustAnime();
 
-    // 3. Fallback / supplementary title and metadata sync via Jikan (MAL)
+    // 3. Long-running shows often have only a small subset of images in the
+    // streaming catalogue. TVMaze supplies episode stills independently of
+    // playback, so it is safe to use only for missing thumbnails.
+    await _syncMissingThumbnailsFromTvMaze();
+
+    // 4. Fallback / supplementary title and metadata sync via Jikan (MAL)
     await _syncWithJikan();
   }
+
+  Future<void> _syncMissingThumbnailsFromTvMaze() async {
+    final currentEpisodes = state.episodes;
+    final currentTitle = state.animeTitle?.trim();
+    if (currentEpisodes.length < 100 || currentTitle == null) return;
+
+    final missingCount =
+        currentEpisodes
+            .where((episode) => episode.thumbnail?.trim().isNotEmpty != true)
+            .length;
+    if (missingCount < currentEpisodes.length ~/ 2) return;
+
+    final mediaId = state.mediaId;
+    final animeId = state.animeId;
+    final cacheKey = currentTitle.toLowerCase();
+
+    try {
+      var thumbnails = _tvMazeThumbnailCache[cacheKey];
+      if (thumbnails == null) {
+        final searchUri = Uri.https('api.tvmaze.com', '/search/shows', {
+          'q': currentTitle,
+        });
+        final searchResponse = await UniversalHttpClient.instance
+            .get(searchUri)
+            .timeout(const Duration(seconds: 15));
+        final searchResults = jsonDecode(searchResponse.body) as List<dynamic>;
+        final normalizedTitle = _normalizeMetadataTitle(currentTitle);
+
+        Map<String, dynamic>? matchedShow;
+        for (final result in searchResults) {
+          final show = Map<String, dynamic>.from(
+            (result as Map)['show'] as Map,
+          );
+          final showName = show['name']?.toString() ?? '';
+          final showType = show['type']?.toString().toLowerCase() ?? '';
+          if (_normalizeMetadataTitle(showName) == normalizedTitle &&
+              showType == 'animation') {
+            matchedShow = show;
+            break;
+          }
+        }
+        if (matchedShow == null) return;
+
+        final showId = matchedShow['id'];
+        if (showId == null) return;
+        final episodeResponse = await UniversalHttpClient.instance
+            .get(Uri.parse('https://api.tvmaze.com/shows/$showId/episodes'))
+            .timeout(const Duration(seconds: 25));
+        final rawEpisodes = jsonDecode(episodeResponse.body) as List<dynamic>;
+        thumbnails = <int, String>{};
+        var absoluteNumber = 0;
+        for (final raw in rawEpisodes) {
+          final episode = Map<String, dynamic>.from(raw as Map);
+          if (episode['type']?.toString().toLowerCase() != 'regular') continue;
+          absoluteNumber++;
+          final image = episode['image'];
+          if (image is! Map) continue;
+          final url =
+              image['original']?.toString() ?? image['medium']?.toString();
+          if (url != null && url.isNotEmpty) thumbnails[absoluteNumber] = url;
+        }
+        _tvMazeThumbnailCache[cacheKey] = thumbnails;
+      }
+
+      if (thumbnails.isEmpty) return;
+      final latestState = state;
+      if (latestState.mediaId != mediaId ||
+          latestState.animeId != animeId ||
+          latestState.animeTitle != currentTitle) {
+        return;
+      }
+
+      final updated = List<EpisodeDataModel>.of(latestState.episodes);
+      var added = 0;
+      for (var index = 0; index < updated.length; index++) {
+        final episode = updated[index];
+        if (episode.thumbnail?.trim().isNotEmpty == true) continue;
+        final number = episode.number ?? index + 1;
+        final thumbnail = thumbnails[number];
+        if (thumbnail == null) continue;
+        updated[index] = episode.copyWith(thumbnail: thumbnail);
+        added++;
+      }
+      if (added > 0) {
+        state = state.copyWith(episodes: updated);
+        AppLogger.success(
+          'Added $added missing episode thumbnails from TVMaze for "$currentTitle"',
+        );
+      }
+    } catch (error) {
+      AppLogger.d('TVMaze thumbnail enrichment skipped: $error');
+    }
+  }
+
+  String _normalizeMetadataTitle(String title) =>
+      title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 
   Future<void> _syncFillerInfo() async {
     try {
@@ -484,6 +588,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
 
     final currentTitle = state.animeTitle!;
     final mediaId = state.mediaId;
+    final animeId = state.animeId;
 
     try {
       final registry = ref.read(animeSourceRegistryProvider);
@@ -587,7 +692,8 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
         }
 
         final updated = List<EpisodeDataModel>.of(state.episodes);
-        int enrichedCount = 0;
+        int enrichedTitleCount = 0;
+        int enrichedThumbnailCount = 0;
 
         for (var i = 0; i < updated.length; i++) {
           final epNum = updated[i].number ?? (i + 1);
@@ -615,11 +721,13 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                 caseSensitive: false,
               ).hasMatch(justTitle);
 
-          if (!isJustGeneric &&
-              (isCurrentGeneric || currentEpTitle != justTitle)) {
+          // Never replace a real source title with a catalogue enrichment.
+          // A stale match previously labelled One Piece 183+ as Alabasta
+          // while the correct Skypiea stream was playing.
+          if (!isJustGeneric && isCurrentGeneric) {
             ep = ep.copyWith(title: justTitle);
             modified = true;
-            enrichedCount++;
+            enrichedTitleCount++;
           }
 
           // Thumbnail: if current is empty or missing, use JustAnime's HD TMDB thumbnail
@@ -628,6 +736,7 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
               justEp.thumbnail!.isNotEmpty) {
             ep = ep.copyWith(thumbnail: justEp.thumbnail);
             modified = true;
+            enrichedThumbnailCount++;
           }
 
           // Description: if current is empty, use JustAnime's description
@@ -649,9 +758,23 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
           }
         }
 
-        if (enrichedCount > 0) {
+        // Metadata sync runs in the background. Never let a late response from
+        // the previously opened anime overwrite the current episode list.
+        final isSameAnime =
+            state.mediaId == mediaId &&
+            state.animeId == animeId &&
+            state.animeTitle == currentTitle &&
+            state.episodes.length == updated.length;
+        final metadataChanged =
+            isSameAnime &&
+            updated.indexed.any(
+              (entry) => !identical(entry.$2, state.episodes[entry.$1]),
+            );
+
+        if (isSameAnime && metadataChanged) {
           AppLogger.success(
-            'Successfully enriched $enrichedCount episode names from JustAnime for "${state.animeTitle}"',
+            'Enriched $enrichedTitleCount titles and '
+            '$enrichedThumbnailCount thumbnails from JustAnime for "$currentTitle"',
           );
           state = state.copyWith(episodes: updated);
         }
@@ -756,6 +879,13 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
             }
             if (syncedTitle != null && syncedTitle.isNotEmpty) {
               final currentEpTitle = updated[i].title ?? '';
+              final currentPlainTitle =
+                  currentEpTitle
+                      .replaceFirst(
+                        RegExp(r'^EP\s*\d+\s*-\s*', caseSensitive: false),
+                        '',
+                      )
+                      .trim();
               final isGeneric =
                   currentEpTitle.isEmpty ||
                   RegExp(
@@ -763,9 +893,20 @@ class EpisodeListNotifier extends _$EpisodeListNotifier {
                     caseSensitive: false,
                   ).hasMatch(currentEpTitle.trim());
 
-              if (isGeneric) {
+              // Jikan is keyed by the real episode number and becomes the
+              // authoritative display title after the MAL series is matched.
+              if (isGeneric || currentEpTitle != 'EP $epNum - $syncedTitle') {
                 updated[i] = updated[i].copyWith(
                   title: 'EP $epNum - $syncedTitle',
+                  // Title and image arrive as one catalogue record. If its
+                  // title disagrees with Jikan's number-keyed title, its image
+                  // is from that same wrong record (seen on One Piece 183-200),
+                  // so fall back to the anime cover instead of showing a false
+                  // episode thumbnail.
+                  clearThumbnail:
+                      !isGeneric &&
+                      currentPlainTitle.toLowerCase() !=
+                          syncedTitle.trim().toLowerCase(),
                 );
                 syncedCount++;
               }

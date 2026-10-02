@@ -9,6 +9,7 @@
 <!-- Release information -->
 [![Latest Release](https://img.shields.io/github/v/release/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Latest&cacheSeconds=300)](https://github.com/anshdeepofficial1/AniDash/releases/latest)
 [![Total Downloads](https://img.shields.io/github/downloads/anshdeepofficial1/AniDash/total?style=for-the-badge&logo=android&label=Total%20Downloads&cacheSeconds=300)](https://github.com/anshdeepofficial1/AniDash/releases)
+[![Active Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fanidashweb.vercel.app%2Fapi%2Fpublic-stats&style=for-the-badge&cacheSeconds=900)](https://anidashweb.vercel.app/)
 
 <!-- Community and project information -->
 [![Stars](https://img.shields.io/github/stars/anshdeepofficial1/AniDash?style=for-the-badge&logo=github&label=Stars&cacheSeconds=300)](https://github.com/anshdeepofficial1/AniDash/stargazers)

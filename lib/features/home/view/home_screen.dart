@@ -246,6 +246,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final layout = ref.watch(homeLayoutProvider);
     final sections = layout.where((s) => s.enabled).toList();
 
+    if (state.isLoading && state.homePage == null) {
+      return Scaffold(
+        body: ListView(
+          padding: const EdgeInsets.only(top: 10, bottom: 100),
+          children: const [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: HeaderSection(isDesktop: false),
+            ),
+            _HomeLoadingSkeleton(),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
@@ -280,11 +295,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   );
                 }
 
-                if (state.isLoading)
-                  return const SizedBox(
-                    height: 200,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
                 if (state.error != null)
                   return Center(child: Text('Error: ${state.error}'));
 
@@ -296,6 +306,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomeLoadingSkeleton extends StatelessWidget {
+  const _HomeLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(10, 12, 10, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(height: 210, radius: 20),
+          SizedBox(height: 28),
+          _SkeletonBox(width: 170, height: 24),
+          SizedBox(height: 14),
+          _SkeletonCardRow(),
+          SizedBox(height: 28),
+          _SkeletonBox(width: 140, height: 24),
+          SizedBox(height: 14),
+          _SkeletonCardRow(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonCardRow extends StatelessWidget {
+  const _SkeletonCardRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 205,
+      child: Row(
+        children: [
+          Expanded(child: _SkeletonBox(height: 205, radius: 14)),
+          SizedBox(width: 12),
+          Expanded(child: _SkeletonBox(height: 205, radius: 14)),
+          SizedBox(width: 12),
+          Expanded(child: _SkeletonBox(height: 205, radius: 14)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({this.width, required this.height, this.radius = 8});
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }

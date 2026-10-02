@@ -120,14 +120,15 @@ class NotificationInboxService {
       return [];
     }
     try {
-      final list = (jsonDecode(raw) as List<dynamic>)
-          .whereType<Map>()
-          .map(
-            (item) =>
-                InboxNotification.fromJson(Map<String, dynamic>.from(item)),
-          )
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final list =
+          (jsonDecode(raw) as List<dynamic>)
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    InboxNotification.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       itemsNotifier.value = list;
       unreadCountNotifier.value = list.where((item) => !item.isRead).length;
       return list;
@@ -186,7 +187,9 @@ class NotificationInboxService {
     for (final item in items) {
       if (item.id == id && item.systemNotificationId != null) {
         try {
-          await NotificationService().cancelNotification(item.systemNotificationId!);
+          await NotificationService().cancelNotification(
+            item.systemNotificationId!,
+          );
         } catch (_) {}
       }
     }
@@ -200,23 +203,27 @@ class NotificationInboxService {
   Future<void> markReadByRouteOrMedia(String route, String? mediaId) async {
     final items = (await load()).toList();
     var changed = false;
-    final updated = items.map((item) {
-      final matchesRoute = item.route != null &&
-          (item.route == route ||
-              route.contains(item.route!) ||
-              item.route!.contains(route));
-      final matchesMedia = mediaId != null && item.mediaId == mediaId;
-      if (!item.isRead && (matchesRoute || matchesMedia)) {
-        changed = true;
-        if (item.systemNotificationId != null) {
-          try {
-            NotificationService().cancelNotification(item.systemNotificationId!);
-          } catch (_) {}
-        }
-        return item.copyWith(isRead: true);
-      }
-      return item;
-    }).toList();
+    final updated =
+        items.map((item) {
+          final matchesRoute =
+              item.route != null &&
+              (item.route == route ||
+                  route.contains(item.route!) ||
+                  item.route!.contains(route));
+          final matchesMedia = mediaId != null && item.mediaId == mediaId;
+          if (!item.isRead && (matchesRoute || matchesMedia)) {
+            changed = true;
+            if (item.systemNotificationId != null) {
+              try {
+                NotificationService().cancelNotification(
+                  item.systemNotificationId!,
+                );
+              } catch (_) {}
+            }
+            return item.copyWith(isRead: true);
+          }
+          return item;
+        }).toList();
 
     if (changed) {
       await _save(updated);
@@ -229,7 +236,9 @@ class NotificationInboxService {
     for (final item in items) {
       if (item.id == id && item.systemNotificationId != null) {
         try {
-          await NotificationService().cancelNotification(item.systemNotificationId!);
+          await NotificationService().cancelNotification(
+            item.systemNotificationId!,
+          );
         } catch (_) {}
       }
     }
@@ -243,9 +252,7 @@ class NotificationInboxService {
       await NotificationService().cancelAllNotifications();
     } catch (_) {}
     final items = (await load()).toList();
-    await _save([
-      for (final item in items) item.copyWith(isRead: true),
-    ]);
+    await _save([for (final item in items) item.copyWith(isRead: true)]);
     await unreadCount();
   }
 
@@ -257,6 +264,30 @@ class NotificationInboxService {
     unreadCountNotifier.value = 0;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
+  }
+
+  Future<void> removeNews() async {
+    final items = (await load()).toList();
+    final newsItems = items.where(
+      (item) =>
+          item.notificationType == 'news' ||
+          item.id.startsWith('news:') ||
+          item.route == '/news',
+    );
+    for (final item in newsItems) {
+      if (item.systemNotificationId != null) {
+        await NotificationService().cancelNotification(
+          item.systemNotificationId!,
+        );
+      }
+    }
+    items.removeWhere(
+      (item) =>
+          item.notificationType == 'news' ||
+          item.id.startsWith('news:') ||
+          item.route == '/news',
+    );
+    await _save(items);
   }
 
   Future<void> _save(List<InboxNotification> items) async {

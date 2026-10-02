@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flex_color_scheme/flex_color_scheme.dart';
+import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:go_router/go_router.dart';
 import 'package:ani_dash/shared/providers/settings/theme_notifier.dart';
+import 'package:ani_dash/core/models/settings/theme_model.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_item.dart';
 import 'package:ani_dash/features/settings/view/widgets/settings_section.dart';
 import 'package:ani_dash/shared/ui/brand_logo.dart';
@@ -299,6 +301,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
 
                         return ListTile(
                           onTap: () {
+                            if (scheme == FlexScheme.custom) {
+                              _showCustomColorEditor(
+                                context,
+                                themeNotifier,
+                                theme,
+                              );
+                              return;
+                            }
                             themeNotifier.updateSettings(
                               (prev) => prev.copyWith(flexScheme: scheme.name),
                             );
@@ -367,6 +377,231 @@ class ThemeSettingsScreen extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+
+  Future<void> _showCustomColorEditor(
+    BuildContext context,
+    ThemeSettingsNotifier themeNotifier,
+    ThemeModel current,
+  ) async {
+    var primary = Color(current.customPrimaryColor);
+    var secondary = Color(current.customSecondaryColor);
+    var tertiary = Color(current.customTertiaryColor);
+    var surface = Color(current.customSurfaceColor);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) {
+              final preview = ColorScheme.fromSeed(
+                seedColor: primary,
+                brightness: Theme.of(context).brightness,
+              ).copyWith(
+                primary: primary,
+                secondary: secondary,
+                tertiary: tertiary,
+                surface: surface,
+              );
+
+              Future<void> editColor(
+                Color initial,
+                ValueChanged<Color> update,
+              ) async {
+                final selected = await _pickCustomColor(context, initial);
+                if (selected != null) setSheetState(() => update(selected));
+              }
+
+              return SafeArea(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Custom Color Scheme',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _buildSimpleSkeleton(preview),
+                      ),
+                      const SizedBox(height: 12),
+                      Flexible(
+                        child: ListView(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          children: [
+                            _customColorTile(
+                              context,
+                              'Primary',
+                              'Buttons, active controls and highlights',
+                              primary,
+                              () => editColor(
+                                primary,
+                                (value) => primary = value,
+                              ),
+                            ),
+                            _customColorTile(
+                              context,
+                              'Secondary',
+                              'Supporting controls and containers',
+                              secondary,
+                              () => editColor(
+                                secondary,
+                                (value) => secondary = value,
+                              ),
+                            ),
+                            _customColorTile(
+                              context,
+                              'Tertiary',
+                              'Accents, badges and complementary elements',
+                              tertiary,
+                              () => editColor(
+                                tertiary,
+                                (value) => tertiary = value,
+                              ),
+                            ),
+                            _customColorTile(
+                              context,
+                              'Surface',
+                              'Pages, cards and background surfaces',
+                              surface,
+                              () => editColor(
+                                surface,
+                                (value) => surface = value,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(sheetContext),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () {
+                                  themeNotifier.updateSettings(
+                                    (previous) => previous.copyWith(
+                                      flexScheme: FlexScheme.custom.name,
+                                      customPrimaryColor: primary.toARGB32(),
+                                      customSecondaryColor:
+                                          secondary.toARGB32(),
+                                      customTertiaryColor: tertiary.toARGB32(),
+                                      customSurfaceColor: surface.toARGB32(),
+                                    ),
+                                  );
+                                  Navigator.pop(sheetContext);
+                                },
+                                child: const Text('Done'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+    );
+  }
+
+  Widget _customColorTile(
+    BuildContext context,
+    String title,
+    String description,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      onTap: onTap,
+      title: Text(title),
+      subtitle: Text(description),
+      trailing: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+        ),
+      ),
+    );
+  }
+
+  Future<Color?> _pickCustomColor(BuildContext context, Color initial) async {
+    var draft = initial;
+    return showDialog<Color>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            scrollable: true,
+            title: const Text('Choose Color'),
+            content: ColorPicker(
+              color: initial,
+              onColorChanged: (value) => draft = value,
+              showColorCode: true,
+              showColorName: true,
+              showMaterialName: true,
+              pickersEnabled: const {
+                ColorPickerType.both: true,
+                ColorPickerType.primary: true,
+                ColorPickerType.accent: true,
+                ColorPickerType.bw: true,
+                ColorPickerType.custom: false,
+                ColorPickerType.wheel: true,
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, draft),
+                child: const Text('Select'),
+              ),
+            ],
+          ),
     );
   }
 

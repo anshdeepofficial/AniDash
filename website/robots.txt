@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://anidash-website.vercel.app/sitemap.xml
+Sitemap: https://anidashweb.vercel.app/sitemap.xml

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "212454649764",
+    "project_id": "anidash-ea838",
+    "storage_bucket": "anidash-ea838.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212454649764:android:092e754b59c6318bd1db31",
+        "android_client_info": {
+          "package_name": "com.anidash.anime"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjQoalv_u-chJ1JuqN7K7qgvLKRGR2ao8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

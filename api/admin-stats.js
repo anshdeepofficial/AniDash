@@ -28,8 +28,47 @@ export default async function handler(req, res) {
     headers: { Authorization: `Key ${process.env.ONESIGNAL_API_KEY}` },
   });
   const data = await response.json();
-  return res.status(response.ok ? 200 : response.status).json({
+  if (!response.ok) {
+    return res.status(response.status).json({ error: data?.errors?.[0] || 'Unable to load OneSignal statistics' });
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const cutoffs = {
+    activeToday: nowSeconds - 24 * 60 * 60,
+    active7Days: nowSeconds - 7 * 24 * 60 * 60,
+    active30Days: nowSeconds - 30 * 24 * 60 * 60,
+  };
+  const active = { activeToday: 0, active7Days: 0, active30Days: 0 };
+  const seen = new Set();
+  const total = Number(data.players || 0);
+
+  // OneSignal creates an anonymous subscription record for each installation.
+  // Its last_active timestamp lets us calculate aggregate activity without
+  // collecting names, watch history, IP addresses, or hardware identifiers.
+  for (let offset = 0; offset < total && offset < 50000; offset += 300) {
+    const playersResponse = await fetch(
+      `https://api.onesignal.com/players?app_id=${encodeURIComponent(process.env.ONESIGNAL_APP_ID)}&limit=300&offset=${offset}`,
+      { headers: { Authorization: `Key ${process.env.ONESIGNAL_API_KEY}` } },
+    );
+    if (!playersResponse.ok) break;
+    const page = await playersResponse.json();
+    const players = Array.isArray(page.players) ? page.players : [];
+    if (players.length === 0) break;
+    for (const player of players) {
+      const id = String(player.id || '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const lastActive = Number(player.last_active || 0);
+      if (lastActive >= cutoffs.activeToday) active.activeToday += 1;
+      if (lastActive >= cutoffs.active7Days) active.active7Days += 1;
+      if (lastActive >= cutoffs.active30Days) active.active30Days += 1;
+    }
+    if (players.length < 300) break;
+  }
+
+  return res.status(200).json({
     totalDevices: data.players ?? 0,
     subscribedDevices: data.messageable_players ?? 0,
+    ...active,
   });
 }

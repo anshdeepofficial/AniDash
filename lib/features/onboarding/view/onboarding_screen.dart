@@ -245,7 +245,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const SizedBox(height: 14),
                     const _OnboardingBenefit(
                       icon: Icons.sync_rounded,
-                      text: 'Sync watch progress with AniList',
+                      text: 'Sync progress with AniList or MyAnimeList',
                     ),
                     const _OnboardingBenefit(
                       icon: Icons.devices_rounded,
@@ -445,8 +445,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     for (final provider in animeSources) ...[
                       Builder(
                         builder: (context) {
-                          final status =
-                              statusData[provider]?['status'] as String?;
+                          // A registered built-in source is ready for selection.
+                          // Startup website probes are not a reliable playback
+                          // health signal and previously marked every source
+                          // offline while the device network was warming up.
+                          const status = 'online';
                           final isSelected =
                               selectedAnimeSource?.providerName ==
                               provider.toLowerCase();
@@ -462,8 +465,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                       : provider.toUpperCase(),
                               description:
                                   provider == 'justanime'
-                                      ? '${status?.toUpperCase() ?? 'UNKNOWN'} • Preselected'
-                                      : status?.toUpperCase() ?? 'UNKNOWN',
+                                      ? '${status.toUpperCase()} • Preselected'
+                                      : status.toUpperCase(),
                               isInSelectionMode: true,
                               isSelected: isSelected,
                               onTap: () {

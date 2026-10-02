@@ -41,7 +41,6 @@ class EpisodeDataModel implements BaseEpisode {
   final String? date;
   final bool? sub;
   final bool? dub;
-  
 
   EpisodeDataModel({
     this.id,
@@ -69,12 +68,13 @@ class EpisodeDataModel implements BaseEpisode {
     String? date,
     bool? sub,
     bool? dub,
+    bool clearThumbnail = false,
   }) {
     return EpisodeDataModel(
       id: id ?? this.id,
       title: title ?? this.title,
       url: url ?? this.url,
-      thumbnail: thumbnail ?? this.thumbnail,
+      thumbnail: clearThumbnail ? null : (thumbnail ?? this.thumbnail),
       isFiller: isFiller ?? this.isFiller,
       isMixed: isMixed ?? this.isMixed,
       number: number ?? this.number,

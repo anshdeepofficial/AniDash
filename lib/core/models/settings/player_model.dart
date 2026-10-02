@@ -42,7 +42,9 @@ class PlayerModel {
        preferredAudioLanguage =
            preferredAudioLanguage == 'dub'
                ? 'dub'
-               : (preferDub == true ? 'dub' : 'sub');
+               : (preferredAudioLanguage == 'sub' || preferDub == false
+                   ? 'sub'
+                   : 'dub');
 
   /// 100% backward-compatible getter for existing code paths
   bool get preferDub => preferredAudioLanguage == 'dub';
@@ -124,7 +126,7 @@ class PlayerModel {
     final rawPreferDub = map['preferDub'] as bool?;
     var audioLang =
         rawPrefLang ??
-        (rawPreferDub != null ? (rawPreferDub ? 'dub' : 'sub') : 'sub');
+        (rawPreferDub != null ? (rawPreferDub ? 'dub' : 'sub') : 'dub');
     audioLang = audioLang == 'dub' ? 'dub' : 'sub';
 
     return PlayerModel(

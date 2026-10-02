@@ -208,7 +208,8 @@ class AboutScreen extends StatelessWidget {
                   context,
                   icon: Iconsax.mobile,
                   title: 'Cross Platform',
-                  description: 'Available on Android and Windows',
+                  description:
+                      'Available on Android. iOS and Windows are currently in testing.',
                 ),
 
                 const SizedBox(height: 32),
@@ -292,7 +293,7 @@ class AboutScreen extends StatelessWidget {
                         child: InkWell(
                           onTap:
                               () => _launchUrl(
-                                'https://buymeacoffee.com/anshdeepofficial1',
+                                'https://buymeacoffee.com/anshdeepofficial',
                               ),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(

@@ -10,7 +10,7 @@ const ADMIN_ANILIST_ID = String.fromEnvironment(
 );
 const ANIDASH_ADMIN_API_URL = String.fromEnvironment(
   'ANIDASH_ADMIN_API_URL',
-  defaultValue: 'https://anidash-website.vercel.app/api',
+  defaultValue: 'https://anidashweb.vercel.app/api',
 );
 
 const ANILIST_CLIENT_ID = String.fromEnvironment(
@@ -19,5 +19,11 @@ const ANILIST_CLIENT_ID = String.fromEnvironment(
 );
 const ANILIST_CLIENT_SECRET = String.fromEnvironment('ANILIST_CLIENT_SECRET');
 
-const MAL_CLIENT_ID = String.fromEnvironment('MAL_CLIENT_ID');
-const MAL_CLIENT_SECRET = String.fromEnvironment('MAL_CLIENT_SECRET');
+const MAL_CLIENT_ID = String.fromEnvironment(
+  'MAL_CLIENT_ID',
+  defaultValue: 'dafce95c66734efefa19650c84178416',
+);
+const MAL_CLIENT_SECRET = String.fromEnvironment(
+  'MAL_CLIENT_SECRET',
+  defaultValue: '',
+);

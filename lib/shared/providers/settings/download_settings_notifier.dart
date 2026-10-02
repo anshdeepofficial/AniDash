@@ -72,14 +72,20 @@ class DownloadSettingsNotifier extends Notifier<DownloadSettingsModel> {
     required bool remember,
     required String language,
     required String quality,
+    String? serverId,
   }) {
     updateSettings(
       (s) => s.copyWith(
         rememberDownloadPreferences: remember,
         preferredLanguage: language,
         preferredQuality: quality,
+        preferredServerId: serverId ?? s.preferredServerId,
       ),
     );
+  }
+
+  void setPreferredServer(String serverId) {
+    updateSettings((s) => s.copyWith(preferredServerId: serverId));
   }
 
   void resetDownloadPreferences() {

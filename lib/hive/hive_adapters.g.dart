@@ -598,20 +598,21 @@ class DownloadSettingsModelAdapter extends TypeAdapter<DownloadSettingsModel> {
       customDownloadPath: fields[0] as String?,
       useCustomPath: fields[1] == null ? false : fields[1] as bool,
       folderStructure: fields[2] == null ? 'Anime' : fields[2] as String,
-      parallelDownloads: fields[3] == null ? 2 : (fields[3] as num).toInt(),
+      parallelDownloads: fields[3] == null ? 1 : (fields[3] as num).toInt(),
       speedLimitKBps: fields[4] == null ? 0 : (fields[4] as num).toInt(),
       wifiOnly: fields[5] == null ? false : fields[5] as bool,
       rememberDownloadPreferences:
           fields[6] == null ? false : fields[6] as bool,
       preferredLanguage: fields[7] == null ? 'dub' : fields[7] as String,
       preferredQuality: fields[8] == null ? '1080p' : fields[8] as String,
+      preferredServerId: fields[9] == null ? 'auto' : fields[9] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, DownloadSettingsModel obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.customDownloadPath)
       ..writeByte(1)
@@ -629,7 +630,9 @@ class DownloadSettingsModelAdapter extends TypeAdapter<DownloadSettingsModel> {
       ..writeByte(7)
       ..write(obj.preferredLanguage)
       ..writeByte(8)
-      ..write(obj.preferredQuality);
+      ..write(obj.preferredQuality)
+      ..writeByte(9)
+      ..write(obj.preferredServerId);
   }
 
   @override

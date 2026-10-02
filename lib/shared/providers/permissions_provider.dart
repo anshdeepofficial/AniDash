@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
 import 'package:ani_dash/core/services/remote_push_service.dart';
+import 'package:ani_dash/storage_provider.dart';
 
 part 'permissions_provider.g.dart';
 
@@ -68,15 +69,17 @@ class Permissions extends _$Permissions {
     }
     await _initSdkInt();
 
+    final consent =
+        (await SharedPreferences.getInstance()).getBool(_storageConsentKey) ??
+        false;
+    final systemStorageGranted =
+        _usesAppOwnedStorage || await _storagePermission().isGranted;
+    final storageReady =
+        consent && systemStorageGranted && await _hasWritableDownloadStorage();
+
     state = state.copyWith(
       notification: await Permission.notification.isGranted,
-      storage:
-          _usesAppOwnedStorage
-              ? (await SharedPreferences.getInstance()).getBool(
-                    _storageConsentKey,
-                  ) ??
-                  false
-              : await _storagePermission().isGranted,
+      storage: storageReady,
       photos: await _mediaPermission(Permission.photos).isGranted,
       videos: await _mediaPermission(Permission.videos).isGranted,
     );
@@ -102,6 +105,10 @@ class Permissions extends _$Permissions {
     if (state.storage || !Platform.isAndroid) return true;
     await _initSdkInt();
     if (_usesAppOwnedStorage) {
+      if (!await _hasWritableDownloadStorage()) {
+        state = state.copyWith(storage: false);
+        return false;
+      }
       await (await SharedPreferences.getInstance()).setBool(
         _storageConsentKey,
         true,
@@ -110,8 +117,15 @@ class Permissions extends _$Permissions {
       return true;
     }
     final granted = await _request(_storagePermission());
-    state = state.copyWith(storage: granted);
-    return granted;
+    final writable = granted && await _hasWritableDownloadStorage();
+    if (writable) {
+      await (await SharedPreferences.getInstance()).setBool(
+        _storageConsentKey,
+        true,
+      );
+    }
+    state = state.copyWith(storage: writable);
+    return writable;
   }
 
   Future<void> revokeStorageAccess() async {
@@ -121,6 +135,8 @@ class Permissions extends _$Permissions {
         false,
       );
       state = state.copyWith(storage: false);
+    } else if (Platform.isAndroid) {
+      await openAppSettings();
     }
   }
 
@@ -158,6 +174,22 @@ class Permissions extends _$Permissions {
       _cachedSdkInt = info.version.sdkInt;
     } catch (_) {
       _cachedSdkInt = 0;
+    }
+  }
+
+  Future<bool> _hasWritableDownloadStorage() async {
+    try {
+      final directory = await StorageProvider.getDefaultDirectory();
+      if (directory == null) return false;
+      if (!await directory.exists()) await directory.create(recursive: true);
+      final probe = File(
+        '${directory.path}${Platform.pathSeparator}.anidash_write_test',
+      );
+      await probe.writeAsString('ok', flush: true);
+      if (await probe.exists()) await probe.delete();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

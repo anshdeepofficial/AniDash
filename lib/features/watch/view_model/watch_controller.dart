@@ -232,7 +232,11 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
     AudioFocusService().initialize(
       onPauseRequested: () async {
         if (_isDisposed) return;
-        await ref.read(playerStateProvider.notifier).pause();
+        final wasPlaying = ref.read(playerStateProvider).isPlaying;
+        AudioFocusService().isPausedByInterruption = wasPlaying;
+        if (wasPlaying) {
+          await ref.read(playerStateProvider.notifier).pause();
+        }
       },
       onResumeRequested: () async {
         if (_isDisposed) return;
@@ -468,6 +472,14 @@ class WatchController extends _$WatchController with WidgetsBindingObserver {
 
       if (next.isPlaying && !(prev?.isPlaying ?? false)) {
         AudioFocusService().requestAudioFocus();
+        // MPV may finish creating its Android audio output after the first
+        // playing event. Reassert our focus listener once that settles so an
+        // incoming call is delivered to AniDash instead of only muting audio.
+        Future<void>.delayed(const Duration(milliseconds: 500), () {
+          if (!_isDisposed && ref.read(playerStateProvider).isPlaying) {
+            AudioFocusService().requestAudioFocus();
+          }
+        });
       }
 
       if (!_isPlayerReady) {

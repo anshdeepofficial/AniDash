@@ -298,6 +298,7 @@ class EpisodeData extends _$EpisodeData {
     }
     _prefetchedEpNum = null;
     _prefetchedSourceData = null;
+    _prefetchedIsDub = null;
     JustAnimeProvider.clearCache(
       animeId: targetMediaId,
       episode: episodeNumber,
@@ -309,6 +310,7 @@ class EpisodeData extends _$EpisodeData {
 
   int? _prefetchedEpNum;
   BaseSourcesModel? _prefetchedSourceData;
+  bool? _prefetchedIsDub;
   bool _isPrefetching = false;
   bool _isRecoveringPlayback = false;
   int _runtimeRecoveryAttempts = 0;
@@ -337,6 +339,7 @@ class EpisodeData extends _$EpisodeData {
       if (data != null && data.sources.isNotEmpty) {
         _prefetchedEpNum = nextEpNum;
         _prefetchedSourceData = data;
+        _prefetchedIsDub = state.selectedServer?.isDub == true;
         AppLogger.success(
           '⚡ Successfully pre-fetched Episode $nextEpNum stream ready for instant play!',
         );
@@ -593,14 +596,29 @@ class EpisodeData extends _$EpisodeData {
 
       if (!context.mounted) return;
 
-      ServerData? selected;
-      if (servers.isNotEmpty) {
-        selected =
-            servers.length == 1
-                ? servers.first
-                : await _showServerSheet(context, servers);
-        if (selected == null || !context.mounted) return;
+      final prefersDub = dlSettings.preferredLanguage == 'dub';
+      final preferredServerId = dlSettings.preferredServerId;
+      ServerData? selected =
+          preferredServerId == 'auto'
+              ? null
+              : servers.firstWhereOrNull(
+                (server) =>
+                    server.id?.toLowerCase() ==
+                        preferredServerId.toLowerCase() &&
+                    server.isDub == (dlSettings.preferredLanguage == 'dub'),
+              );
+      selected ??= state.selectedServer;
+      if (selected != null &&
+          !servers.any(
+            (server) =>
+                server.id == selected!.id && server.isDub == selected.isDub,
+          )) {
+        selected = null;
       }
+      selected ??= servers.firstWhereOrNull(
+        (server) => server.isDub == prefersDub,
+      );
+      selected ??= servers.firstOrNull;
 
       if (!context.mounted) return;
 
@@ -620,7 +638,10 @@ class EpisodeData extends _$EpisodeData {
                 episode: ep,
                 episodeCount: 1,
                 server: selected,
+                availableServers: servers,
                 fetchSources: () => _fetchSourceData(ep, server: selected),
+                fetchSourcesForServer:
+                    (server) => _fetchSourceData(ep, server: server),
               ),
             ),
       );
@@ -1057,11 +1078,15 @@ class EpisodeData extends _$EpisodeData {
 
       BaseSourcesModel? data;
       final streamSw = Stopwatch()..start();
-      if (epNum == _prefetchedEpNum && _prefetchedSourceData != null) {
+      final requestedDub = state.selectedServer?.isDub == true;
+      if (epNum == _prefetchedEpNum &&
+          _prefetchedSourceData != null &&
+          _prefetchedIsDub == requestedDub) {
         AppLogger.success('⚡ Using pre-fetched stream data for Episode $epNum');
         data = _prefetchedSourceData;
         _prefetchedEpNum = null;
         _prefetchedSourceData = null;
+        _prefetchedIsDub = null;
       } else {
         data = await _fetchSourceData(
           epModel,
@@ -1922,67 +1947,6 @@ class EpisodeData extends _$EpisodeData {
                 )
                 : null,
       ),
-    );
-  }
-
-  Future<ServerData?> _showServerSheet(
-    BuildContext context,
-    List<ServerData> servers,
-  ) {
-    return showModalBottomSheet<ServerData>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      builder: (context) {
-        final theme = Theme.of(context);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.55,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Select Server',
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: servers.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final s = servers[i];
-                    return ListTile(
-                      dense: true,
-                      title: Text(
-                        s.id ?? 'unknown',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle:
-                          s.name?.isNotEmpty == true ? Text(s.name!) : null,
-                      trailing: Badge(
-                        label: Text(s.isDub ? 'DUB' : 'SUB'),
-                        backgroundColor:
-                            s.isDub
-                                ? theme.colorScheme.secondary
-                                : theme.colorScheme.primary,
-                      ),
-                      onTap: () => Navigator.pop(context, s),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

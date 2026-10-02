@@ -61,84 +61,10 @@ class SettingsSheetContent extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("More", style: Theme.of(context).textTheme.headlineSmall),
-                const Divider(height: 24),
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.picture_in_picture_alt_rounded),
-                  title: const Text('Pop-up player'),
-                  subtitle: const Text('Continue watching over other apps'),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await ref.read(pipProvider.notifier).enterPiP();
-                  },
-                ),
-                ListTile(
-                  dense: true,
-                  leading: Icon(
-                    ref.watch(playerStateProvider.select((p) => p.isRepeating))
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                  ),
-                  title: const Text('Repeat mode'),
-                  trailing: Text(
-                    ref.watch(playerStateProvider.select((p) => p.isRepeating))
-                        ? 'Episode'
-                        : 'Off',
-                  ),
-                  onTap:
-                      () =>
-                          ref.read(playerStateProvider.notifier).toggleRepeat(),
-                ),
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.info_outline_rounded),
-                  title: const Text('Video information'),
-                  subtitle: Text(
-                    '${isDub ? 'English DUB' : 'Japanese SUB'} · ${currentQuality ?? 'Auto'}',
-                  ),
-                  onTap: () {
-                    final player = ref.read(playerStateProvider);
-                    _showDialog(
-                      context,
-                      builder:
-                          (ctx) => AlertDialog(
-                            title: const Text('Video information'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Audio: ${isDub ? 'English DUB' : 'Japanese SUB'}',
-                                ),
-                                Text('Quality: ${currentQuality ?? 'Auto'}'),
-                                Text(
-                                  'Position: ${_formatDuration(player.position)}',
-                                ),
-                                Text(
-                                  'Duration: ${_formatDuration(player.duration)}',
-                                ),
-                                Text(
-                                  'Buffered: ${_formatDuration(player.buffer)}',
-                                ),
-                                Text('Speed: ${player.playbackSpeed}x'),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                    );
-                  },
-                ),
-                const Divider(height: 20),
                 if (onSubtitlesPressed != null)
                   ListTile(
                     leading: const Icon(Icons.subtitles_rounded),
                     title: const Text('Subtitles'),
-                    subtitle: const Text('Select, disable, or load a subtitle'),
                     onTap: () {
                       Navigator.pop(context);
                       Future<void>.delayed(Duration.zero, onSubtitlesPressed);
@@ -146,7 +72,7 @@ class SettingsSheetContent extends ConsumerWidget {
                   ),
                 ListTile(
                   leading: const Icon(Icons.high_quality_rounded),
-                  title: const Text("Video Quality"),
+                  title: const Text("Quality"),
                   trailing: Text(currentQuality ?? 'Auto'),
                   onTap: () {
                     if (streamData.qualityOptions.isNotEmpty) {
@@ -194,7 +120,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 ListTile(
                   leading: const Icon(Icons.record_voice_over_rounded),
-                  title: const Text("Audio Track"),
+                  title: const Text("Audio"),
                   trailing: Text(isDub ? 'DUB' : 'SUB'),
                   onTap: () {
                     _showDialog(
@@ -340,7 +266,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.fast_forward_rounded),
-                  title: const Text("Auto Skip (Intro/Outro)"),
+                  title: const Text("Auto skip"),
                   value: playerSettings.enableAutoSkip,
                   onChanged: (val) {
                     playerNotifier.updateSettings(
@@ -350,10 +276,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.skip_next_rounded),
-                  title: const Text('Skip Filler Episodes'),
-                  subtitle: const Text(
-                    'Jump to the next canon episode without marking fillers watched',
-                  ),
+                  title: const Text('Skip fillers'),
                   value: playerSettings.skipFillerEpisodes,
                   onChanged: (val) {
                     playerNotifier.updateSettings(
@@ -363,10 +286,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.stop_circle_outlined),
-                  title: const Text('Stop After This Episode'),
-                  subtitle: const Text(
-                    'Prevents auto-playing next episode when current episode finishes',
-                  ),
+                  title: const Text('Stop after episode'),
                   value: playerSettings.stopAfterCurrentEpisode,
                   onChanged: (val) {
                     playerNotifier.updateSettings(
@@ -376,10 +296,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.upcoming_rounded),
-                  title: const Text('Next Episode Prompt'),
-                  subtitle: const Text(
-                    'Show a floating prompt near the end of an episode to quickly jump to the next one',
-                  ),
+                  title: const Text('Next episode prompt'),
                   value: playerSettings.showNextEpisodePrompt,
                   onChanged: (val) {
                     playerNotifier.updateSettings(
@@ -389,7 +306,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 ListTile(
                   leading: const Icon(Iconsax.speedometer),
-                  title: const Text("Playback Speed"),
+                  title: const Text("Speed"),
                   trailing: Text(
                     "${ref.watch(playerStateProvider.select((p) => p.playbackSpeed))}x",
                   ),
@@ -403,8 +320,8 @@ class SettingsSheetContent extends ConsumerWidget {
                   leading: const Icon(Iconsax.crop),
                   title: const Text("Video Fit"),
                   trailing: Text(
-                    _fitModeToString(
-                      ref.watch(playerStateProvider.select((p) => p.fit)),
+                    ref.watch(
+                      playerStateProvider.select((p) => p.fitMode.label),
                     ),
                   ),
                   onTap:
@@ -415,8 +332,7 @@ class SettingsSheetContent extends ConsumerWidget {
                 ),
                 ListTile(
                   leading: const Icon(Iconsax.timer_1),
-                  title: const Text("Jump to Time"),
-                  subtitle: const Text("Seek to a specific time"),
+                  title: const Text("Jump to time"),
                   trailing: Text(
                     _formatDuration(
                       ref.watch(playerStateProvider.select((p) => p.position)),
@@ -437,6 +353,73 @@ class SettingsSheetContent extends ConsumerWidget {
                                   .read(playerStateProvider.notifier)
                                   .seek(targetDuration);
                             },
+                          ),
+                    );
+                  },
+                ),
+                ListTile(
+                  dense: true,
+                  leading: Icon(
+                    ref.watch(playerStateProvider.select((p) => p.isRepeating))
+                        ? Icons.repeat_one_rounded
+                        : Icons.repeat_rounded,
+                  ),
+                  title: const Text('Repeat'),
+                  trailing: Text(
+                    ref.watch(playerStateProvider.select((p) => p.isRepeating))
+                        ? 'Episode'
+                        : 'Off',
+                  ),
+                  onTap:
+                      () =>
+                          ref.read(playerStateProvider.notifier).toggleRepeat(),
+                ),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.picture_in_picture_alt_rounded),
+                  title: const Text('Pop-up player'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await ref.read(pipProvider.notifier).enterPiP();
+                  },
+                ),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.info_outline_rounded),
+                  title: const Text('Video info'),
+                  onTap: () {
+                    final player = ref.read(playerStateProvider);
+                    _showDialog(
+                      context,
+                      builder:
+                          (ctx) => AlertDialog(
+                            title: const Text('Video information'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Audio: ${isDub ? 'English DUB' : 'Japanese SUB'}',
+                                ),
+                                Text('Quality: ${currentQuality ?? 'Auto'}'),
+                                Text(
+                                  'Position: ${_formatDuration(player.position)}',
+                                ),
+                                Text(
+                                  'Duration: ${_formatDuration(player.duration)}',
+                                ),
+                                Text(
+                                  'Buffered: ${_formatDuration(player.buffer)}',
+                                ),
+                                Text('Speed: ${player.playbackSpeed}x'),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Close'),
+                              ),
+                            ],
                           ),
                     );
                   },
@@ -511,13 +494,13 @@ class FitDialog extends ConsumerStatefulWidget {
 }
 
 class _FitDialogState extends ConsumerState<FitDialog> {
-  late BoxFit _selectedFit;
-  static const fitModes = [BoxFit.contain, BoxFit.cover, BoxFit.fill];
+  late VideoFitMode _selectedFit;
+  static const fitModes = VideoFitMode.values;
 
   @override
   void initState() {
     super.initState();
-    _selectedFit = ref.read(playerStateProvider).fit;
+    _selectedFit = ref.read(playerStateProvider).fitMode;
   }
 
   @override
@@ -529,8 +512,8 @@ class _FitDialogState extends ConsumerState<FitDialog> {
         children:
             fitModes
                 .map(
-                  (fit) => RadioListTile<BoxFit>(
-                    title: Text(_fitModeToString(fit)),
+                  (fit) => RadioListTile<VideoFitMode>(
+                    title: Text(fit.label),
                     value: fit,
                     groupValue: _selectedFit,
                     onChanged: (value) {
@@ -547,26 +530,13 @@ class _FitDialogState extends ConsumerState<FitDialog> {
         ),
         TextButton(
           onPressed: () {
-            ref.read(playerStateProvider.notifier).setFit(_selectedFit);
+            ref.read(playerStateProvider.notifier).setFitMode(_selectedFit);
             Navigator.pop(context);
           },
           child: const Text("OK"),
         ),
       ],
     );
-  }
-}
-
-String _fitModeToString(BoxFit fit) {
-  switch (fit) {
-    case BoxFit.contain:
-      return 'Contain';
-    case BoxFit.cover:
-      return 'Cover';
-    case BoxFit.fill:
-      return 'Fill';
-    default:
-      return 'Fit';
   }
 }
 

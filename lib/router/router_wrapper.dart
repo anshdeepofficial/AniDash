@@ -14,6 +14,7 @@ import 'package:ani_dash/features/watchlist/view/watchlist_screen.dart';
 import 'package:ani_dash/features/manga/view/manga_screen.dart';
 import 'package:ani_dash/core/services/offline_sync_queue_service.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/core/services/remote_push_service.dart';
 import 'package:ani_dash/core/services/update_scheduler.dart';
 import 'package:ani_dash/core/services/update_service.dart';
 import 'package:ani_dash/core/utils/updater.dart';
@@ -124,6 +125,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     ) {
       if (results.any((r) => r != ConnectivityResult.none)) {
         OfflineSyncQueueService.flushQueue(ref);
+        RemotePushService.refreshActivity();
       }
     });
     _updateTapSubscription = NotificationService().onUpdateTapped.listen((
@@ -145,15 +147,14 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _openDownloadsOffline();
       try {
-        await ref
-            .read(permissionsProvider.notifier)
-            .requestNotificationPermission();
+        await ref.read(permissionsProvider.notifier).checkAll();
       } catch (_) {}
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) _checkForScheduledUpdate(isAppOpen: true);
       });
       _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);
+      RemotePushService.refreshActivity();
     });
   }
 
@@ -179,6 +180,7 @@ class _AppRouterScreenState extends ConsumerState<AppRouterScreen>
           prefs.setBool('is_app_open', state == AppLifecycleState.resumed),
     );
     if (state == AppLifecycleState.resumed) {
+      ref.read(permissionsProvider.notifier).checkAll();
       _checkForScheduledUpdate(isAppOpen: true);
       _startPeriodicForegroundUpdateCheck();
       OfflineSyncQueueService.flushQueue(ref);

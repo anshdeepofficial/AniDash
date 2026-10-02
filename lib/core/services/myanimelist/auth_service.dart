@@ -35,6 +35,18 @@ class MyAnimeListAuthService extends BaseOAuthService {
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
+  // Keep MAL's public-client callback branded for AniDash without changing
+  // the already-working AniList callback registration.
+  @override
+  String get redirectUri =>
+      isDesktop
+          ? 'http://localhost:43824/success?code=1337'
+          : 'anidash://mal-auth';
+
+  @override
+  String get callbackUrlScheme =>
+      isDesktop ? 'http://localhost:43824' : 'anidash';
+
   Future<String?> authenticate() async {
     if (_clientId.trim().isEmpty) {
       AppLogger.w('MyAnimeList Client ID not configured in this build.');
@@ -90,17 +102,21 @@ class MyAnimeListAuthService extends BaseOAuthService {
 
       AppLogger.i("Exchanging code for access token...");
 
+      final body = <String, String>{
+        'grant_type': 'authorization_code',
+        'code': code,
+        'client_id': _clientId,
+        'redirect_uri': redirectUri,
+        'code_verifier': codeVerifier,
+      };
+      if (_clientSecret.trim().isNotEmpty) {
+        body['client_secret'] = _clientSecret;
+      }
+
       final data = await postTokenRequest(
         _tokenUrl,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'authorization_code',
-          'code': code,
-          'client_id': _clientId,
-          'client_secret': _clientSecret,
-          'redirect_uri': redirectUri,
-          'code_verifier': codeVerifier,
-        },
+        body: body,
       );
 
       if (data != null) {
@@ -117,15 +133,19 @@ class MyAnimeListAuthService extends BaseOAuthService {
     try {
       AppLogger.i("Refreshing MAL access token...");
 
+      final body = <String, String>{
+        'grant_type': 'refresh_token',
+        'refresh_token': token,
+        'client_id': _clientId,
+      };
+      if (_clientSecret.trim().isNotEmpty) {
+        body['client_secret'] = _clientSecret;
+      }
+
       final data = await postTokenRequest(
         _tokenUrl,
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'refresh_token',
-          'refresh_token': token,
-          'client_id': _clientId,
-          'client_secret': _clientSecret,
-        },
+        body: body,
       );
 
       if (data != null) {

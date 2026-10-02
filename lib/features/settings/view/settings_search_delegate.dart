@@ -162,22 +162,25 @@ class SettingsSearchDelegate extends SearchDelegate<void> {
   Widget buildSuggestions(BuildContext context) => _results(context);
 
   Widget _results(BuildContext context) {
+    final normalizedQuery = query.toLowerCase().trim();
+    if (normalizedQuery.length < 3) {
+      return const SizedBox.shrink();
+    }
     final terms =
-        query
-            .toLowerCase()
-            .trim()
+        normalizedQuery
             .split(RegExp(r'\s+'))
             .where((term) => term.isNotEmpty)
             .toList();
     final matches =
-        terms.isEmpty
-            ? _entries
-            : _entries.where((entry) {
-              final haystack =
-                  '${entry.title} ${entry.section} ${entry.keywords}'
-                      .toLowerCase();
-              return terms.every(haystack.contains);
-            }).toList();
+        _entries.where((entry) {
+            final haystack = entry.searchText;
+            return terms.every(haystack.contains);
+          }).toList()
+          ..sort(
+            (a, b) => b
+                .relevance(normalizedQuery, terms)
+                .compareTo(a.relevance(normalizedQuery, terms)),
+          );
 
     if (matches.isEmpty) {
       return const Center(child: Text('No matching setting found'));
@@ -217,4 +220,31 @@ class _SettingsSearchEntry {
   final String keywords;
   final String route;
   final IconData icon;
+
+  String get searchText => '$title $section $keywords'.toLowerCase();
+
+  int relevance(String query, List<String> terms) {
+    final normalizedTitle = title.toLowerCase();
+    final normalizedSection = section.toLowerCase();
+    var score = 0;
+    if (normalizedTitle == query) score += 1000;
+    if (normalizedTitle.startsWith(query)) score += 500;
+    if (normalizedTitle.contains(query)) score += 250;
+    if (normalizedSection.startsWith(query)) score += 120;
+    for (final term in terms) {
+      if (normalizedTitle.split(' ').any((word) => word.startsWith(term))) {
+        score += 80;
+      } else if (normalizedTitle.contains(term)) {
+        score += 50;
+      } else if (keywords
+          .toLowerCase()
+          .split(' ')
+          .any((word) => word.startsWith(term))) {
+        score += 25;
+      } else if (searchText.contains(term)) {
+        score += 10;
+      }
+    }
+    return score;
+  }
 }

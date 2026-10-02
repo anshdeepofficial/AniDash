@@ -183,7 +183,9 @@ class NotificationService {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       return data[key] as bool? ?? true;
     } catch (_) {
-      return true;
+      // A malformed persisted preference must never re-enable a category the
+      // user may have explicitly disabled.
+      return false;
     }
   }
 
@@ -192,13 +194,13 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.reload();
       final raw = prefs.getString('player_settings_data');
-      if (raw == null || raw.isEmpty) return false;
+      if (raw == null || raw.isEmpty) return true;
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final language = data['preferredAudioLanguage'] as String?;
       return language == 'dub' ||
           (language == null && (data['preferDub'] as bool? ?? false));
     } catch (_) {
-      return false;
+      return true;
     }
   }
 
@@ -561,6 +563,7 @@ class NotificationService {
       body: body,
       route: payload,
       dedupeKey: 'news:${payload ?? title}',
+      notificationType: 'news',
       systemNotificationId: notifId,
     );
     await ensureSoundChannelsCreated();

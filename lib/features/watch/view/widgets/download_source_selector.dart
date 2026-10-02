@@ -18,7 +18,10 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
   final EpisodeDataModel? episode;
   final int episodeCount;
   final ServerData? server;
+  final List<ServerData> availableServers;
   final Future<BaseSourcesModel?> Function()? fetchSources;
+  final Future<BaseSourcesModel?> Function(ServerData server)?
+  fetchSourcesForServer;
   final ScrollController? scrollController;
   final Future<void> Function(
     String language,
@@ -35,7 +38,9 @@ class DownloadSourceSelector extends ConsumerStatefulWidget {
     this.episode,
     this.episodeCount = 1,
     this.server,
+    this.availableServers = const [],
     this.fetchSources,
+    this.fetchSourcesForServer,
     this.scrollController,
     this.onConfirmBatchDownload,
     this.isAdult = false,
@@ -55,7 +60,10 @@ class _DownloadSourceSelectorState
 
   late String _selectedLanguage;
   late String _selectedQuality;
-  bool _rememberChoice = false;  bool _hasDub = true;
+  bool _rememberChoice = false;
+  bool _hasDub = true;
+  late ServerData? _selectedServer;
+  bool _downloadSubtitles = true;
 
   @override
   void initState() {
@@ -64,6 +72,7 @@ class _DownloadSourceSelectorState
     _selectedLanguage = downloadSettings.preferredLanguage;
     _selectedQuality = downloadSettings.preferredQuality;
     _rememberChoice = downloadSettings.rememberDownloadPreferences;
+    _selectedServer = widget.server;
 
     if (widget.fetchSources != null) {
       _initSources();
@@ -77,15 +86,21 @@ class _DownloadSourceSelectorState
     });
 
     try {
-      final data = await widget.fetchSources!();
+      final data =
+          widget.fetchSourcesForServer != null && _selectedServer != null
+              ? await widget.fetchSourcesForServer!(_selectedServer!)
+              : await widget.fetchSources!();
       if (!mounted) return;
 
       if (data != null && data.sources.isNotEmpty) {
-        final hasDub = data.sources.any((s) => s.isDub);
+        final hasDub =
+            data.sources.any((s) => s.isDub) ||
+            widget.availableServers.any((server) => server.isDub);
 
         setState(() {
           _sources = data.sources;
-          _subtitles = data.tracks;          _hasDub = hasDub;
+          _subtitles = data.tracks;
+          _hasDub = hasDub;
           _loading = false;
         });
       } else {
@@ -98,6 +113,28 @@ class _DownloadSourceSelectorState
         _loading = false;
       });
     }
+  }
+
+  Future<void> _selectLanguage(String language) async {
+    setState(() => _selectedLanguage = language);
+    final wantsDub = language == 'dub';
+    final matching =
+        widget.availableServers
+            .where((server) => server.isDub == wantsDub)
+            .toList();
+    if (matching.isNotEmpty && _selectedServer?.isDub != wantsDub) {
+      setState(() => _selectedServer = matching.first);
+      await _initSources();
+    }
+  }
+
+  Future<void> _selectServer(ServerData server) async {
+    if (_selectedServer == server) return;
+    setState(() {
+      _selectedServer = server;
+      _selectedLanguage = server.isDub ? 'dub' : 'sub';
+    });
+    await _initSources();
   }
 
   String _formatSize(int mb) {
@@ -131,6 +168,7 @@ class _DownloadSourceSelectorState
             remember: true,
             language: _selectedLanguage,
             quality: _selectedQuality,
+            serverId: _selectedServer?.id,
           );
     }
 
@@ -216,7 +254,10 @@ class _DownloadSourceSelectorState
       downloadUrl: downloadUrl,
       quality: _selectedQuality,
       filePath: fileName,
-      subtitles: _subtitles.map((s) => jsonEncode(s.toJson())).toList(),
+      subtitles:
+          _downloadSubtitles
+              ? _subtitles.map((s) => jsonEncode(s.toJson())).toList()
+              : const [],
       contentType: isM3U8 ? 'application/vnd.apple.mpegurl' : null,
       headers: {
         'User-Agent':
@@ -303,16 +344,33 @@ class _DownloadSourceSelectorState
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.download_rounded,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 54,
+                      height: 54,
+                      child:
+                          (widget.episode?.thumbnail?.isNotEmpty == true ||
+                                  widget.animeCover?.isNotEmpty == true)
+                              ? Image.network(
+                                widget.episode?.thumbnail ?? widget.animeCover!,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, _, _) => ColoredBox(
+                                      color: colorScheme.primaryContainer,
+                                      child: Icon(
+                                        Icons.download_rounded,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                              )
+                              : ColoredBox(
+                                color: colorScheme.primaryContainer,
+                                child: Icon(
+                                  Icons.download_rounded,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
+                              ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -338,6 +396,15 @@ class _DownloadSourceSelectorState
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        if (!isBatch && widget.episode?.title != null)
+                          Text(
+                            widget.episode!.title!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -383,6 +450,69 @@ class _DownloadSourceSelectorState
                 ),
               ],
               const SizedBox(height: 18),
+              if (widget.availableServers.isNotEmpty) ...[
+                Text(
+                  'Server',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                PopupMenuButton<ServerData>(
+                  onSelected: _selectServer,
+                  itemBuilder:
+                      (context) =>
+                          widget.availableServers
+                              .map(
+                                (server) => PopupMenuItem(
+                                  value: server,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          server.name ??
+                                              server.id?.toUpperCase() ??
+                                              'Server',
+                                        ),
+                                      ),
+                                      Badge(
+                                        label: Text(
+                                          server.isDub ? 'DUB' : 'SUB',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.dns_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _selectedServer?.name ??
+                                _selectedServer?.id?.toUpperCase() ??
+                                'Automatic',
+                          ),
+                        ),
+                        Badge(
+                          label: Text(
+                            _selectedServer?.isDub == true ? 'DUB' : 'SUB',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_drop_down_rounded),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
               Text(
                 'Language / Audio',
                 style: theme.textTheme.labelLarge?.copyWith(
@@ -400,15 +530,31 @@ class _DownloadSourceSelectorState
                       label: 'English (Dub)',
                       icon: Iconsax.volume_high,
                       isSelected: _selectedLanguage == 'dub',
-                      onTap: () => setState(() => _selectedLanguage = 'dub'),
+                      onTap: () => _selectLanguage('dub'),
                     ),
                   _LanguageChip(
                     label: 'Japanese (Sub)',
                     icon: Iconsax.translate,
                     isSelected: _selectedLanguage == 'sub',
-                    onTap: () => setState(() => _selectedLanguage = 'sub'),
+                    onTap: () => _selectLanguage('sub'),
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.subtitles_rounded),
+                title: const Text('Include subtitles'),
+                subtitle: Text(
+                  _subtitles.isEmpty
+                      ? 'No subtitle tracks reported by this server'
+                      : '${_subtitles.length} track${_subtitles.length == 1 ? '' : 's'} available',
+                ),
+                value: _downloadSubtitles && _subtitles.isNotEmpty,
+                onChanged:
+                    _subtitles.isEmpty
+                        ? null
+                        : (value) => setState(() => _downloadSubtitles = value),
               ),
               const SizedBox(height: 22),
               Text(

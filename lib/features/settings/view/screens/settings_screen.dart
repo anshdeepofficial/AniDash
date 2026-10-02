@@ -185,7 +185,7 @@ class SettingsScreen extends ConsumerWidget {
                   description: 'Support the developer directly',
                   onTap:
                       () => launchUrl(
-                        Uri.parse('https://buymeacoffee.com/anshdeepofficial1'),
+                        Uri.parse('https://buymeacoffee.com/anshdeepofficial'),
                         mode: LaunchMode.externalApplication,
                       ),
                 ),

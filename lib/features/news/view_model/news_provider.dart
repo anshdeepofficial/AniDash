@@ -5,6 +5,7 @@ import 'package:ani_dash/core/models/universal/universal_news.dart';
 import 'package:ani_dash/core/services/anime_news_network_service.dart';
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/core/services/notification_service.dart';
+import 'package:ani_dash/shared/providers/settings/notification_settings_notifier.dart';
 
 part 'news_provider.g.dart';
 
@@ -54,31 +55,34 @@ class News extends _$News {
 
       if (freshNews.isNotEmpty) {
         final readBox = Hive.box<String>('news_read_status');
-        final mergedNews = freshNews.map((news) {
-          if (news.url != null && readBox.containsKey(news.url)) {
-            return news.copyWith(isRead: true);
-          }
-          return news;
-        }).toList();
+        final mergedNews =
+            freshNews.map((news) {
+              if (news.url != null && readBox.containsKey(news.url)) {
+                return news.copyWith(isRead: true);
+              }
+              return news;
+            }).toList();
 
         // If background poll, check if we actually have *new* unread items to notify implicitly via state change.
         if (isBackgroundPoll) {
           final oldState = state.value ?? [];
           final oldUrls = oldState.map((e) => e.url).toSet();
-          final newItems = mergedNews
-              .where((e) => !oldUrls.contains(e.url))
-              .toList();
+          final newItems =
+              mergedNews.where((e) => !oldUrls.contains(e.url)).toList();
 
           if (newItems.isNotEmpty) {
-            final count = newItems.length;
-            final message = count == 1
-                ? 'New: ${newItems.first.title ?? "Anime News"}'
-                : '$count New Anime Articles!';
+            if (ref.read(notificationSettingsProvider).enableNews) {
+              final count = newItems.length;
+              final message =
+                  count == 1
+                      ? 'New: ${newItems.first.title ?? "Anime News"}'
+                      : '$count New Anime Articles!';
 
-            await NotificationService().showNewsNotification(
-              title: 'AniDash News',
-              body: message,
-            );
+              await NotificationService().showNewsNotification(
+                title: 'AniDash News',
+                body: message,
+              );
+            }
           }
         }
 
@@ -105,12 +109,13 @@ class News extends _$News {
 
     if (state.hasValue) {
       final currentList = state.value!;
-      final updatedList = currentList.map((item) {
-        if (item.url == news.url) {
-          return item.copyWith(isRead: true);
-        }
-        return item;
-      }).toList();
+      final updatedList =
+          currentList.map((item) {
+            if (item.url == news.url) {
+              return item.copyWith(isRead: true);
+            }
+            return item;
+          }).toList();
 
       state = AsyncData(updatedList);
 

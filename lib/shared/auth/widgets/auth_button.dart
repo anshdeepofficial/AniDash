@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:ani_dash/core/services/auth_provider_enum.dart';
+import 'package:ani_dash/core/utils/env_loader.dart';
 import '../providers/auth_notifier.dart';
 
 class AccountAuthenticationSection extends ConsumerWidget {
@@ -22,6 +23,17 @@ class AccountAuthenticationSection extends ConsumerWidget {
           brandColor: const Color(0xFF02A9FF),
           state: state,
         ),
+        const SizedBox(height: 12),
+        _ServiceCard(
+          platform: AuthPlatform.mal,
+          name: 'MyAnimeList',
+          description: 'Sync your anime list and watch progress',
+          logoUrl:
+              'https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png',
+          brandColor: const Color(0xFF2E51A2),
+          state: state,
+          isConfigured: MAL_CLIENT_ID.trim().isNotEmpty,
+        ),
       ],
     );
   }
@@ -34,6 +46,7 @@ class _ServiceCard extends ConsumerWidget {
   final String logoUrl;
   final Color brandColor;
   final AuthState state;
+  final bool isConfigured;
 
   const _ServiceCard({
     required this.platform,
@@ -42,6 +55,7 @@ class _ServiceCard extends ConsumerWidget {
     required this.logoUrl,
     required this.brandColor,
     required this.state,
+    this.isConfigured = true,
   });
 
   @override
@@ -55,14 +69,16 @@ class _ServiceCard extends ConsumerWidget {
     final isLoading = state.isLoadingFor(platform);
 
     return Material(
-      color: isAuthenticated
-          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)
-          : colorScheme.surfaceContainer,
+      color:
+          isAuthenticated
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)
+              : colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: isActive
-            ? BorderSide(color: brandColor, width: 2)
-            : BorderSide.none,
+        side:
+            isActive
+                ? BorderSide(color: brandColor, width: 2)
+                : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -122,7 +138,9 @@ class _ServiceCard extends ConsumerWidget {
                       )
                     else
                       Text(
-                        description,
+                        isConfigured
+                            ? description
+                            : 'Ready after AniDash adds its MAL Client ID',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -144,8 +162,8 @@ class _ServiceCard extends ConsumerWidget {
                 )
               else if (isAuthenticated)
                 IconButton.filledTonal(
-                  onPressed: () =>
-                      _showDisconnectDialog(context, ref, name, platform),
+                  onPressed:
+                      () => _showDisconnectDialog(context, ref, name, platform),
                   icon: const Icon(Iconsax.logout),
                   style: IconButton.styleFrom(
                     backgroundColor: colorScheme.errorContainer,
@@ -154,14 +172,25 @@ class _ServiceCard extends ConsumerWidget {
                 )
               else
                 FilledButton.tonal(
-                  onPressed: () =>
-                      ref.read(authProvider.notifier).login(platform),
+                  onPressed: () {
+                    if (!isConfigured) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'MyAnimeList login will be enabled after the AniDash MAL Client ID is configured.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    ref.read(authProvider.notifier).login(platform);
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: brandColor.withValues(alpha: 0.1),
                     foregroundColor: brandColor,
                     textStyle: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  child: const Text('Connect'),
+                  child: Text(isConfigured ? 'Connect' : 'Setup pending'),
                 ),
             ],
           ),
@@ -178,30 +207,31 @@ class _ServiceCard extends ConsumerWidget {
   ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Iconsax.warning_2),
-        title: Text('Disconnect $name?'),
-        content: const Text(
-          'Syncing will stop immediately. Local data will remain intact.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(authProvider.notifier).logout(platform);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
+      builder:
+          (context) => AlertDialog(
+            icon: const Icon(Iconsax.warning_2),
+            title: Text('Disconnect $name?'),
+            content: const Text(
+              'Syncing will stop immediately. Local data will remain intact.',
             ),
-            child: const Text('Disconnect'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ref.read(authProvider.notifier).logout(platform);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: const Text('Disconnect'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }

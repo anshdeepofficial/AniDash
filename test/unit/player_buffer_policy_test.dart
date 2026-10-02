@@ -3,6 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('online player buffer policy', () {
+    test('new installs genuinely default to English dub', () {
+      expect(PlayerModel().preferredAudioLanguage, 'dub');
+      expect(PlayerModel.fromMap({}).preferredAudioLanguage, 'dub');
+    });
+
+    test('an explicit Japanese sub preference is preserved', () {
+      expect(
+        PlayerModel.fromMap({
+          'preferredAudioLanguage': 'sub',
+        }).preferredAudioLanguage,
+        'sub',
+      );
+    });
+
     test('new installs use a 100 MiB cache capacity', () {
       expect(PlayerModel().bufferSize, 100);
     });

@@ -10,6 +10,10 @@ class ThemeModel {
   final bool useMaterial3;
   final bool useDynamicColors;
   final String logoMode;
+  final int customPrimaryColor;
+  final int customSecondaryColor;
+  final int customTertiaryColor;
+  final int customSurfaceColor;
 
   ThemeModel({
     this.themeMode = 'system',
@@ -20,6 +24,10 @@ class ThemeModel {
     this.useMaterial3 = true,
     this.useDynamicColors = false,
     this.logoMode = 'dynamic',
+    this.customPrimaryColor = 0xFF6750A4,
+    this.customSecondaryColor = 0xFF625B71,
+    this.customTertiaryColor = 0xFF7D5260,
+    this.customSurfaceColor = 0xFFFFF7FF,
   });
 
   ThemeModel copyWith({
@@ -31,6 +39,10 @@ class ThemeModel {
     bool? useMaterial3,
     bool? useDynamicColors,
     String? logoMode,
+    int? customPrimaryColor,
+    int? customSecondaryColor,
+    int? customTertiaryColor,
+    int? customSurfaceColor,
   }) {
     return ThemeModel(
       themeMode: themeMode ?? this.themeMode,
@@ -41,6 +53,10 @@ class ThemeModel {
       useMaterial3: useMaterial3 ?? this.useMaterial3,
       useDynamicColors: useDynamicColors ?? this.useDynamicColors,
       logoMode: logoMode ?? this.logoMode,
+      customPrimaryColor: customPrimaryColor ?? this.customPrimaryColor,
+      customSecondaryColor: customSecondaryColor ?? this.customSecondaryColor,
+      customTertiaryColor: customTertiaryColor ?? this.customTertiaryColor,
+      customSurfaceColor: customSurfaceColor ?? this.customSurfaceColor,
     );
   }
 
@@ -58,6 +74,10 @@ class ThemeModel {
       'useMaterial3': useMaterial3,
       'useDynamicColors': useDynamicColors,
       'logoMode': logoMode,
+      'customPrimaryColor': customPrimaryColor,
+      'customSecondaryColor': customSecondaryColor,
+      'customTertiaryColor': customTertiaryColor,
+      'customSurfaceColor': customSurfaceColor,
     };
   }
 
@@ -71,6 +91,10 @@ class ThemeModel {
       useMaterial3: map['useMaterial3'] ?? true,
       useDynamicColors: map['useDynamicColors'] ?? false,
       logoMode: map['logoMode'] ?? 'dynamic',
+      customPrimaryColor: map['customPrimaryColor'] ?? 0xFF6750A4,
+      customSecondaryColor: map['customSecondaryColor'] ?? 0xFF625B71,
+      customTertiaryColor: map['customTertiaryColor'] ?? 0xFF7D5260,
+      customSurfaceColor: map['customSurfaceColor'] ?? 0xFFFFF7FF,
     );
   }
 

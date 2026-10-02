@@ -69,7 +69,9 @@ class DownloadSettingsScreen extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Download directory set to $selectedDirectory'),
+                              content: Text(
+                                'Download directory set to $selectedDirectory',
+                              ),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -78,7 +80,9 @@ class DownloadSettingsScreen extends ConsumerWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Selected directory is not writable: $e'),
+                              content: Text(
+                                'Selected directory is not writable: $e',
+                              ),
                               backgroundColor: Colors.red,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -166,8 +170,8 @@ class DownloadSettingsScreen extends ConsumerWidget {
                 title: 'Remember Preferences',
                 description:
                     settings.rememberDownloadPreferences
-                        ? 'Downloads auto-start with saved language & quality'
-                        : 'Prompt for language & quality every time',
+                        ? 'Downloads auto-start with saved server, audio & quality'
+                        : 'Show these saved defaults before every download',
                 value: settings.rememberDownloadPreferences,
                 onChanged: (val) {
                   notifier.updateSettings(
@@ -175,7 +179,36 @@ class DownloadSettingsScreen extends ConsumerWidget {
                   );
                 },
               ),
-              if (settings.rememberDownloadPreferences) ...[
+              ...[
+                DropdownSettingsItem(
+                  icon: const Icon(Icons.dns_rounded),
+                  accent: colorScheme.primary,
+                  title: 'Default Server',
+                  description:
+                      'Used when this server is available for the episode',
+                  value: settings.preferredServerId,
+                  items: const [
+                    DropdownMenuItem(value: 'auto', child: Text('Automatic')),
+                    DropdownMenuItem(value: 'megaplay', child: Text('Momo')),
+                    DropdownMenuItem(value: 'zokoanime', child: Text('Zoko')),
+                    DropdownMenuItem(value: 'animegg', child: Text('Gigi')),
+                    DropdownMenuItem(value: 'anineko', child: Text('Neko')),
+                    DropdownMenuItem(
+                      value: 'megacloud',
+                      child: Text('Megacloud'),
+                    ),
+                    DropdownMenuItem(value: 'hd-1', child: Text('HD-1')),
+                    DropdownMenuItem(value: 'hd-2', child: Text('HD-2')),
+                    DropdownMenuItem(value: 'anikoto', child: Text('Anikoto')),
+                    DropdownMenuItem(
+                      value: 'animepahe',
+                      child: Text('AnimePahe'),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) notifier.setPreferredServer(val);
+                  },
+                ),
                 DropdownSettingsItem(
                   icon: Icon(Iconsax.translate),
                   accent: colorScheme.primary,

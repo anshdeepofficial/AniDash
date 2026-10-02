@@ -1,5 +1,6 @@
 import 'package:ani_dash/features/downloads/model/download_item.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
+import 'package:ani_dash/core/models/settings/download_settings_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DownloadItem _item({
@@ -24,6 +25,18 @@ DownloadItem _item({
 }
 
 void main() {
+  test('download defaults use one job and persist the preferred server', () {
+    final defaults = DownloadSettingsModel();
+    expect(defaults.parallelDownloads, 1);
+    expect(defaults.preferredServerId, 'auto');
+
+    final restored = DownloadSettingsModel.fromJson(
+      defaults.copyWith(preferredServerId: 'megaplay').toJson(),
+    );
+    expect(restored.parallelDownloads, 1);
+    expect(restored.preferredServerId, 'megaplay');
+  });
+
   group('Download progress units', () {
     test('HLS percentage uses segment count and remains within 0-100', () {
       final item = _item(

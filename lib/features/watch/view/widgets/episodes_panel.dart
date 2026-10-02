@@ -10,6 +10,7 @@ import 'package:ani_dash/features/downloads/view_model/downloads_notifier.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
 import 'package:ani_dash/data/hive/models/anime_watch_progress_model.dart';
 import 'package:collection/collection.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EpisodesPanel extends ConsumerStatefulWidget {
   final AnimationController panelAnimation;
@@ -26,11 +27,28 @@ class EpisodesPanel extends ConsumerStatefulWidget {
 }
 
 class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
+  static const _rangeSizeKey = 'player_episode_range_size';
   int _rangeSize = 50;
   int _currentStart = 1;
   bool _initializedForEp = false;
   int? _lastSelectedEp;
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRangeSize();
+  }
+
+  Future<void> _loadRangeSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt(_rangeSizeKey);
+    if (!mounted || !const [25, 50, 100].contains(saved)) return;
+    setState(() {
+      _rangeSize = saved!;
+      _initializedForEp = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -57,39 +75,46 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
     showDialog(
       context: context,
       builder: (_) {
-        return AlertDialog(
-          title: const Text("Episode Range Size"),
-          content: Wrap(
-            spacing: 8,
-            children: [25, 50, 100].map((size) {
-              return ChoiceChip(
-                label: Text("$size"),
-                selected: temp == size,
-                onSelected: (_) {
-                  setState(() {
-                    temp = size;
-                  });
-                },
-              );
-            }).toList(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _rangeSize = temp;
-                  _currentStart = 1;
-                  _initializedForEp = false;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text("Apply"),
-            ),
-          ],
+        return StatefulBuilder(
+          builder:
+              (context, setDialogState) => AlertDialog(
+                title: const Text("Episode Range Size"),
+                content: Wrap(
+                  spacing: 8,
+                  children:
+                      [25, 50, 100].map((size) {
+                        return ChoiceChip(
+                          label: Text("$size"),
+                          selected: temp == size,
+                          onSelected: (_) {
+                            setDialogState(() {
+                              temp = size;
+                            });
+                          },
+                        );
+                      }).toList(),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel"),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        _rangeSize = temp;
+                        _currentStart = 1;
+                        _initializedForEp = false;
+                      });
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setInt(_rangeSizeKey, temp);
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Apply"),
+                  ),
+                ],
+              ),
         );
       },
     );
@@ -251,8 +276,9 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                           useRootNavigator: true,
                           isScrollControlled: true,
                           shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.vertical(top: Radius.circular(20)),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
                           ),
                           builder: (sheetContext) {
                             return SafeArea(
@@ -269,24 +295,26 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                                       child: Container(
                                         width: 36,
                                         height: 4,
-                                        margin:
-                                            const EdgeInsets.only(bottom: 12),
+                                        margin: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color:
-                                              Colors.grey.withValues(alpha: 0.4),
-                                          borderRadius:
-                                              BorderRadius.circular(2),
+                                          color: Colors.grey.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
                                         ),
                                       ),
                                     ),
                                     Text(
                                       episode.title ?? 'Episode $epNum',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -295,10 +323,12 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                                       leading: Icon(
                                         isCompleted
                                             ? Icons.remove_red_eye_outlined
-                                            : Icons.check_circle_outline_rounded,
-                                        color: isCompleted
-                                            ? Colors.orange
-                                            : Colors.green,
+                                            : Icons
+                                                .check_circle_outline_rounded,
+                                        color:
+                                            isCompleted
+                                                ? Colors.orange
+                                                : Colors.green,
                                       ),
                                       title: Text(
                                         isCompleted
@@ -319,7 +349,8 @@ class _EpisodesPanelState extends ConsumerState<EpisodesPanel> {
                                           EpisodeProgress(
                                             episodeNumber: epNum,
                                             episodeTitle:
-                                                episode.title ?? 'Episode $epNum',
+                                                episode.title ??
+                                                'Episode $epNum',
                                             episodeThumbnail: episode.thumbnail,
                                             progressInSeconds:
                                                 newWatched ? 1440 : 0,
@@ -418,7 +449,10 @@ class EpisodeTile extends StatelessWidget {
               isMixed
                   ? Border.all(color: theme.colorScheme.primary, width: 1.6)
                   : isFiller
-                  ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.6), width: 1.2)
+                  ? Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                    width: 1.2,
+                  )
                   : null,
           borderRadius: BorderRadius.circular(8),
         ),

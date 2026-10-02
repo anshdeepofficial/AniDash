@@ -58,6 +58,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (am == null) return false
 
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
             val playbackAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
@@ -65,6 +66,7 @@ class MainActivity : FlutterFragmentActivity() {
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(playbackAttributes)
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .setWillPauseWhenDucked(true)
                 .build()
             audioFocusRequest = request
             am.requestAudioFocus(request)

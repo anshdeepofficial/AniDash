@@ -69,6 +69,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
   double _lastSpeed = 1.0;
   Timer? _volumeOverlayTimer;
   Timer? _doubleTapTimer;
+  Timer? _fitLabelTimer;
+  String? _fitLabel;
   int _doubleTapPairCount = 0;
   Duration _doubleTapAnchor = Duration.zero;
 
@@ -96,7 +98,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
       });
       FlutterVolumeController.addListener((volume) {
         if (!mounted || _isChangingVolume) return;
-        ref.read(playerUIControllerProvider.notifier).setVolume(volume);
+        _applyPlayerVolume(volume, updateSystemVolume: false);
       });
     }
     // Restart auto-hide timer on init
@@ -128,6 +130,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _focusNode.dispose();
+    _fitLabelTimer?.cancel();
     _volumeOverlayTimer?.cancel();
     _doubleTapTimer?.cancel();
 
@@ -543,8 +546,13 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
     );
   }
 
-  void _toggleFullScreen() async {
-    UIHelper.handleToggleFullscreen();
+  void _cycleVideoFit() {
+    final mode = ref.read(playerStateProvider.notifier).cycleFitMode();
+    _fitLabelTimer?.cancel();
+    setState(() => _fitLabel = mode.label);
+    _fitLabelTimer = Timer(const Duration(milliseconds: 1100), () {
+      if (mounted) setState(() => _fitLabel = null);
+    });
   }
 
   void _openSubtitle() {
@@ -623,6 +631,16 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
       ),
     );
 
+    if (state.fitMode == VideoFitMode.ratio16x9 ||
+        state.fitMode == VideoFitMode.ratio4x3) {
+      videoView = Center(
+        child: AspectRatio(
+          aspectRatio: state.fitMode == VideoFitMode.ratio16x9 ? 16 / 9 : 4 / 3,
+          child: videoView,
+        ),
+      );
+    }
+
     if (widget.screenshotController != null) {
       videoView = Screenshot(
         controller: widget.screenshotController!,
@@ -647,8 +665,8 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
           const SingleActivator(LogicalKeyboardKey.arrowRight):
               () => notifier.forward(10),
           const SingleActivator(LogicalKeyboardKey.keyM): notifier.toggleMute,
-          const SingleActivator(LogicalKeyboardKey.f11): _toggleFullScreen,
-          const SingleActivator(LogicalKeyboardKey.keyF): _toggleFullScreen,
+          const SingleActivator(LogicalKeyboardKey.f11): _cycleVideoFit,
+          const SingleActivator(LogicalKeyboardKey.keyF): _cycleVideoFit,
         },
         child: Focus(
           focusNode: _focusNode,
@@ -699,7 +717,7 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
                   onServerPressed: _openServer,
                   onAudioPressed: _openAudio,
                   onSubtitlePressed: _openSubtitle,
-                  onFullScreenPressed: _toggleFullScreen,
+                  onFullScreenPressed: _cycleVideoFit,
                   localTitle: widget.localTitle,
                   isLocal: widget.localFilePath != null,
                 ),
@@ -767,6 +785,29 @@ class _AniDashVideoPlayerState extends ConsumerState<AniDashVideoPlayer>
                 // Speed Indicator
                 if (_isSpeeding)
                   SpeedIndicatorOverlay(currentSpeed: _lastSpeed),
+
+                if (_fitLabel != null)
+                  Center(
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _fitLabel!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Volume/Brightness Overlays
                 if (_isChangingBrightness)

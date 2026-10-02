@@ -11,6 +11,19 @@ import 'package:ani_dash/core/utils/stream_headers.dart';
 
 part 'player_provider.g.dart';
 
+enum VideoFitMode { fitScreen, fill, ratio16x9, ratio4x3, center, bestFit }
+
+extension VideoFitModeLabel on VideoFitMode {
+  String get label => switch (this) {
+    VideoFitMode.fitScreen => 'Fit Screen',
+    VideoFitMode.fill => 'Fill',
+    VideoFitMode.ratio16x9 => '16:9',
+    VideoFitMode.ratio4x3 => '4:3',
+    VideoFitMode.center => 'Center',
+    VideoFitMode.bestFit => 'Best Fit',
+  };
+}
+
 @immutable
 class PlayerState {
   final Duration position;
@@ -24,6 +37,7 @@ class PlayerState {
   final double playbackSpeed;
   final List<String> subtitle;
   final BoxFit fit;
+  final VideoFitMode fitMode;
   final double subtitleDelay;
   final bool isRepeating;
 
@@ -39,6 +53,7 @@ class PlayerState {
     required this.playbackSpeed,
     required this.subtitle,
     required this.fit,
+    required this.fitMode,
     this.subtitleDelay = 0.0,
     this.isRepeating = false,
   });
@@ -54,6 +69,7 @@ class PlayerState {
     playbackSpeed: 1.0,
     subtitle: [],
     fit: BoxFit.contain,
+    fitMode: VideoFitMode.fitScreen,
     subtitleDelay: 0.0,
     isRepeating: false,
   );
@@ -71,6 +87,7 @@ class PlayerState {
     double? playbackSpeed,
     List<String>? subtitle,
     BoxFit? fit,
+    VideoFitMode? fitMode,
     double? subtitleDelay,
     bool? isRepeating,
   }) {
@@ -87,6 +104,7 @@ class PlayerState {
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       subtitle: subtitle ?? this.subtitle,
       fit: fit ?? this.fit,
+      fitMode: fitMode ?? this.fitMode,
       subtitleDelay: subtitleDelay ?? this.subtitleDelay,
       isRepeating: isRepeating ?? this.isRepeating,
     );
@@ -564,6 +582,24 @@ class PlayerStateNotifier extends _$PlayerStateNotifier {
   }
 
   void setFit(BoxFit fit) => state = state.copyWith(fit: fit);
+
+  void setFitMode(VideoFitMode mode) {
+    final fit = switch (mode) {
+      VideoFitMode.fitScreen => BoxFit.contain,
+      VideoFitMode.fill => BoxFit.cover,
+      VideoFitMode.ratio16x9 || VideoFitMode.ratio4x3 => BoxFit.fill,
+      VideoFitMode.center => BoxFit.none,
+      VideoFitMode.bestFit => BoxFit.scaleDown,
+    };
+    state = state.copyWith(fit: fit, fitMode: mode);
+  }
+
+  VideoFitMode cycleFitMode() {
+    final modes = VideoFitMode.values;
+    final next = modes[(state.fitMode.index + 1) % modes.length];
+    setFitMode(next);
+    return next;
+  }
 
   Future<void> setSubtitle(SubtitleTrack track) =>
       _player.setSubtitleTrack(track);

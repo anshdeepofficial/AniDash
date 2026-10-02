@@ -77,7 +77,7 @@ class EpisodeReleaseTask {
         } catch (_) {}
       }
 
-      var prefersEnglishDub = false;
+      var prefersEnglishDub = true;
       try {
         final rawPlayerSettings = pref.getString('player_settings_data');
         if (rawPlayerSettings != null && rawPlayerSettings.isNotEmpty) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:ani_dash/core/utils/app_logger.dart';
 import 'package:ani_dash/features/downloads/model/download_status.dart';
@@ -43,7 +44,7 @@ class DownloadsScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            _buildDownloadList(context, downloads),
+            _buildDownloadList(context, downloads, groupByAnime: true),
             _buildDownloadList(
               context,
               downloads
@@ -54,12 +55,14 @@ class DownloadsScreen extends ConsumerWidget {
                         d.state == DownloadStatus.queued,
                   )
                   .toList(),
+              groupByAnime: true,
             ),
             _buildDownloadList(
               context,
               downloads
                   .where((d) => d.state == DownloadStatus.downloaded)
                   .toList(),
+              groupByAnime: true,
             ),
           ],
         ),
@@ -107,11 +110,15 @@ class DownloadsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDownloadList(BuildContext context, List<DownloadItem> items) {
+  Widget _buildDownloadList(
+    BuildContext context,
+    List<DownloadItem> items, {
+    bool groupByAnime = false,
+  }) {
     if (items.isEmpty) {
-      return Center(
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(28, 72, 28, 120),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Iconsax.receive_square,
@@ -122,15 +129,115 @@ class DownloadsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Downloads',
+              'Your offline library starts here',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: Theme.of(
                   context,
                 ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
+            const SizedBox(height: 10),
+            Text(
+              'Download episodes to watch without internet. AniDash keeps each anime together and orders episodes by number.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 22),
+            FilledButton.icon(
+              onPressed: () => context.go('/browse'),
+              icon: const Icon(Iconsax.search_normal_1),
+              label: const Text('Find anime to download'),
+            ),
+            const SizedBox(height: 28),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: const [
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.folder_copy_outlined),
+                      title: Text('Organized automatically'),
+                      subtitle: Text(
+                        'Episodes are grouped into anime folders.',
+                      ),
+                    ),
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.play_circle_outline_rounded),
+                      title: Text('Same AniDash player'),
+                      subtitle: Text(
+                        'Offline and online playback use the same controls.',
+                      ),
+                    ),
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.subtitles_outlined),
+                      title: Text('Audio and subtitles'),
+                      subtitle: Text(
+                        'Choose language, quality, and subtitles before downloading.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
+      );
+    }
+    if (groupByAnime) {
+      final grouped = <String, List<DownloadItem>>{};
+      for (final item in items) {
+        final key =
+            (item.animeId?.isNotEmpty == true)
+                ? 'id:${item.animeId}'
+                : 'title:${item.animeTitle.trim().toLowerCase()}';
+        grouped.putIfAbsent(key, () => []).add(item);
+      }
+      final groups =
+          grouped.values.toList()..sort(
+            (a, b) => a.first.animeTitle.toLowerCase().compareTo(
+              b.first.animeTitle.toLowerCase(),
+            ),
+          );
+      for (final group in groups) {
+        group.sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
+      }
+      return ListView.builder(
+        padding: EdgeInsets.fromLTRB(
+          10,
+          10,
+          10,
+          MediaQuery.paddingOf(context).bottom + 110,
+        ),
+        itemCount: groups.length,
+        itemBuilder: (context, index) {
+          final group = groups[index];
+          final completed =
+              group
+                  .where((item) => item.state == DownloadStatus.downloaded)
+                  .length;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              initiallyExpanded: groups.length == 1,
+              leading: const Icon(Icons.folder_rounded),
+              title: Text(
+                group.first.animeTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                '${group.length} episode${group.length == 1 ? '' : 's'} • $completed ready',
+              ),
+              children: [for (final item in group) DownloadCard(item: item)],
+            ),
+          );
+        },
       );
     }
     return ListView.builder(

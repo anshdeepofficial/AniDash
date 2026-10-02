@@ -446,6 +446,8 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen>
                           )
                           : _results.isEmpty && !_isLoading
                           ? _EmptyState()
+                          : _results.isEmpty && _isLoading
+                          ? const _BrowseLoadingSkeleton()
                           : _ResultsGrid(
                             results: _results,
                             scrollController: _scrollController,
@@ -835,6 +837,33 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+class _BrowseLoadingSkeleton extends StatelessWidget {
+  const _BrowseLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Theme.of(context).colorScheme.surfaceContainerHighest;
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 100),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.68,
+      ),
+      itemCount: 8,
+      itemBuilder:
+          (_, _) => Container(
+            decoration: BoxDecoration(
+              color: placeholder,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+    );
+  }
+}
+
 class _LoadingIndicator extends StatelessWidget {
   const _LoadingIndicator();
 
@@ -893,7 +922,7 @@ class _ExploreView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const _BrowseLoadingSkeleton();
     }
 
     if (trending.isEmpty && popular.isEmpty && upcoming.isEmpty) {

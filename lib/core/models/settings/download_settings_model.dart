@@ -10,17 +10,19 @@ class DownloadSettingsModel {
   final bool rememberDownloadPreferences;
   final String preferredLanguage; // 'sub', 'dub'
   final String preferredQuality; // '1080p', '720p', '480p', '360p'
+  final String preferredServerId;
 
   DownloadSettingsModel({
     this.customDownloadPath,
     this.useCustomPath = false,
     this.folderStructure = 'Anime',
-    this.parallelDownloads = 2,
+    this.parallelDownloads = 1,
     this.speedLimitKBps = 0,
     this.wifiOnly = false,
     this.rememberDownloadPreferences = false,
     this.preferredLanguage = 'dub',
     this.preferredQuality = '1080p',
+    this.preferredServerId = 'auto',
   });
 
   DownloadSettingsModel copyWith({
@@ -33,6 +35,7 @@ class DownloadSettingsModel {
     bool? rememberDownloadPreferences,
     String? preferredLanguage,
     String? preferredQuality,
+    String? preferredServerId,
   }) {
     return DownloadSettingsModel(
       customDownloadPath: customDownloadPath ?? this.customDownloadPath,
@@ -45,6 +48,7 @@ class DownloadSettingsModel {
           rememberDownloadPreferences ?? this.rememberDownloadPreferences,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredQuality: preferredQuality ?? this.preferredQuality,
+      preferredServerId: preferredServerId ?? this.preferredServerId,
     );
   }
 
@@ -59,6 +63,7 @@ class DownloadSettingsModel {
       'rememberDownloadPreferences': rememberDownloadPreferences,
       'preferredLanguage': preferredLanguage,
       'preferredQuality': preferredQuality,
+      'preferredServerId': preferredServerId,
     };
   }
 
@@ -67,12 +72,13 @@ class DownloadSettingsModel {
       customDownloadPath: map['customDownloadPath'],
       useCustomPath: map['useCustomPath'] ?? false,
       folderStructure: map['folderStructure'] ?? 'Anime',
-      parallelDownloads: (map['parallelDownloads']?.toInt() ?? 2).clamp(1, 10),
+      parallelDownloads: (map['parallelDownloads']?.toInt() ?? 1).clamp(1, 10),
       speedLimitKBps: map['speedLimitKBps']?.toInt() ?? 0,
       wifiOnly: map['wifiOnly'] ?? false,
       rememberDownloadPreferences: map['rememberDownloadPreferences'] ?? false,
       preferredLanguage: map['preferredLanguage'] ?? 'dub',
       preferredQuality: map['preferredQuality'] ?? '1080p',
+      preferredServerId: map['preferredServerId'] ?? 'auto',
     );
   }
 
